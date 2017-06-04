@@ -49,6 +49,18 @@ void printVector2(string name, vector<double> &xs){
   cout << "]" << endl;
 }
 
+void printVectorWithIterator(string name, vector<double> &xs){
+  cout << name << " = [ "; 
+  
+  for (vector<double>::iterator i = xs.begin(); i != xs.end(); ++i){
+    cout << *i << " " ;    
+  }
+
+  cout << "]" << endl;
+  
+}
+
+
 // Returns the sum of all vector elements.
 double vectorSum(vector<double> &xs){
   double sum = 0;
@@ -128,6 +140,8 @@ int main(){
   printVector1("ys", ys);
 
   printVector2("zs", zs);
+
+  printVectorWithIterator("Print Vector with iteractor - xs", xs);
   
   cout << "xs.size()      = " << xs.size()  << endl ;
   cout << "xs.at(3)       = " << xs.at(3)   << endl ;    
