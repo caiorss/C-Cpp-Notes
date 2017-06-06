@@ -1,6 +1,8 @@
 #include <iostream>
 #include <cmath>
 #include <vector>
+#include <iterator>
+
 // #include "hpc.hpp"
 
 using namespace std;
@@ -13,6 +15,16 @@ extern "C" { double vectorNorm(double [], int) ; }
 
 extern "C" { double arrayNorm(double [], int); }
 
+extern "C" { void* createVector(double [], int); }
+
+/// C-wrapper for the circle class 
+extern "C" {
+  void  *Circle_new    (double radius);
+  void   Circle_delete (void *circle);
+  double Circle_getArea(void *circle);
+}
+
+
 
 // Create a C++ STL vector from an C-array.
 //
@@ -24,14 +36,22 @@ vector<double> arrayToVector(double arr[], int n){
   return  xs;
 }
 
-
-
-/// C-wrapper for the circle class 
-extern "C" {
-  void  *Circle_new    (double radius);
-  void   Circle_delete (void *circle);
-  double Circle_getArea(void *circle);
+vector<double> arrayToVector2(double arr[], int n){
+  // arr       -> Is a pointer to the first array cell 
+  // arr + n   -> Is a pointer ot the last array cell.
+  vector<double> v(arr, arr + n);
+  return v;
 }
+
+
+// extern "C" { void* createVector(double [], int); }
+
+void* createVector(double xs [], int n){
+  vector<double> v(xs, xs + n);
+  return static_cast<void*> (& v[0]);
+}
+
+
 
 
 
@@ -61,14 +81,36 @@ double vectorNorm(vector<double> &xs){
   return sqrt(sum);
 }
 
+
+
+
+
 // C-wrapper to vectorNorm
 //
 // extern "C" { double vectorNorm(double [], int) ; }
 //
 double vectorNorm(double xs [], int n){
-  vector<double> v = arrayToVector(xs, n);
+  //vector<double> v = arrayToVector(xs, n);
+  vector<double> v = arrayToVector2(xs, n);
   return vectorNorm(v);
 }
+
+
+vector<double> vectorScale(vector<double> &xs, double scale){
+  vector<double> ys;
+
+  for (int i = 0; i < xs.size(); i++){
+    ys.push_back(scale * xs.at(i));
+  }
+  return ys;
+}
+
+
+void vectorScale(double xs [], int n, double* out){
+  vector<double> v = vectorScale(arrayToVector2(xs, n));
+  
+}
+
 
 
 class Circle{

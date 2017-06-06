@@ -1,6 +1,29 @@
 open System 
 open System.Runtime.InteropServices
 
+/// Linux LibC FFI
+///
+module Libc =
+    let x = 10
+
+    //  int puts(const char *s);
+    [<DllImport("libc.so.6", EntryPoint="puts")>]
+    extern void puts(string)
+
+    // int gethostname(char *name, size_t len);
+    [<DllImport("libc.so.6", EntryPoint="gethostname")>]
+    extern int private c_getHostname(System.Text.StringBuilder, int len)
+    let getHostName () =
+        let sb = new System.Text.StringBuilder(64)
+        c_getHostname(sb, 64)
+        sb.ToString()    
+
+    // double cbrt(double x);
+    [<DllImport("libm.so.6", EntryPoint="cbrt")>]
+    extern double cbrt(double)
+    
+
+
 
 [<DllImport("hpc.so", EntryPoint="vector2DNorm")>]
 extern double vector2DNorm(double a, double b)
@@ -54,4 +77,10 @@ let main(args) =
     printfn "computeArrayNorm()              = %f"   <| computeArrayNorm()
     printfn "arrayNormWrapper([|1.0; 2.0; 3.0; 4.0 |] = %f" <|  arrayNormWrapper [|1.0; 2.0; 3.0; 4.0 |]
     printfn "testVectorNorm() = %f" <| testVectorNorm()
+
+    printfn "Array.map Libc.cbrt  [| 1.0 ; 8.0; 27.0; 64 |] = %A" <| Array.map Libc.cbrt [| 1.0 ; 8.0; 27.0; 64.0|] 
+
+    printfn "Libc.getHostName() = %s" <| Libc.getHostName()
+    
+    Libc.puts "\n\nHello world!! It works!!"
     0
