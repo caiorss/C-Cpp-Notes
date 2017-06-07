@@ -17,6 +17,10 @@ extern "C" { double arrayNorm(double [], int); }
 
 extern "C" { void* createVector(double [], int); }
 
+extern "C" { double* genArray(int size); }
+
+extern "C" { void genArray2(double* arr, int size); }
+
 /// C-wrapper for the circle class 
 extern "C" {
   void  *Circle_new    (double radius);
@@ -109,6 +113,29 @@ vector<double> vectorScale(vector<double> &xs, double scale){
 void vectorScale(double xs [], int n, double* out){
   vector<double> v = vectorScale(arrayToVector2(xs, n));
   
+// }
+
+// Generates an array of size n
+//
+double* genArray(int size){
+  double *arr = new double[size];
+
+  for(int i = 0; i < size; i++){
+    arr[i] = i * i;
+  }
+
+  return arr;
+}
+
+// Generates an array of size n
+//
+// Unlike genArray, in this function, the caller
+// must allocate the array that will be returned.
+//
+void genArray2(double *xs, int size){
+  for(int i = 0; i < size; i++){
+    xs[i] = i * i;
+  }
 }
 
 

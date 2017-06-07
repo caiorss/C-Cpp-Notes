@@ -35,6 +35,25 @@ extern double arrayNorm(double [], int)
 extern double vectorNorm(double [], int)
 
 
+[<DllImport("hpc.so", EntryPoint="genArray")>]
+extern IntPtr c_genArray(int)
+
+[<DllImport("hpc.so", EntryPoint="genArray2")>]
+extern void c_genArray2(double [], int)
+
+
+let genArray n =
+    let ptr = c_genArray n
+    let arr = Array.create n 0.0
+    Marshal.Copy(ptr, arr, 0, n)
+    arr
+
+let genArray2 n =
+    let arr = Array.create n 0.0
+    let ptr = c_genArray2(arr, n)
+    arr
+
+
 module Circle =
     
     // The accessiblity qualifier "private" makes the function
@@ -78,9 +97,12 @@ let main(args) =
     printfn "arrayNormWrapper([|1.0; 2.0; 3.0; 4.0 |] = %f" <|  arrayNormWrapper [|1.0; 2.0; 3.0; 4.0 |]
     printfn "testVectorNorm() = %f" <| testVectorNorm()
 
-    printfn "Array.map Libc.cbrt  [| 1.0 ; 8.0; 27.0; 64 |] = %A" <| Array.map Libc.cbrt [| 1.0 ; 8.0; 27.0; 64.0|] 
-
-    printfn "Libc.getHostName() = %s" <| Libc.getHostName()
+    printfn "genArray 5 = %A" <| genArray 5
+    printfn "genArray2 5 = %A" <| genArray2 5
     
+    printfn "Array.map Libc.cbrt  [| 1.0 ; 8.0; 27.0; 64 |] = %A" <| Array.map Libc.cbrt [| 1.0 ; 8.0; 27.0; 64.0|]
+    printfn "Libc.getHostName() = %s" <| Libc.getHostName()
     Libc.puts "\n\nHello world!! It works!!"
+
+
     0
