@@ -15,7 +15,7 @@ module Libc =
     extern int private c_getHostname(System.Text.StringBuilder, int len)
     let getHostName () =
         let sb = new System.Text.StringBuilder(64)
-        c_getHostname(sb, 64)
+        ignore <| c_getHostname(sb, 64)
         sb.ToString()    
 
     // double cbrt(double x);
