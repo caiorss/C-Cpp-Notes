@@ -12,5 +12,10 @@ app.exe : wrapper.fsx
 run: hpc.so app.exe
 	env LD_LIBRARY_PATH=. mono app.exe 
 
+gsl: gsl.dll
+
+gsl.dll: gsl.fsx
+	fsharpc gsl.fsx --out:gsl.dll --target:library
+
 clear:
 	rm -rf *.exe *.so *.bin
