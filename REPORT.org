@@ -1,0 +1,204 @@
+* Report 
+** F# Fsharp (.NET) bindings for GNU Scientific Library (GSL) 
+*** Overview 
+
+This example shows how to create access native code (shared libraries)
+with Pinvoke in F#.
+
+*** Files
+
+   - [[file:gsl.fsx][file:gsl.fsx]] - F# source code of gsl.dll - Library
+
+   - [[file:gslAdapter.c][file:gslAdapter.c]] - Adapter for library GSL - Gnu Scientifc
+     Library providing an FFI-friendly interface for GSL through void*
+     pointers to C structs.
+
+   - [[file:Makefile][file:Makefile]] - Makefile recipes to build the F# library
+     (gsl.dll) and the native shared library (dynamic library)
+     gslAdapter.so.
+
+*** References 
+
+ - [[https://www.gnu.org/software/gsl/manual/html_node/index.html#Top][GNU Scientific Library – Reference Manual: Top]]
+
+ - [[https://www.lrz.de/services/software/mathematik/gsl/gsl-ref-116.pdf][GNU Scientific Library]] - PDF Reference Manual
+
+ - [[http://www.mas.ncl.ac.uk/~ndjw1/teaching/sim/gsl.html][Getting started with GSL]]
+
+ - [[https://www.physics.ohio-state.edu/~ntg/780/gsl_examples/][Sample Codes Using GSL Routines]]
+
+ - [[http://www.courses.physics.helsinki.fi/fys/cprog/lectures/12-gsl.pdf][Scientific Programming in C XII. GNU Scientific Library]]
+
+*** Building
+
+To build the library run =$ make gsl=. 
+
+#+BEGIN_SRC sh 
+$ make gsl
+gcc gslAdapter.c -o libGslAdapter.so -Wall -shared -fpic -lgsl -lgslcblas -lm 
+fsharpc gsl.fsx --out:gsl.dll --target:library
+F# Compiler for F# 4.1
+Freely distributed under the Apache 2.0 Open Source License
+
+$ file libGslAdapter.so 
+libGslAdapter.so: ELF 64-bit LSB shared object, x86-64, version 1 (SYSV), dynamically linked, BuildID[sha1]=ac05836b1ed610f8d5b37e9f202792850d94d6f4, not stripped, with debug_info
+
+$ file gsl.dll 
+gsl.dll: PE32 executable (DLL) (console) Intel 80386 Mono/.Net assembly, for MS Windows
+#+END_SRC
+
+*** Examples
+
+Basic Functions
+
+#+BEGIN_SRC fsharp 
+- Gsl.Basic.log1p 100.0 ;;
+val it : double = 4.615120517
+> 
+
+- Gsl.Basic.hypot(60.0, 80.0) ;;
+val it : double = 100.0
+
+> Gsl.Basic.hypot(6.0, 8.0) ;;  
+val i
+
+- [(3.0, 4.0) ; (6.0, 8.0) ; (60.0, 80.0)] |> List.map Gsl.Basic.hypot ;;- 
+val it : double list = [5.0; 10.0; 100.0]
+> 
+
+
+#+END_SRC
+
+Polynomial functions
+
+#+BEGIN_SRC fsharp
+- module Poly = Gsl.Poly ;;
+> 
+- let poly1 = Poly.polyEval [1.0 ; 2.0; 3.0; 4.0 ] ;;
+
+val poly1 : (double -> double)
+
+> poly1 1.0 ;;
+val it : double = 10.0
+> poly1 (-1.0) ;;
+val it : double = -2.0
+> 
+
+- let f x = 1. + 2.0 * x + 3.0 * x**2.0 + 4.0 * x**3.0 ;;
+
+val f : x:float -> float
+
+> f 1.0 ;;                                               
+val it : float = 10.0
+> 
+- f -1.0 ;;
+val it : float = -2.0
+> 
+
+// Solve: x^2 - 25.0 = 0 
+//
+- Poly.solveQuadratic 1.0 0.0 -25.0 ;;
+val it : float list = [-5.0; 5.0]
+> 
+
+// Solve: x^2 - 25.0 = 0 
+//
+- Poly.solveQuadratic 1.0 0.0 25.0 ;;
+val it : float list = []
+> 
+
+
+// Solve
+//        3 * (x - 3)(x - 4)    = 0 
+//        3 * (x ^ 2 - 7x + 12) = 0 
+//        3*x^2 -21*x + + 36    = 0
+//
+//        a = 3, b = -21, c = 36
+> Poly.solveQuadratic 3. -21. 36. ;;
+val it : float list = [3.0; 4.0]
+> 
+
+
+#+END_SRC
+
+Bessel Functions 
+
+#+BEGIN_SRC fsharp
+- Gsl.Bessel.besselJ0 0.0 ;;
+val it : double = 1.0
+
+> Gsl.Bessel.besselJ0 1.0 ;;
+val it : double = 0.7651976866
+> 
+
+#+END_SRC
+
+Complex numbers 
+
+#+BEGIN_SRC fsharp 
+  $ make gsl && env LD_LIBRARY_PATH=. fsharpi -r:gsl.dll
+  make: Nothing to be done for 'gsl'.
+
+  F# Interactive for F# 4.1
+  Freely distributed under the Apache 2.0 Open Source License
+
+  For help type #help;;
+
+  > 
+  - module Cpl = Gsl.Cpl ;;
+  > 
+  - let a = Cpl.rect 10.0 20.0 
+  - let b = Cpl.rect 40.0 25.0
+  - let c = Cpl.rect 100.0 0.0
+  - ;;
+
+  val a : Gsl.Cpl.Cpl = Complex: 10.000000 + 20.000000j
+  val b : Gsl.Cpl.Cpl = Complex: 40.000000 + 25.000000j
+  val c : Gsl.Cpl.Cpl = Complex: 100.000000 + 0.000000j
+
+  > a.GetReal() ;;
+  val it : double = 10.0
+  > a.GetImag() ;;
+  val it : double = 20.0
+  > a.ToTupleRect() ;;
+  val it : double * double = (10.0, 20.0)
+  > 
+
+  > 10.0 + a ;;
+  val it : Gsl.Cpl.Cpl = Complex: 20.000000 + 20.000000j
+  > 
+  - a - 10.0 ;;
+  val it : Gsl.Cpl.Cpl = Complex: 0.000000 + 20.000000j
+  > 
+  - a * b ;;
+  val it : Gsl.Cpl.Cpl = Complex: -100.000000 + 1050.000000j
+  > 
+  - a - b ;;
+  val it : Gsl.Cpl.Cpl = Complex: -30.000000 + -5.000000j
+  > 
+  - b / a ;;
+  val it : Gsl.Cpl.Cpl = Complex: 1.800000 + -1.100000j
+  > 
+  - b ;;
+  val it : Gsl.Cpl.Cpl = Complex: 40.000000 + 25.000000j
+  > 
+  - b / 10.0 ;;
+  val it : Gsl.Cpl.Cpl = Complex: 4.000000 + 2.500000j
+  > 
+  - c ;;
+  val it : Gsl.Cpl.Cpl = Complex: 100.000000 + 0.000000j
+  > 
+  - c / 100.0 ;;
+  val it : Gsl.Cpl.Cpl = Complex: 1.000000 + 0.000000j
+  > 
+  - 10.0 + c / 100.0 ;;
+  val it : Gsl.Cpl.Cpl = Complex: 11.000000 + 0.000000j
+  > 
+  - Cpl.sqrt c ;;
+  val it : Gsl.Cpl.Cpl = Complex: 10.000000 + 0.000000j
+  > 
+  - Cpl.log10 c ;;
+  val it : Gsl.Cpl.Cpl = Complex: 2.000000 + 0.000000j
+  > 
+
+#+END_SRC
