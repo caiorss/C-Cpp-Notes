@@ -110,9 +110,9 @@ vector<double> vectorScale(vector<double> &xs, double scale){
 }
 
 
-void vectorScale(double xs [], int n, double* out){
-  vector<double> v = vectorScale(arrayToVector2(xs, n));
-  
+// void vectorScale(double xs [], int n, double* out){
+//   vector<double> v = vectorScale(arrayToVector2(xs, n));
+//   return v
 // }
 
 // Generates an array of size n
