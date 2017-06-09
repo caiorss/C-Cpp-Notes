@@ -1,4 +1,5 @@
 * C++ Interface with .NET (F# Fsharp).
+** Goals 
 
 This example shows how to interface a C++ shared library from .NET (F#
 language) on Linux.
@@ -33,12 +34,12 @@ Note:
 
 Shared Libraries 
 
-| OS      | Suffix                       | Dynamic Linker | Object Code file Format |
-|---------+------------------------------+----------------+-------------------------|
-| Linux   | .so                          | ld.so          | ELF                     |
-| Mac OSX |                              | dyld           | MacO                    |
-| Windows | .dll or .OCX (OLE Libraries) |                |                         |
-|         |                              |                |                         |
+| OS      | Suffix                       | Dynamic Linker | Object Code file Format    |
+|---------+------------------------------+----------------+----------------------------|
+| Linux   | .so                          | ld.so          | ELF                        |
+| Mac OSX | .dylib                       | dyld           | MacO                       |
+| Windows | .dll or .OCX (OLE Libraries) |                | PE   - Portable Executable |
+|         |                              |                |                            |
 
 Linux Tooling 
 
@@ -78,7 +79,33 @@ Linux Tooling
 
  - Marshalling -
 
- -
+ - Endianess
+
+   - Little Endian
+
+   - Big Endian
+
+   - Network Order 
+
+ - Strings Representation (Enconding)
+
+   - ACII - 8 bits characters
+
+   - UTF-8
+
+   - UTF-16
+
+   - ISO-8859-1
+
+   - ANSI
+
+ - New Line Character
+
+   - ~\n~   - CR - Carriage Return (Unix, Linux)
+
+   - ~\r~   - LF - 
+
+   - ~\n\r~ - CRLF - Windows 
 
 *Notes about C# - Pinvoke* 
 
@@ -98,13 +125,28 @@ Linux Tooling
    C-type it is necessary to write C-wrapper or C-interface with
    "extern" and void* pointer.
 
+ - Thre is no way to use a C++ class directly from a C# code. In order
+   to use the C++ class, it is necesary to write c-wrappers for all
+   C++ class methods that will be used and a .NET Pinvoke statement.
+
+   - -- https://stackoverflow.com/questions/315051/using-a-class-defined-in-a-c-dll-in-c-sharp-code
+
+
+ - System.Runtime.InteropServices namespace.
+
+ - StructLayout - C-struct.
+
  - Dllimport
 
    - EntryPoint
 
    - CharSet
 
+     - CharSet.Auto
+
      - CharSet.Ansi
+
+     - CharSet.Unicode
 
    - CallingConvention
 
@@ -112,16 +154,180 @@ Linux Tooling
 
      - CallingConvention.Cdecl
 
-| C-type | C# type | F# type | Description |
-|--------+---------+---------+-------------|
-|        |         |         |             |
-|        |         |         |             |
-|        |         |         |             |
+     - CallingConvention.Winapi
+
+   - SetLastError
+
+ - MarshalAs
+
+   - UnmanagedType.LPArray
+
+   - MarshalAs(UnmanagedType.LPStr)
+
+   - MarshalAs(UnmanagedType.LPStruct)
+
+   - 
 
 
 
+| C-type / Function Parameter | C# type                                  | F# type  | Description                                             |
+|-----------------------------+------------------------------------------+----------+---------------------------------------------------------|
+| char*                       | string, StringBuilder, byte [] or IntPtr |          | Const char terminated by null                           |
+| const char*                 |                                          |          |                                                         |
+| double                      | double                                   | float    | 64-bit IEEE Float point number                          |
+|                             |                                          |          |                                                         |
+| (double xs [], int n)       | double []                                | float [] | C array passed with its size.                           |
+|                             |                                          |          |                                                         |
+| & int                       | ref int                                  | ref int  | C-pointer to a varible of type int passed by reference. |
+|                             |                                          |          |                                                         |
+|                             |                                          |          |                                                         |
+|                             |                                          |          |                                                         |
 
-References:
+
+| C Data Type                          | .NET Equivalent | C# Equivalent |
+|--------------------------------------+-----------------+---------------|
+| char, boolean                        | System.SByte    | sbyte         |
+| wchar_t, short                       | System.Int16    | short         |
+|                                      |                 |               |
+| unsigned char, byte                  | System.Int33    | int           |
+| unsigned short                       | System.Uint16   | ushort        |
+| unsigned long, unsigned int          | System.Uint32   | uint          |
+|                                      |                 |               |
+| BSTR, char*, LPSTR, wchar_t*, LPWSTR | System.String   | string        |
+|                                      |                 |               |
+
+** C++ Notes 
+*** Converting std::vector to void*
+    
+From: [[https://stackoverflow.com/questions/40594494/how-to-convert-stdvectorvector-to-void][c++ - how to convert std::vector<vector> to void* - Stack Overflow]]
+
+ + Pre C++11: (void*)&piexls_[0] (!empty() check is recommended)
+
+ + Since C++11: static_cast<void*>(piexls_.data())
+
+ + data = static_cast<void*>(& myvector[0]) ?? - http://www.cplusplus.com/forum/general/13904/
+
+ + 
+
+*** C structs in C#
+
+ - [[https://social.msdn.microsoft.com/Forums/vstudio/en-US/d730658c-e74d-4cb9-a193-7f5f8d32da81/calling-return-struct-using-pinvoke?forum=clr][Calling return struct using PInvoke]]
+
+#+BEGIN_SRC csharp
+[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
+public struct A
+{
+  int i:
+  double d;
+  .
+  .
+  . // and so on
+}
+
+[DllImport(Constants.LibraryPath, EntryPoint = "callculate", CallingConvention = CallingConvention.Cdecl)]
+public static extern void callculate(ref A, int i);
+
+#+END_SRC
+
+*** Pinvoke Marshalling 
+
+ - [[https://msdn.microsoft.com/en-us/library/aa446538.aspx][Marshalling Types During Platform Invoke (P/Invoke) on the Microsoft .NET Compact Framework]]
+ 
+ - [[https://msdn.microsoft.com/en-us/library/ef4c3t39.aspx][How to: Marshal Structures Using PInvoke]]
+
+ - [[http://www.software-architects.com/content/images/blog/2014/03/PInvoke.pdf][P/Invoke .NET Interop]]
+
+ - [[https://msdn.microsoft.com/en-us/library/hh304361(v=vs.100).aspx][How to: Call Native Libraries from F#]]
+
+ - [[https://blogs.msdn.microsoft.com/dsvc/2009/02/18/marshalling-complicated-structures-using-pinvoke/][Marshalling Complicated Structures using PInvoke – Developer Support Languages – VC++, C# and VB.NET]]
+
+ - [[http://fdatamining.blogspot.com.br/2010/04/matrix-and-linear-algebra-in-f-part-v.html][F# and Data Mining: Matrix and linear algebra in F#, Part V: Sparse matrix implementation in PowerPack, and PInvoke a large scale SVD library as an application.]]
+
+ - [[ftp://164.41.45.4/pub/os/DotGNU/current/pnet/doc/pinvoke.html][PInvoke Conventions for Unix]]
+
+ - [[http://www.moonmile.net/blog/archives/6773?img=link][Let’s call Fortran DLL from F# language. | Moonmile Solutions Blog]]
+
+ - [[https://thebytekitchen.com/page/2/][Clatter from the Byte Kitchen | Working The Web, Software, User Interfaces | Page 2]]
+
+ - [[https://basildoncoder.com/blog/marshalling-variable-length-array-from.html][Marshalling a Variable-Length Array From Unmanaged Code In C# · Basildon Coder]]
+
+ - [[https://www.codeproject.com/Questions/395579/PInvoke-C-function-that-return-pointer][Solved - PInvoke C function that return pointer - CodeProject]]
+
+ - [[https://blog.getpaint.net/2012/04/30/marshaling-native-arrays-back-as-managed-arrays-without-copying/][Marshaling native arrays back as managed arrays without copying | paint.net blog]]
+
+ - [[https://fossies.org/linux/mono/mono/tests/pinvoke2.cs][Mono: mono/tests/pinvoke2.cs | Fossies]]
+
+ - [[https://romain.blogreen.org/blog/2009/11/packing-structures-with-mono-or-how-to-fix-alignment-problems-for-pinvoke/][Packing structures with Mono or how to fix alignment problems for P/Invoke]]
+
+ - [[http://www.tebiki.co.uk/cross-platform/interop.html][Cross-platform .NET: Everything you (n)ever wanted to know about Marshaling (and were afraid to ask!)]]
+
+ - [[http://techqa.info/programming/question/10387603/p/invoke-ioctl-system-call][P/Invoke ioctl system call - c# - linux - mono - pinvoke - TechQA]]
+
+ - [[http://www.cs.ru.nl/~marko/onderwijs/oss/portable.dotnet.linking.pdf][Link native libraries from a .NET application]]
+
+ - [[http://www.fssnip.net/c1/title/F-yet-another-Interop-example][F# yet another Interop example | F# Snippets]]
+
+ - [[https://manski.net/2012/06/pinvoke-tutorial-passing-parameters-part-3/][P/Invoke Tutorial: Passing parameters (Part 3) | manski's blog]]
+
+ - 
+
+ - 
+
+** Finding Shared Libraries in Linux
+
+Show all system's shared libraries.
+
+#+BEGIN_SRC sh 
+$ strings -n5 /etc/ld.so.cache 
+ld.so-1.7.0
+glibc-ld.so.cache1.1
+libzvbi.so.0
+/usr/lib/libzvbi.so.0
+libzvbi.so
+/usr/lib/libzvbi.so
+libzvbi-chains.so.0
+/usr/lib/libzvbi-chains.so.0
+libzvbi-chains.so
+/usr/lib/libzvbi-chains.so
+... ... ... 
+#+END_SRC
+
+Filter the shared libraries:
+
+#+BEGIN_SRC sh
+# GNU Scientific Library 
+$ strings -n5 /etc/ld.so.cache | grep -i libgsl
+libgslcblas.so.0
+/usr/lib/libgslcblas.so.0
+libgslcblas.so
+/usr/lib/libgslcblas.so
+libgsl.so.19
+/usr/lib/libgsl.so.19
+libgsl.so
+/usr/lib/libgsl.so
+
+
+# C-lib Math Library
+$ strings -n5 /etc/ld.so.cache | grep -i libm.so
+libm.so.6
+/usr/lib/libm.so.6
+libm.so.6
+/usr/lib32/libm.so.6
+libm.so
+/usr/lib32/libm.so
+
+# Libc
+$ strings -n5 /etc/ld.so.cache | grep -i libc.so
+libc.so.6
+/usr/lib/libc.so.6
+libc.so.6
+/usr/lib32/libc.so.6
+
+
+#+END_SRC
+
+** References
+*** General 
 
  - [[https://bytes.com/topic/c/insights/921728-calling-c-class-methods-c][Calling C++ class methods from C - C / C++]]
 
@@ -131,7 +337,77 @@ References:
 
  - [[http://www.techytalk.info/c-cplusplus-library-programming-on-linux-part-two-dynamic-libraries/][C/C++ library programming on Linux – Part two: Dynamic libraries | TechyTalk]]
 
- - [[http://blogs.microsoft.co.il/sasha/2014/08/25/marshaling-net-stl-collections-ccli/][Marshaling .NET and STL Collections in C++/CLI | All Your Base Are Belong To Us]]
+ - 
+
+ - 
+
+ - 
+
+*** Useful C# References 
+
+   - Guides / Tutorials
+
+     - [[https://msdn.microsoft.com/en-us/library/Aa288468][Platform Invoke Tutorial (C#)]]
+
+     - [[http://pinvoke.net/index.aspx][pinvoke.net: the interop wiki!]]
+
+     - [[https://web.archive.org/web/20070302115157/http://www.gotdotnet.com/team/clr/bcl/TechArticles/TechArticles/PInvokeHelp/FAQ.aspx][Platform Invoke Cheat Sheet]]
+
+     - [[https://www.slideshare.net/elsheimy/marshaling-with-c-pocket-reference][Marshaling with C# Pocket Reference]]
+
+     - [[https://www.slideshare.net/rohitvipin/unmanged-code-interoperability?qid=93d97d87-b582-4300-99de-fce2b0465328&v=&b=&from_search=1][Unmanged code InterOperability]] 
+
+     - [[http://blogs.microsoft.co.il/sasha/2014/08/25/marshaling-net-stl-collections-ccli/][Marshaling .NET and STL Collections in C++/CLI | All Your Base Are Belong To Us]]
+
+     - [[https://www.slideshare.net/DmitriNesteruk/unmanaged-parallelization-via-pinvoke][Unmanaged Parallelization via P/Invoke]]
+
+     - [[https://stackoverflow.com/questions/2402978/get-an-array-of-structures-from-native-dll-to-c-sharp-application][pinvoke - Get an array of structures from native dll to c# application - Stack Overflow]]
+
+     - [[https://stackoverflow.com/questions/289076/how-can-i-pass-a-pointer-to-an-array-using-p-invoke-in-c][How can I pass a pointer to an array using p/invoke in C#? - Stack Overflow]]
+
+     - [[https://msdn.microsoft.com/en-us/library/ms235282.aspx][Calling Native Functions from Managed Code]] 
+
+   - References
+
+     - [[https://en.wikipedia.org/wiki/Platform_Invocation_Services][Platform Invocation Services - Wikipedia]]
+
+     - [[https://en.wikipedia.org/wiki/Blittable_types][Blittable types - Wikipedia]]
+
+     - [[https://stackoverflow.com/questions/315051/using-a-class-defined-in-a-c-dll-in-c-sharp-code][using a class defined in a c++ dll in c# code - Stack Overflow]]
+
+     - [[https://en.wikipedia.org/wiki/Blittable_types][Blittable types - Wikipedia]]
+
+     - [[http://www.swig.org/Doc2.0/CSharp.html][SWIG and C#]]
+
+     - [[http://zone.ni.com/reference/en-XX/help/372636F-01/mstudiowebhelp/html/callinginstdriversnet/][Calling Instrument Drivers from .NET Languages - Measurement Studio 2012 for Visual Studio 2010 Help - National Instruments]]
+
+     - [[http://diranieh.com/NET/UnmanagedCode.htm][Interacting with Unmanaged Code]]
+
+     - 
+
+*** C-interface
+
+ - [[https://stackoverflow.com/questions/1588788/wrapping-c-class-api-for-c-consumption][Wrapping C++ class API for C consumption - Stack Overflow]]
+
+ - [[http://blogs.msmvps.com/gdicanio/2016/11/30/passing-stdvectors-underlying-array-to-c-apis/][Passing std::vector’s Underlying Array to C APIs – C++ and more!]]
+
+ - [[https://stackoverflow.com/questions/19461932/converting-array-to-vector][c++ - converting array to vector - Stack Overflow]]
+
+ - [[http://www.augustcouncil.com/~tgibson/tutorial/arr.html][Tutorial: Arrays in C and C++]]
+
+ - 
+
+ - 
+
+ - 
+
+*** Other FFIs
+
+ - [[http://www.biostat.jhsph.edu/~rpeng/docs/interface.pdf][An Introduction to the .C Inteface to R]]
+
+ - [[http://yosefk.com/c++fqa/mixing.html][C++ FQA Lite: How to mix C and C++]]
+
+ - [[http://www.geeksforgeeks.org/g-fact-12-2/][How does "void *" differ in C and C++? - GeeksforGeeks]]
 
  - 
 
@@ -140,4 +416,36 @@ References:
  - 
 
  - 
+
+*** GCC Manual
+
+ - [[https://www3.ntu.edu.sg/home/ehchua/programming/cpp/gcc_make.html][GCC and Make - A Tutorial on how to compile, link and build C/C++ applications]]
+
+ - 
+
+ - 
+
+ - 
+
+
+*** Numerical Libraries 
+
+ - Linear Algebrar
+   - BLAS
+     - [[https://www.cs.indiana.edu/classes/p573/notes/arch/36_blas2.html][P573: Practical Use of the BLAS]]
+
+   - LPACK
+
+   - ATLAS
+
+   - 
+
+   - 
+
+   - https://www.wire.tu-bs.de/lehre/ss15/parallel/pc13_numLibs.pdf
+
+   - Fortran
+
+     - [[http://www.yolinux.com/TUTORIALS/LinuxTutorialMixingFortranAndC.html][Tutorial: Using C/C++ and Fortran together]]
+
 
