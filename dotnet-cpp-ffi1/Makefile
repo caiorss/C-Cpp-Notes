@@ -14,8 +14,11 @@ run: hpc.so app.exe
 
 gsl: gsl.dll
 
-gsl.dll: gsl.fsx
+libGslAdapter.so: gslAdapter.c
+	gcc gslAdapter.c -o libGslAdapter.so -Wall -shared -fpic -lgsl -lgslcblas -lm 
+
+gsl.dll: gsl.fsx libGslAdapter.so
 	fsharpc gsl.fsx --out:gsl.dll --target:library
 
-clear:
-	rm -rf *.exe *.so *.bin
+clean:
+	rm -rf *.exe *.so *.bin *.dll
