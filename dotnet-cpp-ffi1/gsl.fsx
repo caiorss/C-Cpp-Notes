@@ -135,7 +135,142 @@ let gslCplToTuple (cpl: gsl_complex) =
            ,EntryPoint="gsl_complex_rect"
            ,CallingConvention=CallingConvention.Cdecl)>]
 extern IntPtr gsl_complex_rect(double x, double Y)
-    
+
+
+[<DllImport("libgsl.so"
+           ,EntryPoint="gsl_complex_rect"
+           ,CallingConvention=CallingConvention.Cdecl)>]
+extern gsl_complex gsl_complex_rect2(double x, double Y)
+
+/// FFI for GSL (Gnu Scientific Library) using the library
+/// libGslAdapter.so that provides convenient C-wrappers
+/// for easy FFI
+///
+module Cpl =
+    module internal FFI =
+        [<DllImport("libGslAdapter.so", EntryPoint="cplRect")>]
+        extern void* cpl_rect(double x, double Y)
+
+        [<DllImport("libGslAdapter.so", EntryPoint="cplPol")>]
+        extern void* cpl_polar(double x, double Y)
+
+        [<DllImport("libGslAdapter.so", EntryPoint="cplGetReal")>]
+        extern double cpl_get_real(void*)
+
+        [<DllImport("libGslAdapter.so", EntryPoint="cplGetImag")>]
+        extern double cpl_get_imag(void*)
+
+        [<DllImport("libGslAdapter.so", EntryPoint="cpl_add")>]
+        extern void* cpl_add(void*, void*)
+
+        [<DllImport("libGslAdapter.so", EntryPoint="cpl_sub")>]
+        extern void* cpl_sub(void*, void*)
+
+        [<DllImport("libGslAdapter.so", EntryPoint="cpl_mul")>]
+        extern void* cpl_mul(void*, void*)
+
+        [<DllImport("libGslAdapter.so", EntryPoint="cpl_div")>]
+        extern void* cpl_div(void*, void*)
+
+        [<DllImport("libGslAdapter.so", EntryPoint="cpl_add_real")>]
+        extern void* cpl_add_real(void*, double)
+
+        [<DllImport("libGslAdapter.so", EntryPoint="cpl_sub_real")>]
+        extern void* cpl_sub_real(void*, double)
+
+        [<DllImport("libGslAdapter.so", EntryPoint="cpl_mul_real")>]
+        extern void* cpl_mul_real(void*, double)
+
+        [<DllImport("libGslAdapter.so")>]
+        extern void* cpl_div_real(void*, double)
+
+        [<DllImport("libGslAdapter.so")>]
+        extern void* cpl_sqrt(void*)
+
+        [<DllImport("libGslAdapter.so")>]
+        extern void* cpl_exp(void*)
+
+        [<DllImport("libGslAdapter.so")>]
+        extern void* cpl_log10(void*)
+
+
+    /// Abstract type to hide implementation and make the API
+    /// type-safe. (nativeint = void*)
+    ///
+    type Cpl = private Cpl of nativeint
+         with
+             member this.ToTupleRect() =
+                 match this with
+                 | Cpl p -> (FFI.cpl_get_real p, FFI.cpl_get_imag p)
+
+             member this.GetReal() =
+                 match this with
+                 | Cpl p -> FFI.cpl_get_real p
+
+             member this.GetImag() =
+                 match this with
+                 | Cpl p -> FFI.cpl_get_imag p
+
+             override this.ToString() =
+                 match this with
+                 | Cpl p -> let x = FFI.cpl_get_real p
+                            let y = FFI.cpl_get_imag p
+                            sprintf "Complex: %f + %fj" x y
+
+             static member (+) (Cpl a, Cpl b) =
+                 Cpl <| FFI.cpl_add(a, b)
+
+             static member (+) (Cpl a, x) =
+                 Cpl <| FFI.cpl_add_real(a, x)
+
+             static member (+) (x, Cpl a) =
+                 Cpl <| FFI.cpl_add_real(a, x)
+
+             static member (-) (Cpl a, Cpl b) =
+                 Cpl <| FFI.cpl_sub(a, b)
+
+             static member (-) (Cpl a, x) =
+                 Cpl <| FFI.cpl_sub_real(a, x)
+
+             static member (-) (x, Cpl a) =
+                 Cpl <| FFI.cpl_sub_real(a, x)
+
+             static member (*) (Cpl a, Cpl b) =
+                 Cpl <| FFI.cpl_mul(a, b)
+
+             static member (*) (Cpl a, x) =
+                 Cpl <| FFI.cpl_mul_real(a, x)
+
+             static member (*) (x, Cpl a) =
+                 Cpl <| FFI.cpl_mul_real(a, x)
+
+             static member (/) (Cpl a, Cpl b) =
+                 Cpl <| FFI.cpl_div(a, b)
+
+             static member (/) (Cpl a, x) =
+                 Cpl <| FFI.cpl_div_real(a, x)
+
+             static member (/) (x, Cpl a) =
+                 Cpl <| FFI.cpl_div_real(a, x)
+
+    let rect x y =
+        Cpl <| FFI.cpl_rect(x, y)
+
+    let polar r theta =
+        Cpl <| FFI.cpl_polar(r, theta)
+
+    let imag (Cpl p) =
+        FFI.cpl_get_real p
+
+    let real (Cpl p) =
+        FFI.cpl_get_imag p
+
+    let sqrt (Cpl p) =
+        Cpl <| FFI.cpl_sqrt p
+
+    let log10 (Cpl p) =
+        Cpl <| FFI.cpl_log10 p
+
 
 let ptrToCpl (p: IntPtr): gsl_complex =
     Marshal.PtrToStructure(p)
