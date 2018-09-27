@@ -893,6 +893,143 @@ Summary:
  + Templates are widely used in the STL (Standard Template Library)
    and the Boost Library.
 
+** Scoped Enum 
+
+Scoped enumerations are a more type-safe alternative to the old
+C-enums as it has several problems realated to namespace conflicts and
+implicit conversions that can introduce bugs hard to catch and reason
+about. 
+
+Syntax: 
+
+ - Simple scoped enum class 
+
+#+BEGIN_SRC cpp 
+  enum class Color {
+     white,
+     black,
+     yellow,
+     red,
+     blue,
+  };
+
+  >> Color::white
+  (Color) (Color::white) : (int) 0
+  >> Color::blue
+  (Color) (Color::blue) : (int) 4
+  >> Color::yellow
+  (Color) (Color::yellow) : (int) 2
+  >> Color::red
+  (Color) (Color::red) : (int) 3
+  >> 
+
+  >> static_cast<int>(Color::blue)
+  (int) 4
+  >> static_cast<int>(Color::white)
+  (int) 0
+  >> static_cast<int>(Color::yellow)
+  (int) 2
+  >> 
+#+END_SRC
+
+ - Scoped enum with hexadecimal error codes.
+ 
+#+BEGIN_SRC cpp 
+  enum class ErrorCode: std::uint32_t {
+     tankNotFilled = 0xff,
+     missingSupply = 0x2f,
+     lowBattery    = 0x2a,
+     unknown       = 0x24                                         
+  };
+#+END_SRC
+
+ - Scoped enums with chars 
+
+#+BEGIN_SRC cpp 
+  enum class ErrorCodeLetter: char {
+          tankNotFilled = 'x',
+          missingSupply = 'y',
+          lowBattery    = 'a',
+          unknown       = 'k'                                         
+  };
+
+  >> ErrorCodeLetter::tankNotFilled
+  (ErrorCodeLetter) (ErrorCodeLetter::tankNotFilled) : (char) 120
+  >> ErrorCodeLetter::missingSupply
+  (ErrorCodeLetter) (ErrorCodeLetter::missingSupply) : (char) 121
+  >> ErrorCodeLetter::unknown
+  (ErrorCodeLetter) (ErrorCodeLetter::unknown) : (char) 107
+  >> static_cast<char>(ErrorCodeLetter::unknown)
+  (char) 'k'
+  >> static_cast<char>(ErrorCodeLetter::missingSupply)
+  (char) 'y'
+  >> 
+#+END_SRC
+
+
+ *More Exhaustive Example:*
+
+#+BEGIN_SRC cpp 
+  enum class MachineStatus: std::uint32_t {
+     running = 0xf5,
+     iddle   = 0x2a,
+     waiting = 0x35,
+     failure = 0x24                                         
+  };
+#+END_SRC
+
+Example: CERN's root shell. 
+
+#+BEGIN_SRC cpp 
+   >> MachineStatus::running
+   (MachineStatus) (MachineStatus::running) : (unsigned int) 245
+   >> MachineStatus::iddle
+   (MachineStatus) (MachineStatus::iddle) : (unsigned int) 42
+   >> MachineStatus::waiting
+   (MachineStatus) (MachineStatus::waiting) : (unsigned int) 53
+   >> MachineStatus::failure
+   (MachineStatus) (MachineStatus::failure) : (unsigned int) 36
+   >> 
+
+   >> auto status = MachineStatus::running
+   (MachineStatus) (MachineStatus::running) : (unsigned int) 245
+
+   >> std::cout << "Machine status = " << std::hex << "0x" << static_cast<std::uint32_t>(status) << std::endl;
+   Machine status = 0xf5
+   >> 
+   >> 
+
+   >> status = MachineStatus::iddle 
+   (MachineStatus) (MachineStatus::iddle) : (unsigned int) 42
+   >> std::cout << "Machine status = " << std::hex << "0x" << static_cast<std::uint32_t>(status) << std::endl;
+   Machine status = 0x2a
+   >> 
+
+   >> if(status == MachineStatus::iddle) { std::cout << "Machine is iddle" << std::endl; }
+   Machine is iddle
+   >> 
+
+   >> status = MachineStatus::running
+   (MachineStatus) (MachineStatus::running) : (unsigned int) 245
+   >> if(status == MachineStatus::running) { std::cout << "Machine is running" << std::endl; }
+   Machine is running
+   >> 
+
+   >> static_cast<std::uint32_t>(MachineStatus::running)
+   (unsigned int) 245
+   >> static_cast<std::uint32_t>(MachineStatus::iddle)
+   (unsigned int) 42
+   >> static_cast<std::uint32_t>(MachineStatus::iddle) == 0x2a
+   (bool) true
+   >> 
+   >> static_cast<MachineStatus>(0x2a) 
+   (MachineStatus) (MachineStatus::iddle) : (unsigned int) 42
+   >> 
+   >> static_cast<MachineStatus>(0x2a) == MachineStatus::iddle
+   (bool) true
+   >> 
+#+END_SRC
+
 ** C++17 New Features 
 *** Cpp17 std::invoke 
 
