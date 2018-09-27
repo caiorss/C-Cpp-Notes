@@ -1,0 +1,553 @@
+#+TITLE: CPP / C++ Review
+#+DESCRIPTION: cpp c++ code examples, demonstrations, design pattern and integration.
+#+STARTUP: content 
+#+AUTHOR: Caio Rodrigues 
+
+* Understanding C++ 
+** Value Semantics X Reference Semantics 
+
+ According to the - [[https://isocpp.org/wiki/faq/value-vs-ref-semantics][ISO C++]], value and reference semantics are defined
+ as: 
+
+ #+BEGIN_QUOTE
+   With reference semantics, assignment is a pointer-copy (i.e., a
+   reference). Value (or “copy”) semantics mean assignment copies the
+   value, not just the pointer. C++ gives you the choice: use the
+   assignment operator to copy the value (copy/value semantics), or use
+   a pointer-copy to copy a pointer (reference semantics). C++ allows
+   you to override the assignment operator to do anything your heart
+   desires, however the default (and most common) choice is to copy the
+   value.
+ #+END_QUOTE
+
+  *Definitions:*
+
+ _Reference Semantics_: Behavior where composite types are passed by
+ reference when assigned; passed as function or method parameters or
+ returned from functions. This is the default behavior of most object
+ oriented programming languages, except C++.
+ 
+ In Java, C#, Scala, Python and etc. Objects have reference semantics
+ by default. This example in Scala programming language shows how
+ _reference semantics_ works in most languages.
+
+ #+BEGIN_SRC scala 
+   class Foo(name: String){
+     private var _name = name
+     def setName(name: String) =
+       _name = name
+     def getName() =
+       name
+     override def toString() =
+       s"Foo { name = $name }"
+   }
+
+   scala> var x = 10
+   x: Int = 10
+
+   // Primitive types have value semantics: assignment of variables of
+   // primitive types, creates a copy, so both variables can be modified
+   // without changing each other.
+   scala> var y = x
+   y: Int = 10
+
+   // By modifying x, the value of y remains the same.
+   scala> x = 25
+   x: Int = 25
+
+   scala> y
+   res5: Int = 10
+
+   scala> 
+
+   //===> Composite and complexity types have reference semantics by default 
+   // in languages other than C++.
+
+   scala> val foo = new Foo("bar")
+   foo: Foo = Foo { name = bar }
+
+   // Assignment doesn't create a copy like assignment 
+   // of primitive type, actually the assignment creates 
+   // a reference to the object foo. As result, modifying 
+   // one of the objects, modifies the other.
+   scala> val bar = foo
+   bar: Foo = Foo { name = bar }
+
+   // Modifying bar modifes foo. 
+   scala> bar.setName("something")
+
+   scala> bar
+   res3: Foo = Foo { name = something }
+
+   scala> foo
+   res4: Foo = Foo { name = something }
+
+   // Passing as function parameter doesn't create a copy like in C++, 
+   // it passes the object by reference, so if the parameter is modified inside
+   // the function, the original object will be modified too. 
+    def setFooPrint(param: Foo){
+      param.setName("dummy name")
+      println(foo)
+    }
+
+    scala> setFooPrint(foo)
+    Foo { name = dummy name }
+
+    scala> foo
+    res8: Foo = Foo { name = dummy name }
+
+    // Returning an object from a function doesn't create a copy as would happen 
+    // with primitive types.
+    def modifyReturn(param: Foo, newName: String) = {
+      param.setName(newName)
+      param
+    }
+    scala> val foob = modifyReturn(foo, "Scala + C++ + JNI == HPC")
+    foob: Foo = Foo { name = Scala + C++ + JNI == HPC }
+
+    scala> foo
+    res9: Foo = Foo { name = Scala + C++ + JNI == HPC }
+ #+END_SRC
+
+ _Value Semantics_: Behavior where composite types such as instances of
+ classes are treated as primitive type such as booleans, integers or
+ float point numbers. In the value semantics, a copy is created when
+ variables are assigned; passed as parameters to functions or methods
+ and returned from functions. So modifying one of the variables doesn't
+ change the other. 
+
+Unlike other languages, C++ uses value semantics by default, it means
+that in operations such as assignment; returning objects from
+functions and passing objects as parameters create a full copy of the
+object, instead of creating a reference to the object as would happen
+in most object oriented programming languages such as Java, C#,
+Python, Ruby and etc. C++ also supports reference semantics, however
+it is not the default behavior and unlike in the majority of
+programming languages, requires explicit annotation to pass objects by
+reference or create a reference to the object.
+
+  *Value Semantics in C++*
+
+  Example: demonstration of value semantics in C++ tested in the CERN's
+  C++ ROOT REPL:
+
+  - Note: this code can be copied and pasted in the CERN's ROOT REPL.
+ 
+ #+BEGIN_SRC cpp 
+   #include <iostream>
+   #include <string>
+
+   class Foo{
+   private:
+     std::string _name;
+   public:
+     // Constructor 
+     Foo(std::string name):_name(name){}
+     // Copy constructor
+     //--------------------------
+     // Note: If it is not defined, the compiler, defines 
+     // a default copy constructor. It was created to demonstrate
+     // when the copy constructor is invoked.
+     Foo(const Foo& rhs){
+       _name = rhs._name;    
+       std::cout << " [INFO] Copy constructor invoked." << std::endl;    
+     }
+     // Copy assignment-operator
+     //--------------------------
+     // Note: It is similar to the copy constructor and
+     // default assignment copy-assignment-operator is created
+     // by the compiler if the user doesn't define it.
+     Foo operator= (const Foo& rhs){    
+       std::cout << " [INFO] Copy-assignment operator invoked." << std::endl;
+       return Foo(rhs._name);
+     }
+     void setName(std::string name){
+       _name = name;
+     }
+     std::string getName() const {
+       return _name;
+     }
+     void show(){
+       std::cout << "Foo { name = " << _name << " } " << std::endl;
+     }
+     void show2() const {
+       std::cout << "Foo { name = " << _name << " } " << std::endl;
+     }
+   };
+
+ #+END_SRC
+
+ Assignment creates a copy, unlike in most OOP languages like Java, C#,
+ Python and so on. 
+
+ #+BEGIN_SRC cpp 
+   >> Foo foo("foo");
+   >> foo.show()
+   Foo { name = foo } 
+
+   // Assingment creates a copy, unlike in most OO languages
+   >> Foo bar = foo; 
+    [INFO] Copy constructor invoked.
+
+   // Modifying one of the objects, doens't change the other. 
+   >> bar.show()
+   Foo { name = foo } 
+
+   >> bar.setName("I am object bar")
+
+   >> bar.show()
+   Foo { name = I am object bar } 
+
+   >> foo.show()
+   Foo { name = foo } 
+   >> 
+
+   // foo and bar objects aren't the same as they have 
+   // different memory locations. 
+   >> &foo == &bar
+   (bool) false
+   >>
+ #+END_SRC
+
+ Primitive and composite types are passed by value in C++, unlike in
+ most OOP languages. So, it means that a copy of the object is created.
+
+ #+BEGIN_SRC cpp
+   void setFooPrint(Foo param, std::string name){
+     param.setName(name);
+     param.show();
+     std::cout << " name = " << param.getName() << std::endl;
+   }
+
+   // Modifying the function paramenter, doesn't modify the passed object.
+   >> setFooPrint(foo, "dummy name")
+    [INFO] Copy constructor invoked.
+   Foo { name = dummy name } 
+    name = dummy name
+
+   >> foo.show()
+   Foo { name = foo } 
+   >> 
+ #+END_SRC
+
+ Returning an object from function, creates a copy of the object
+ instead of returning a reference to it like in Java, Scala, Python and
+ most languages.
+
+ #+BEGIN_SRC cpp 
+   Foo modifyReturn(Foo param, std::string newName) {
+     param.setName(newName);
+     return param;
+   }
+
+   >> auto ret = modifyReturn(foo, "New name")
+    [INFO] Copy constructor invoked.
+    [INFO] Copy constructor invoked.
+   (Foo &) @0x7f54f0288050
+
+   >> &ret == &foo
+   (bool) false
+
+   >> ret.show()
+   Foo { name = New name } 
+
+   >> foo.show()
+   Foo { name = foo } 
+   >> 
+
+ #+END_SRC
+
+ Value semantics and STL 
+
+  - Objects can be stored in STL containers by value, reference or by
+    pointers. 
+
+ #+BEGIN_SRC cpp 
+   #include <deque> // Double ended queue collection 
+
+   >> std::deque<Foo> xs;
+
+   // Temporary objects are created on the stack, 
+   // copied to the deque data structure and then 
+   // put on the collection. 
+   // 
+   >> xs.push_back(Foo("hello"));
+    [INFO] Copy constructor invoked.
+   >> xs.push_back(Foo("world"));
+    [INFO] Copy constructor invoked.
+   >> xs.push_back(Foo("value"));
+    [INFO] Copy constructor invoked.
+   >> xs.push_back(Foo("semantics"));
+    [INFO] Copy constructor invoked.
+   >> 
+
+   >> xs
+   (std::deque<Foo> &) { @0x1393820, @0x1393840, @0x1393860, @0x1393880 }
+   >> 
+
+   >> xs.size()
+   (unsigned long) 4
+   >> 
+
+   >> xs.at(0).show()
+   Foo { name = hello } 
+   >> xs.at(0).show2()
+   Foo { name = hello } 
+   >> 
+   >> xs.at(2).show()
+   Foo { name = value } 
+   >> 
+
+   // Error: invoke const reference method which is not annotated with 'const'
+   >> for(const auto& x: xs) { x.show(); }
+   ROOT_prompt_56:1:26: error: member function 'show' not viable: 
+   'this' argument has type 'const Foo', but function is not marked const
+   for(const auto& x: xs) { x.show(); }
+
+   // Works as show2() is annotated with 'const'
+   >> for(const auto& x: xs) { x.show2(); }
+   Foo { name = hello } 
+   Foo { name = world } 
+   Foo { name = value } 
+   Foo { name = semantics } 
+   >> 
+
+   // Wateful for-loop 
+   >> for(auto x: xs) { x.show(); }
+    [INFO] Copy constructor invoked.
+   Foo { name = hello } 
+    [INFO] Copy constructor invoked.
+   Foo { name = world } 
+    [INFO] Copy constructor invoked.
+   Foo { name = value } 
+    [INFO] Copy constructor invoked.
+   Foo { name = semantics } 
+   >> 
+
+   // By using emplace_back - a copy is not created.
+   >> auto xs2 = deque<Foo>()
+   (std::deque<Foo, std::allocator<Foo> > &) {}
+   >> 
+   >> xs2.emplace_back("hello")
+   >> xs2.emplace_back("world")
+   >> xs2.emplace_back("value")
+   >> xs2.emplace_back("semantics")
+   >> xs2
+   (std::deque<Foo, std::allocator<Foo> > &) { @0x411ff30, @0x411ff50, @0x411ff70, @0x411ff90 }
+   >> 
+
+   >> for(const auto& x: xs2) { x.show2(); }
+   Foo { name = hello } 
+   Foo { name = world } 
+   Foo { name = value } 
+   Foo { name = semantics } 
+   >> 
+ #+END_SRC
+
+  *Reference Semantics in C++*
+
+ Unlike in most programming languages where reference semantics for
+ complex types such as object is the default behavior, in C++ reference
+ semantics requires explicit annotation with reference operator (&) or
+ passing objects by pointer. 
+
+ The default behavior of passing by value cause significant memory and
+ performance overhead. In order to avoid unnecessary copies, it is
+ preferable to pass objects by reference with operator (&) or by const
+ reference when the object is not supposed to be modified by the
+ function the objects are passed to.
+
+  - Create a reference in assignment operation instead of a copy.
+
+ #+BEGIN_SRC cpp 
+   >> foo.show()
+   Foo { name = foo } 
+
+   >> Foo& ref1 = foo;
+
+   >> ref1.setName("I am foo reference")
+   >> foo.show()
+   Foo { name = I am foo reference } 
+   >> 
+
+   // The reference has the same memory location of foo.
+   >> &foo == &ref1
+   (bool) true
+   >> 
+ #+END_SRC
+
+  - Passing a parameter by reference instead of passing it by
+    value. Note: that the copy constructor is not invoked when passing
+    by reference.
+
+ #+BEGIN_SRC cpp 
+   void setFooPrintRef(Foo& param, const std::string& name){
+     param.setName(name);
+     param.show();
+     std::cout << " name = " << param.getName() << std::endl;
+   }
+
+   >> setFooPrintRef(foo, "dummy name")
+   Foo { name = dummy name } 
+    name = dummy name
+
+   >> foo.show()
+   Foo { name = dummy name } 
+   >> 
+ #+END_SRC
+
+  - Returning objects from functions as references. 
+
+ #+BEGIN_SRC cpp 
+   Foo& modifyReturnRef(Foo& param, std::string newName) {
+     param.setName(newName);
+     return param;
+   }
+
+   >> foo.setName("unnamed")
+
+   >> fooRefx.setName("I am foo reference")
+   >> foo.show()
+   Foo { name = I am foo reference } 
+
+   >> &foo == &fooRefx
+   (bool) true
+   >> 
+
+   >> auto& fooRefAuto = modifyReturnRef(foo, "C++ type inference auto!")
+   (Foo &) @0x7f54f0288010
+
+   >> foo.show()
+   Foo { name = C++ type inference auto! } 
+
+   >> fooRefAuto.show()
+   Foo { name = C++ type inference auto! } 
+
+   >> fooRefAuto.setName("C++17")
+
+   >> foo.show()
+   Foo { name = C++17 } 
+   >> 
+
+   >> &foo == &fooRefAuto
+   (bool) true
+   >> 
+ #+END_SRC
+
+  - Const references cannot be modified as any attempt to change it
+    will result in a compile-time error. 
+
+ #+BEGIN_SRC cpp 
+   >> Foo foo("foo");
+
+   >> foo.show()
+   Foo { name = foo } 
+
+   >> foo.getName()
+   (std::string) "foo"
+
+   >> const Foo& fooRefConst = modifyReturnRef(foo, "C++ constant ref.")
+   (const Foo &) @0x7fbf2003c010
+
+   >> foo.show()
+   Foo { name = C++ constant ref. } 
+
+   >> foo.getName()
+   (std::string) "C++ constant ref."
+   >> 
+
+   >> fooRefConst.show2()
+   Foo { name = C++ constant ref. } 
+   >> 
+
+   // Any attempt to call a method not annotated with const will result 
+   // in a compile-time error. 
+   >> fooRefConst.show()
+   ROOT_prompt_52:1:1: error: member function 'show' not viable: 'this' 
+   argument has type 'const Foo', but function is not marked const
+   fooRefConst.show()
+   ^~~~~~~~~~~
+   ROOT_prompt_30:1:6: note: 'show' declared here
+   void show(){ 
+ #+END_SRC
+
+  *Summary* 
+
+  + Value Semantics X Reference Semantics
+    + _Value Semantics_ -> Objects are assigned, passed to functions and
+      return from functions as primitive types without being modified
+      as what is modified is a copy of the object. This is default
+      behavior of C++.
+
+      + Object A = B; => (C++ Only) Creates object A as a copy of the object B.
+
+      + Object A = B.copy() (C#, Java, Python ...) Creates object A as
+        copy of object B. As value-semantics is not the default
+        behavior in thoses languages, it is necessary to invoke some
+        deep copy method explicity.
+
+    + _Reference Semantics_ -> Objects are passed by reference or
+      pointer; assigned by pointer and so on. Objects passed to
+      functions using reference semantics can modified. This is the
+      default behavior of Java, Python, C# and other programming
+      languages.
+
+      + Object A = B; (C#, Java, Python ...) => The object A is
+        reference to object B. Any modification to A or B will modify
+        both as the refer to the same memory location.
+
+      + Object& A = B; (C++ only) => Creating a reference in C++
+        requires an explicit annotation with operator (&) as it is
+        non-default behavior.
+
+  + Most programming languages, except C++, uses value-semantics for
+    primitive types and reference semantics for complex or composite
+    types such as objects due to performance reasons.
+
+  + C++ Uses _values-semantics_ by default for all types, unlike most
+    programming languages, when any primitive type or composite type such
+    as class when assigned, passed to functions or returned from 
+    functions, copy is created and the original object is not
+    changed.
+
+  + _C++ supports both value and reference semantics_ which is not
+    default for objects linke in Java, Python and other languages. The
+    reference semantics requires explicit annotation.
+
+  + In order to avoid unncessary copies what would bring memory
+    peformance overhead, it is preferable to use reference semantics,
+    in other words, pass large objects by reference or const reference
+    to functions or methods. 
+
+  + Move semantics optmizes return-by value avoiding copy. The copy
+    overhead can avoided when returning an object from functions by
+    defining a _move constructor_ (see C++11's move semantics) which
+    transfer resource ownership from the object defined locally within
+    the function body to the returned object.
+
+  *Further Reading:*
+
+  + ISO C++ - Reference and Value Semantics -
+    <https://isocpp.org/wiki/faq/value-vs-ref-semantics>
+    + Note: Provides a good and clear definition about what really is
+      value and reference semantics. 
+
+  + Andrezj's C++ blog - Value Semantics -
+    <https://akrzemi1.wordpress.com/2012/02/03/value-semantics/> 
+
+  + Value Semantics - Code of the danmed -
+    <http://codeofthedamned.com/index.php/value-semantics>
+
+  + What do ‘value semantics’ and ‘pointer semantics’ mean? -
+    <https://stackoverflow.com/questions/166033/what-do-value-semantics-and-pointer-semantics-mean>
+
+  + MSDN - Value Types (Modern C++) -
+    <https://msdn.microsoft.com/en-us/library/hh438479.aspx>
+    + Note:
+
+  + My Precious Compile Time Bool (long introduction to Move
+    Semantics) - <https://medium.com/@gaussnoise/my-precious-compile-time-bool-long-introduction-to-move-semantics-c9ee73c370c7>
+
+  + 
+
+
