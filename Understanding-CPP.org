@@ -551,3 +551,170 @@ reference or create a reference to the object.
   + 
 
 
+** Template type-safe duck-typing or structural typing 
+
+In dynamically programming languages like Python, Ruby and etc, a
+function or method can accept any object implementing the methods
+referred in the function body regardless of the object base or
+interface. For instance, in the code below the function describeArea
+will work with any class implementing the methods .area() and .name()
+not matter the object's base class. 
+
+This ability to work with any object which has that requested types,
+in this case .area() and .name() is called _duck-typying_. Other
+languages with duck-typing ability are Smalltalk, Groovy, C#, Scala
+and Objective-C. The advantage of duck-typing is that function or
+methods can work with classes without an inheritance hierarchy or a
+common base class.
+
+#+BEGIN_SRC python 
+  def describeArea(shape):
+      print("Shape is      = " + shape.name())
+      print("Shape area is = " + str(shape.area()))
+
+  class Square:
+      def __init__(self, side):
+          self.side = side 
+      def area(self):
+          return self.side * self.side
+      def name(self):
+          return "square"
+
+  class Circle:
+      def __init__(self, radius):
+          self.radius = radius
+      def area(self):
+          return self.radius * self.radius  * 3.1415
+      def name(self):
+          return "circle"    
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC python 
+  >>> s = Square(10)
+  >>> c = Circle(3)
+  >>>
+
+  >>> describeArea(s)
+  Shape is      = square
+  Shape area is = 100
+  >>> 
+  >>> describeArea(c)
+  Shape is      = circle
+  Shape area is = 28.273500000000002
+  >>> 
+  >>> 
+#+END_SRC
+
+
+ *C++ "Duck-typing" or type-safe structural typing*
+
+C++ templates feature supports a more type-safe duck-typing as the
+feature allows to write functions or methods which works with any
+object implementing the methods requested in the template code
+regardless of passed types have a common class hierarchy or a base
+class. However, unlike Python or Scala's duck typing, C++'s template
+doesn't have performance penalty due to dynamic polymorphism or
+reflection as it generates code at compile-time for each parameter
+type. 
+
+The C++'s template duck-typing is also called static polymorphism as a
+contrast to dynamic polymorphism which requires that all objects
+passed to a function or method implement the same base class.
+
+Example: The function describeArea works with any object implementing
+the methods area() and name(), however unlike Python and other
+dynamically typed languages, if an object that doesn't implement none
+of those mentioned methods is passed as argument, a compile error will
+be generated rather than a runtime error. 
+
+The advantage of C++ template is that it eliminates the runtime
+overhead of dynamic polymorphism or virtual function calls, therefore
+makes the code more performant and loosely coupled as it can work with
+any class without any inheritance hierarchy.  
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+
+  // Works with any type T which implements .name() or .area()
+  template <class T>
+  void describeArea(const T& obj){
+          std::cout << "Shape is = " << obj.name() << std::endl;
+          std::cout << "Area is  = " << obj.area() << std::endl;
+          std::cout << "---------" << std::endl;
+  }
+
+  class Circle{
+  private:
+          double m_radius;
+  public:
+          Circle(double radius): m_radius(radius) {};
+          double area() const {
+                  return 3.1415 * m_radius * m_radius;
+          }
+          const char* name() const {
+                  return "circle";
+          }	
+  };
+
+  class Square{
+  private:
+          double m_side;
+  public:
+          Square(double side): m_side(side) {};
+          double area() const {
+                  return m_side * m_side;
+          }
+          const char* name() const {
+                  return "square";
+          }
+  };
+
+  int main(){
+          Square s(4.0);
+          Circle c(3.0);
+          describeArea(s);
+          describeArea(c);
+          return 0;
+  }
+
+#+END_SRC
+
+Running: 
+
+ - The template generates multiple versions of the function
+   describeArea specific for each type, for instance, it generates,
+   describeArea(const Circle&) and describeArea(const Square&). The
+   static polymorphism is a high performance alternative to the use of
+   dynamic polymorphism, inheritance, and virtual methods since the
+   methods that will be called are resolved at compile-time.
+
+#+BEGIN_SRC sh 
+  $ clang++ -std=c++11 templateDuckTyping.cpp -o out.bin && ./out.bin
+  Shape is = square
+  Area is  = 16
+  ---------
+  Shape is = circle
+  Area is  = 28.2735
+  ---------
+#+END_SRC
+
+Summary: 
+
+ + C++ Templates works in similar fashion to dynamically typed
+   languages' duck typing.
+
+ + Templates can make the code more loosely coupled as they works with
+   any class or type implementing the requested methods.
+
+ + Templates have zero cost and follows the C++ motto, "don't pay for
+   what you don't use" they only generate code when requested or
+   instantiated.
+
+ + Templates are widely used in the STL (Standard Template Library)
+   and the Boost Library.
+
+
+
+
