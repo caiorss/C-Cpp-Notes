@@ -21,6 +21,8 @@ extern "C" { double* genArray(int size); }
 
 extern "C" { void genArray2(double* arr, int size); }
 
+extern "C" {double vectorSum(double xs [], size_t n); }
+
 /// C-wrapper for the circle class 
 extern "C" {
   void  *Circle_new    (double radius);
@@ -78,15 +80,12 @@ double vector2DNorm(double x, double y){
 double vectorNorm(vector<double> &xs){
   double sum = 0.0;
   
-  for (int i = 0; i < xs.size(); i++){
+  for (size_t i = 0; i < xs.size(); i++){
     sum = sum + xs.at(i) * xs.at(i);
   }
 
   return sqrt(sum);
 }
-
-
-
 
 
 // C-wrapper to vectorNorm
@@ -98,6 +97,23 @@ double vectorNorm(double xs [], int n){
   vector<double> v = arrayToVector2(xs, n);
   return vectorNorm(v);
 }
+
+double vectorSum(vector<double> &xs){
+  double sum = 0.0 ;
+  for (size_t i = 0; i < xs.size(); i++){
+    sum = sum + xs.at(i);
+  }
+}
+
+// C-wrapper for vectorSum 
+// 
+double vectorSum(double xs [], size_t n){
+  vector<double>v(n);
+  double* p = v.data();
+  p = xs;
+  return vectorSum(v);  
+}
+
 
 
 vector<double> vectorScale(vector<double> &xs, double scale){

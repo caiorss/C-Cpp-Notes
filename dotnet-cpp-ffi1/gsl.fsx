@@ -100,9 +100,7 @@ module Bessel =
     ///  double gsl_sf_bessel_Jn (int n, double x)
     ///
     [<DllImport("libgsl.so", EntryPoint="gsl_sf_bessel_Jn")>]
-    extern double besselJn(int n, double x)
-    
-
+    extern double besselJn(int n, double x)    
 
 
 (*  C-struct equivalent.
@@ -114,7 +112,7 @@ module Bessel =
         } gsl_complex;
 *)
 [<Struct>]
-[<StructLayout(LayoutKind.Sequential)>]
+[<StructLayout(LayoutKind.Sequential, Size=16, Pack=1)>]
 type gsl_complex =
     struct
 

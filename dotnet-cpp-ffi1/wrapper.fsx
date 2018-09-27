@@ -19,6 +19,9 @@ extern IntPtr c_genArray(int)
 [<DllImport("hpc.so", EntryPoint="genArray2")>]
 extern void c_genArray2(double [], int)
 
+[<DllImport("hpc.so")>]
+extern double vectorSum(double [], int)
+
 
 let genArray n =
     let ptr = c_genArray n
@@ -76,5 +79,6 @@ let main(args) =
     printfn "testVectorNorm()                               = %f" <| testVectorNorm()
 
     printfn "genArray 5                                     = %A" <| genArray 5
-    printfn "genArray2 5                                    = %A" <| genArray2 5       
+    printfn "genArray2 5                                    = %A" <| genArray2 5
+    printfn "sumArray([1.0; 2.0; 3.0; 4.0], 4)                 = %A" <| vectorSum([| 1.0; 2.0; 3.0; 4.0 |], 4)
     0
