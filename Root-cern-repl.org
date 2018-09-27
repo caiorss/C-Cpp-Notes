@@ -1,0 +1,1519 @@
+#+TITLE: CPP / C++ Review
+#+DESCRIPTION: cpp c++ interactive scripting with C++ on CERN's ROOT REPL or CLING.
+#+STARTUP: content 
+#+AUTHOR: Caio Rodrigues 
+
+
+* C++ CPP CERN - Root Cling Interpreter and tools
+** Overview 
+
+[[https://en.wikipedia.org/wiki/CERN][CERN]]'s (European Organization for Nuclear Research) [[https://en.wikipedia.org/wiki/ROOT][Root Framework]]
+allows one to explore and play with C++ interactively through an
+interactive C++ interpreter where the user can type and evaluate
+expressions and commands in a similar way to Python's REPL. 
+
+The Root interpreter, also known as CLING, currently can interpret
+C++14 and supports mostly U-nix like operating system like Linux or
+MacOSX and Windows support is still experimental.
+
+Among other things, ROOT has the following features: 
+ + Run C++ code as scripts
+ + Evaluate C++ code interactively
+ + Load C libraries such as OpenGL, GNU scientific libraries
+ + Load header only libraries such as Boost-Libraries
+ + Data analysis tools and statistical libraries
+ + Plotting tools 
+
+Possible Use-cases: 
+ + Learn C++ faster. 
+ + Exploratory design
+ + Explore and play with a wide range of C++ libraries
+ + Test new ideas faster.
+ + Learn about operating system APIs.
+
+Note: 
+ + CLING is the ROOT's C++ interpreter distributed in a standalone way
+   without ROOT's additional plotting and statistical libraries.
+
+Download: 
+
+ + https://root.cern.ch/downloading-root - ROOT framework.
+
+ + https://root.cern.ch/downloading-root - CLING - only the C++ interpreter
+   without ROOT's GUIs, plotting and statistical libraries. CLING can
+   also be embedded on applications.
+
+Demonstration Videos: 
+
+ + [[https://youtu.be/s9PTrWOnDy8?list=PLTG3YvUaExuuISUOLwQDUVdvXgEi1Ez2J&t=503][Intro to ROOT Tutorial Lesson 0 - Getting Started]]
+ + [[https://www.youtube.com/watch?v=eoIuqLNvzFs][Cling Interactive OpenGL Demo]]
+ + [[https://www.youtube.com/watch?v=Lbi7MLS03Yc][Cling — An Interactive C++ Interpreter]] - by Dmitri Nesteruk.
+ + [[https://www.youtube.com/watch?v=PLF5Y5BXD_g][Cling on Ubuntu on Windows]] - by Dmitri Nesteruk.
+ + [[https://www.youtube.com/watch?v=1IGTHusaJ18][cling C++ interpreter testdrive]]
+
+Technical Explanations and talks: 
+
+ + Boostcon: [[https://www.youtube.com/watch?v=K2KqEV866Ro][Vassil Vassilev: Interactive, Introspected C++ at CERN - YouTube]]
+   + "CERN is the world's biggest particle physics laboratory. It has
+     to process about 15 PB/year in order to make such scientific
+     breakthroughs. The ROOT Framework's unique abilities enable
+     physicists to analyse that data with high efficiency,
+     computationally and storage-wise. In the core of ROOT's newest
+     version is Cling -- an interactive C++ interpreter, that targets
+     support of C++11. Cling replaces a previous C++ interpreter that
+     is traditionally the main user interface to ROOT. Cling is built
+     on LLVM/Clang compiler infrastructure. The interpreter is not
+     only used by ROOT to serialize, deserialize and manipulate the
+     C++ OO representation of data, but to help novices learn and
+     understand C++ faster." 
+
+ + GoogleTechTalks: [[https://www.youtube.com/watch?v=f9Xfh8pv3Fs][Introducing cling, a C++ Interpreter Based on clang/LLVM - YouTube]]
+   + Presented by Axel Naumann, CERN. "At CERN, 50 million lines of
+     C++ code are being used by about 10 thousand physicist. Many of
+     them are not programming experts. To make writing C++ more
+     accessible, ROOT (http://root.cern.ch), one of the core tools at
+     CERN, has been using the CINT C++ interpreter for more than 15
+     years. CINT also opens up a whole new world of dynamic
+     programming: plug-ins, signal/slot, runtime evaluation,
+     reflection. In particular, the latter is fundamental to CERN and
+     its petabytes of Large Hadron Collider data per year, which are
+     created, serialized, and analyzed as C++ objects ..."
+
+** Command Sumamry 
+
+
+| REPL Command       | Description                                                                                |
+|--------------------+--------------------------------------------------------------------------------------------|
+| .?                 | Show help                                                                                  |
+| .q                 | Exit ROOT shell                                                                            |
+| .L file.cpp        | Load file.cpp, so it loads all the file's classes and functions                            |
+| .x script.cxx      | Load and execute ROOT script or C++ ordinary source code. The entry point is void script() |
+| .include           | Show include path                                                                          |
+| .I <include path>  | Add include path to search for header files (*.h), for instance .I /usr/include/qt5/       |
+| .! <shell command> | Run shell command such as ls on Unix.                                                      |
+| .class TFile       | Show all methods and fields of the class TFile                                             |
+|                    |                                                                                            |
+|                    |                                                                                            |
+
+Documentation: 
+ + Source Code Documentation: https://root.cern/doc/v612/files.html
+ + 
+
+GSystem object: 
+
+#+BEGIN_SRC cpp 
+ gSystem->AddLinkedLibs (...) 
+ gSystem->AddIncludePath(...)
+
+ gROOT->GetListOfClasses()
+ gROOT->GetListOfColors()
+ gROOT->GetListOfTypes()
+ gROOT->GetListOfGlobals()
+ gROOT->GetListOfGlobalFunctions()
+ gROOT->GetListOfFiles()
+ gROOT->GetListOfMappedFiles()
+ gROOT->GetListOfSockets()
+ gROOT->GetListOfCanvases()
+ gROOT->GetListOfStyles()
+ gROOT->GetListOfFunctions()
+ gROOT->GetListOfSpecials()
+ gROOT->GetListOfGeometries()
+ gROOT->GetListOfBrowsers()
+ gROOT->GetListOfMessageHandlers()
+#+END_SRC
+
+Get Version: 
+
+#+BEGIN_SRC cpp 
+  root [20] gROOT->GetVersion()
+  (const char *) "6.14/04"
+  root [21]
+#+END_SRC
+
+Get and Set Prompt: 
+
+#+BEGIN_SRC cpp 
+  root [0] static_cast<TRint*>(gROOT->GetApplication())->GetPrompt()
+  (char *) "root [1] "
+  root [1]
+
+  root [1] static_cast<TRint*>(gROOT->GetApplication())->SetPrompt(">> ")
+  (const char *) "root [%d] "
+  >>
+  >>
+#+END_SRC
+
+Change and check current working directory.
+
+#+BEGIN_SRC cpp 
+  root [30] gSystem->cd("/home/archbox")
+  (bool) true
+
+  root [31] gSystem->pwd()
+  (const char *) "/home/archbox"
+  root [32] 
+  root [32] 
+#+END_SRC
+
+Get environment variables: 
+
+#+BEGIN_SRC cpp 
+  root [32] gSystem->Getenv("HOME")
+  (const char *) "/home/archbox"
+
+  root [33] gSystem->Getenv("PATH")
+  (const char *) "/usr/lib64/qt-3.3/bin:/usr/local/bin:/usr/bin:/bin:..."
+#+END_SRC
+
+Add Include Path: 
+
+ -- Ref: [[https://root-forum.cern.ch/t/setting-include-path-in-rootrc-file/6245][Setting .include path in .rootrc file? - ROOT - ROOT Forum]]
+
+#+BEGIN_SRC cpp 
+  gSystem->SetIncludePath(" -Imyincludepath1 ");
+  gSystem->SetIncludePath(" -Imyincludepath2 ");
+  ...
+#+END_SRC
+
+Eval String: 
+
+#+BEGIN_SRC cpp 
+  root [0] gROOT->ProcessLine("std::cout << \"Hello world\" << std::endl;");
+  Hello world
+  root [1] 
+
+  root [2] gROOT->ProcessLine("cos(M_PI)");
+  (double) -1.0000000
+
+  root [3] gROOT->ProcessLine("cos(2 * M_PI)");
+  (double) 1.0000000
+  root [4] 
+#+END_SRC
+
+Print configuration: 
+ 
+ + Command: gEnv->Print()
+
+#+BEGIN_SRC cpp 
+  Root [5] gEnv->Print()
+  Unix.*.Root.UseTTFonts:   true                           [Global]
+  WinNT.UseNetAPI:          true                           [Global]
+  Unix.*.Root.UseThreads:   false                          [Global]
+  Root.CompressionAlgorithm: 0                              [Global]
+  Root.ShowPath:            false                          [Global]
+  Root.TMemStat:            0                              [Global]
+  Root.TMemStat.buffersize: 100000                         [Global]
+  Root.TMemStat.maxcalls:   5000000                        [Global]
+  Root.TMemStat.system:                                    [Global]
+  Root.MemStat:             0                              [Global]
+  Root.MemStat.size:        -1                             [Global]
+  Root.MemStat.cnt:         -1                             [Global]
+  Root.ObjectStat:          0                              [Global]
+  Root.MemCheck:            0                              [Global]
+
+#+END_SRC
+
+** Installation and configuration 
+
+Set environment variables: 
+
+ - Add this piece of code to any of those configuration files:
+   ~/.profile, =~/.bash_profile= or ~/.bashrc. 
+
+#+BEGIN_SRC sh 
+  # Set root directory (ROOTSYS) to the path where it was installed 
+  export ROOTSYS=$HOME/opt/root 
+  # DO NOT change those variables below 
+  export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$ROOTSYS/lib 
+  export PATH=$PATH:$ROOTSYS/bin
+  alias cern-root="$ROOTSYS/bin/root -l"
+#+END_SRC
+
+Questions about configuration files: 
+
+ + [[http://insectnation.org/articles/basic-root.html][Basic ROOT start-up guide | Insectnation]]
+ + [[https://root.cern.ch/root/roottalk/roottalk00/3018.html][RootTalk: Re: ROOT .rootrc, etc.]]
+ + [[https://root-forum.cern.ch/t/setting-include-path-in-rootrc-file/6245][Setting .include path in .rootrc file? - ROOT - ROOT Forum]]
+ + 
+
+Current install: 
+
+#+BEGIN_SRC sh 
+  $ which root
+  /home/archbox/opt/root/bin/root
+
+  $ pwd
+  /home/archbox/opt/root
+
+  archbox@localhost 16:10 ~/opt/root
+  $ tree -L 1 .
+  .
+  ├── aclocal
+  ├── bin
+  ├── cmake
+  ├── config
+  ├── emacs
+  ├── etc
+  ├── fonts
+  ├── geom
+  ├── icons
+  ├── include
+  ├── lib
+  ├── LICENSE
+  ├── macros
+  ├── man
+  ├── README
+  ├── test
+  ├── tmva
+  └── tutorials
+
+  17 directories, 1 file
+
+#+END_SRC
+
+Show tools available: 
+
+#+BEGIN_SRC sh
+  $ tree -L 1 bin/
+  bin/
+  ├── g2root
+  ├── genreflex
+  ├── h2root
+  ├── hadd
+  ├── hist2workspace
+  ├── memprobe
+  ├── pq2
+  ├── prepareHistFactory
+  ├── proofd
+  ├── proofexecv
+  ├── proofserv
+  ├── proofserv.exe
+  ├── rmkdepend
+  ├── root
+  ├── rootbrowse
+  ├── rootcint
+  ├── rootcling
+  ├── root-config
+  ├── rootcp
+  ├── rootd
+  ├── rootdrawtree
+  ├── rooteventselector
+  ├── root.exe
+  ├── rootls
+  ├── rootmkdir
+  ├── rootmv
+  ├── rootnb.exe
+  ├── rootn.exe
+  ├── rootprint
+  ├── rootrm
+  ├── roots
+  ├── roots.exe
+  ├── rootslimtree
+  ├── setenvwrap.csh
+  ├── setxrd.csh
+  ├── setxrd.sh
+  ├── ssh2rpd
+  ├── thisroot.csh
+  ├── thisroot.sh
+  ├── xpdtest
+  └── xproofd
+
+  0 directories, 41 files
+
+#+END_SRC
+
+** Playing with Root REPL 
+*** Start root interpreter 
+#+BEGIN_SRC sh 
+  $ $HOME/opt/root/bin/root 
+  ERROR in cling::CIFactory::createCI(): cannot extract standard library include paths!
+  Invoking:
+    LC_ALL=C ccache  -O3 -DNDEBUG -xc++ -E -v /dev/null 2>&1 >/dev/null | awk '/^#include </,/^End of search/{if (!/^#include </ && !/^End of search/){ print }}' | GREP_OPTIONS= grep -E "(c|g)\+\+"
+  Results was:
+  With exit code 256
+     ------------------------------------------------------------
+    | Welcome to ROOT 6.14/04                http://root.cern.ch |
+    |                               (c) 1995-2018, The ROOT Team |
+    | Built for linuxx8664gcc                                    |
+    | From tags/v6-14-04@v6-14-04, Aug 23 2018, 17:00:44         |
+    | Try '.help', '.demo', '.license', '.credits', '.quit'/'.q' |
+     ------------------------------------------------------------
+
+  root [0] 
+#+END_SRC
+*** Run shell command: 
+
+#+BEGIN_SRC sh 
+  root [66] .! ls
+  a.out		 clang1.cpp	clang-start.bin   myclass.cpp	    testclang.bin
+  cashFlowApp.cpp  clangcpp1.bin	clang-start.cpp   myclass.hpp	    testclang.cpp
+  cashflow.cpp	 clangcpp1.cpp	diagnostics.bin   numLimits.cpp     testcl.bin
+  cashflow.h	 clanger.bin	diagnostics.cpp   printHeaders.cpp  testcl.cpp
+  cashflow.so	 clanger.c	dump-classes.cpp  source-info.bin
+  clang1.bin	 clanger.cpp	libcashflow.cpp   source-info.cpp
+  root [67]
+
+  root [67] .! pwd
+  /home/archbox/shared/reflection-root
+  root [68] 
+#+END_SRC
+*** Show Math constants 
+
+#+BEGIN_SRC cpp 
+  root [5] M_PI
+  (double) 3.1415927
+  root [6] M_E
+  (double) 2.7182818
+  root [7] 
+  root [7] // Predefined math constants in the header cmath
+  root [8] M_E
+  (double) 2.7182818
+  root [9] M_PI
+  (double) 3.1415927
+  root [10] M_LOG10E // Logarithm to base 2 of E
+  (double) 0.43429448
+  root [11] M_LN10 // Natural log of 10
+  (double) 2.3025851
+  root [12] M_PI_4 // PI divided by 4 or PI/4
+  (double) 0.78539816
+  root [13] M_2_PI // 2 * PI or 360 deg
+  (double) 0.63661977
+  root [14] M_SQRT2 // Square root of 2
+  (double) 1.4142136
+  root [15] M_SQRT1_2
+  (double) 0.70710678
+  root [16] 
+#+END_SRC
+*** Print to stdout
+
+#+BEGIN_SRC cpp 
+  root [20] std::cout << "Hello world" << std::endl;
+  Hello world
+  root [21] 
+
+  root [21] for(int i = 0 ; i < 10; i++){ std::cout << "i = " << i << std::endl; }
+  i = 0
+  i = 1
+  i = 2
+  i = 3
+  i = 4
+  i = 5
+  i = 6
+  i = 7
+  i = 8
+  i = 9
+
+#+END_SRC
+*** Paste multiline
+
+#+BEGIN_SRC cpp 
+  // To paste a multi line code, paste the code between brackets
+    // To paste a multi line code, paste the code between brackets
+    {
+    auto func = [](double x){
+        return x * x - 4 * x + 10;
+    };
+    }
+
+    root [38] func(4.0)
+    (double) 10.000000
+    root [39] 
+    root [39] func(0)
+    (double) 10.000000
+    root [40] func(3)
+    (double) 7.0000000
+    root [41] func(5)
+    (double) 15.000000
+    root [42] func(10)
+    (double) 70.000000
+    root [43] 
+
+#+END_SRC
+*** Playing with STL Vectors
+
+#+BEGIN_SRC cpp 
+root [47] std::vector<double> ys {10.0, 3.0, 5.0, 6.0, 10.0, 20.0}
+(std::vector<double> &) { 10.000000, 3.0000000, 5.0000000, 6.0000000, 10.000000, 20.000000 }
+root [48] 
+
+root [48] ys.size()
+(unsigned long) 6
+root [49] ys.max_size()
+(unsigned long) 2305843009213693951
+root [50] ys[0]
+(double) 10.000000
+root [51] ys[1]
+(double) 3.0000000
+root [52] ys[2]
+(double) 5.0000000
+root [53] ys.at(0)
+(double) 10.000000
+root [54] ys.at(1)
+(double) 3.0000000
+root [55] ys.at(2)
+(double) 5.0000000
+root [56] ys.at(100)
+Error in <TRint::HandleTermInput()>: std::out_of_range caught: vector::_M_range_check: __n (which is 100) >= this->size() (which is 6)
+root [57] 
+
+root [58] ys.push_back(5)
+root [59] ys
+(std::vector<double> &) { 10.000000, 3.0000000, 5.0000000, 6.0000000, 10.000000, 20.000000, 5.0000000 }
+root [60] 
+
+#+END_SRC
+*** Playing with Deque - Double Ended Queue STL Container 
+
+#+BEGIN_SRC cpp 
+  root [71] std::deque<double> d;
+  root [72] d
+  (std::deque<double> &) {}
+
+  root [73] d. // Type tab to complete 
+  assign
+  at
+  back
+  begin
+  cbegin
+  cend
+  clear
+  crbegin
+  crend
+  ... ... 
+
+  root [73] d.push_back(10.0)
+  root [74] d.push_back(3.0)
+  root [75] d.push_back(5.0)
+  root [76] d
+  (std::deque<double> &) { 10.000000, 3.0000000, 5.0000000 }
+  root [77] 
+
+  root [83] std::cout << std::fixed << std::setprecision(2)
+  (std::basic_ostream<char, std::char_traits<char> > &) @0x7fe94fd0ae20
+  root [84] 
+
+  // C++ 11 For-range based loop 
+  root [89] for(const auto& x: d){ std::cout << x << std::endl; }
+  10.00
+  6.00
+  10.00
+  3.00
+  5.00
+  root [90] 
+
+
+  root [88] for(const auto& x: d){ std::cout << std::right << std::setw(10) << x << std::end   
+       10.00
+        6.00
+       10.00
+        3.00
+        5.00
+  root [89] 
+
+  // Clear 
+  root [97] d.clear()
+  root [98] d
+  (std::deque<double> &) {}
+  root [99] 
+
+
+#+END_SRC
+*** Playing with STL Maps 
+
+STL Map (dictionary, hash map) container: 
+
+#+BEGIN_SRC cpp 
+
+  // Create a map container with uniform initialization 
+  root [1] std::map<std::string, double> constants {{"pi", 3.1415}, {"earth_gravity", 9.81},(std::map<std::string, double> &) 
+          { "earth_gravity" => 9.8100000, "pi" => 3.1415000, "sqrt_2" => 1.4170000 }
+  root [2] 
+  root [2] 
+
+  root [5] constants["earth_gravity"]
+  (double) 9.8100000
+  root [6] 
+  root [6] constants.at("earth_gravity")
+  (double) 9.8100000
+
+  // Generate exception 
+  root [7] constants.at("pi")
+  (double) 3.1415000
+  root [8] constants.at("pix")
+  Error in <TRint::HandleTermInput()>: std::out_of_range caught: map::at
+  root [9] 
+
+  root [9] constants.size()
+  (unsigned long) 4
+  root [10] 
+  root [10] 
+
+  root [11] constants.clear()
+  root [12] 
+  root [12] constants
+  (std::map<std::string, double> &) {}
+  root [13] 
+
+  root [15] constants.insert(std::pair<std::string, double>("pi", 3.1415))
+  root [17] constants.insert(std::pair<std::string, double>("x", 10.0))
+
+  root [18] constants
+  (std::map<std::string, double> &) { "pi" => 3.1415000, "x" => 10.000000 }
+  root [19] 
+
+  {
+  for(const auto& x: constants){
+          cout << "key   = " << std::setw(4) << x.first << std::setw(10)
+               << "value = " << x.second << endl;
+      }
+  }
+  // Output 
+  key   =   pi  value = 3.1415
+  key   =    x  value = 10
+
+#+END_SRC
+*** Playing with classes 
+**** CashFlow class
+
+ROOT Cling can also play with C++ classes as they were ordinary
+scripts. 
+
+File: CashFlow.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <vector>
+  #include <initializer_list>
+  #include <iomanip> // setw, setpreicision ...
+
+  class CashFlow{
+  private:
+     std::vector<double> m_pmt;
+  public:
+      // Default constructor - doesn't
+      CashFlow(){}
+
+      // Overloaded contructor with vector
+      CashFlow(std::vector<double> pmt){
+          m_pmt.insert(m_pmt.begin(), pmt.begin(), pmt.end());
+      }
+      // Overloaded constructor with initializer list
+      CashFlow(std::initializer_list<double> pmt){
+          m_pmt.insert(m_pmt.begin(), pmt.begin(), pmt.end());
+      }
+      CashFlow& add(double x){
+          m_pmt.push_back(x);
+          return *this;
+      }
+      void show(){
+          int i = 0;
+          for(const auto& x: m_pmt){
+              std::cout << std::setw(10) << i
+                        << std::setw(10) << std::setprecision(3) << std::fixed << x
+                        << std::endl;
+              ++i;
+          }
+      }
+
+  };
+#+END_SRC
+
+
+In the ROOT shell: 
+
+#+BEGIN_SRC cpp 
+  root [0] .L CashFlow.cpp 
+
+  root [1] CashFlow clf;
+
+  root [2] clf.show()
+
+  root [3] clf.add(-30).add(20).add(4).add(5).add(25)
+  (CashFlow &) @0x7fa4df246010
+  root [4] clf.show()
+           0   -30.000
+           1    20.000
+           2     4.000
+           3     5.000
+           4    25.000
+
+  root [6] 
+  root [6] CashFlow clf2 {-30.0, 20.0, 3.0, 5.0, 25.0} ;
+  root [7] clf2.show()
+           0   -30.000
+           1    20.000
+           2     3.000
+           3     5.000
+           4    25.000
+  root [8] 
+
+#+END_SRC
+**** Linear function class 
+
+ROOT Session:
+
+#+BEGIN_SRC cpp 
+  root [0] .L linfun.cpp 
+  root [1] 
+  root [1] LinearFunction lfun1(3.0, 4.0)
+  (LinearFunction &) @0x7fac4d729010
+  root [2] lfun1
+  (LinearFunction &) @0x7fac4d729010
+  root [3] std::cout << lfun1 << std::endl;
+  y(x) = 3.000 * x + 4.000
+  root [4] 
+  root [4] lfun1(3.0)
+  (double) 13.000000
+  root [5] lfun1(0)
+  (double) 4.0000000
+  root [6] lfun1(5)
+  (double) 19.000000
+  root [7] lfun1(10)
+  (double) 34.000000
+  root [8] lfun1.setCoeffs(5.0, 10.0);
+  root [9] 
+  root [9] std::cout << lfun1 << std::endl;
+  y(x) = 5.000 * x + 10.000
+  root [10] 
+  root [10] std::vector<double> xs{3.0, 4.0, 5.0, 6.0, 5.0};
+  root [11] 
+  root [11] xs
+  (std::vector<double> &) { 3.0000000, 4.0000000, 5.0000000, 6.0000000, 5.0000000 }
+  root [12] 
+  root [12] lfun1(xs)
+  (std::vector<double>) { 25.000000, 30.000000, 35.000000, 40.000000, 35.000000 }
+  root [13] 
+  root [13] auto lfun2 = LinearFunction::fromPoints(2, 9, 8 , 21);
+  root [14] std::cout << lfun2 << std::endl;
+  y(x) = 2.000 * x + 5.000
+  root [15] 
+  root [15] lfun2(3.0) 
+  (double) 11.000000
+  root [16] lfun2(4.0) 
+  (double) 13.000000
+  root [17] lfun2(5.0) 
+  (double) 15.000000
+  root [18] 
+
+#+END_SRC
+
+File: linfun.cpp
+
+#+BEGIN_SRC cpp 
+  class LinearFunction{
+  public:
+      LinearFunction(double a, double b): A(a), B(b) {}
+
+      /* Named constructor, aka static factory method*/
+      static LinearFunction fromCoeffs(double a, double b){
+          return LinearFunction(a, b);
+      }   
+      /* Named constructor, aka static factory method*/
+      static LinearFunction fromPoints(double x1, double y1, double x2, double y2){
+          double a = (y2 - y1)/(x2 - x1);
+          double b = y1 - a * x1;
+          return LinearFunction(a, b);
+      }
+
+      double eval(double x){
+          return A * x + B;
+      }
+
+      // Function-call-operator overload
+      // Using the New C++11 return type
+      // It could also be:
+      //  >> double operator()(double x){ ... 
+      auto operator()(double x) -> double{
+          return A * x + B;
+      }   
+      // Function-call-operator overload
+      std::vector<double> operator()(const std::vector<double>& xs){
+          std::vector<double> res;
+          for(auto& x: xs){
+              res.push_back(A * x + B);
+          }
+          return res;
+      }   
+      void setCoeffs(double A, double B){
+          this->A = A;
+          this->B = B;
+      }
+      void setA(double a){
+          A = a;
+      }
+      void setB(double b){
+          B = b;
+      }
+      // The stream insertion operator (<<) is not a method 
+      // (member function) of this class. It is a overload of 
+      // the operator (<<) for the class std::ostream which is
+      // a generic output stream.
+      friend std::ostream& operator<<(std::ostream &os, const LinearFunction& lfun){
+          os.precision(3);
+          os.setf(std::ios::fixed);
+          os << "y(x) = " << lfun.A << " * x" << " + " << lfun.B;
+          return os;
+      }
+  private:
+      double A;
+      double B;
+  }; //---- End of object LinearFunction --- //
+
+  /** Makes the vector printable, similar to implementing vector.toString in Java */
+  std::ostream& operator << (std::ostream &os, const std::vector<double>& xs){
+      os << "[" << xs.size() << "](" ;
+      copy(xs.begin(), xs.end(), std::ostream_iterator<double>(os, " "));
+      os << ")";
+      return os;
+  }
+#+END_SRC
+
+*** Playing with higher order functions and C++11 lambdas
+
+To load the following code, just copy and then paste it in the ROOT
+REPL. 
+
+#+BEGIN_SRC cpp 
+  // Type synonym to avoid repeating it.
+  // Equivalent to typedef std::function<double (double)> MathFun 
+  using MathFun = std::function<double (double)>;
+
+  /** Higher order function to tabulate ordinary function 
+    ,* The first parameter can be a ordinary lambda function or 
+    ,* a any function object implementing  double operator()(double x)
+    ,* or  operator()(double) => double Using Scala's notation.
+    ,*/
+  void tabulate(
+      std::function<double (double)> fn,
+      double start,
+      double stop,
+      double step,
+      std::ostream& os = std::cout
+      ){      
+      os.precision(3);
+      os.flags(std::ios::fixed);
+      os << std::setw(10) << "Input" << std::setw(10) << "Output" << std::endl;
+      double x = start;
+      while(x <= stop){
+          os << std::setw(10) << x << std::setw(10) << fn(x) << std::endl;
+          x = x + step;
+      }
+  }
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC cpp 
+root [40] tabulate([](double x){ return sqrt(x);}, -4.0, 9.0, 1.0)
+     Input    Output
+    -4.000      -nan
+    -3.000      -nan
+    -2.000      -nan
+    -1.000      -nan
+     0.000     0.000
+     1.000     1.000
+     2.000     1.414
+     3.000     1.732
+     4.000     2.000
+     5.000     2.236
+     6.000     2.449
+     7.000     2.646
+     8.000     2.828
+     9.000     3.000
+root [41] 
+
+MathFun makeLinFun(double a, double b)  {
+    // [=] means -> capture a and b by value 
+    return [=](double x){return a * x + b; };
+}
+
+root [70] tabulate(makeLinFun(10.0, 5.0), -5, 5, 1)
+     Input    Output
+    -5.000   -45.000
+    -4.000   -35.000
+    -3.000   -25.000
+    -2.000   -15.000
+    -1.000    -5.000
+     0.000     5.000
+     1.000    15.000
+     2.000    25.000
+     3.000    35.000
+     4.000    45.000
+     5.000    55.000
+root [71] 
+
+#+END_SRC
+
+*** Playing with STL algorithms 
+
+Required headers: <iostram> and <algorithm> (~std::for_each~)
+
+ - C Arrays 
+
+#+BEGIN_SRC cpp 
+  root [0] double xs [] = {10.0, 5.0, 6.0, 3.0}
+  (double [4]) { 10.000000, 5.0000000, 6.0000000, 3.0000000 }
+  root [1] 
+  root [1] std::for_each(xs, xs + 4, [](double x){ std::cout << sqrt(x) << " " << '\n' << std::flush;} );
+  3.16228 
+  2.23607 
+  2.44949 
+  1.73205 
+  root [2] 
+#+END_SRC
+
+ - C++ Vectors 
+
+#+BEGIN_SRC cpp 
+  root [0] std::vector<double> vec { 10.0, 3.0, 5.0, 2.0, -6.0} ;
+  root [1] xs
+
+  root [3] std::for_each(vec.begin(), vec.end(), [](double x){ std::cout << sqrt(x) << std::endl;})
+  3.16228
+  1.73205
+  2.23607
+  1.41421
+  -nan
+  ((lambda)) @0x1a42030
+
+  root [4] std::for_each(vec.begin(), vec.end(), [](double x){ std::cout << sqrt(x) << std::endl;});
+  3.16228
+  1.73205
+  2.23607
+  1.41421
+  -nan
+
+#+END_SRC
+
+*** Show a file 
+
+Paste the following code in the ROOT interpreter.
+
+#+BEGIN_SRC cpp 
+  {
+  // Headers:  <iostream>, <fstream>,  <stdlib.h>
+  void showFile(const char* file){
+    std::ifstream fin;
+    std::string line;
+    fin.open(file);
+    if(fin.fail()){
+      std::cerr << "Error: file " << file << " cannot be opened.";
+      exit(-1);
+    }
+    while(!fin.eof()){
+      std::getline(fin, line);
+      std::cout << line << std::endl;
+    }
+    fin.close();
+  }
+
+  }
+
+#+END_SRC
+
+Run: 
+
+#+BEGIN_SRC cpp 
+    root [24] showFile("/etc/protocols")
+    # /etc/protocols:
+    # $Id: protocols,v 1.12 2016/07/08 12:27 ovasik Exp $
+    #
+    # Internet (IP) protocols
+    #
+    #	from: @(#)protocols	5.1 (Berkeley) 4/17/89
+    #
+    # Updated for NetBSD based on RFC 1340, Assigned Numbers (July 1992).
+    # Last IANA update included dated 2011-05-03
+    #
+    # See also http://www.iana.org/assignments/protocol-numbers
+
+    ip	0	IP		# internet protocol, pseudo protocol number
+    hopopt	0	HOPOPT		# hop-by-hop options for ipv6
+    icmp	1	ICMP		# internet control message protocol
+    igmp	2	IGMP		# internet group management protocol
+    ggp	3	GGP		# gateway-gateway protocol
+    ipv4	4	IPv4		# IPv4 encapsulation
+     ... ...  ... ...  ... ...  ... ...  ... ...  ... ... 
+#+END_SRC
+
+*** Using boost libraries 
+
+It assumes that the boost libraries are already installed. 
+
+ - Example: Using Boost special math functions
+   - [[https://www.boost.org/doc/libs/1_68_0/libs/math/doc/html/math_toolkit/sf_erf/error_function.html][Error Functions - 1.68.0]]
+
+#+BEGIN_SRC cpp 
+  root [0] #include <boost/math/special_functions/erf.hpp>
+  root [1] boost::math::erf
+
+  root [2] boost::math::erf(0.1)
+  (double) 0.11246292
+  root [3] 
+  root [3] boost::math::erf(2.0)
+  (double) 0.99532227
+  root [4] boost::math::erf(3.0)
+  (double) 0.99997791
+ 
+  root [9] using boost::math::erf;
+  root [10] 
+  root [10] erf(1.2)
+  (double) 0.91031398
+  root [11] erf(4.5)
+  (double) 1.0000000
+  root [12] 
+
+#+END_SRC
+
+*** Playing with GNU Scientific library shared library 
+
+Note: the command #pragma cling load("/lib64/libgslcblas.so.0") is
+used to load the symbols from the shared library libgslcblas.so.
+
+#+BEGIN_SRC cpp 
+  root [1] #pragma cling load("/lib64/libgslcblas.so.0")
+  root [2] 
+  root [2] #pragma cling load("/lib64/libgsl.so")
+  root [3] 
+  root [3] #include <gsl/gsl_errno.h>
+  root [4] #include <gsl/gsl_sf_bessel.h>
+  root [5] 
+  root [5] gsl_sf_bessel_J0(4.0)
+  (double) -0.39714981
+  root [6] gsl_sf_bessel_J0(5.0)
+  (double) -0.17759677
+  root [7] 
+
+  {
+    double x = 5.0;
+    double expected = -0.17759677131433830434739701;
+  
+    double y = gsl_sf_bessel_J0 (x);
+
+    printf ("J0(5.0) = %.18f\n", y);
+    printf ("exact   = %.18f\n", expected);
+  }
+  // Output: 
+  J0(5.0) = -0.177596771314338264
+  exact   = -0.177596771314338292
+  root [14] 
+
+
+#+END_SRC
+
+Complete script using (#prgram cling load) to load the shared
+libraries command:
+
+ - [[https://root-forum.cern.ch/t/how-to-call-external-libraries/10845][How to call external libraries - ROOT - ROOT Forum]]
+
+#+BEGIN_SRC cpp
+  #include <gsl/gsl_errno.h>
+  #include <gsl/gsl_sf_bessel.h>
+
+  #pragma cling load("/lib64/libgslcblas.so.0")
+  #pragma cling load("/lib64/libgsl.so")
+
+  gsl_sf_bessel_J0(4.0);
+  gsl_sf_bessel_J0(5.0);
+  double x = 5.0;
+  double expected = -0.17759677131433830434739701;
+
+  double y = gsl_sf_bessel_J0 (x);
+
+  printf ("J0(5.0) = %.18f\n", y);
+  printf ("exact   = %.18f\n", expected);
+
+#+END_SRC
+
+Complete script using gSystem->Load to add load libraries: 
+
+#+BEGIN_SRC cpp 
+  #include <gsl/gsl_errno.h>
+  #include <gsl/gsl_sf_bessel.h>
+
+  gSystem->Load("/lib64/libgslcblas.so.0");
+  gSystem->Load("/lib64/libgsl.so");
+
+  gsl_sf_bessel_J0(4.0);
+  gsl_sf_bessel_J0(5.0);
+  double x = 5.0;
+  double expected = -0.17759677131433830434739701;
+
+  double y = gsl_sf_bessel_J0 (x);
+
+  printf ("J0(5.0) = %.18f\n", y);
+  printf ("exact   = %.18f\n", expected);
+#+END_SRC
+
+Complete script using gSystem->AddLinkedLibs to load shared libraries: 
+
+#+BEGIN_SRC cpp 
+  #include <gsl/gsl_errno.h>
+  #include <gsl/gsl_sf_bessel.h>
+
+  gSystem->AddLinkedLibs("-lgsl -lgslcblas");
+  // gSystem->AddLinkedLibs("-lgsl");
+  // gSystem->AddLinkedLibs("-lgslcblas");
+
+  gsl_sf_bessel_J0(4.0);
+  gsl_sf_bessel_J0(5.0);
+  double x = 5.0;
+  double expected = -0.17759677131433830434739701;
+
+  double y = gsl_sf_bessel_J0 (x);
+
+  printf ("J0(5.0) = %.18f\n", y);
+  printf ("exact   = %.18f\n", expected);
+
+#+END_SRC
+
+*** Testing Unix System-Calls and APIs 
+**** Get current directory - getcwd()
+
+ - [[http://pubs.opengroup.org/onlinepubs/009695399/functions/getcwd.html][Unix Open Group - getcwd]]
+
+Get current working directory of current process: 
+
+#+BEGIN_SRC cpp 
+  #include <unistd.h>
+
+  root [10] getcwd(nullptr, 0)
+  (char *) "/home/archbox/shared/reflection-root"
+  root [11] 
+
+  root [7] std::string current_dir = getcwd(nullptr, 0)
+  (std::string &) "/home/archbox/shared/reflection-root"
+
+  root [8] current_dir
+  (std::string &) "/home/archbox/shared/reflection-root"
+
+  root [9] std::cout << "Current directory = " << current_dir << std::endl;
+  Current directory = /home/archbox/shared/reflection-root
+
+#+END_SRC
+
+Set current working directory of current process: 
+
+ - [[https://linux.die.net/man/2/chdir][chdir(2): change working directory - Linux man page]]
+
+#+BEGIN_SRC cpp 
+oot [15] 
+root [15] getcwd(nullptr, 0)
+(char *) "/etc"
+root [16] 
+root [16] chdir("/usr/include")
+(int) 0
+root [17] getcwd(nullptr, 0)
+(char *) "/usr/include"
+root [18] chdir("/usr/includeError")
+(int) -1
+root [19] getcwd(nullptr, 0)
+(char *) "/usr/include"
+root [20] 
+
+#+END_SRC
+**** Create a directory - mkdir 
+
+Documentation: 
+ - [[http://pubs.opengroup.org/onlinepubs/009695399/functions/mkdir.html][Open Group Base Specification Issue 6 - mkdir]]
+ - [[https://linux.die.net/man/3/mkdir][mkdir(3): make directory - Linux man page]]
+
+#+BEGIN_SRC cpp 
+  root [9] #include <stdlib.h>
+  root [10] #include <limits.h>  
+  root [11] #include <unistd.h>
+  root [12] #include <sys/stat.h> 
+  root [13] 
+  root [14] mkdir("/home/archbox/Desktop/mydir", 0777)
+  (int) 0
+  root [15] 
+  root [15] mkdir("/home/archbox/Desktop/mydir", 0777)
+  (int) -1
+  root [16] 
+#+END_SRC
+
+**** List directory - opendir 
+
+#+BEGIN_SRC cpp 
+  // #include <string>
+  #include <sys/types.h>
+  #include <dirent.h>  // Get function opendir
+  #include <errno.h>
+
+  void listDirectory(const std::string& path){
+      DIR *dir;
+      struct dirent *dp;
+      dir = opendir(path.c_str()) ;
+      // To determine the cause of error - It is necessary to check the error code.
+      if (dir == NULL)
+       throw std::runtime_error("Error: Cannot read directory");
+      while ((dp = readdir(dir)) != NULL) {
+      std::cout << dp->d_name << std::endl ;
+      };
+      closedir(dir);
+  }
+#+END_SRC
+
+Running in root REPL: 
+
+#+BEGIN_SRC cpp 
+  root [37] listDirectory("/")
+  etc
+  tmp
+  sbin
+  sys
+  opt
+  media
+  .
+  boot
+  .local
+  .autorelabel
+  home
+  var
+  dev
+  .. ... ... 
+
+  root [39] listDirectory("/boot/grub")
+  .
+  splash.xpm.gz
+  ..
+  root [40] 
+  root [40] 
+
+  root [40] listDirectory("/boot/grub/dsafa")
+  Error in <TRint::HandleTermInput()>: std::runtime_error caught: Error: Cannot read directory
+  root [41] 
+  root [41] 
+#+END_SRC
+
+**** Read process output with popen 
+
+#+BEGIN_SRC cpp 
+  // Copy and paste this code in the ROOT REPL
+  {
+          FILE* fp = popen("ls -l /", "r");
+          char ch;
+          std::stringstream ss;
+          if(!fp)
+                  std::cerr << "Error: could not open process output." << std::endl;
+          while((ch = fgetc(fp)) != EOF){
+                  ss << ch;
+          }
+          pclose(fp);
+          std::cout << "Output = " << '\n' << ss.str() << std::flush;	
+  }
+
+  // Ouptut: 
+
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC text 
+  Output = 
+  total 64
+  lrwxrwxrwx.   1 root root     7 Feb 10  2017 bin -> usr/bin
+  dr-xr-xr-x.   7 root root  4096 Jul 15 15:58 boot
+  drwxr-xr-x   23 root root  4220 Sep  8 17:47 dev
+  drwxr-xr-x. 169 root root 12288 Sep 10 03:27 etc
+  drwxr-xr-x.   5 root root  4096 Mar  2  2018 home
+  lrwxrwxrwx.   1 root root     7 Feb 10  2017 lib -> usr/lib
+  lrwxrwxrwx.   1 root root     9 Feb 10  2017 lib64 -> usr/lib64
+  drwx------.   2 root root 16384 Sep 17  2017 lost+found
+  drwxr-xr-x.   2 root root  4096 Feb 10  2017 media
+  drwxr-xr-x.   2 root root  4096 Feb 10  2017 mnt
+   ... .... ... .... ... .... ... .... ... .... 
+#+END_SRC
+
+This unnamed script can be encapsulate into a function: 
+
+#+BEGIN_SRC cpp
+  std::string getProcessOutput(std::string command){
+          FILE* fp = popen(command.c_str(), "r");
+          char ch;
+          std::stringstream ss;
+          if(!fp)
+                  std::cerr << "Error: could not open process output." << std::endl;
+          while((ch = fgetc(fp)) != EOF){
+                  ss << ch;
+          }
+          pclose(fp);
+          return ss.str();
+  }
+
+  root [14] getProcessOutput("date")
+  (std::string) "Mon Sep 10 16:46:06 -03 2018
+  "
+  root [15] getProcessOutput("uname -a")
+  (std::string) "Linux localhost.localdomain 4.16.11-100.fc26.x86_64 #1 SMP Tue May 22 20:02:12 UTC 2018 x86_64 x86_64 x86_64 GNU/Linux
+  "
+  root [16] 
+
+#+END_SRC
+
+** Command Line 
+*** Start ROOT without splashing screen 
+
+ - Command: $ root -l
+
+#+BEGIN_SRC sh 
+$ $HOME/opt/root/bin/root -l
+ERROR in cling::CIFactory::createCI(): cannot extract standard library include paths!
+Invoking:
+  LC_ALL=C ccache  -O3 -DNDEBUG -xc++ -E -v /dev/null 2>&1 >/dev/null | awk '/^#include </,/^End of search/{if (!/^#include </ && !/^End of search/){ print }}' | GREP_OPTIONS= grep -E "(c|g)\+\+"
+Results was:
+With exit code 256
+root [0] 
+root [0] 
+
+#+END_SRC
+
+*** Run a root script at command line 
+**** Example: Run a Ublas - Boost Library Linear Algebra C++ script 
+
+File: ublas.C 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+
+  // Headers for vectors 
+  #include <boost/numeric/ublas/vector.hpp>
+  #include <boost/numeric/ublas/io.hpp>
+
+  // Headers for Matrix 
+  #include <boost/numeric/ublas/matrix.hpp>
+
+  namespace ub = boost::numeric::ublas;
+
+  template<class T>
+  void printVal(const std::string &name, const T &value){
+      std::cout << name << " = " << value << std::endl;
+  }
+
+  void printSection(const std::string &descr){
+      std::cout << descr << std::endl;
+      for(int i = 0; i < descr.size(); i++){
+          std::cout << '-';
+      }
+      std::cout << std::endl;
+  }
+
+  void vecOperation1(){
+      ub::vector<double> vec1(5, 1.0);
+      printVal("vec1", vec1);
+      vec1[1] = 2.4;
+      vec1[2] = 3.5;
+      vec1[3] = -5.0;
+      printVal("vec1", vec1); 
+      printVal("sum(vec1)", sum(vec1));
+      printVal("norm_1(vec1)", norm_1(vec1));
+      printVal("norm_2(vec1)", norm_2(vec1)); 
+      printVal("norm_inf(vec1)", norm_inf(vec1));
+      printVal("index_norm_inf(vec1)", index_norm_inf(vec1)); 
+  }
+
+  void vecOperation2(){
+      ub::vector<double> vec1(3, 2.2) ; vec1[2] = -5.1;
+      ub::vector<double> vec2(3, -1.2); vec2[2] = 1.1;
+
+      double factor = 2.5;
+
+      printVal("vec1", vec1);
+      printVal("vec1.size()", vec1.size());
+
+      printVal("vec2", vec2);
+      printVal("vec2.size()", vec2.size());
+
+      printVal("inner_prod(vec1, vec2)", inner_prod(vec1, vec2));
+
+      printVal("vec1 + vec2", vec1 + vec2);
+      printVal("vec1 - vec2", vec1 - vec2);
+      printVal("vec1 * factor", vec1 * factor);
+      printVal("vec1 / factor", vec1 / factor);
+
+  }
+
+  void matrixOperation1(){
+      ub::matrix<double> matrix1(3, 3, 2.5);
+      matrix1(0, 0) = matrix1(2, 2) = 1.0;
+      matrix1(0, 2) = -3.5; matrix1(2, 0) = 5.9;
+
+      printVal("matrix1     ", matrix1);
+      printVal("Num of rows ", matrix1.size1());
+      printVal("Num of cols ", matrix1.size2());
+      printVal("Transpose   ", trans(matrix1));
+      printVal("Real part   ", real(matrix1));
+
+      matrix1.resize(4, 4);
+      printVal("Matrix resized = matrix1.resize(4, 4)", matrix1);
+
+      printVal("identity_matrix<double>(3)", ub::identity_matrix<double>(3));
+      printVal("zero_matrix<double>(3)", ub::zero_matrix<double>(3));
+
+  }
+
+  // SCRIPT Entry-point - must have the same name as the file.
+  void ublas(){
+      printSection("Running vecOperation1");
+      vecOperation1();
+      std::cout << std::endl; 
+
+      printSection("Running vecOperation2");
+      vecOperation2();
+      std::cout << std::endl;
+
+      printSection("Running matrixOperation1");
+      matrixOperation1();
+  }
+
+#+END_SRC
+
+Running in batch mode: 
+
+#+BEGIN_SRC sh 
+  $ $HOME/opt/root/bin/root -l -q ublas.C
+  ERROR in cling::CIFactory::createCI(): cannot extract standard library include paths!
+  Invoking:
+    LC_ALL=C ccache  -O3 -DNDEBUG -xc++ -E -v /dev/null 2>&1 >/dev/null | awk '/^#include </,/^End of search/{if (!/^#include </ && !/^End of search/){ print }}' | GREP_OPTIONS= grep -E "(c|g)\+\+"
+  Results was:
+  With exit code 256
+
+  Processing ublas.C...
+  Running vecOperation1
+  ---------------------
+  vec1 = [5](1,1,1,1,1)
+  vec1 = [5](1,2.4,3.5,-5,1)
+  sum(vec1) = 2.9
+  norm_1(vec1) = 12.9
+  norm_2(vec1) = 6.70895
+  norm_inf(vec1) = 5
+  index_norm_inf(vec1) = 3
+
+  Running vecOperation2
+  ---------------------
+  vec1 = [3](2.2,2.2,-5.1)
+  vec1.size() = 3
+  vec2 = [3](-1.2,-1.2,1.1)
+  vec2.size() = 3
+  inner_prod(vec1, vec2) = -10.89
+  vec1 + vec2 = [3](1,1,-4)
+  vec1 - vec2 = [3](3.4,3.4,-6.2)
+  vec1 * factor = [3](5.5,5.5,-12.75)
+  vec1 / factor = [3](0.88,0.88,-2.04)
+
+  Running matrixOperation1
+  ------------------------
+  matrix1      = [3,3]((1,2.5,-3.5),(2.5,2.5,2.5),(5.9,2.5,1))
+  Num of rows  = 3
+  Num of cols  = 3
+  Transpose    = [3,3]((1,2.5,5.9),(2.5,2.5,2.5),(-3.5,2.5,1))
+  Real part    = [3,3]((1,2.5,-3.5),(2.5,2.5,2.5),(5.9,2.5,1))
+  Matrix resized = matrix1.resize(4, 4) = [4,4]((1,2.5,-3.5,2.93415e+59),(2.5,2.5,2.5,1.10542e+161),(5.9,2.5,1,9.83212e-72),(1.41746e+190,5.16752e+25,6.32283e+233,6.94321e-307))
+  identity_matrix<double>(3) = [3,3]((1,0,0),(0,1,0),(0,0,1))
+  zero_matrix<double>(3) = [3,3]((0,0,0),(0,0,0),(0,0,0))
+#+END_SRC
+
+** Basic Commands 
+*** Show Help 
+ 
+ + Command: .?
+
+#+BEGIN_SRC text 
+Root [3] .?
+
+ Cling (C/C++ interpreter) meta commands usage
+ All commands must be preceded by a '.', except
+ for the evaluation statement { }
+ ==============================================================================
+ Syntax: .Command [arg0 arg1 ... argN]
+
+   .L <filename>		- Load the given file or library
+
+   .(x|X) <filename>[args]	- Same as .L and runs a function with
+				  signature: ret_type filename(args)
+
+   .> <filename>		- Redirect command to a given file
+      '>' or '1>'		- Redirects the stdout stream only
+      '2>'			- Redirects the stderr stream only
+      '&>' (or '2>&1')		- Redirects both stdout and stderr
+      '>>'			- Appends to the given file
+
+   .undo [n]			- Unloads the last 'n' inputs lines
+
+   .U <filename>		- Unloads the given file
+
+   .I [path]			- Shows the include path. If a path is given -
+				  adds the path to the include paths
+
+   .O <level>			- Sets the optimization level (0-3)
+				  (not yet implemented)
+
+   .class <name>		- Prints out class <name> in a CINT-like style
+
+   .files 			- Prints out some CINT-like file statistics
+
+   .fileEx 			- Prints out some file statistics
+
+   .g 				- Prints out information about global variable
+				  'name' - if no name is given, print them all
+
+   .@ 				- Cancels and ignores the multiline input
+
+   .rawInput [0|1]		- Toggle wrapping and printing the
+				  execution results of the input
+
+   .dynamicExtensions [0|1]	- Toggles the use of the dynamic scopes and the
+				  late binding
+
+   .printDebug [0|1]		- Toggles the printing of input's corresponding
+				  state changes
+
+   .storeState <filename>	- Store the interpreter's state to a given file
+
+   .compareState <filename>	- Compare the interpreter's state with the one
+				  saved in a given file
+
+   .stats [name]		- Show stats for internal data structures
+				  'ast'  abstract syntax tree stats
+				  'asttree [filter]'  abstract syntax tree layout
+				  'decl' dump ast declarations
+				  'undo' show undo stack
+
+   .help			- Shows this information
+
+   .q				- Exit the program
+
+
+#+END_SRC
+
+** References and Bookmarks 
+
+Download: 
+ + https://root.cern.ch/content/release-61404
+
+Documentation: 
+
+ + [[https://root.cern.ch/cint][CINT | ROOT a Data analysis Framework]] 
+ + [[https://www.slac.stanford.edu/BFROOT/www/doc/tutorials/19Jun2000_Root_Tutorial/ROOT_Tutorial.html][ROOT Tutorial Stanford]]
+ + [[https://root.cern.ch/root/htmldoc/guides/users-guide/GettingStarted.html][Chapter: GettingStarted]]
+ + [[http://www.t2.ucsd.edu/twiki2/bin/view/UCSDTier2/AnalysisTutorial][AnalysisTutorial < UCSDTier2 < TWiki]]
+ + [[https://root.cern.ch/root/htmldoc/guides/users-guide/Cling.html][The C++ Interpreter Cling]]
+ + 
+
+Root Reflection Documentation: 
+ + [[https://root.cern/doc/v612/namespaceROOT.html][ROOT: ROOT Namespace Reference]]
+
+Questions: 
+ + [[https://stackoverflow.com/questions/37671030/how-do-you-load-a-library-with-cling][c++ - How do you load a library with cling? - Stack Overflow]]
+
+Files: 
+
+ + *Scripting in the ROOT analysis Framework*
+   + URL:  http://www.ftj.agh.edu.pl/~bold/scripts/wyklady/w5.pdf
+
+ + *Introduction to ROOT Practical Session*
+   + URL:  http://ific.uv.es/~fiorini/ROOTTutorial/root_tutorial.pdf
+
+ + *A Root Guide for Beginners - Root Data Analysis Framework*
+   + URL:   http://web.mit.edu/root_v6.12/ROOT-Primer.pdf
