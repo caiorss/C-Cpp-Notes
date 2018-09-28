@@ -229,3 +229,131 @@ References:
 |                                   |                                                                              |
 |                                   |                                                                              |
 
+** Associative Container - Map methods 
+
+Documentation: 
+ + [[http://www.cplusplus.com/reference/map/map/][map - C++ Reference]]
+
+| Method of map<K, V>          | Return type          |                                                                              |
+|------------------------------+----------------------+------------------------------------------------------------------------------|
+| *Capacity*                     |                      |                                                                              |
+| empty()                      | bool                 | Return true if container empty                                               |
+| size()                       | size_t               | Return number of elements                                                    |
+| max_size()                   | sizet_t              | Return maximum number of elements                                            |
+|                              |                      |                                                                              |
+| *Element Access*               |                      |                                                                              |
+| operator[](K k)              | V&                   | Return value associated to key k. It doesn't throw exception.                |
+| at(K k)                      | V&                   | Return value associated to key k. Note: it can throw exception.              |
+| find(const K& k)             | iterator             | Search for an element and returns map::end if it doesn't find the given key. |
+| count(const K& k)            | size_t               | Count number of elements with a given key.                                   |
+|                              |                      |                                                                              |
+| *Modifiers*                    |                      |                                                                              |
+| clear()                      | void                 | Remove all elements.                                                         |
+| insert(std::pair<K, V> pair) | void                 | Insert a new key-value pair.                                                 |
+| emplace(Args&&& ... args)    | pair<iterator, bool> |                                                                              |
+|                              |                      |                                                                              |
+|                              |                      |                                                                              |
+
+Map example: 
+
+ - File: *map-container.cpp*
+
+#+BEGIN_SRC cpp 
+  #include<iostream>
+  #include<string>
+  #include<map>
+  #include <iomanip>
+
+  struct Point3D{
+          double x;
+          double y;
+          double z;
+          Point3D(): x(0), y(0), z(0){}
+          Point3D(double x, double y, double z): x(x), y(y), z(z){}
+          /* Copy constructor 
+       ,* -> Implement redundant copy constructor for logging purposes and 
+       ,* detect when copy happens. 
+       ,*/
+          Point3D(const Point3D& p){		
+                  std::cerr << " I was copied" << std::endl;
+                  this->x = p.x;
+                  this->y = p.y;
+                  this->z = p.z;
+          }
+          ~Point3D() = default;
+  };
+
+  std::ostream& operator<< (std::ostream& os, const Point3D& p){
+          os << std::setprecision(3) << std::fixed;
+          return os << "Point3D{"
+                            << "x = "  << p.x
+                            << ",y = " << p.y
+                            << ", z = "<< p.z
+                            << "}";
+  }
+
+  int main(){	
+          auto locations = std::map<std::string, Point3D>();
+          locations["point1"] = Point3D(2.0, 3.0, 5.0);
+          locations["pointX"] = Point3D(12.0, 5.0, -5.0);
+          locations["pointM"] =  {121.0, 4.0, -15.0};
+          locations["Origin"] = {}; // Point32{} or Point3D()
+	
+          // Invokes copy constructor
+          std::cerr << "  <== Before inserting" << "\n";
+          locations.insert(std::pair<std::string, Point3D>("PointO1", Point3D(0.0, 0.0, 0.0)));
+          std::cerr << "  <== After inserting" << "\n";
+	
+          // operator[] doesn't throw exception 
+          std::cout << "point1 = " << locations["point1"] << "\n";
+          std::cout << "pointX = " << locations.at("pointX") << "\n";
+          std::cout << "pointM = " << locations.at("pointM") << "\n";
+
+          // Safer and uses exception 
+          try {
+                  std::cout << "pointY = " << locations.at("pointY") << "\n";
+          } catch(const std::out_of_range& ex){
+                  std::cout << "Error - not found element pointY. MSG = " << ex.what() << "\n";
+          }
+
+          if(auto it = locations.find("pointX"); it != locations.end())
+                  std::cout << " [INFO]= => Location pointX found =  " << it->second << "\n";
+
+          if(locations.find("pointMAS") == locations.end())
+                  std::cout << " [ERROR] ==> Location pointMAS  not found" << "\n";
+	
+          std::cout << "Key-Value pairs " << "\n";
+          std::cout << "-------------------------" << "\n";
+          for (const auto& x: locations)
+                  std::cout << x.first << " : " << x.second << "\n";
+          std::cout << '\n';
+
+          return 0;
+  }
+
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC sh 
+  $ clang++ map-container.cpp -o map-container.bin -std=c++1z -Wall -Wextra  && ./map-container.bin
+
+    <== Before inserting
+   I was copied
+   I was copied
+    <== After inserting
+  point1 = Point3D{x = 2.000,y = 3.000, z = 5.000}
+  pointX = Point3D{x = 12.000,y = 5.000, z = -5.000}
+  pointM = Point3D{x = 121.000,y = 4.000, z = -15.000}
+  pointY = Error - not found element pointY. MSG = map::at
+   [INFO]= => Location pointX found =  Point3D{x = 12.000,y = 5.000, z = -5.000}
+   [ERROR] ==> Location pointMAS  not found
+  Key-Value pairs 
+  -------------------------
+  Origin : Point3D{x = 0.000,y = 0.000, z = 0.000}
+  PointO1 : Point3D{x = 0.000,y = 0.000, z = 0.000}
+  point1 : Point3D{x = 2.000,y = 3.000, z = 5.000}
+  pointM : Point3D{x = 121.000,y = 4.000, z = -15.000}
+  pointX : Point3D{x = 12.000,y = 5.000, z = -5.000}
+
+#+END_SRC
