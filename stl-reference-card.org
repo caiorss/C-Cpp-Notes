@@ -79,7 +79,37 @@
      + <cstdbool>, <cstdint>, <cstddef>, <cstdarg>
      + <cstdbool>, <cstdint>, <cstddef>, <cstdarg>
 ** STL Sequential Container Methods - Cheat Sheet  
+*** Use Cases 
 
+Use Cases: 
+ + _vector_
+   + Operations where the vector size is known in advance and it is
+     necessary constant access time for random access to any
+     element. Example of use case: linear algebra and numerical
+     algorithms. Insertion of elements at end or at the front is
+     efficient, however it less efficient than the deque container and
+     whenever a new element is added. Vectors are not ideal for
+     operations where the number of elements is not known because its
+     elements are stored in C-array allocated in the heap, as result,
+     all elements are reallocated whenever a new element is added or
+     removed.
+   + Use cases:
+     + General sequential container
+     + Linear algebra and numerical algorithms 
+     + C++ replacement for C-arrays 
+     + C-arrays interoperability
+ + _deque_
+   + Operations with requires fast random access time and fast
+     insertion or deletion of elements at both ends. Unlike vectors,
+     deque is not stored internally as a C-array and unlike vectors,
+     whenever an element is inserted, any reallocation happens which
+     means that deques are more efficient than vectors when the size
+     of container is not known in advance.
+   + Use Case:
+     + General sequential container
+     + Fast random access
+     + Number of elements aren't known in advance.
+*** Member Functions / Methods reference table 
 
 | Method of Container<T> | Return type | Description                                              | vector | deque | list | array |
 |------------------------+-------------+----------------------------------------------------------+--------+-------+------+-------|
@@ -115,35 +145,8 @@
 | cend()                 | iterator    | Return const iterator to end                             |        |       |      |       |
 | crebegin()             | iterator    | Return const iterator to beginning                       |        |       |      |       |
 | crend()                | iterator    | Return const iterator to end                             |        |       |      |       |
-
-Use Cases: 
- + _vector_
-   + Operations where the vector size is known in advance and it is
-     necessary constant access time for random access to any
-     element. Example of use case: linear algebra and numerical
-     algorithms. Insertion of elements at end or at the front is
-     efficient, however it less efficient than the deque container and
-     whenever a new element is added. Vectors are not ideal for
-     operations where the number of elements is not known because its
-     elements are stored in C-array allocated in the heap, as result,
-     all elements are reallocated whenever a new element is added or
-     removed.
-   + Use cases:
-     + General sequential container
-     + Linear algebra and numerical algorithms 
-     + C++ replacement for C-arrays 
-     + C-arrays interoperability
- + _deque_
-   + Operations with requires fast random access time and fast
-     insertion or deletion of elements at both ends. Unlike vectors,
-     deque is not stored internally as a C-array and unlike vectors,
-     whenever an element is inserted, any reallocation happens which
-     means that deques are more efficient than vectors when the size
-     of container is not known in advance.
-   + Use Case:
-     + General sequential container
-     + Fast random access
-     + Number of elements aren't known in advance. 
+    
+*** Constructors 
 
 Vector constructors: 
 
@@ -203,6 +206,154 @@ References:
  + [[https://embeddedartistry.com/blog/2017/9/11/choosing-the-right-stl-container-sequential-containers][Choosing the Right Container: Sequential Containers — Embedded Artistry]]
  + [[http://cs.stmarys.ca/~porter/csc/ref/stl/containers_sequential.html][STL Sequential Container Member Function Summary]] 
 	 
+*** Tips and tricks 
+**** Pass containers by reference or const reference
+
+If the intent of the operation is not modify the container, it is
+preferrable to pass it by const reference in order to avoid copying
+overhead. 
+
+For instance, the function: 
+
+#+BEGIN_SRC cpp 
+  double computeNorm(std::vector<double> xs)
+  {
+   // The vector xs is copied here, if it has 1GB of memory.
+   // It will use 2GB instead of 1GB!
+    ... ... 
+  }
+#+END_SRC
+
+Should be written as: 
+
+#+BEGIN_SRC cpp 
+  double computeNorm(const std::vector<double>& xs)
+  {
+    ... ... 
+  }
+  double computeNorm(const std::list<double>& xs)
+  {
+    ... ... 
+  }
+  double computeNorm(const std::deque<double>& xs)
+  {
+    ... ... 
+  }
+#+END_SRC
+**** Use the member function emplace_back to avoid uncessary copies.
+
+Example: 
+
+ - file: stl-emplace.cpp
+
+#+BEGIN_SRC cpp :export both :results code
+  #include <iostream>
+  #include <ostream>
+  #include <iomanip>
+  #include <string>
+  #include <vector>
+  #include <deque>
+
+  struct Product{
+          std::string  name;	
+          int          quantity;
+          double       price;
+          Product(){
+                  std::cerr << " [TRACE] - Empty constructor invoked\n";
+          }
+          Product(const std::string& name, int quantity, double price):
+                  name(name),
+                  quantity(quantity),
+                  price(price){
+                  std::cerr << " [TRACE] - Product created as " << *this << "\n" ;
+          }
+          // The compiler generate an copy constructor automatically,
+          // but this one was written to instrument C++ value semantics
+          // and check when copies happen.
+          Product(const Product& p){
+                  this->name		= p.name;
+                  this->quantity	= p.quantity;
+                  this->price		= p.price;
+                  std::cerr << " [TRACE] Copy constructor invoked -> copied = " << *this << "\n";
+          }
+          // Copy assignment-operator
+          void operator=(const Product& p){
+                  this->name		= p.name;
+                  this->quantity	= p.quantity;
+                  this->price		= p.price;
+                  std::cerr << " [TRACE] Copy assignment operator invoked = " << *this << "\n";		
+          }
+          // Make class printable 
+          friend std::ostream& operator<< (std::ostream& os, const Product& p)
+          {
+                  int size1 = 10;
+                  int size2 = 2;
+                  return os << " Product{ "
+                                    << std::setw(1) << " name = "       << p.name
+                                    << std::setw(10) << "; quantity  = "  << std::setw(size2) << p.quantity
+                                    << std::setw(size1) << "; price = "      << std::setw(size2) << p.price
+                                    << " }";
+          }
+  };
+
+
+  int main(){
+          auto inventory = std::deque<Product>();
+
+          // Using push_back
+          std::cerr << "====== Experiment .push_back() ======\n";
+          std::cerr << " [INFO] - Adding orange with .push_back\n";
+          inventory.push_back(Product("Orange - 1kg", 10, 3.50));
+          std::cerr << " [INFO] - Adding rice with .push_back \n";
+          inventory.push_back({"Rice bag", 20, 0.80});
+
+          // Using emlace_back
+          std::cerr << "====== Experiment .emplace_back() ======\n";	
+          std::cerr << " [INFO] - Adding baccon with .emplace_back \n";
+          inventory.emplace_back("Fresh tasty bacon", 50, 30.25);
+          std::cerr << " [INFO] - Adding soft drink with .emplace_back \n";
+          inventory.emplace_back("Soft drink", 100, 2.50);
+
+          std::cerr << " ====== Inventory =======\n";
+          // Print inventory
+          int nth = 0;
+          for(const auto& p: inventory){
+                  std::cout << "product " << nth << " = " << p << "\n";
+                  nth++;
+          }	
+          return 0;
+  }
+
+#+END_SRC
+
+Running:
+
+ - It can be seen in the program output that ~.emplace_back~ doen't
+   invoke the copy constructor, so it has less overhead than
+   ~.emplace_back~ which copies the passed element.
+
+#+BEGIN_SRC txt
+  $ clang++ stl-emplace.cpp -o stl-emplace.bin -g -std=c++11 -Wall -Wextra && ./stl-emplace.bin
+
+  ====== Experiment .push_back() ======
+   [INFO] - Adding orange with .push_back
+   [TRACE] - Product created as  Product{  name = Orange - 1kg; quantity  = 10; price = 3.5 }
+   [TRACE] Copy constructor invoked -> copied =  Product{  name = Orange - 1kg; quantity  = 10; price = 3.5 }
+   [INFO] - Adding rice with .push_back 
+   [TRACE] - Product created as  Product{  name = Rice bag; quantity  = 20; price = 0.8 }
+   [TRACE] Copy constructor invoked -> copied =  Product{  name = Rice bag; quantity  = 20; price = 0.8 }
+  ====== Experiment .emplace_back() ======
+   [INFO] - Adding baccon with .emplace_back 
+   [TRACE] - Product created as  Product{  name = Fresh tasty bacon; quantity  = 50; price = 30.25 }
+   [INFO] - Adding soft drink with .emplace_back 
+   [TRACE] - Product created as  Product{  name = Soft drink; quantity  = 100; price = 2.5 }
+   ====== Inventory =======
+  product 0 =  Product{  name = Orange - 1kg; quantity  = 10; price = 3.5 }
+  product 1 =  Product{  name = Rice bag; quantity  = 20; price = 0.8 }
+  product 2 =  Product{  name = Fresh tasty bacon; quantity  = 50; price = 30.25 }
+  product 3 =  Product{  name = Soft drink; quantity  = 100; price = 2.5 }
+
+#+END_SRC
 ** Methods of C++ STL Vetor<T>
 
 
