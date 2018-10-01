@@ -192,9 +192,10 @@ public:
 		this->addFunction("sin", sin);
 		this->addFunction("cos", cos);
 		this->addFunction("tan", tan);
-		this->_functions["inv"] = [this](){
-									 this->push(1.0 / this->pop());
-								  };
+		this->_functions["inv"] =
+			[this](){
+				this->push(1.0 / this->pop());
+			};
 		// Turn stack value into percent
 		this->_functions["pct"] =
 			[this](){
@@ -287,11 +288,14 @@ auto main() -> int {
 	RPNEvaluator eval{};
 	std::string line;
 
-	eval.addGenFunction("clear", [&](){ eval.clear(); });
-	eval.addGenFunction("quit", [&](){
-									std::cout << " Exiting REPL OK." << "\n";
-									exit(0);
-								});
+	eval.addGenFunction("clear",
+						[&](){ eval.clear();
+						});
+	eval.addGenFunction("quit",
+						[&](){
+							std::cout << " Exiting REPL OK." << "\n";
+							exit(0);
+						});
 	while(true){
 		std::cout << " EXPR+> ";
 		std::getline(std::cin, line);
