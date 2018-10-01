@@ -139,42 +139,49 @@ public:
 			return  text.c_str();
 		}
 	};
-
+	
 	RPNEvaluator()
 	{
 		// Fundamental operators
-		this->_functions["+"] = [this](){
-									double a = this->pop();
-									double b = this->pop();
-									this->push(b + a);
-								};
-		this->_functions["-"] = [this](){
-									double a = this->pop();
-									double b = this->pop();
-									this->push(b - a);
-								};
-		this->_functions["*"] = [this](){
-									double a = this->pop();
-									double b = this->pop();
-									this->push(b * a);
-								};
-		this->_functions["/"] = [this](){
-									double a = this->pop();
-									double b = this->pop();
-									this->push(b / a);
-								};
-		this->_functions["dup"] = [this](){
-									this->push(this->peek());
-								};
-		this->_functions["drop"] = [this](){
-									   this->pop();
-								};
-		this->_functions["swap"] = [this](){
-								    double a = this->pop();
-									double b = this->pop();
-									this->push(a);
-									this->push(b);
-								};
+		this->_functions["+"] =
+			[this](){
+				double a = this->pop();
+				double b = this->pop();
+				this->push(b + a);
+			};
+		this->_functions["-"] =
+			[this](){
+				double a = this->pop();
+				double b = this->pop();
+				this->push(b - a);
+			};
+		this->_functions["*"] =
+			[this](){
+				double a = this->pop();
+				double b = this->pop();
+				this->push(b * a);
+			};
+		this->_functions["/"] =
+			[this](){
+				double a = this->pop();
+				double b = this->pop();
+				this->push(b / a);
+			};
+		this->_functions["dup"] =
+			[this](){
+				this->push(this->peek());
+			};
+		this->_functions["drop"] =
+			[this](){
+				this->pop();
+			};
+		this->_functions["swap"] =
+			[this](){
+				double a = this->pop();
+				double b = this->pop();
+				this->push(a);
+				this->push(b);
+			};
 		// Fundamental transcendental functions
 		this->addFunction("abs", abs);
 		this->addFunction("sqrt", sqrt);
@@ -189,9 +196,10 @@ public:
 									 this->push(1.0 / this->pop());
 								  };
 		// Turn stack value into percent
-		this->_functions["pct"] = [this](){
-									 this->push(this->pop() / 100.0);
-								  };
+		this->_functions["pct"] =
+			[this](){
+				this->push(this->pop() / 100.0);
+			};
 		// Useful binary functions
 		this->addBinaryFunction("hypot", hypot);
 
