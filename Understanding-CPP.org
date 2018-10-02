@@ -893,6 +893,258 @@ Summary:
  + Templates are widely used in the STL (Standard Template Library)
    and the Boost Library.
 
+** Functor Function-Object and higher order functions 
+
+Functor is any object which behaves like a function and callable like
+a function. Unlike C++ ordinary functions, functors can have internal
+state and change its internal data as well.
+
+Functors are implementing in C++ by overloading the function
+application operator. 
+
+The code in the file: [[file:src/cpp-functor.cpp][file:src/cpp-functor.cpp]] shows an
+exhaustive example about how to implement, use functors and implement
+client code using dynamic polymorphism (aka subtyping or inheritance),
+static polymorphism (aka template metaprogramming) and C++11's
+function type _std::function_.
+
+ + Math functor interface class representing a general math function. 
+
+#+BEGIN_SRC cpp  
+  class IMathFunctor {
+  public:
+          // Pure virtual function
+          // => const -> Means that the function cannot change the object internal state.
+          // => (= 0) -> Means abstract member function or abstract method.
+          virtual double operator()(double x)	const = 0;
+          virtual ~IMathFunctor() = default;
+  };
+#+END_SRC
+
+ - Linear Function "C++ functor." - function-object 
+
+#+BEGIN_SRC cpp 
+  /** Linear Function "C++ functor." - function-object 
+   ,*   LinFun(x) = A * x + B
+   ,*/
+  class LinFun: public IMathFunctor {
+  private:
+          // Linear coefficient or line slope 
+          double _a; 
+          double _b;
+  public:
+          LinFun(double a, double b): _a(a), _b(b){}
+          auto getA()				-> double   { return _a;}
+          auto setA(double a)			-> void	    { _a = a; }
+          auto getB()				-> double   { return _b;}
+          auto setB(double b)			-> void	    { _b = b; }
+
+          // Function-call operator => Makes this object callable
+          //------------------------------
+          // double operator()(double x)	-> double	{ return _a * x + _b;}	
+          double operator()(double x)	const { return _a * x + _b;}	
+  };
+#+END_SRC
+
+Higher order functions (functions that calls or return functions) can
+be implemented using dynamic polymorphis or inheritance; static
+polymorphism, also known as template metaprogramming and using the
+type std::function from C++11.
+
+
+ - *Higher order function using dynamic polymorphism*
+   (inheritance). This function only accepts implementations of
+   IMathFunctor and cannot worth with an arbitrary function-object,
+   ordinary functions or C++11 lambda function. Another drawback is
+   the runtime overhead of virtual function-calls.
+
+Example:
+
+#+BEGIN_SRC cpp 
+  void tabulateDynamic(const IMathFunctor& fun, double start, double stop, double step){
+          std::cout << std::fixed << std::setprecision(3);
+          for(double x = start; x <= stop ; x += step)
+                  std::cout << std::setw(10) << x << std::setw(10) << fun(x) << "\n";
+  }
+#+END_SRC
+
+Usage:
+
+#+BEGIN_SRC cpp 
+    tabulatDynamic(fun1, 0.0, 5.0, 1.0);
+#+END_SRC
+
+Sample Output: 
+
+#+BEGIN_SRC text 
+  -----> Tabulating fun1
+      0.000     4.000
+      1.000     7.000
+      2.000    10.000
+      3.000    13.000
+      4.000    16.000
+      5.000    19.000
+#+END_SRC
+
+ - *Higher order function using static polymorphism* - The advantage
+   of this function is that it can work with any callable object like
+   functors (function-objects), ordinary functions and C++11 lambda
+   functions. Another benefit is the lower runtime overhead than the
+   implementation using dynamic polymorphism. For this case, the
+   runtime cost of dynamic polymorphism is not significant, however it
+   can become noticeable on large scale computation or high
+   performance computations.
+
+ - Example:
+
+#+BEGIN_SRC cpp 
+  template<class Function>
+  void tabulateStatic(const Function& fun, double start, double stop, double step){
+          std::cout << std::fixed << std::setprecision(3);
+          for(double x = start; x <= stop ; x += step)
+                  std::cout << std::setw(10) << x << std::setw(10) << fun(x) << "\n";
+  }
+#+END_SRC
+
+Usage:
+
+#+BEGIN_SRC cpp 
+    std::cout << " -----> Tabulating fun1" << nl;
+    tabulateStatic(fun1, 0.0, 5.0, 1.0);
+    std::cout << " -----> Tabulating fun2" << nl;
+    tabulateStatic(fun2, 0.0, 5.0, 1.0);
+#+END_SRC
+
+
+ - *Higher order function using the C++11 type std::function* - The type
+   std::function provides type erasure and can work with any functor,
+   ordinary function and C++11 lambda functions, in addition it also
+   allows all those types of functions to be stored in STL containers.
+
+Example: 
+
+#+BEGIN_SRC cpp 
+  void tabulateLambdaList(
+           const std::vector<std::function<double (double)>> funlist
+          ,double start
+          ,double stop
+          ,double step
+          ){
+          std::cout << std::fixed << std::setprecision(3);
+          for(double x = start; x <= stop ; x += step){
+                  std::cout << std::setw(10) << x;
+                  // const auto& is used for avoid uncessary copies 
+                  for(const auto& fun: funlist)
+                          std::cout << std::setw(10) << fun(x);
+                  std::cout << "\n";
+          }
+  }
+#+END_SRC
+
+Usage:
+
+#+BEGIN_SRC cpp 
+   tabulateLambdaList({fun1, fun2, exp, ordinaryFunction}, 0.0, 5.0, 1.0)
+#+END_SRC
+
+Output:
+
+#+BEGIN_SRC text 
+         x         fun1     fun2      exp      ordinaryFunction
+       0.000     4.000     4.000     1.000     0.000
+       1.000     7.000     9.000     2.718     3.000
+       2.000    10.000    18.000     7.389     6.000
+       3.000    13.000    31.000    20.086     9.000
+       4.000    16.000    48.000    54.598    12.000
+       5.000    19.000    69.000   148.413    15.000
+#+END_SRC
+
+Compilation of [[file:src/cpp-functor.cpp][file:src/cpp-functor.cpp]] 
+
+#+BEGIN_SRC sh 
+  $ clang++ cpp-functor.cpp -o cpp-functor.bin -g -std=c++11 -Wall -Wextra &&
+#+END_SRC
+
+Complete program output of [[file:src/cpp-functor.cpp][file:src/cpp-functor.cpp]] 
+
+#+BEGIN_SRC sh 
+  ./cpp-functor.bin
+
+  a = 3 ; b = 4
+  fun1(3.0) = 13
+  fun1(4.0) = 16
+  fun1(5.0) = 19
+  =======================
+  a = 2 ; b = 3 ; c = 4
+  fun2(3.0) = 31
+  fun2(4.0) = 48
+  fun2(5.0) = 69
+  ======= [1] Client Code using dynamic polymorphism  ================
+   -----> Tabulating fun1
+       0.000     4.000
+       1.000     7.000
+       2.000    10.000
+       3.000    13.000
+       4.000    16.000
+       5.000    19.000
+   -----> Tabulating fun2
+       0.000     4.000
+       1.000     9.000
+       2.000    18.000
+       3.000    31.000
+       4.000    48.000
+       5.000    69.000
+  ======= [2] Client Code using dynamic polymorphism  ================
+       0.000     4.000     4.000
+       1.000     7.000     9.000
+       2.000    10.000    18.000
+       3.000    13.000    31.000
+       4.000    16.000    48.000
+       5.000    19.000    69.000
+  ======= Client Code using static polymorphism (template)  ================
+   -----> Tabulating fun1
+       0.000     4.000
+       1.000     7.000
+       2.000    10.000
+       3.000    13.000
+       4.000    16.000
+       5.000    19.000
+   -----> Tabulating fun2
+       0.000     4.000
+       1.000     9.000
+       2.000    18.000
+       3.000    31.000
+       4.000    48.000
+       5.000    69.000
+   -----> Tabulating lambda function f(x) = x * x
+       0.000     0.000
+       1.000     1.000
+       2.000     4.000
+       3.000     9.000
+       4.000    16.000
+       5.000    25.000
+   -----> Tabulating ordinary function f(x) = 3 * x
+       0.000     0.000
+       1.000     3.000
+       2.000     6.000
+       3.000     9.000
+       4.000    12.000
+       5.000    15.000
+   -----> Tabulating ordinary function f(x) = exp(x)
+       0.000     1.000
+       1.000     2.718
+       2.000     7.389
+       3.000    20.086
+       4.000    54.598
+       5.000   148.413
+  ======= Client Code using C++11 lambda std::function  ================
+       0.000     4.000     4.000     1.000     0.000
+       1.000     7.000     9.000     2.718     3.000
+       2.000    10.000    18.000     7.389     6.000
+       3.000    13.000    31.000    20.086     9.000
+       4.000    16.000    48.000    54.598    12.000
+       5.000    19.000    69.000   148.413    15.000
+#+END_SRC
 ** C++11 - Scoped Enum
 
 Scoped enumerations are a more type-safe alternative to the old
