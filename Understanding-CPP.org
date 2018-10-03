@@ -1371,9 +1371,114 @@ Complete program output of [[file:src/cpp-functor.cpp][file:src/cpp-functor.cpp]
     and the Boost Library.
 *** Templates and C++ iterators 
 
-Templates can be used for writing stl-like algorithms or higher order
-functions that operates on any type of iterator and process any type
-of SLT containers.
+Templates can be used for writing more generic and resuable code which
+operates like functions or STL algorithms on  any type of iterator or
+container. 
+
+This example shows how to implement generic code which operates on any
+type of container or iterator in modern C++.
+
+ + File: [[file:src/template-iterator-container.cpp][file:src/template-iterator-container.cpp]]
+
+Code highlights:
+
+#+BEGIN_SRC cpp 
+  namespace IterUtils{
+          template<class Iterator>
+          double sumContainer(const Iterator& begin, const Iterator& end){
+                  double sum = 0.0;
+                  for(Iterator it = begin; it != end; ++it)
+                          sum += *it;
+                  return sum;
+          }
+
+          // Sum elements of any type <Container> with methods .begin() and .end()
+          // returnign iterators.
+          template<class U, class Container>
+          auto sumContainer2(const Container& container) -> U{
+                  U sum{}; // Uniform initialization
+                  for(auto it = container.begin(); it != container.end(); ++it)
+                          sum += *it;
+                  return sum;
+          }
+
+          template<class Iterator>
+          auto printContainer(
+                  const Iterator& begin,
+                  const Iterator& end,
+                  const std::string& sep = ", " ) -> void
+          {
+                  for(Iterator it = begin; it != end; ++it)
+                          std::cout <<  *it << sep;
+          }
+
+          template<class Container>
+          auto printContainer2(
+                    const Container& cont
+                   ,const std::string& sep = ", "
+                  ) -> void
+          {
+                  // C++11 For-range based loop
+                  for(const auto& x: cont)
+                          std::cout <<  x << sep;
+          }
+
+          // Higher order function
+          // The parameter actions accepts any type which can be called like
+          // a function returning void.
+          //
+          // Note: It doesn't matter as it is possible to use both class T or typename T.
+          template<typename Container, typename Function>
+          auto for_each (const Container cont, Function action) -> void
+          {
+                  for(const auto& x: cont) action(x);
+          }
+
+  }; // ----- End of namespace IterUtils ----- //
+#+END_SRC
+
+Program output: 
+
+#+BEGIN_SRC sh 
+  $ clang++ template-iterator-container.cpp -o template-iterator-container.bin -g -std=c++11 -Wall -Wextra 
+  $ ./template-iterator-container.bin
+
+  =========== Experiment 1 - sumContainer
+  template-iterator-container.cpp:95: ; iu::sumContainer(&carray[0], &carray[0] + arrsize) = 16
+  template-iterator-container.cpp:96: ; iu::sumContainer(vec1.begin(), vec1.end()) = 16
+  template-iterator-container.cpp:97: ; iu::sumContainer(list1.begin(), list1.end()) = 16
+  template-iterator-container.cpp:98: ; iu::sumContainer(deque1.begin(), deque1.end()) = 16
+
+  =========== Experiment 2 - sumContainer2 
+  template-iterator-container.cpp:101: ; iu::sumContainer2<double>(vec1) = 16
+  template-iterator-container.cpp:102: ; iu::sumContainer2<int>(vec1) = 15
+  template-iterator-container.cpp:103: ; iu::sumContainer2<double>(list1) = 16
+  template-iterator-container.cpp:104: ; iu::sumContainer2<int>(list2) = 114
+
+  =========== Experiment 3 - printContainer 
+
+  Contents of carray  = 1, 2, 4.5, 2.5, 6, 
+  Contents of vec1  = 1, 2, 4.5, 2.5, 6, 
+  Contents of vec2  = c++, templates, awesome, binary, 
+  Contents of list1 = 1, 2, 4.5, 2.5, 6, 
+
+  =========== Experiment 4 - printContainer2 
+
+  Contents of vec1  = 1, 2, 4.5, 2.5, 6, 
+  Contents of vec2  = c++, templates, awesome, binary, 
+  Contents of list1 = 1, 2, 4.5, 2.5, 6, 
+
+  =========== Experiment 5 - for_each higher order function 
+
+  Contents of vec1  = 1, 2, 4.5, 2.5, 6, 
+  Contents of vec2  = c++, templates, awesome, binary, c++, templates, awesome, binary, 
+  Contents of m1  = 
+    earth-gravity     9.810
+            euler     2.718
+               pi     3.142
+                x     2.345
+
+#+END_SRC
 
 *** Basic Template Specialization 
     :PROPERTIES:
@@ -1778,7 +1883,6 @@ Papers and technical documents about Generic Programming and Template Metaprogra
 
 
  
-
 ** C++11 - Uniform Initialization
 
 The C++11 uniform initialization feature allows classes, STL
