@@ -1565,7 +1565,7 @@ Program output:
 *** Template Specilization for Metafunctions 
 
 Metafunction is a template metaprogramming technique for type
-instrospection, type manipulation and type computation. This idiom
+introspection, type manipulation and type computation. This idiom
 uses templates, template specialization, structs (classes with
 everything public) and constexpr in C++11.
 
@@ -1583,7 +1583,74 @@ Example in file: [[file:src/template-metafunction.cpp][file:src/template-metafun
    template specialization, catalog type information and display the
    user as well. 
 
-Program output: 
+Highlights: 
+
+ - The *metafunction isPointer* checks whether a given type is a
+   pointer.
+
+#+BEGIN_SRC cpp
+  template<class T>
+  struct isPointer{
+          static constexpr bool value = false;
+          constexpr bool operator()() const { return false; }
+  };
+
+  template<class T>
+  struct isPointer<T*>{
+          static constexpr bool value = true;
+          constexpr bool operator()() const { return true; }
+  };
+#+END_SRC
+
+Sample usage:
+
+#+BEGIN_SRC cpp 
+  std::cout << "isPointer<short*>::value  = " << isPointer<short*>::value << "\n";
+  std::cout << "isPointer<short>::value   = " << isPointer<short>::value << "\n";
+  std::cout << "isPointer<double>::value  = " << isPointer<double>::value << "\n";
+  std::cout << "isPointer<double*>::value = " << isPointer<double*>::value << "\n";
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC text 
+  isPointer<short*>::value  = true
+  isPointer<short>::value   = false
+  isPointer<double>::value  = false
+  isPointer<double*>::value = true
+#+END_SRC
+
+  - The *meta function removePointer* turns any pointer type into a
+    non-pointer type removing the star operator.
+
+#+BEGIN_SRC cpp 
+  // Partial specilization
+  template<class T> struct removePointer{
+          typedef T type;
+  };
+  template<class T> struct removePointer<T*>{
+          typedef T type;
+  };
+#+END_SRC
+
+Usage: 
+
+#+BEGIN_SRC cpp 
+  disp(Typeinfo<removePointer<double>::type>::name);
+  disp(Typeinfo<removePointer<double*>::type>::name);
+  disp(Typeinfo<removePointer<const char*>::type>::name);
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC text 
+  template-metafunction.cpp:175: ; Typeinfo<removePointer<double>::type>::name = double
+  template-metafunction.cpp:176: ; Typeinfo<removePointer<double*>::type>::name = double
+  template-metafunction.cpp:177: ; Typeinfo<removePointer<const char*>::type>::name = const char
+#+END_SRC
+
+
+ *Complete Program output:*
 
 #+BEGIN_SRC text 
    $ clang++ template-metafunction.cpp -o template-metafunction.bin -g -std=c++11 -Wall -Wextra  
