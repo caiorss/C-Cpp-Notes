@@ -1649,6 +1649,47 @@ Output:
   template-metafunction.cpp:177: ; Typeinfo<removePointer<const char*>::type>::name = const char
 #+END_SRC
 
+ -  *The metafunction Typeinfo* computes basic information about types at
+   compile-time. As this "metafunction" relies on template
+   specialization, it requires defining template specialization for
+   all supported types what can be cumbersome. In order to avoid the
+   specialization boilerplate code, the macro ~REGISTER_TYPE_INFO~ is
+   used to register the supported types. 
+
+#+BEGIN_SRC cpp 
+  template<typename T>
+  struct Typeinfo{
+          static constexpr const char* name	 = "unknown";
+          static constexpr size_t      size	 = sizeof(T);
+          static constexpr bool        isNumber	 = false;
+          static constexpr bool        isPointer = ::isPointer<T>::value;
+          static constexpr bool        isConst	 = ::isConst<T>::value;		
+  };
+
+  // Macro for type registration 
+  #define REGISTER_TYPE_INFO(type, isNumberFlag) \
+          template<> struct Typeinfo<type>{ \
+                  static constexpr const char* name		= #type; \
+                  static constexpr size_t      size		= sizeof(type); \
+                  static constexpr bool        isNumber	= isNumberFlag;	\
+                  static constexpr bool        isPointer	= ::isPointer<type>::value; \
+                  static constexpr bool        isConst	= ::isConst<type>::value;	\
+          }
+
+   // Type registration 
+   REGISTER_TYPE_INFO(bool, false);
+   REGISTER_TYPE_INFO(char, false);
+#+END_SRC
+
+Usage example: 
+
+#+BEGIN_SRC cpp 
+  std::cout << "Type info for " << Typeinfo<int>>::name 
+            << " size = " << Typeinfo<int>::size 
+            << " isPointer = " << Typeinfo<int>::isPointer 
+            << "\n";
+#+END_SRC
+
 
  *Complete Program output:*
 
