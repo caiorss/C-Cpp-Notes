@@ -791,6 +791,155 @@ reference or create a reference to the object.
 
   + 
 
+** C++11 - Uniform Initialization
+
+The C++11 uniform initialization feature allows classes, STL
+containers (collections) and primitives values to be initialized in a
+uniform way similar to vectors and C-arrays. 
+
+ - Uniform initialization of primitive types: 
+
+#+BEGIN_SRC cpp 
+  int    x {};   // x = 0
+  double fd {};  // fd = 0.0
+  float  ff {};  // ff = 0.0f
+  bool   flag{}; // flag = false = 0 
+#+END_SRC
+
+ - Uniform initialization of C-arrays 
+
+#+BEGIN_SRC cpp 
+  int xs[] {10, 20, 30};  //  int xs[] =  {10, 20, 30};
+  double ys[3] {1.0};     //  double ys[] = {1.0};
+#+END_SRC
+
+ - Uniform initialization of pointers 
+
+#+BEGIN_SRC cpp 
+  double* fdptr{} ; // fdptr = nullptr 
+#+END_SRC
+
+ - Uniform initialization of STL containers: 
+
+#+BEGIN_SRC cpp 
+  std::string s {};                // s = ""
+  std::string s {"Hello world"};   // s = "Hello World"
+
+  // Vectors 
+  std::vector<double> xs {};                      
+  std::vector<double> ys {2.0, 3.0, 4.0, 5.0};
+  std::vector<string> zs {"apple", "orange", "grape", "banana"};
+  // Lists
+  std::list<double>   xs {};
+  std::list<double>   ys{2.0, 3.0, 4.0, 5.0};   
+  // Sets 
+  std::set<double>    xs{};
+  std::set<double>    ys {3.0, 4.0, 3.0, 10.0};
+  // Unordered set 
+  std::unordered_set<int>    xs{};
+  std::unordered_set<string> zs {"apple", "orange", "grape", "banana"};
+
+  // Maps, aka hash map, aka dictionary, aka hash table 
+  std::map<std::string,double> prices {{"orange", 10.0}, {"grapes", 25.12}, {"apple", 4.12}};
+#+END_SRC
+
+ - Initialization of C-structus POD - Plain Old Data 
+
+#+BEGIN_SRC cpp 
+  struct Point3D{
+      double x;
+      double y;
+      double z;
+  };
+
+  // Before C++11
+  //---------------------------
+  Point3D pa;
+  pa.x = 10.0;
+  pa.y = 20.0;
+  pa.z = 35.0;
+
+  // After C++11
+  //---------------------------
+  Point3D pb {10.0, 20.0, 35.0};
+  Point3D pc = {10.0, 20.0, 35.0};
+
+  // C++ Vector - way 1
+  std::vector<Point3D> {{ 20.0, 15.0, 5.0}, { 10.0, 25.0, 12.4}, {-14.0, 0.32, 51.43}};
+
+  // C++ Vector - way 2 
+  std::vector<Point3D> {
+        Point3D{ 20.0, 15.0, 5.0}
+       ,Point3D{ 10.0, 25.0, 12.4}
+       ,Point3D{-14.0, 0.32, 51.43}
+  };
+
+  // C++ Map Containers 
+  std::map<std::string, Point3D> locations = {
+       {"City 1",    { 20.0, 15.0, 5.0}}
+      ,{"Somewhere", { 10.0, 25.0, 12.4}}
+      ,{"Nowhere",   {-14.0, 0.32, 51.43}}     
+  };
+
+  // or in more pleasant notation 
+  // C++ Map Containers 
+  auto locations2 = std::map<std::string, Point3D> {
+       {"City 1",    { 20.0, 15.0, 5.0}}
+      ,{"Somewhere", { 10.0, 25.0, 12.4}}
+      ,{"Nowhere",   {-14.0, 0.32, 51.43}}     
+  };
+
+  //--- Functions -------//
+
+  Point3D makeOriginPoint(){
+      // return Point3D{0.0, 0.0, 0.0};
+      return {0.0, 0.0, 0.0};
+  }
+
+#+END_SRC
+
+Classes: 
+
+#+BEGIN_SRC cpp 
+  class A{
+  public: 
+      A(double x, double y, double z, std::string name):
+          m_x(x),
+          m_y(y),
+          m_z(z),
+          m_name(name) {      
+      }
+      auto getX() -> double{ return m_x;}
+      auto getY() -> double {return m_y;}
+      auto getZ() -> double {return m_z;} 
+  private:
+      double m_x;
+      double m_y;
+      double m_z; 
+  };
+
+  void display(const A& a){
+      std::cout << "A (" << a.getX() << " " << a.getY() << a.getZ() << ")" << "\n";
+  }
+
+  int main(){
+      A instance1 {10.0, 20.0, 15.0, "unknown binary blob"};  
+      display(instance1);
+      display({10.0, 20.0, 15.0, "unknown binary blob"});
+      return 0;
+  }
+
+#+END_SRC
+
+References: 
+
+ + [[http://scottmeyers.blogspot.com/2015/09/thoughts-on-vagaries-of-c-initialization.html][The View from Aristeia: Thoughts on the Vagaries of C++ Initialization]]
+ + [[https://www.codeguru.com/cpp/cpp/article.php/c19081/C-2011-Uniform-Initialization.htm][C++ 2011: Uniform Initialization]]
+ + [[https://mbevin.wordpress.com/2012/11/16/uniform-initialization/][Lesson #3: Uniform Initialization | Mike's C++11 Blog]]
+ + [[https://softwareengineering.stackexchange.com/questions/133688/is-c11-uniform-initialization-a-replacement-for-the-old-style-syntax][c++ - Is C++11 Uniform Initialization a replacement for the old style syntax? - Software Engineering Stack Exchange]]
+ + 
+ + 
+
 ** C++11 - Scoped Enum
 
 Scoped enumerations are a more type-safe alternative to the old
@@ -1879,159 +2028,6 @@ Papers and technical documents about Generic Programming and Template Metaprogra
 
  + Gabriel Dos Reis and Jaakko Jarvi. *What is Generic Programming?*
    + <https://pdfs.semanticscholar.org/e730/3991015a041e50c7bdabbe4cb4678531e35b.pdf>
-
-
-
- 
-** C++11 - Uniform Initialization
-
-The C++11 uniform initialization feature allows classes, STL
-containers (collections) and primitives values to be initialized in a
-uniform way similar to vectors and C-arrays. 
-
- - Uniform initialization of primitive types: 
-
-#+BEGIN_SRC cpp 
-  int    x {};   // x = 0
-  double fd {};  // fd = 0.0
-  float  ff {};  // ff = 0.0f
-  bool   flag{}; // flag = false = 0 
-#+END_SRC
-
- - Uniform initialization of C-arrays 
-
-#+BEGIN_SRC cpp 
-  int xs[] {10, 20, 30};  //  int xs[] =  {10, 20, 30};
-  double ys[3] {1.0};     //  double ys[] = {1.0};
-#+END_SRC
-
- - Uniform initialization of pointers 
-
-#+BEGIN_SRC cpp 
-  double* fdptr{} ; // fdptr = nullptr 
-#+END_SRC
-
- - Uniform initialization of STL containers: 
-
-#+BEGIN_SRC cpp 
-  std::string s {};                // s = ""
-  std::string s {"Hello world"};   // s = "Hello World"
-
-  // Vectors 
-  std::vector<double> xs {};                      
-  std::vector<double> ys {2.0, 3.0, 4.0, 5.0};
-  std::vector<string> zs {"apple", "orange", "grape", "banana"};
-  // Lists
-  std::list<double>   xs {};
-  std::list<double>   ys{2.0, 3.0, 4.0, 5.0};   
-  // Sets 
-  std::set<double>    xs{};
-  std::set<double>    ys {3.0, 4.0, 3.0, 10.0};
-  // Unordered set 
-  std::unordered_set<int>    xs{};
-  std::unordered_set<string> zs {"apple", "orange", "grape", "banana"};
-
-  // Maps, aka hash map, aka dictionary, aka hash table 
-  std::map<std::string,double> prices {{"orange", 10.0}, {"grapes", 25.12}, {"apple", 4.12}};
-#+END_SRC
-
- - Initialization of C-structus POD - Plain Old Data 
-
-#+BEGIN_SRC cpp 
-  struct Point3D{
-      double x;
-      double y;
-      double z;
-  };
-
-  // Before C++11
-  //---------------------------
-  Point3D pa;
-  pa.x = 10.0;
-  pa.y = 20.0;
-  pa.z = 35.0;
-
-  // After C++11
-  //---------------------------
-  Point3D pb {10.0, 20.0, 35.0};
-  Point3D pc = {10.0, 20.0, 35.0};
-
-  // C++ Vector - way 1
-  std::vector<Point3D> {{ 20.0, 15.0, 5.0}, { 10.0, 25.0, 12.4}, {-14.0, 0.32, 51.43}};
-
-  // C++ Vector - way 2 
-  std::vector<Point3D> {
-        Point3D{ 20.0, 15.0, 5.0}
-       ,Point3D{ 10.0, 25.0, 12.4}
-       ,Point3D{-14.0, 0.32, 51.43}
-  };
-
-  // C++ Map Containers 
-  std::map<std::string, Point3D> locations = {
-       {"City 1",    { 20.0, 15.0, 5.0}}
-      ,{"Somewhere", { 10.0, 25.0, 12.4}}
-      ,{"Nowhere",   {-14.0, 0.32, 51.43}}     
-  };
-
-  // or in more pleasant notation 
-  // C++ Map Containers 
-  auto locations2 = std::map<std::string, Point3D> {
-       {"City 1",    { 20.0, 15.0, 5.0}}
-      ,{"Somewhere", { 10.0, 25.0, 12.4}}
-      ,{"Nowhere",   {-14.0, 0.32, 51.43}}     
-  };
-
-  //--- Functions -------//
-
-  Point3D makeOriginPoint(){
-      // return Point3D{0.0, 0.0, 0.0};
-      return {0.0, 0.0, 0.0};
-  }
-
-#+END_SRC
-
-Classes: 
-
-#+BEGIN_SRC cpp 
-  class A{
-  public: 
-      A(double x, double y, double z, std::string name):
-          m_x(x),
-          m_y(y),
-          m_z(z),
-          m_name(name) {      
-      }
-      auto getX() -> double{ return m_x;}
-      auto getY() -> double {return m_y;}
-      auto getZ() -> double {return m_z;} 
-  private:
-      double m_x;
-      double m_y;
-      double m_z; 
-  };
-
-  void display(const A& a){
-      std::cout << "A (" << a.getX() << " " << a.getY() << a.getZ() << ")" << "\n";
-  }
-
-  int main(){
-      A instance1 {10.0, 20.0, 15.0, "unknown binary blob"};  
-      display(instance1);
-      display({10.0, 20.0, 15.0, "unknown binary blob"});
-      return 0;
-  }
-
-#+END_SRC
-
-References: 
-
- + [[http://scottmeyers.blogspot.com/2015/09/thoughts-on-vagaries-of-c-initialization.html][The View from Aristeia: Thoughts on the Vagaries of C++ Initialization]]
- + [[https://www.codeguru.com/cpp/cpp/article.php/c19081/C-2011-Uniform-Initialization.htm][C++ 2011: Uniform Initialization]]
- + [[https://mbevin.wordpress.com/2012/11/16/uniform-initialization/][Lesson #3: Uniform Initialization | Mike's C++11 Blog]]
- + [[https://softwareengineering.stackexchange.com/questions/133688/is-c11-uniform-initialization-a-replacement-for-the-old-style-syntax][c++ - Is C++11 Uniform Initialization a replacement for the old style syntax? - Software Engineering Stack Exchange]]
- + 
- + 
-
 ** C++17 New Features 
 *** Cpp17 std::invoke 
     :PROPERTIES:
