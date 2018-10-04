@@ -2020,14 +2020,189 @@ Usage example:
    template-metafunction.cpp:176: ; Typeinfo<removePointer<double*>::type>::name = double
    template-metafunction.cpp:177: ; Typeinfo<removePointer<const char*>::type>::name = const char
 #+END_SRC
+*** Variadic Templates 
+
+This code shows examples about variadic templates in C++11 and
+newer standards.
+
+File: [[file:src/template-variadic.cpp][file:src/template-variadic.cpp]]
+
+Code Highlights:
+
+
+ - Print a sequence of heterogenous arguments.
+
+#+BEGIN_SRC cpp 
+  template<typename T>
+  void printTypes(const T& x){	
+          std::cout << std::left << std::setw(15) << x
+                                    << std::setw(10) << std::right << " size = "
+                                    << std::setw(2) << sizeof(x) << "\n";
+          std::clog << " [TRACE] Base case => x = " << x << "\n";
+  }
+  // Variadic template arguments 
+  template<typename T, typename ... Types>
+  void printTypes(const T& x, const Types ... args){
+          std::cout << std::left << std::setw(15) << x
+                                    << std::setw(10) << std::right << " size = "
+                                    << std::setw(2) << sizeof(x) << "\n";
+          printTypes(args ...);
+  }
+#+END_SRC
+
+Usage: 
+
+#+BEGIN_SRC cpp 
+   printTypes("hello world", 10, 'x', 20.23f, true, NAN);
+#+END_SRC
+
+Ouput: 
+
+#+BEGIN_SRC text 
+  hello world       size = 12
+  10                size =  4
+  x                 size =  1
+  20.23             size =  4
+  1                 size =  1
+  nan               size =  4
+#+END_SRC
+
+
+ - Create a function that applies a member function to a given object.
+
+#+BEGIN_SRC cpp 
+  template<class T, class R, class ... Args>
+  auto makeCommand(
+          // Pointer to member function 
+          R (T::* pMemfn) (Args ... args),
+          // Member function arguments 
+          Args ... arglist) -> std::function<R (T& obj)> {
+          return [=](T& obj){ return (obj.*pMemfn)(arglist ...); };
+  }
+#+END_SRC
+
+Usage:
+
+#+BEGIN_SRC cpp
+   CNCMachine mach1("7Z9FA");
+   CNCMachine mach2("MY9FT");
+   auto setSpeed10 = makeCommand(&CNCMachine::setSpeed, 10);
+   auto shutdown   = makeCommand(&CNCMachine::shutdown);
+   setSpeed10(mach1);
+   setSpeed10(mach2);
+   shutdown(mach2);
+#+END_SRC
+
+ - Dynamic load an [U] nix-shared library or shared object.
+
+#+BEGIN_SRC cpp 
+  /** Type synonym for shared library handler 
+   ,*  Requires: #include <dlfcn.h> and -ldl linker flag */
+  using LibHandle = std::unique_ptr<void, std::function<void (void*)>>;
+
+  auto loadDLL(const std::string& libPath) -> LibHandle {
+          // Return unique_ptr for RAAI -> Resource Acquisition is Initialization
+          // releasing closing handle when the unique_ptr goes out of scope. 
+          return LibHandle(
+                  dlopen(libPath.c_str(), RTLD_LAZY),
+                  [](void* h){
+                          std::cout << " [INFO] Shared library handle released OK." << "\n";
+                          dlclose(h);
+                  });		
+  }
+
+  /** Load symbol from shared library 
+    ,*  Requires: #include <dlfcn.h> and -ldl linker flag */
+  template<typename Function>
+  auto loadSymbol(const LibHandle& handle, const std::string& symbol) -> Function* {
+          void* voidptr = dlsym(handle.get(), symbol.c_str());
+          if(voidptr == nullptr)
+                  return nullptr;
+          return reinterpret_cast<Function*>(voidptr);
+  }
+#+END_SRC
+
+Usage: 
+
+#+BEGIN_SRC cpp 
+   // GNU Scientific Library - Linear Algebra CBLAS 
+   auto handle1 = loadDLL("/usr/lib64/libgslcblas.so");
+   using cblas_daxpy_type = void (int, double, const double*, int, double*, int);
+   auto cblas_daxpy = loadSymbol<cblas_daxpy_type>(handle1, "cblas_daxpy");
+   // Or 
+   auto cblas_daxpy = loadSymbol<void (int, double, const double*, int, double*, int)>(handle1, "cblas_daxpy");
+
+   auto xs = std::vector<double>{ 3.0, 5.0, 6.0, 10.0, 8.0};
+   auto ys = std::vector<double>{ 2.0, 2.0, 2.0,  2.0, 2.0};
+   printContainer("xs", xs);
+   printContainer("ys", ys);
+   // Compute xs * 4.0 + ys
+   cblas_daxpy(xs.size(), 4.0, &xs[0], 1, &ys[0], 1);
+   printContainer("ys", ys);
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC text 
+  [INFO]  Loaded clblas_daxpy OK!
+ xs = 3, 5, 6, 10, 8, 
+ ys = 2, 2, 2, 2, 2, 
+ ys = 14, 22, 26, 42, 34, 
+  [INFO] Shared library handle released OK.
+#+END_SRC
+
+
+Complete Output: 
+
+#+BEGIN_SRC txt 
+   $ g++ template-variadic.cpp -o template-variadic.bin -g -std=c++11 -Wall -Wextra -ldl 
+   $ ./template-variadic.bin
+
+   EXPERIMENT 1 = Function of many argument for printing all of them
+   ---------------------------------------
+   hello world       size = 12
+   10                size =  4
+   x                 size =  1
+   20.23             size =  4
+   1                 size =  1
+   nan               size =  4
+    [TRACE] Base case => x = nan
+
+   EXPERIMENT 2 = Indirect method invocation
+   --------------------------------------
+   [MACHINE] id = 7Z9FA Set machine speed to level 10
+   [MACHINE] id = MY9FT Set machine speed to level 10
+   [MACHINE] id = 7Z9FA  Equipment to position set to  x = 10 ; y = -20
+   [MACHINE] id = MY9FT  Equipment to position set to  x = 10 ; y = -20
+   [MACHINE] id = 7Z9FA Shutdown equipment
+   [MACHINE] id = MY9FT Shutdown equipment
+
+   EXPERIMENT 3 = Dynamic Loading from shared library (libgslcblas.so) 
+   --------------------------------------
+    [INFO]  Loaded clblas_daxpy OK!
+   xs = 3, 5, 6, 10, 8, 
+   ys = 2, 2, 2, 2, 2, 
+   ys = 14, 22, 26, 42, 34, 
+    [INFO] Shared library handle released OK.
+#+END_SRC
+
+References:  
+ + [[https://stackoverflow.com/questions/27604128/c-stdfunction-like-template-syntax][c++11 - C++ std::function-like template syntax - Stack Overflow]]
+ + [[https://www.nag.com/numeric/FL/nagdoc_fl24/html/F06/f06ecf.html][F06ECF (DAXPY) : NAG Library, Mark 24]]
+ + [[https://dwheeler.com/program-library/Program-Library-HOWTO/x172.html][Dynamically Loaded (DL) Libraries]]
+ + [[https://www.gnu.org/software/gsl/doc/html/cblas.html][GSL CBLAS Library — GSL 2.5 documentation]]
+
 *** References and Bookmarks 
 
 General 
 
  + [[https://en.cppreference.com/w/cpp/language/templates][Templates - cppreference.com]]
 
+ + [[https://en.cppreference.com/w/cpp/header/type_traits][Standard library header <type_traits> - cppreference.com]]
+
  + [[https://en.cppreference.com/w/cpp/language/class_template][Class template - cppreference.com]]
- 
+
+
 Templates and Iterators: 
  + [[https://www.fluentcpp.com/2018/05/08/std-iterator-deprecated/][std::iterator is deprecated: Why, What It Was, and What to Use Instead - Fluent C++]]
 
@@ -2037,6 +2212,8 @@ Dependent Type Names:
 Variadic Templates:
  + [[http://www.cplusplus.com/articles/EhvU7k9E/][C++11 - New features - Variadic template - C++ Articles]]
  + [[http://kevinushey.github.io/blog/2016/01/27/introduction-to-c++-variadic-templates/][Introduction to C++ Variadic Templates · R and C++]]
+ + [[https://docs.microsoft.com/en-gb/cpp/cpp/ellipses-and-variadic-templates?view=vs-2017][Ellipses and Variadic Templates | Microsoft Docs]]
+ + [[https://stackoverflow.com/questions/27604128/c-stdfunction-like-template-syntax][c++11 - C++ std::function-like template syntax - Stack Overflow]]
 
 Papers and technical documents about Generic Programming and Template Metaprogramming 
 
