@@ -1366,6 +1366,540 @@ Complete program output of [[file:src/cpp-functor.cpp][file:src/cpp-functor.cpp]
        5.000    19.000    69.000   148.413    15.000
 #+END_SRC
 
+** OOP Polymorphism 
+*** Oveview 
+
+ Dynamic or subtyping polymorphis is basically, the ability
+ of the client code to deal with any any instance of derived classes in
+ the same way it deals with an instance of the base class. 
+
+ In C++, it is only possible to use OOP subtyping polymorphism with
+ pointers or references. As a result, it is not possible to store
+ instances of base class in STL containers by value, or to create
+ polymorphic functions which return instance of derived classes by
+ value or take instance derived classes as argument passed by value.
+
+ To summarize: 
+
+  + Object Oriented Polymorphism, is aso called:
+    + Dynamic polymorphism
+    + Runtime polymorphism 
+  + In C++ it is only possible to use polymorphism with references or
+    pointers.
+  + A polymorphic function which returns any instance of the derived
+    class casted as an instance of the base class can only return them
+    *by pointer to objects allocated on the heap* (dynamic memory) with
+    *new* operator. Functions like this are called factory functions and
+    in this case, it is better to wrap the pointer in smart pointer,
+    ~unique_ptr~ or ~shared_ptr~.
+*** Dynamic Polymorphism example 
+
+ File: polymorphism.cpp 
+
+ #+BEGIN_SRC cpp 
+   #include <iostream>
+   #include <string>
+   #include <memory>   // C++11 Smart pointers (unique_ptr and shared_ptr)
+   #include <map>      // Hash table, hash map or dictionary
+   #include <vector>
+   #include <deque>
+
+   #include <cassert> // assertions tests 
+
+   // Interface class 
+   class GenericDBDriver{
+   public:
+     GenericDBDriver() = default;
+     virtual auto driverName()  const -> std::string {
+       return "generic";   
+     }
+     virtual auto getID() const -> std::string {
+       return "unknown";
+     }
+     virtual auto connect(std::string url) -> void {
+       std::cout << "Connecting to generic driver url = " << url << std::endl;
+     }
+     virtual auto isConnected()  const -> bool {
+       return false;
+     }
+     // Default destructor
+     virtual ~GenericDBDriver() {
+       std::cout << "Disconnecting from generic driver - id = " << "unknown"<< std::endl;
+     }
+   };
+
+   class DriverSQLiteDriver: public GenericDBDriver{
+   private:
+     bool m_connected = false;
+     std::string m_id = "unknown";
+   public:
+     DriverSQLiteDriver() = default;
+     DriverSQLiteDriver(const std::string& name): m_id(name){}
+    
+     // Const keyword in this case indicates that the member function (method)
+     // doesn't change the current object.
+     auto driverName() const -> std::string override{
+       return "sqlite";
+     }
+     auto getID() const -> std::string override {
+       return m_id;
+     }  
+     // This keyword override -> indicates visually that the method
+     // is being overriden and also provides some safety features which
+     // helps to improve type-safety and compile-time correctness.
+     // For instance, if member function (aka method) being overriden
+     // is not annotated as virtual in the base class, this C++11 keyword
+     // will generate a compile-time error. It also will generate a compile-time
+     // error if the member function being overriden doesn't exist in the base class.  
+     auto connect(std::string url) -> void override {
+       std::cout << "Connecting to " << url << std::endl;
+       m_connected = true;
+     }
+     auto isConnected() const -> bool override {
+       return m_connected;
+     }
+     ~DriverSQLiteDriver(){
+       std::cout << "Disconnecting from PosgresDB - m_id = " << m_id << std::endl;
+     }
+   };
+
+
+   class DriverPostgresSQL: public GenericDBDriver{
+   private:
+     bool m_connected = false;
+     std::string m_id = "unknown";  
+   public:
+     // DriverPostgresSQL () = default;
+     DriverPostgresSQL(const std::string& name): m_id(name){}
+ 
+     auto driverName() const -> std::string override{
+       return "PostGresSQL";
+     }
+     virtual auto getID() const -> std::string override {
+       return m_id;
+     }   
+     auto connect(std::string url) -> void override {
+       std::cout << "Connecting to " << url << std::endl;
+       m_connected = true;
+     }
+     auto isConnected() const -> bool override {
+       return m_connected;
+     }
+     ~DriverPostgresSQL(){
+       std::cout << "Disconnecting from PostGresSQL - id = " << m_id << std::endl;
+     }  
+   };
+
+
+   class DriverSQLServer : public GenericDBDriver{
+   private:
+     bool m_connected = false;
+     std::string m_id = "unknown";  
+   public:
+     DriverSQLServer() = default;
+     DriverSQLServer(const std::string& name): m_id(name){}
+      
+     auto driverName() const -> std::string override{
+       return "SQLServer";
+     }
+     auto getID() const -> std::string override {
+       return m_id;
+     }    
+     auto connect(std::string url) -> void override {
+       std::cout << "Connecting to " << url << std::endl;
+       m_connected = true;
+     }
+     auto isConnected() const -> bool override {
+       return m_connected;
+     }
+     ~DriverSQLServer(){
+       std::cout << "Disconnecting from SQLServer - id = " << m_id << std::endl;
+     }  
+   };
+
+
+   // Non-polymorphi function -> Parameters passed by value cannot be polymorphic
+   // void showDriverStatus(const GenericDBDriver driver){ ... }
+
+   // Polymorphic function using references 
+   void showDriverStatus1(const GenericDBDriver& driver){
+     std::cout << std::boolalpha;
+     std::cout << " [INFO] Driver = " << driver.driverName()
+               << " id = " << driver.getID()
+               << " ; status = " << driver.isConnected() <<  std::endl;
+   }
+
+   // Polymorphic function using pointers 
+   void showDriverStatus2(const GenericDBDriver* driver){
+     std::cout << std::boolalpha;
+     std::cout << " [INFO] Driver = " << driver->driverName()
+               << " id = " << driver->getID()
+               << " ; status = " << driver->isConnected() <<  std::endl;
+   }
+
+
+   // Factory method
+   enum class DriverType{
+    generic,
+    sqlite,
+    postgres,
+    sqlserver                        
+   };
+
+   auto dbDriverFactory(const DriverType& dbtype, const std::string& id = "unknown")
+     -> std::shared_ptr<GenericDBDriver>{
+     if(dbtype == DriverType::generic)
+       return std::make_shared<GenericDBDriver>();   
+     if(dbtype == DriverType::sqlite)
+       return std::make_shared<DriverSQLiteDriver>(id);   
+     if(dbtype == DriverType::postgres)
+       return std::make_shared<DriverPostgresSQL>(id);   
+     if(dbtype == DriverType::sqlserver)
+       return std::make_shared<DriverSQLServer>(id);    
+     // Failure -> DO NOT return old C++98 NULL as it is not typesafe 
+     return nullptr;
+   }
+
+
+   class DriverFactory{
+   private:
+  
+   public:
+
+     DriverFactory() = delete;
+     DriverFactory(const DriverFactory& lhs) = delete;
+
+     static auto getInstance() 
+   };
+
+   int main(){
+
+     {
+       std::cout << "\n====== Test 1 ===========" << std::endl;
+       // Uniform initialization 
+       GenericDBDriver   d0;
+       DriverSQLServer   d1{"d1"};
+       DriverPostgresSQL d2 = {"d2"};
+       DriverSQLServer   d3 = {"d3"};
+
+       showDriverStatus1(d0);
+       showDriverStatus1(d1);
+       d1.connect("file:///home/user/datbase.sqlite");
+       showDriverStatus1(d1);
+       showDriverStatus1(d2);
+       showDriverStatus1(d3);
+
+       std::cout << "====== End of test 1 ===========" << std::endl;
+     }
+
+     {
+       std::cout << "\n====== Test 2 ===========" << std::endl;
+       // Uniform initialization 
+       GenericDBDriver   d0;
+       DriverSQLServer   d1{"d1"};
+       DriverPostgresSQL d2 = {"d2"};
+       DriverSQLServer   d3 = {"d3"};
+
+       showDriverStatus2(&d0);
+       showDriverStatus2(&d1);
+       d1.connect("file:///home/user/datbase.sqlite");
+       showDriverStatus2(&d1);
+       showDriverStatus2(&d2);
+       showDriverStatus2(&d3);
+
+       std::cout << "====== End of test 2 ===========" << std::endl;
+     }
+
+     { // Failure ! -> It only calls the methods of GenericDBDriver
+       // It is not possible to polymorphism (subtyping polymorphism) in C++
+       // without pointers or references.
+       std::cout << "\n====== Test 3 ===========" << std::endl;
+       std::deque<GenericDBDriver> xs;
+
+       xs.push_back(GenericDBDriver{});
+       xs.push_back(DriverSQLServer {"d1"});
+       xs.push_back(DriverPostgresSQL{"d2"});
+       xs.push_back(DriverSQLServer{"d3"});
+
+       for(const auto& x: xs){
+         std::cout << " - driver = " << x.driverName() << " ; id = " << x.getID() << std::endl;
+       }
+
+       assert(xs.at(0).driverName() == "generic");
+       assert(xs.at(1).driverName() == "generic");
+       assert(xs.at(2).driverName() == "generic");
+       assert(xs.at(3).driverName() == "generic");
+    
+       std::cout << "\n====== End of test 3 ===========" << std::endl;
+     }
+
+
+     { std::cout << "\n====== Test 4 ===========" << std::endl;
+       std::deque<GenericDBDriver*> xs;
+
+       auto d0 = GenericDBDriver{};
+       auto d1 = DriverSQLiteDriver {"d1"};
+       auto d2 = DriverPostgresSQL{"d2"};
+       auto d3 = DriverSQLServer{"d3"};
+       xs.push_back(&d0);
+       xs.push_back(&d1);
+       xs.push_back(&d2);
+       xs.push_back(&d3);
+
+       for(const auto& x: xs){
+         std::cout << " - driver = " << x->driverName() << " ; id = " << x->getID() << std::endl;;
+       }
+       assert(xs.at(0)->driverName() == "generic");
+       assert(xs.at(1)->driverName() == "sqlite");
+       assert(xs.at(2)->driverName() == "PostGresSQL");
+       assert(xs.at(3)->driverName() == "SQLServer");
+    
+       std::cout << "====== End of test 4 ===========" << std::endl;
+     }  
+
+     { std::cout << "\n====== Test 5 ===========" << std::endl;
+       std::deque<std::shared_ptr<GenericDBDriver>> xs;
+       xs.push_back(dbDriverFactory(DriverType::generic));
+       xs.push_back(dbDriverFactory(DriverType::sqlite,    "d1"));
+       xs.push_back(dbDriverFactory(DriverType::postgres,  "d2"));
+       xs.push_back(dbDriverFactory(DriverType::sqlserver, "d3"));
+       for(const auto& x: xs){
+         std::cout << " - driver = " << x->driverName() << " ; id = " << x->getID() << std::endl;;
+       }
+       assert(xs.at(0)->driverName() == "generic");
+       assert(xs.at(1)->driverName() == "sqlite");
+       assert(xs.at(2)->driverName() == "PostGresSQL");
+       assert(xs.at(3)->driverName() == "SQLServer");
+    
+       std::cout << "====== End of test 5 ===========" << std::endl;
+     }  
+     return EXIT_SUCCESS;
+   }
+ #+END_SRC
+
+ Running: 
+
+ #+BEGIN_SRC sh
+   $ clang++ polymorphism.cpp -std=c++1z -Wall -Wextra && ./a.out
+
+   ====== Test 1 ===========
+    [INFO] Driver = generic id = unknown ; status = false
+    [INFO] Driver = SQLServer id = d1 ; status = false
+   Connecting to file:///home/user/datbase.sqlite
+    [INFO] Driver = SQLServer id = d1 ; status = true
+    [INFO] Driver = PostGresSQL id = d2 ; status = false
+    [INFO] Driver = SQLServer id = d3 ; status = false
+   ====== End of test 1 ===========
+   Disconnecting from SQLServer - id = d3
+   Disconnecting from generic driver - id = unknown
+   Disconnecting from PostGresSQL - id = d2
+   Disconnecting from generic driver - id = unknown
+   Disconnecting from SQLServer - id = d1
+   Disconnecting from generic driver - id = unknown
+   Disconnecting from generic driver - id = unknown
+
+   ====== Test 2 ===========
+    [INFO] Driver = generic id = unknown ; status = false
+    [INFO] Driver = SQLServer id = d1 ; status = false
+   Connecting to file:///home/user/datbase.sqlite
+    [INFO] Driver = SQLServer id = d1 ; status = true
+    [INFO] Driver = PostGresSQL id = d2 ; status = false
+    [INFO] Driver = SQLServer id = d3 ; status = false
+   ====== End of test 2 ===========
+   Disconnecting from SQLServer - id = d3
+   Disconnecting from generic driver - id = unknown
+   Disconnecting from PostGresSQL - id = d2
+   Disconnecting from generic driver - id = unknown
+   Disconnecting from SQLServer - id = d1
+   Disconnecting from generic driver - id = unknown
+   Disconnecting from generic driver - id = unknown
+
+   ====== Test 3 ===========
+   Disconnecting from generic driver - id = unknown
+   Disconnecting from SQLServer - id = d1
+   Disconnecting from generic driver - id = unknown
+   Disconnecting from PostGresSQL - id = d2
+   Disconnecting from generic driver - id = unknown
+   Disconnecting from SQLServer - id = d3
+   Disconnecting from generic driver - id = unknown
+    - driver = generic ; id = unknown
+    - driver = generic ; id = unknown
+    - driver = generic ; id = unknown
+    - driver = generic ; id = unknown
+
+   ====== End of test 3 ===========
+   Disconnecting from generic driver - id = unknown
+   Disconnecting from generic driver - id = unknown
+   Disconnecting from generic driver - id = unknown
+   Disconnecting from generic driver - id = unknown
+
+   ====== Test 4 ===========
+    - driver = generic ; id = unknown
+    - driver = sqlite ; id = d1
+    - driver = PostGresSQL ; id = d2
+    - driver = SQLServer ; id = d3
+   ====== End of test 4 ===========
+   Disconnecting from SQLServer - id = d3
+   Disconnecting from generic driver - id = unknown
+   Disconnecting from PostGresSQL - id = d2
+   Disconnecting from generic driver - id = unknown
+   Disconnecting from PosgresDB - m_id = d1
+   Disconnecting from generic driver - id = unknown
+   Disconnecting from generic driver - id = unknown
+
+   ====== Test 5 ===========
+    - driver = generic ; id = unknown
+    - driver = sqlite ; id = d1
+    - driver = PostGresSQL ; id = d2
+    - driver = SQLServer ; id = d3
+   ====== End of test 5 ===========
+   Disconnecting from generic driver - id = unknown
+   Disconnecting from PosgresDB - m_id = d1
+   Disconnecting from generic driver - id = unknown
+   Disconnecting from PostGresSQL - id = d2
+   Disconnecting from generic driver - id = unknown
+   Disconnecting from SQLServer - id = d3
+   Disconnecting from generic driver - id = unknown
+
+ #+END_SRC
+
+
+*** STL containers and polymorphism 
+
+C++'s STL (Standard Template Library) containers/collections such as
+vector, deque, map, stack and so on can only store pointers to
+instances of different derived classes from a given base
+class. However the STL containers cannot store references to those
+instances. The STL std::reference_wrapper solves this problem. 
+
+Documentation: 
+  + http://www.cplusplus.com/reference/functional/reference_wrapper/operator_func/
+
+Demonstration in CERN's ROOT C++ REPL: 
+
+ - Create test classes.
+
+#+BEGIN_SRC cpp 
+  // Base class 
+  class IRoot{
+  public:
+    virtual auto getName() const -> std::string {
+      return "root";
+    }
+  };
+
+  //===== Derived Classes ====== //
+ 
+  class A: public IRoot{
+  public:
+    auto getName() const -> std::string {
+      return "Class A";
+    }
+  };
+
+  class B: public IRoot{
+  public:
+    auto getName() const -> std::string {
+      return "Class B";
+    }
+  };
+#+END_SRC
+
+ - Play with sample objects:
+
+#+BEGIN_SRC cpp 
+  // Create test objects 
+  auto r = IRoot();
+  auto a = A();
+  auto b = B();
+
+  // Test objects 
+  >> r.getName()
+  (std::string) "root"
+  >> a.getName()
+  (std::string) "Class A"
+  >> b.getName()
+  (std::string) "Class B"
+  >>
+#+END_SRC
+
+ - Store those objects in a collection by pointer:
+
+#+BEGIN_SRC cpp 
+  >> auto xsp = std::deque<IRoot*>()
+  (std::deque<IRoot *, std::allocator<IRoot *> > &) {}
+  >> xsp.push_back(&r)
+  >> xsp.push_back(&a)
+  >> xsp.push_back(&b)
+  >> xsp
+  (std::deque<IRoot *, std::allocator<IRoot *> > &) { @0x2f01990, @0x2f01998, @0x2f019a0 }
+  >>
+  >>
+
+  >> for(auto x: xsp) { std::cout << "name = " << x->getName() << std::endl; }
+  name = root
+  name = Class A
+  name = Class B
+  >>
+
+#+END_SRC
+
+ - Try to store those object r, a and b in a container/collection by
+   reference.
+
+#+BEGIN_SRC cpp 
+  /** Many of errors: new_allocator.h:63:18: error: 'pointer' declared
+   ,* as a pointer to a reference of type 'IRoot &' typedef _Tp* pointer;
+   ,*/
+  auto xs = std::deque<IRoot&>() 
+#+END_SRC
+
+ - Try to store those object r, a and b in a container/collection by
+   reference using _std::reference_wrapper_.
+
+#+BEGIN_SRC cpp 
+  >> auto xsr = std::deque<std::reference_wrapper<IRoot>> {}
+  (std::deque<std::reference_wrapper<IRoot>, std::allocator<std::reference_wrapper<IRoot> > > &) {}
+  >>
+
+  xsr.push_back(a)
+  xsr.push_back(r)
+  xsr.push_back(b)
+
+  >> xsr
+  (std::deque<std::reference_wrapper<IRoot>, std::allocator<std::reference_wrapper<IRoot> > > &)
+  { @0x31013c0, @0x31013c8, @0x31013d0 }
+  >>
+
+  >> xsr.at(0).get().getName()
+  (std::string) "Class A"
+  >> xsr.at(1).get().getName()
+  (std::string) "root"
+  >> xsr.at(2).get().getName()
+  (std::string) "Class B"
+  >> 
+  >>
+
+  >> for(auto x: xsr) { std::cout << "name = " << x.get().getName() << std::endl; }
+  name = Class A
+  name = root
+  name = Class B
+  >> 
+
+  >> for(const auto& x: xsr) { std::cout << "name = " << x.get().getName() << std::endl; }
+  name = Class A
+  name = root
+  name = Class B
+  >> 
+#+END_SRC
+
+References: 
+
+ + https://oopscenities.net/2012/08/09/reference_wrapper/
+
+ + How to correctly use std::reference_wrappers -
+   <https://stackoverflow.com/questions/18127469/how-to-correctly-use-stdreference-wrappers>
+
 ** Template Metaprogramming 
 *** Overview 
 
@@ -1925,8 +2459,10 @@ information about this subject and further reading, see:
  + [[https://en.wikibooks.org/wiki/More_C%2B%2B_Idioms/Metafunction][More C++ Idioms/Metafunction - Wikibooks, open books for an open world]]
  + [[https://en.wikibooks.org/wiki/More_C%2B%2B_Idioms/Type_Generator][More C++ Idioms/Type Generator - Wikibooks, open books for an open world]]
  + [[https://akrzemi1.wordpress.com/2012/03/19/meta-functions-in-c11/][Meta-functions in C++11 | Andrzej's C++ blog]]
+ + [[https://accu.org/index.php/journals/442][ACCU - An introduction to C++ Traits]]
 
-A meta function has the form: 
+
+A meta function has the forms: 
 
  + Meta function which returns type.
 
