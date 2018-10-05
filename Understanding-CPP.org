@@ -1366,8 +1366,243 @@ Complete program output of [[file:src/cpp-functor.cpp][file:src/cpp-functor.cpp]
        5.000    19.000    69.000   148.413    15.000
 #+END_SRC
 
+** Lambda Functions
+   :PROPERTIES:
+   :ID:       02be1a97-c100-44ce-ad76-63835818d406
+   :END:
+
+Lambda expressions, also known as lambda functions or lambda
+abstractions, are ubiquitous in functional programming, they were
+introduced by Lisp and has made its way into mainstream and has 
+arrived to C# (Cshap), Java 8 and C++11. 
+
+Lambda expression can be passed as arguments as any function and also
+be defined locally at the call-site simplifying all the boilerplate
+code necessary to pass a function. In addition, they can be returned
+from functions and have state. 
+
+Summary:
+  + Lambda functions can be:
+    + returned from functions.
+    + be passed as function parameters.
+    + Can be stored in data structures.
+    + Hold state and capture variables (closure).
+    + Lambdas can be converted to function pointers what is useful with
+      old C-APIs.
+  + Lambda turns C++11 is a game changer and turns C++ into an almost
+    functional programming language.
+
+*Main parts* 
+ 
+ - Capture list between square brackets ~[ ]~
+ - Argument list between parenthesis ~()~
+ - Function body between curly braces ~{}~
+
+Syntax: 
+
+#+BEGIN_SRC text 
+  [capture](parameters) -> return-type {body}
+#+END_SRC
+
+Some lambda functions: 
+
+#+BEGIN_SRC cpp 
+ auto fn = [](int n){ return n * 10}
+#+END_SRC
+
+
+*Parts of a C++'s lambda expression:*  - ([[https://msdn.microsoft.com/en-us/library/dd293608.aspx][Microsoft Inc. Lambda C++]])
+
+ 1. Capture clause - Specifies captured variables (closure).
+    - ~[ ]~ - Empty capture clause means that no variable from escope
+      is captured.
+    - ~[x, y]~- The variables x and y are captured by value and the
+      the lambda body will get a copy of x and y. They cannot be
+      modified in the body of the lambda expression. 
+    - ~[&x , y]~ - The variable x is captured by reference and y by
+      value, therefore x can be modified in the body of the lambda
+      expression and y cannot.
+    - ~[&]~ - Capture all variables used in the lambda's body by
+      reference.
+    - ~[=]~- Captures all variables used in the body by value
+      (copy). The variables cannot be modifed as they are passed by
+      value.
+    - ~[=, &blob]~- The variable blob is captured by reference and all
+      other variables are captured by value (copy).
+    - ~[this]~ - Captures the "this" pointer of the enclosing class.
+
+ 2. Parameter list (Optional)- Parameters, aka arguments, of the lambda expression.
+ 3. Mutable specification (optional)
+ 4. exception-specification (optional)
+ 5. trailing return type (optional)
+ 6. lambda-body - The body can access variables such as:
+    - Lambda parameters passed between parenthesis:  ~(int x)~
+    - Captured variables from the enclosing scope.
+    - Global variables.
+    - Class data members if the lambda expression is defined inside a
+      class. 
+
+#+BEGIN_SRC text 
+  --
+              (1)  (2)    (3)       (4)         (5)
+                 |    |         |            |           |
+                ...  ....  .....+....  ...+....     ......
+                [ ]  ( )  mutable  throw()  -> int
+                {                                                   
+                  // (6)                                              
+                  // Lambda body 
+                  int n = x + y;
+                  x = y;
+                  y  = n;
+                  return n;
+                }
+#+END_SRC
+
+*Proof-of-concept code* 
+
+File: [[file:src/lambdaFun.cpp][file:src/lambdaFun.cpp]]
+
+Output: 
+
+#+BEGIN_SRC sh
+  g++ lamdaFun.cpp -o bin/lamdaFun.bin && bin/lamdaFun.bin
+
+  -----------------------------------------------------------------------------------------
+  >> Example(1) - Testing function lambda1
+  Lambda1: : I got the value = Hello
+  Lambda1: : I got the value = World
+
+  -----------------------------------------------------------------------------------------
+  >> Example(2) Testing function lambda2
+  Lambda 2 :: I got the value  = Japan
+  Lambda 2 :: I got the value  = Korea
+
+  -----------------------------------------------------------------------------------------
+  >> Example(3) Testing function lambda3
+     - Lambda function can be defined and executed at the call-site
+  Lambda 3 :: I got the value = C++11 is awesome!
+
+  -----------------------------------------------------------------------------------------
+  >> Example(4) Testing function sumLambda
+     - Lambda functions  can return values as any function.
+  sumLambda(10.0, 25.34) = 35.34
+  sumLambda(-10.23, 4.56) = -5.67
+
+  -----------------------------------------------------------------------------------------
+  >> Example(5) Testing function lamdaCapture
+     - Lambda functions  can capture its environment (closures) and have state as "function objects"
+    x  = 5  c = 3
+  lamdaCapture(2, 5)  = 32
+    x  = 5  c = 4
+    lamdaCapture(1, 2) =  16
+    x  = 5  c = 5
+
+  -----------------------------------------------------------------------------------------
+  >> Example(6) Testing function sumLambda
+     - Lambda functions  can play well with STL algorithms
+  Print all vector elements - Version 1
+    v[0] = 1
+    v[1] = 2
+    v[2] = 3
+    v[3] = 4
+    v[4] = 5
+    v[5] = 6
+    v[6] = 7
+    v[7] = 8
+  Print all vector element Version 2  - local state with 'static' keyword
+    v[0] = 1
+    v[1] = 2
+    v[2] = 3
+    v[3] = 4
+    v[4] = 5
+    v[5] = 6
+    v[6] = 7
+    v[7] = 8
+
+  -----------------------------------------------------------------------------------------
+  >> Example(7) 
+     Playing with STL transform algorithm.
+    Vector transformed =  
+  v  [0] = 4
+  v  [1] = 7
+  v  [2] = 10
+  v  [3] = 13
+  v  [4] = 16
+  v  [5] = 19
+  v  [6] = 22
+  v  [7] = 25
+
+  -----------------------------------------------------------------------------------------
+  >> Example(8) 
+     Lambda functions can be returned from functions and be generated at run-time.
+    mulSumBy2(2, 4) = 12
+    mulSumBy2(3, 1) = 8
+    mulSumBy5(2, 4) = 30
+    mulSumBy5(9, 2) = 55
+
+  -----------------------------------------------------------------------------------------
+  >> Example(9) 
+     Lambda functions can be returned from functions and have state.
+    Running dummy function
+      (*) m = 2, n = 0, x = 1, y = 3, z = 8
+    Running dummy function
+      (*) m = 2, n = 1, x = 2, y = 5, z = 15
+    Running dummy function
+      (*) m = 3, n = 0, x = 1, y = 3, z = 12
+    Running dummy function
+      (*) m = 3, n = 1, x = 2, y = 5, z = 22
+
+  -----------------------------------------------------------------------------------------
+  >> Example(10) 
+     Lambda functions can return lambda functions!!
+    addTo5(4) = 9
+    addTo5(3) = 8
+    addTo10(4) = 14
+    addTo10(3) = 13
+
+  -----------------------------------------------------------------------------------------
+  >> Example(11) 
+     Lambda functions can be passed as function arguments!
+  foldVector(dataset2, 0, add) = 28
+  foldVector(dataset2, 1, mul) = 5040
+
+  -----------------------------------------------------------------------------------------
+  >> Example(12) - Observer pattern
+  (observer 1) Temperature changed to 30.5 C
+  (observer 2) Sensor temperature changed to 30.5 C
+  (observer 1) Temperature changed to 20.5 C
+  (observer 2) Sensor temperature changed to 20.5 C
+
+#+END_SRC
+
+*References*
+
+ - *Lambda Expressions in C++* -
+   <https://msdn.microsoft.com/en-us/library/dd293608.aspx>
+
+ - *Lambda expressions (since C++11)* -
+   <http://en.cppreference.com/w/cpp/language/lambda> 
+
+ - *C++ Core Guidelines: Function Objects and Lambdas* -
+   <http://www.modernescpp.com/index.php/c-core-guidelines-function-objects-and-lambas> 
+
+ - *C++11/C++14 lambda functions - 2017* -
+   <http://www.bogotobogo.com/cplusplus/C11/C11_lambda_functions_expressions.php>
+
+ - *Lambda Functions in C++11 - the Definitive Guide* -
+   <https://www.cprogramming.com/c++11/c++11-lambda-closures.html> 
+
+ - *Fun with Lambdas: C++14 Style (part 1)* -
+   <https://www.slideshare.net/SumantTambe/fun-with-lambdas-c14-style> 
+
+ - *ICS 45C Fall 2016 - Notes and Examples: Functions and Lambdas* -
+   <http://www.ics.uci.edu/~thornton/ics45c/Notes/FunctionsAndLambdas/>
+
+ - *Creating Recursive Lambdas ... and returning them too!* -
+   <http://cpptruths.blogspot.com.br/2013/10/creating-recursive-lambdas-and.html> 
+
 ** OOP Polymorphism 
-*** Oveview 
+*** Overview 
 
  Dynamic or subtyping polymorphis is basically, the ability
  of the client code to deal with any any instance of derived classes in
@@ -1968,6 +2203,8 @@ References:
  + _Meta Functions_ => "Functions" emualted with structs and static
    methods or members that can manipulate types or query information
    about types using template specialisation.
+ + _Policy Based Design_
+ + _SFINAE_
 
  *Libraries and Frameworks for metaprogramming:*
 
@@ -1979,6 +2216,18 @@ References:
 
  + [[http://metashell.org/index.html][Home - Metashell]] - "The goal of this project is to provide an
    interactive template metaprogramming shell." 
+
+
+ *Template Metaprogramming Reference* 
+
+ - Andrei Alexandrescu's *Loki Library* (http://loki-lib.sourceforge.net/)
+   + type list
+   + functor
+   + singleton
+   + object factory
+   + visitor
+   + multi methods
+   + pimpl - pointer to implementation.
 
 *** Template type-safe duck-typing or structural typing 
 
