@@ -1370,6 +1370,7 @@ Complete program output of [[file:src/cpp-functor.cpp][file:src/cpp-functor.cpp]
    :PROPERTIES:
    :ID:       02be1a97-c100-44ce-ad76-63835818d406
    :END:
+*** Overview 
 
 Lambda expressions, also known as lambda functions or lambda
 abstractions, are ubiquitous in functional programming, they were
@@ -1457,6 +1458,8 @@ Some lambda functions:
                   return n;
                 }
 #+END_SRC
+
+*** Basic Example 
 
 *Proof-of-concept code* 
 
@@ -1602,6 +1605,201 @@ Output:
  - *Creating Recursive Lambdas ... and returning them too!* -
    <http://cpptruths.blogspot.com.br/2013/10/creating-recursive-lambdas-and.html> 
 
+*** std::bind 
+**** Overview
+
+The operator std::bind can simplify help simplifying turning ordinary
+functions, instance methods (member functions) and static methods
+(static member functions) into ordinary functions.
+
+Example 1: Turn a function of signature: 
+  + Input Signature:
+    + double functionABC(double a, double c, double c)
+  + Target signature: 
+    + function<double (double)> 
+
+For the function functionABC
+
+#+BEGIN_SRC cpp 
+  double functionABC(double a, double c, double c);
+#+END_SRC
+
+The expression:
+
+#+BEGIN_SRC cpp 
+ // Type of fnFunOfA is std::function<double (double)>
+ auto fnFunOfA = std::bind(functionABC, _1, 10.0, 20.0)
+ // It is the same as 
+ auto fnFunOfA = [](double x){ return functionABC(x, 10.0, 20.0); };
+ // It also equivalent to 
+ std::function<double (double)> fnFunOfA = [](double x){ return functionABC(x, 10.0, 20.0); };
+#+END_SRC
+
+So, it follows that: 
+
+#+BEGIN_SRC cpp 
+  auto fnFunOfB = std::bind(functionABC, 25.0 , _1, 20.0);
+  // It is equivalent to 
+  auto fnFunOfB = [](double x){ return (functionABC, 25.0 , _1, 20.0); };
+#+END_SRC
+
+By using more lambda placeholders it is also possible to generate
+multi variable functions: 
+
+#+BEGIN_SRC cpp 
+  #include <functional> 
+  using namespace std::placeholders; // Import placeholders, _1, _2, _3 ...  
+
+  //----------------------------------//
+  auto fnFunOfAB = std::bind(functionABC, _1 , _2, 20.0);
+  // Equivalent to 
+  auto fnFunOfAB = [](double x, double y){ return functionABC( x , y, 20.0);};
+
+  //----------------------------------//
+  auto fnFunOfAC = std::bind(functionABC, _1 , 10.0, _2);
+  // Equivalent to 
+  auto fnFunOfAC = [](double x, double y){ return functionABC( x , 10.0, y);};
+
+  //----------------------------------//
+  auto fnFunOfABC = std::bind(functionABC, _1 , 10.0, _2);
+  // Equivalent to 
+  auto fnFunOfABC = [](double x, double y, double z){ return functionABC( x , y, z);};
+#+END_SRC
+
+
+ *Binding non-static methods (member function)*
+
+For the following class:
+
+#+BEGIN_SRC cpp 
+ struct FunctionObject{
+      double x;
+      double y;
+      FunctionObject(double x, double y): x(x), y(y) {};      
+      double operator ()(double a){   
+         return a * a;
+      }   
+      double operator ()(double a, double b, double c){
+          return a * x + b * y + c / (x + y);
+      }
+      double method1(double a){
+          return this->x * a  + this->y / a;
+      }
+      double method2(double a, double b, double c){
+          return  c * (a / x + b / y);
+      }       
+  };
+#+END_SRC
+
+It is possible to create lambda functions from those class methods
+(member functions):
+
+#+BEGIN_SRC cpp 
+  FunctionObject obj;
+
+  //-------------------------
+  auto method1LambdaA = std::bind(&FunctionObject::method1, fobj, _1);
+  // Equivalent to: 
+  auto method1LambdaA = [&obj](double a){return obj.method1(x); };
+
+  //-------------------------
+  auto method2LambdaAsFnOfAC = std::bind(&FunctionObject::method2, &fobj, _1, 10.0, _2);
+  // Equivalent to: 
+  auto method2LambdaAsFnOfAC = [&obj](double a, double c){ return obj.method2(a, 10.0, c); }
+
+  //-------------------------
+  auto functionOfObj = std::bind(&FunctionObject::method1, _1, 10.0);
+  // Equivalent to: 
+  auto functionOfobj = [](FunctionObject a){ return obj.method1(obj, 10.0);};
+#+END_SRC
+
+**** std::bind Example 
+     :PROPERTIES:
+     :ID:       219c4de9-3e9e-446f-bdd5-1ae6e7d45b5b
+     :END:
+
+File: 
+ +  [[file:src/lambda-bind.cpp][file:src/lambda-bind.cpp]]
+
+Running: 
+
+#+BEGIN_SRC sh 
+  $ g++ lambda-bind.cpp -o lambda-bind.bin -g -std=c++11 -Wall -Wextra -ldl 
+  $ ./lambda-bind.bin
+
+  ======== Test 1 ========
+  lambda-bind.cpp:58: ; sum10(2.0) = 12
+  lambda-bind.cpp:59: ; sum10(4.5) = 14.5
+  lambda-bind.cpp:60: ; sum10(25.0) = 35
+  ======== Test 2 ========
+  lambda-bind.cpp:66: ; vectorLenAsFunctionOfX(4.0) = 27.2213
+  lambda-bind.cpp:67: ; std::bind(vectorLength, _1, 10.0, 25.0)(4.0) = 27.2213
+  lambda-bind.cpp:68: ; vectorLenAsFunctionOfX(10.0) = 28.7228
+  lambda-bind.cpp:69: ; std::bind(vectorLength, _1, 10.0, 25.0)(10.0) = 28.7228
+  Tabulating - vectorLenAsFunctionOfX
+       1.000    26.944
+       2.000    27.000
+       3.000    27.092
+       4.000    27.221
+       5.000    27.386
+  ======== Test 3 ========
+  lambda-bind.cpp:77: ; vectorLenAsFunctionOfY(14.0) = 30.348
+  lambda-bind.cpp:78: ; vectorLenAsFunctionOfY(20.0) = 33.541
+  Tabulating - vectorLenAsFunctionOfY
+       1.000    26.944
+       2.000    27.000
+       3.000    27.092
+       4.000    27.221
+       5.000    27.386
+  ======== Test 4 ========
+  lambda-bind.cpp:92: ; vectorLenAsFunctionOfYZ(3.0, 6.0) = 12.0416
+  lambda-bind.cpp:93: ; vectorLenAsFunctionOfYZ(15.0, 26.0) = 31.6386
+  ======== Test 5 ========
+  lambda-bind.cpp:97: ; fobj(4.0) = 16
+  lambda-bind.cpp:98: ; fobj(5.0) = 25
+  lambda-bind.cpp:99: ; fobj(10.0) = 100
+  lambda-bind.cpp:101: ; fobj(4.0, 10.0, 5.0) = 104.357
+  lambda-bind.cpp:102: ; fobj(6.0, 8.0, 9.0) = 100.643
+  Running: tabulate(0.0, 5.0, 1.0, fobj)
+       0.000     0.000
+       1.000     1.000
+       2.000     4.000
+       3.000     9.000
+       4.000    16.000
+       5.000    25.000
+  Turning class member function into lambda function 
+   Note: it is not possible (0.0, 5.0, 1.0, fobj.method1)
+  lambda-bind.cpp:111: ; fobj.method1(10.0) = 60.8
+  lambda-bind.cpp:112: ; method1LambdaA(10.0) = 60.8
+  lambda-bind.cpp:113: ; fobj.method1(20.0) = 120.4
+  lambda-bind.cpp:114: ; method1LambdaA(20.0) = 120.4
+  lambda-bind.cpp:115: ; fobj.method1(30.0) = 180.267
+  lambda-bind.cpp:116: ; method1LambdaA(30.0) = 180.267
+  Tabulating method1LambdaA
+       0.000       inf
+       1.000    14.000
+       2.000    16.000
+       3.000    20.667
+       4.000    26.000
+       5.000    31.600
+  Tabulating method1LambdaA using direct lambda
+       0.000       inf
+       1.000    14.000
+       2.000    16.000
+       3.000    20.667
+       4.000    26.000
+       5.000    31.600
+  ======== Test 6 ========
+  lambda-bind.cpp:129: ; method2LambdaAsFnOfA(5.0) = 41.6667
+  lambda-bind.cpp:130: ; method2LambdaAsFnOfA(6.0) = 45
+  lambda-bind.cpp:131: ; method2LambdaAsFnOfA(10.0) = 58.3333
+  lambda-bind.cpp:136: ; fobj.method2(3.0, 10.0, 4.0) = 7
+  lambda-bind.cpp:137: ; method2LambdaAsFnOfAC(3.0, 4.0) = 7
+  lambda-bind.cpp:138: ; fobj.method2(15.0, 10.0, 14.0) = 52.5
+  lambda-bind.cpp:139: ; method2LambdaAsFnOfAC(15.0, 14.0) = 52.5
+
+
+#+END_SRC
 ** OOP Polymorphism 
 *** Overview 
 
