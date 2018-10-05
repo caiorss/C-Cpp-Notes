@@ -2135,7 +2135,300 @@ References:
 
  + How to correctly use std::reference_wrappers -
    <https://stackoverflow.com/questions/18127469/how-to-correctly-use-stdreference-wrappers>
+** Pointer to Member Function 
+   :PROPERTIES:
+   :ID:       07dc0b5f-0486-4c18-b356-226ec48d4834
+   :END:
 
+In addition to ordinary pointers and function pointers, C++ has member
+function pointers which can point to a particular class method and be
+used for performing indirect method calls. 
+
+Despite member function pointer are much less used than other types of
+pointers, they are still useful in lots of use cases such as: 
+
+ + Implementing callbacks => Example: QT Slots and Signals.
+ + Creating warappers     => Example: Boost.Python 
+ + Reflection 
+
+Pointer Member Function variable declaration : 
+
+  + It declares a pointer-to-member function of the class
+    _CLASS_NAME_. The pointer variable  is named pVariable and has the
+    type signature:  _(ARG0, ARG1, ... ARGN) => RETURN_TYPE_
+
+#+BEGIN_SRC cpp 
+   RETURN_TYPE (CLASS_NAME::* pVariable) (ARG0, ARG1, ..., ARGN-1);
+   RETURN_TYPE (CLASS_NAME::* pVariable) (ARG0, ARG1, ..., ARGN-1) = nullptr;
+   RETURN_TYPE (CLASS_NAME::* pVariable) (ARG0, ARG1, ..., ARGN-1) = &CLASS_NAME::member_functionA;
+   RETURN_TYPE (CLASS_NAME::* pVariable) (ARG0, ARG1, ..., ARGN-1) = &CLASS_NAME::member_functionB;
+#+END_SRC
+
+  + Example: Pointer to any member function taking zero arguments and
+    returning a string.
+
+#+BEGIN_SRC cpp 
+   std::string (Dummy::* pMemfn) () = nullptr;
+#+END_SRC
+
+  + Invoking a pointer to member function. It is necessary an instance
+    of the class in order to invoke the member function pointed by the
+    pointer.
+
+#+BEGIN_SRC cpp 
+   CLASS_TYPE obj;
+   pVariable = &CLASS_TYPE::member_function1;
+   (obj.*pVariable)(arg0, arg1, arg2, ... argn);
+#+END_SRC
+
+
+  + Type synonym with Typdef 
+
+#+BEGIN_SRC cpp 
+   typedef RETURN_TYPE (CLASS_NAME::* pMemberFunction) (ARG0, ARG1, ..., ARGN-1);
+   pMemberFunction pvar = &CLASS_NAME::member_functionA;
+   CLASS_NAME obj;
+   (obj.*pvar)(arg0, arg1, .... argn-1);
+#+END_SRC
+
+  + Type synonym with C++11 "using" keyword
+
+#+BEGIN_SRC cpp 
+   using pMemberFunction = RETURN_TYPE (CLASS_NAME::*) (ARG0, ARG1, ..., ARGN-1);
+   pMemberFunction pvar = &CLASS_NAME::member_functionA;
+   CLASS_NAME obj;
+   (obj.*pvar)(arg0, arg1, .... argn-1);
+#+END_SRC
+
+ *Further Reading:*
+ 
+ + [[https://accu.org/index.php/journals/495][ACCU - An Application of Pointers to Members]]
+ + [[http://soggywizards.com/tips/code/c%2B%2B/member-pointers.html][Pointers to C++ Member Functions]]
+ + [[https://yosefk.com/c%2B%2Bfqa/function.html][C++ FQA Lite: Pointers to member functions]]
+ + [[https://arne-mertz.de/2017/01/decltype-declval/][Modern C++ Features - decltype and std::declval - Simplify C++!]]
+ + [[https://isocpp.org/wiki/faq/pointers-to-members][Pointers to Member Functions, C++ FAQ]]
+ + [[https://wiki.qt.io/New_Signal_Slot_Syntax][New Signal Slot Syntax - Qt Wiki]]
+ + [[https://www.codeguru.com/cpp/cpp/article.php/c17401/C-Tutorial-PointertoMember-Function.htm][C++ Tutorial: Pointer-to-Member Function]]
+ + [[https://embeddedartistry.com/blog/2017/1/26/c11-improving-your-callback-game][Improving Your Callback Game — Embedded Artistry]]
+ 
+
+ *Example*
+
+File: 
+  - [[file:src/member-function-pointer.cpp][file:src/member-function-pointer.cpp]]
+  - Online compiler: http://rextester.com/WYFC32509
+
+#+BEGIN_SRC cpp :tangle src/member-function-pointer.cpp
+  #include <iostream>
+  #include <string>
+  #include <iomanip>
+  #include <deque>
+  #include <map>
+  #include <cassert>
+
+  class Dummy {
+  private:
+          std::string _name = "unnamed";
+  public:
+          Dummy(){}
+          Dummy(const std::string& name): _name(name){}
+          ~Dummy() = default;
+          std::string getName() {
+                  return "I am a dummy class named <" + _name + ">";
+          }
+          std::string getLocation() {
+                  return "Unknown location";
+          }
+          std::string operator()(){
+                  return "I am a function-object called: <" + _name + ">";
+          }
+          auto compute(double x, double y) -> double {
+                  return 4 * x + 5 * y;
+          }	
+  };
+
+  class DummyB{
+  public:
+          DummyB(){}
+          ~DummyB() = default;
+          std::string getName() {
+                  return "My name is DummyB";
+          }
+          std::string getLocation() {
+                  return "Location of dummyB location";
+          }
+          std::string operator()(){
+                  return "I am the class DummyB";
+          }
+  };
+
+  // Create type synonym to any member function of Dummy class
+  // which takes no parameter and returns a string.
+  typedef std::string (Dummy::* pDummyMemFnStr)();
+
+  void invokeMemberFun(Dummy& obj, pDummyMemFnStr pMemfn){
+          std::cout << " [1] Method invocation returned value: " << (obj.*pMemfn)() << "\n";
+  }
+
+  // Create type synonum with the new "using" C++11 syntax
+  using pDummyMemFnStrCPP11 = std::string (Dummy::*)();
+
+  auto invokeMemberFun2(Dummy& obj, pDummyMemFnStrCPP11 pMemfn) -> void {
+          std::cout << " [2] Method invocation returned value: " << (obj.*pMemfn)() << "\n";
+  }
+
+  template<class T>
+  auto invokeMemberFun3(T& obj, std::string (T::* pMemfn)()) -> void{
+          std::cout << " [3] Method invocation returned value: " << (obj.*pMemfn)() << "\n";
+  }
+
+  template<class T, class R, class ... Args>
+  auto invokeMemfn(R (T::* pMemfn) (Args ... args), T& obj, Args ... arglist) -> R{
+          return (obj.*pMemfn)(arglist ...);
+  }
+
+  int main(){
+          const auto nl = std::string("\n");
+          const auto nl2 = std::string("\n\n");
+          const std::string line = "--------------------------------------------------\n";
+	
+          std::cout << nl << "=== Experiment 1 ===============" << nl2;
+          std::cout << line;
+          // Pointer to member function to any member functions
+          // (aka method) which takes no argument and returns a string
+          // of signature: () => std::string
+          //.....................................................
+          std::string (Dummy::* pMemfn) () = nullptr;
+          // std::string (Dummy::* pMemfn) ();
+          if(pMemfn == nullptr)
+                  std::cerr << " [INFO] Pointer not initilialized yet." << nl;
+
+          Dummy d("DUMMY");
+	
+          // Set the function pointer to member function getName().
+          pMemfn = &Dummy::getName;
+          // Invoke pointer to member function (aka pointer to method)
+          std::cout << "Name     = " << (d.*pMemfn)() << nl2;
+          assert((d.*pMemfn)() == "I am a dummy class named <DUMMY>");
+
+          if(pMemfn != nullptr)
+                  std::cerr << " [INFO] Pointer initilialized OK." << nl;
+	
+          // Set pointer to Dummy::getLocation
+          pMemfn = &Dummy::getLocation;
+          std::cout << "Location = " << (d.*pMemfn)() << nl;
+          // assert((d.*pMemfn)() == "I am a dummy class named <DUMMY>");	
+	
+	
+          std::cout << nl << "=== Experiment 2 - Using typedef ===============" << nl;
+          std::cout << line;
+          pDummyMemFnStr pMemfn2 = nullptr;
+          pMemfn2 = &Dummy::getName;
+          std::cout << "d.getName() == " << (d.*pMemfn2)() << nl;
+          assert((d.*pMemfn2)() == "I am a dummy class named <DUMMY>");	
+
+          std::cout << nl << "=== Experiment 3 - Invoking member function with free function =" << nl;
+          std::cout << line;
+          // execute d.getName() 
+          invokeMemberFun(d, &Dummy::getName);
+          // execute d.getLocation() 
+          invokeMemberFun(d, &Dummy::getLocation);
+          // execute d() 
+          invokeMemberFun(d, &Dummy::operator());
+	
+          std::cout << nl << "=== Experiment 4 - Invoking member function with free function C++11" << nl;
+          std::cout << line;
+          invokeMemberFun2(d, &Dummy::getName);
+          invokeMemberFun2(d, &Dummy::getLocation);
+          invokeMemberFun2(d, &Dummy::operator());
+
+          std::cout << nl << "=== Experiment 5 - Pointer to member functions in STL deque collection" << nl;
+          auto plist = std::deque<pDummyMemFnStrCPP11>();
+          plist.push_back(&Dummy::getName);
+          plist.push_back(&Dummy::getLocation);
+          plist.push_back(&Dummy::operator());
+          for(const auto& p: plist)
+                  std::cout << " (+) Calll returned = " << (d.*p)() << nl;
+
+          std::cout << nl << "=== Experiment 6 - Pointer to member functions in map collection" << nl;
+          auto dict = std::map<std::string, pDummyMemFnStrCPP11>();
+          dict["getName"]     = &Dummy::getName;
+          dict["getLocation"] = &Dummy::getLocation;
+          dict["callme"]      = &Dummy::operator();
+          for(const auto& kv: dict)
+                  std::cout << std::right << std::setw(20)  << "invoke(object, "
+                                    << std::setw(15) << kv.first << ")"
+                                    << " = " << (d.*(kv.second))() << nl;
+
+          std::cout << nl << "=== Experiment 7 - Template " << nl;
+          DummyB b;
+          invokeMemberFun3(d, &Dummy::getName);
+          invokeMemberFun3(b, &DummyB::getName);
+          invokeMemberFun3(d, &Dummy::getLocation);
+          invokeMemberFun3(b, &DummyB::getLocation);
+
+          std::cout << nl << "=== Experiment 8 - Template " << nl;
+          std::cout << line;
+          std::cout << "d.getName()         = " << invokeMemfn(&Dummy::getName, d) << nl;
+          std::cout << "d.compute(3.0, 4.0) = " << invokeMemfn(&Dummy::compute, d, 3.0, 4.0) << nl;
+	
+          return 0;
+  }
+
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC sh 
+   $ clang++ member-function-pointer.cpp -o member-function-pointer.bin -std=c++1z -Wall -Wextra  && ./member-function-pointer.bin
+
+   === Experiment 1 ===============
+
+   --------------------------------------------------
+    [INFO] Pointer not initilialized yet.
+   Name     = I am a dummy class named <DUMMY>
+
+    [INFO] Pointer initilialized OK.
+   Location = Unknown location
+
+   === Experiment 2 - Using typedef ===============
+   --------------------------------------------------
+   d.getName() == I am a dummy class named <DUMMY>
+
+   === Experiment 3 - Invoking member function with free function =
+   --------------------------------------------------
+    [1] Method invocation returned value: I am a dummy class named <DUMMY>
+    [1] Method invocation returned value: Unknown location
+    [1] Method invocation returned value: I am a function-object called: <DUMMY>
+
+   === Experiment 4 - Invoking member function with free function C++11
+   --------------------------------------------------
+    [2] Method invocation returned value: I am a dummy class named <DUMMY>
+    [2] Method invocation returned value: Unknown location
+    [2] Method invocation returned value: I am a function-object called: <DUMMY>
+
+   === Experiment 5 - Pointer to member functions in STL deque collection
+    (+) Calll returned = I am a dummy class named <DUMMY>
+    (+) Calll returned = Unknown location
+    (+) Calll returned = I am a function-object called: <DUMMY>
+
+   === Experiment 6 - Pointer to member functions in map collection
+        invoke(object,          callme) = I am a function-object called: <DUMMY>
+        invoke(object,     getLocation) = Unknown location
+        invoke(object,         getName) = I am a dummy class named <DUMMY>
+
+   === Experiment 7 - Template 
+    [3] Method invocation returned value: I am a dummy class named <DUMMY>
+    [3] Method invocation returned value: My name is DummyB
+    [3] Method invocation returned value: Unknown location
+    [3] Method invocation returned value: Location of dummyB location
+
+   === Experiment 8 - Template 
+   --------------------------------------------------
+   d.getName()         = I am a dummy class named <DUMMY>
+   d.compute(3.0, 4.0) = 32
+
+#+END_SRC
 ** Template Metaprogramming 
 *** Overview 
 
@@ -3555,300 +3848,5 @@ Running:
   type = int     => value = 10
   type = string  => value = world
 
-
-#+END_SRC
-
-** Pointer to Member Function 
-   :PROPERTIES:
-   :ID:       07dc0b5f-0486-4c18-b356-226ec48d4834
-   :END:
-
-In addition to ordinary pointers and function pointers, C++ has member
-function pointers which can point to a particular class method and be
-used for performing indirect method calls. 
-
-Despite member function pointer are much less used than other types of
-pointers, they are still useful in lots of use cases such as: 
-
- + Implementing callbacks => Example: QT Slots and Signals.
- + Creating warappers     => Example: Boost.Python 
- + Reflection 
-
-Pointer Member Function variable declaration : 
-
-  + It declares a pointer-to-member function of the class
-    _CLASS_NAME_. The pointer variable  is named pVariable and has the
-    type signature:  _(ARG0, ARG1, ... ARGN) => RETURN_TYPE_
-
-#+BEGIN_SRC cpp 
-   RETURN_TYPE (CLASS_NAME::* pVariable) (ARG0, ARG1, ..., ARGN-1);
-   RETURN_TYPE (CLASS_NAME::* pVariable) (ARG0, ARG1, ..., ARGN-1) = nullptr;
-   RETURN_TYPE (CLASS_NAME::* pVariable) (ARG0, ARG1, ..., ARGN-1) = &CLASS_NAME::member_functionA;
-   RETURN_TYPE (CLASS_NAME::* pVariable) (ARG0, ARG1, ..., ARGN-1) = &CLASS_NAME::member_functionB;
-#+END_SRC
-
-  + Example: Pointer to any member function taking zero arguments and
-    returning a string.
-
-#+BEGIN_SRC cpp 
-   std::string (Dummy::* pMemfn) () = nullptr;
-#+END_SRC
-
-  + Invoking a pointer to member function. It is necessary an instance
-    of the class in order to invoke the member function pointed by the
-    pointer.
-
-#+BEGIN_SRC cpp 
-   CLASS_TYPE obj;
-   pVariable = &CLASS_TYPE::member_function1;
-   (obj.*pVariable)(arg0, arg1, arg2, ... argn);
-#+END_SRC
-
-
-  + Type synonym with Typdef 
-
-#+BEGIN_SRC cpp 
-   typedef RETURN_TYPE (CLASS_NAME::* pMemberFunction) (ARG0, ARG1, ..., ARGN-1);
-   pMemberFunction pvar = &CLASS_NAME::member_functionA;
-   CLASS_NAME obj;
-   (obj.*pvar)(arg0, arg1, .... argn-1);
-#+END_SRC
-
-  + Type synonym with C++11 "using" keyword
-
-#+BEGIN_SRC cpp 
-   using pMemberFunction = RETURN_TYPE (CLASS_NAME::*) (ARG0, ARG1, ..., ARGN-1);
-   pMemberFunction pvar = &CLASS_NAME::member_functionA;
-   CLASS_NAME obj;
-   (obj.*pvar)(arg0, arg1, .... argn-1);
-#+END_SRC
-
- *Further Reading:*
- 
- + [[https://accu.org/index.php/journals/495][ACCU - An Application of Pointers to Members]]
- + [[http://soggywizards.com/tips/code/c%2B%2B/member-pointers.html][Pointers to C++ Member Functions]]
- + [[https://yosefk.com/c%2B%2Bfqa/function.html][C++ FQA Lite: Pointers to member functions]]
- + [[https://arne-mertz.de/2017/01/decltype-declval/][Modern C++ Features - decltype and std::declval - Simplify C++!]]
- + [[https://isocpp.org/wiki/faq/pointers-to-members][Pointers to Member Functions, C++ FAQ]]
- + [[https://wiki.qt.io/New_Signal_Slot_Syntax][New Signal Slot Syntax - Qt Wiki]]
- + [[https://www.codeguru.com/cpp/cpp/article.php/c17401/C-Tutorial-PointertoMember-Function.htm][C++ Tutorial: Pointer-to-Member Function]]
- + [[https://embeddedartistry.com/blog/2017/1/26/c11-improving-your-callback-game][Improving Your Callback Game — Embedded Artistry]]
- 
-
- *Example*
-
-File: 
-  - [[file:src/member-function-pointer.cpp][file:src/member-function-pointer.cpp]]
-  - Online compiler: http://rextester.com/WYFC32509
-
-#+BEGIN_SRC cpp :tangle src/member-function-pointer.cpp
-  #include <iostream>
-  #include <string>
-  #include <iomanip>
-  #include <deque>
-  #include <map>
-  #include <cassert>
-
-  class Dummy {
-  private:
-          std::string _name = "unnamed";
-  public:
-          Dummy(){}
-          Dummy(const std::string& name): _name(name){}
-          ~Dummy() = default;
-          std::string getName() {
-                  return "I am a dummy class named <" + _name + ">";
-          }
-          std::string getLocation() {
-                  return "Unknown location";
-          }
-          std::string operator()(){
-                  return "I am a function-object called: <" + _name + ">";
-          }
-          auto compute(double x, double y) -> double {
-                  return 4 * x + 5 * y;
-          }	
-  };
-
-  class DummyB{
-  public:
-          DummyB(){}
-          ~DummyB() = default;
-          std::string getName() {
-                  return "My name is DummyB";
-          }
-          std::string getLocation() {
-                  return "Location of dummyB location";
-          }
-          std::string operator()(){
-                  return "I am the class DummyB";
-          }
-  };
-
-  // Create type synonym to any member function of Dummy class
-  // which takes no parameter and returns a string.
-  typedef std::string (Dummy::* pDummyMemFnStr)();
-
-  void invokeMemberFun(Dummy& obj, pDummyMemFnStr pMemfn){
-          std::cout << " [1] Method invocation returned value: " << (obj.*pMemfn)() << "\n";
-  }
-
-  // Create type synonum with the new "using" C++11 syntax
-  using pDummyMemFnStrCPP11 = std::string (Dummy::*)();
-
-  auto invokeMemberFun2(Dummy& obj, pDummyMemFnStrCPP11 pMemfn) -> void {
-          std::cout << " [2] Method invocation returned value: " << (obj.*pMemfn)() << "\n";
-  }
-
-  template<class T>
-  auto invokeMemberFun3(T& obj, std::string (T::* pMemfn)()) -> void{
-          std::cout << " [3] Method invocation returned value: " << (obj.*pMemfn)() << "\n";
-  }
-
-  template<class T, class R, class ... Args>
-  auto invokeMemfn(R (T::* pMemfn) (Args ... args), T& obj, Args ... arglist) -> R{
-          return (obj.*pMemfn)(arglist ...);
-  }
-
-  int main(){
-          const auto nl = std::string("\n");
-          const auto nl2 = std::string("\n\n");
-          const std::string line = "--------------------------------------------------\n";
-	
-          std::cout << nl << "=== Experiment 1 ===============" << nl2;
-          std::cout << line;
-          // Pointer to member function to any member functions
-          // (aka method) which takes no argument and returns a string
-          // of signature: () => std::string
-          //.....................................................
-          std::string (Dummy::* pMemfn) () = nullptr;
-          // std::string (Dummy::* pMemfn) ();
-          if(pMemfn == nullptr)
-                  std::cerr << " [INFO] Pointer not initilialized yet." << nl;
-
-          Dummy d("DUMMY");
-	
-          // Set the function pointer to member function getName().
-          pMemfn = &Dummy::getName;
-          // Invoke pointer to member function (aka pointer to method)
-          std::cout << "Name     = " << (d.*pMemfn)() << nl2;
-          assert((d.*pMemfn)() == "I am a dummy class named <DUMMY>");
-
-          if(pMemfn != nullptr)
-                  std::cerr << " [INFO] Pointer initilialized OK." << nl;
-	
-          // Set pointer to Dummy::getLocation
-          pMemfn = &Dummy::getLocation;
-          std::cout << "Location = " << (d.*pMemfn)() << nl;
-          // assert((d.*pMemfn)() == "I am a dummy class named <DUMMY>");	
-	
-	
-          std::cout << nl << "=== Experiment 2 - Using typedef ===============" << nl;
-          std::cout << line;
-          pDummyMemFnStr pMemfn2 = nullptr;
-          pMemfn2 = &Dummy::getName;
-          std::cout << "d.getName() == " << (d.*pMemfn2)() << nl;
-          assert((d.*pMemfn2)() == "I am a dummy class named <DUMMY>");	
-
-          std::cout << nl << "=== Experiment 3 - Invoking member function with free function =" << nl;
-          std::cout << line;
-          // execute d.getName() 
-          invokeMemberFun(d, &Dummy::getName);
-          // execute d.getLocation() 
-          invokeMemberFun(d, &Dummy::getLocation);
-          // execute d() 
-          invokeMemberFun(d, &Dummy::operator());
-	
-          std::cout << nl << "=== Experiment 4 - Invoking member function with free function C++11" << nl;
-          std::cout << line;
-          invokeMemberFun2(d, &Dummy::getName);
-          invokeMemberFun2(d, &Dummy::getLocation);
-          invokeMemberFun2(d, &Dummy::operator());
-
-          std::cout << nl << "=== Experiment 5 - Pointer to member functions in STL deque collection" << nl;
-          auto plist = std::deque<pDummyMemFnStrCPP11>();
-          plist.push_back(&Dummy::getName);
-          plist.push_back(&Dummy::getLocation);
-          plist.push_back(&Dummy::operator());
-          for(const auto& p: plist)
-                  std::cout << " (+) Calll returned = " << (d.*p)() << nl;
-
-          std::cout << nl << "=== Experiment 6 - Pointer to member functions in map collection" << nl;
-          auto dict = std::map<std::string, pDummyMemFnStrCPP11>();
-          dict["getName"]     = &Dummy::getName;
-          dict["getLocation"] = &Dummy::getLocation;
-          dict["callme"]      = &Dummy::operator();
-          for(const auto& kv: dict)
-                  std::cout << std::right << std::setw(20)  << "invoke(object, "
-                                    << std::setw(15) << kv.first << ")"
-                                    << " = " << (d.*(kv.second))() << nl;
-
-          std::cout << nl << "=== Experiment 7 - Template " << nl;
-          DummyB b;
-          invokeMemberFun3(d, &Dummy::getName);
-          invokeMemberFun3(b, &DummyB::getName);
-          invokeMemberFun3(d, &Dummy::getLocation);
-          invokeMemberFun3(b, &DummyB::getLocation);
-
-          std::cout << nl << "=== Experiment 8 - Template " << nl;
-          std::cout << line;
-          std::cout << "d.getName()         = " << invokeMemfn(&Dummy::getName, d) << nl;
-          std::cout << "d.compute(3.0, 4.0) = " << invokeMemfn(&Dummy::compute, d, 3.0, 4.0) << nl;
-	
-          return 0;
-  }
-
-#+END_SRC
-
-Running: 
-
-#+BEGIN_SRC sh 
-   $ clang++ member-function-pointer.cpp -o member-function-pointer.bin -std=c++1z -Wall -Wextra  && ./member-function-pointer.bin
-
-   === Experiment 1 ===============
-
-   --------------------------------------------------
-    [INFO] Pointer not initilialized yet.
-   Name     = I am a dummy class named <DUMMY>
-
-    [INFO] Pointer initilialized OK.
-   Location = Unknown location
-
-   === Experiment 2 - Using typedef ===============
-   --------------------------------------------------
-   d.getName() == I am a dummy class named <DUMMY>
-
-   === Experiment 3 - Invoking member function with free function =
-   --------------------------------------------------
-    [1] Method invocation returned value: I am a dummy class named <DUMMY>
-    [1] Method invocation returned value: Unknown location
-    [1] Method invocation returned value: I am a function-object called: <DUMMY>
-
-   === Experiment 4 - Invoking member function with free function C++11
-   --------------------------------------------------
-    [2] Method invocation returned value: I am a dummy class named <DUMMY>
-    [2] Method invocation returned value: Unknown location
-    [2] Method invocation returned value: I am a function-object called: <DUMMY>
-
-   === Experiment 5 - Pointer to member functions in STL deque collection
-    (+) Calll returned = I am a dummy class named <DUMMY>
-    (+) Calll returned = Unknown location
-    (+) Calll returned = I am a function-object called: <DUMMY>
-
-   === Experiment 6 - Pointer to member functions in map collection
-        invoke(object,          callme) = I am a function-object called: <DUMMY>
-        invoke(object,     getLocation) = Unknown location
-        invoke(object,         getName) = I am a dummy class named <DUMMY>
-
-   === Experiment 7 - Template 
-    [3] Method invocation returned value: I am a dummy class named <DUMMY>
-    [3] Method invocation returned value: My name is DummyB
-    [3] Method invocation returned value: Unknown location
-    [3] Method invocation returned value: Location of dummyB location
-
-   === Experiment 8 - Template 
-   --------------------------------------------------
-   d.getName()         = I am a dummy class named <DUMMY>
-   d.compute(3.0, 4.0) = 32
 
 #+END_SRC
