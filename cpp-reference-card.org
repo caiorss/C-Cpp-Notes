@@ -585,6 +585,332 @@ Notes:
      + <clocale>: localizaton
      + <cstdbool>, <cstdint>, <cstddef>, <cstdarg>
      + <cstdbool>, <cstdint>, <cstddef>, <cstdarg>
+** Operators and operator overload 
+*** Summary Table 
+
+| Description                                             | Operator               | Class operator overload declaration  |
+|---------------------------------------------------------+------------------------+--------------------------------------|
+| Equal to                                                | a == b                 |                                      |
+| Logical not                                             | !a, !false, !true      |                                      |
+| Logical and                                             | a && b                 |                                      |
+| Logical or                                              | a \vert\vert b         |                                      |
+|                                                         |                        |                                      |
+| Pre increment (prefix)                                  | ++i                    |                                      |
+| Post increment                                          | i++                    |                                      |
+| Pre decrement                                           | ++i                    |                                      |
+| Post increment                                          | i--                    |                                      |
+|                                                         |                        |                                      |
+| Addition assignment        ~(+=)~                         | a += b ; a <- a + b    |                                      |
+| Subtraction assignment     ~(-=)~                         | a -= b ; a <- a - b    |                                      |
+| Multiplication assignment  ~(*=)~                         | a *= b ; a <- a * b    |                                      |
+| Division assignment       ~(/=)~                          | a /= b ; a <- a / b    |                                      |
+|                                                         |                        |                                      |
+| Subscript, array index                                  | a[b]                   | ~A C::operator [](S index)~            |
+| Indirection - derreference                              | ~*a~                     | ~A C::operator *()~                     |
+| Address or reference                                    | &a                     | ~A* C::operator &()~                    |
+| Structure dereference                                   | a->memberFunction(x)   |                                      |
+| Structure reference (.)                                 | a.memberFunction(x)    | - N/A                                |
+|                                                         |                        |                                      |
+| Function call (function-object declaration)             | A(p0, p1, p2)          | R C::operator()(P0 p0, P1 p1, P2 p2) |
+| Ternary conditional - similar to if x = (if cond 10 20) | a ? b : c              | - N/A                                |
+| Scope resolution operator                               | Class::staticMethod(x) | - N/A                                |
+| Sizeof - returns size of type at compile-time           | sizeof(type)           | - N/A                                |
+|                                                         |                        |                                      |
+|                                                         |                        |                                      |
+|                                                         |                        |                                      |
+
+For more details check out: 
+
+ - [[https://en.wikipedia.org/wiki/Operators_in_C_and_C%2B%2B][Operators in C and C++ - Wikipedia]]
+*** Operator Overload Snippet 1 
+
+#+BEGIN_SRC cpp 
+  class SomeClass{
+  private:
+      // ---->> Private data here <------
+  public:
+      SomeClass(){}
+      SomeClass(double x, double y){
+          m_x = x;
+          m_y = y;
+      }
+      // Copy assignment operator 
+      SomeClass& operator=(const SomeClass& other){
+          //  ...  ......
+      }
+      // Equality operator - check whether current object is equal to
+      // the other.
+      //-----------------------------------------------
+      bool operator==(const SomeClass& p){
+          return this->x == p.x && this->y == p.y;
+      }
+      // Not equal operator - checks whether current object is not equal to
+      // the other.
+      //-----------------------------------------------
+      bool operator!=(const SomeClass& p){
+          return this->x != p.x || this->y != p.y;
+      }
+      // Not logical operator (!) Exclamation mark.
+      // if(!obj){ ... }
+      //-----------------------------------------------
+      bool operator! (){
+          return this->m_data != nullptr;
+      }
+      // Operator ++obj
+      //-----------------------------------------------
+      SomeClass& operator++(){
+          this->m_counter += 1;
+          return *this;
+      }
+
+      // Operator (+)
+      // SomeClass a, b;
+      // SomeClass c = a + b;
+      SomeClass operator+(SomeClass other){
+          SomeClass res;
+          res.x = m_x + other.x;
+          res.y = m_y + other.y;
+          return res;
+      }
+      // Operator (+)
+      SomeClass operator+(double x){
+          SomeClass res;
+          res.x = m_x + x
+          res.y = m_y + x
+          return res;
+      }
+      // Operator (*)
+      SomeClass operator*(double x){
+          SomeClass res;
+          res.x = res.x * x;
+          res.y = res.y * x;
+          return res;
+      }
+
+      // Operator (+=)
+      // SomeClass cls;
+      // cls += 10.0;
+      SomeClass& operator +=(double x){
+          m_x += x;
+          m_y += y;
+          return *this;
+      }
+      // Operator index -> obj[2]
+      // SomeClass cls;
+      // double z = cls[2];
+      //-----------------------------------------------
+      double operator[](int idx){
+          return this->array[idx];
+      }
+      // Function application operator
+      // SomeClass obj;
+      // double x = obj();
+      //-----------------------------------------------
+      double operator()(){
+          return m_counter * 10;
+      }
+      // Function application operator
+      // SomeClass obj;
+      // double x = obj(3.4, "hello world");
+      //-----------------------------------------------
+      double operator()(double x, std::string msg){
+          std::cout << "x = " << x << " msg  = " << msg;
+          return 3.5 * x;                                       
+      }
+      // Operator string insertion, allows printing the current object 
+      // SomeClass obj;
+      // std::cout << obj << std::enl;
+      //-----------------------------------------------
+      friend std::ostream& operator<<(std::ostream &os, const SomeClass& cls){
+          // Print object internal data structure 
+          os << cls.m_x << cls.m_y  ;
+          return os;
+      }
+  };
+#+END_SRC
+*** Operator Overload Snippet 2 
+
+File: SomeClass.hpp - Header file. 
+
+#+BEGIN_SRC cpp 
+  class SomeClass{
+  private:
+      // ---->> Private data here <------
+  public:
+      SomeClass(){}
+      SomeClass(double x, double y);
+      bool operator==(const SomeClass& p);
+      bool operator!=(const SomeClass& p);
+      bool operator! ();
+      SomeClass& operator++();
+      SomeClass operator+(SomeClass other);
+      SomeClass operator+(double x);
+      SomeClass operator*(double x);
+      SomeClass& operator +=(double x);
+      double operator[](int idx);
+      double operator()();
+      double operator()(double x, std::string msg);
+      friend std::ostream& operator<<(std::ostream &os, const SomeClass& cls);
+  };
+#+END_SRC
+
+File: SomeClass.cpp - implementation
+
+#+BEGIN_SRC cpp 
+  SomeClass::SomeClass(){}
+
+  SomeClass::SomeClass(double x, double y){
+          m_x = x;
+          m_y = y;
+      }
+      
+  // Equality operator - check whether current object is equal to
+  // the other.
+  //-----------------------------------------------
+  bool SomeClass::operator==(const SomeClass& p){
+      return this->x == p.x && this->y == p.y;
+  }
+
+  // Not equal operator - checks whether current object is not equal to
+  // the other.
+  //-----------------------------------------------
+  bool SomeClass::operator!=(const SomeClass& p){
+      return this->x != p.x || this->y != p.y;
+  }
+      
+  // Not logical operator (!) Exclamation mark.
+  // if(!obj){ ... }
+  //-----------------------------------------------
+  bool SomeClass::operator! (){
+      return this->m_data != nullptr;
+  }
+      
+  // Operator ++obj
+  //-----------------------------------------------
+  SomeClass& SomeClass::operator++(){
+      this->m_counter += 1;
+      return *this;
+  }
+
+  // Operator (+)
+  // SomeClass a, b;
+  // SomeClass c = a + b;
+  SomeClass SomeClass::operator+(SomeClass other){
+      SomeClass res;
+      res.x = m_x + other.x;
+          res.y = m_y + other.y;
+          return res;
+  }
+  // Operator (+)
+  SomeClass SomeClass::operator+(double x){
+      SomeClass res;
+      res.x = m_x + x;
+      res.y = m_y + x;
+      return res;
+  }
+  // Operator (*)
+  SomeClass SomeClass::operator*(double x){
+      SomeClass res;
+      res.x = res.x * x;
+      res.y = res.y * x;
+          return res;
+  }
+
+  // Operator (+=)
+  // SomeClass cls;
+  // cls += 10.0;
+  SomeClass& SomeClass::operator +=(double x){
+      m_x += x;
+      m_y += y;
+      return *this;
+  }
+      
+      
+  // Operator index -> obj[2]
+  // SomeClass cls;
+  // double z = cls[2];
+  //-----------------------------------------------
+  double SomeClass::operator[](int idx){
+      return this->array[idx];
+  }
+      
+  // Function application operator
+  // SomeClass obj;
+  // double x = obj();
+  //-----------------------------------------------
+  double SomeClass::operator()(){
+      return m_counter * 10;
+  }
+
+  // Function application operator
+  // SomeClass obj;
+  // double x = obj(3.4, "hello world");
+  //-----------------------------------------------
+  double SomeClass::operator()(double x, std::string msg){
+      std::cout << "x = " << x << " msg  = " << msg;
+      return 3.5 * x;                                       
+  }
+
+  // Operator string insertion, allows printing the current object 
+  // SomeClass obj;
+  // std::cout << obj << std::enl;
+  //-----------------------------------------------
+  friend std::ostream& SomeClass::operator<<(std::ostream &os, const SomeClass& cls){
+      // Print object internal data structure 
+      os << cls.m_x << cls.m_y  ;
+      return os;
+  }
+
+#+END_SRC
+*** Array index operator overload 
+
+This example how to overload the operator array index to allow
+returning a value or performing an assignment operation. 
+
+File: *array-index-overload.cpp* 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <vector>
+
+  class Container{
+  private:
+          std::vector<double> xs =  { 1.0, 2.0, 4.0, 6.233, 2.443};
+  public:
+      Container(){}
+      double& operator[](int index){
+          return xs[index];
+      }
+  };
+
+  int main(){
+      Container t;
+      std::cout << "t[0] = " << t[0] << std::endl;
+      std::cout << "t[1] = " << t[1] << std::endl;
+      std::cout << "t[2] = " << t[2] << std::endl;
+      std::cout << "\n--------\n";
+      t[0] = 3.5;
+      std::cout << "t[0] = " << t[0] << std::endl;
+      t[2] = -15.684;
+      std::cout << "t[2] = " << t[2] << std::endl;    
+      return 0;
+  }
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC sh 
+$ cl.exe array-index-overload.cpp /EHsc /Zi /nologo /Fe:out.exe && out.exe
+t[0] = 1
+t[1] = 2
+t[2] = 4
+
+--------
+t[0] = 3.5
+t[2] = -15.684
+
+#+END_SRC
+
 ** Math Functions and Constants in <cmath>
 
 Documentation: [[https://en.cppreference.com/w/cpp/header/cmath][Standard library header <cmath> - cppreference.com]]
