@@ -107,6 +107,7 @@ programming languages are:
    + See:
      + http://www.cppstd17.com/
      + https://isocpp.org/wiki/faq/cpp17-language
+     + [[https://www.infoworld.com/article/3044727/application-development/qa-bjarne-stroustrup-previews-c-17.html][Q&A: Bjarne Stroustrup previews C++ 17 | InfoWorld]]
    + std::any
    + std::variant
    + std::optional
@@ -976,6 +977,254 @@ References:
  + [[https://softwareengineering.stackexchange.com/questions/133688/is-c11-uniform-initialization-a-replacement-for-the-old-style-syntax][c++ - Is C++11 Uniform Initialization a replacement for the old style syntax? - Software Engineering Stack Exchange]]
  + 
  + 
+
+** Iterato based loops and for-range based loops 
+*** Iterator based loop 
+
+Loop over a vector: 
+
+#+BEGIN_SRC cpp 
+  std::vector<std::string> xs {"Hello", "world", "C++", "HPC", "awesome"};
+
+  for(std::vector<std::string>::iterator it = xs.begin(); it != xs.end(); ++it){
+          std::cout << "word = '" << *it << "' size = " << it->size() << "\n";
+  }
+
+  /** Output: 
+     word = 'Hello' size = 5
+     word = 'world' size = 5
+     word = 'C++' size = 3
+     word = 'HPC' size = 3
+     word = 'awesome' size = 7
+     >> 
+   ,*/
+
+  // === OR =====//
+
+  for(auto it = xs.begin(); it != xs.end(); ++it){
+          std::cout << "word = '" << *it << "' size = " << it->size() << "\n";
+  }
+
+  /** Output: 
+          word = 'Hello' size = 5
+          word = 'world' size = 5
+          word = 'C++' size = 3
+          word = 'HPC' size = 3
+          word = 'awesome' size = 7
+   ,*/
+#+END_SRC
+
+Loop over a deque: 
+
+#+BEGIN_SRC cpp 
+  auto ds = std::deque<std::string> {"Physics", "C++", "STL", "Math", "Algebra", "Electronics"};
+
+  for(std::deque<std::string>::iterator it = ds.begin(); it != ds.end(); ++it){
+          std::cout << "word = '" << *it << "' size = " << it->size() << "\n";
+  }
+
+  // Or: 
+  for(auto it = ds.begin(); it != ds.end(); ++it){
+          std::cout << "word = '" << *it << "' size = " << it->size() << "\n";
+  }
+
+  /** Output: 
+     word = 'Physics' size = 7
+     word = 'C++' size = 3
+     word = 'STL' size = 3
+     word = 'Math' size = 4
+     word = 'Algebra' size = 7
+     word = 'Electronics' size = 11
+   ,*/
+
+#+END_SRC
+
+Loop over a list: 
+
+#+BEGIN_SRC cpp 
+  // Struct is a class with everything public 
+  struct Waypoint{
+          std::string name;
+          double      lat;
+          double      lon;
+          // This constructor is necessary for storing this object
+          // in STL collections/containers 
+          Waypoint(){}
+          Waypoint(const std::string& name, double lat, double lon):
+                  name(name), lat(lat), lon(lon){}
+  };
+
+  >> auto wp = Waypoint("Paris", 48.23, 22.12)
+  >> wp.name
+  (std::string &) "Paris"
+  >> wp.lat
+  (double) 48.230000
+  >> wp.lon
+  (double) 22.120000
+  >> 
+  >> 
+
+  auto waypoints = std::list<Waypoint>{};
+  waypoints.emplace_back("Paris", 48.8566, 2.3522);
+  waypoints.emplace_back("Tokyo", 35.6895, 139.6917);
+  waypoints.emplace_back("Beijing", 39.9042, 116.4074);
+  waypoints.emplace_back("Cape Town", -33.9249, 18.4241);
+  waypoints.emplace_back("Buenos Aires", -34.6037, -58.3816);
+
+  std::cout << std::fixed << std::setprecision(2);
+
+  for(auto it = waypoints.begin(); it != waypoints.end(); ++it){
+          std::cout << std::setw(15) << std::left  << it->name
+                            << std::setw(15) << std::right << it->lat
+                            << std::setw(15) << it->lon
+                            << "\n";
+  }
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC text 
+  Paris                    48.86           2.35
+  Tokyo                    35.69         139.69
+  Beijing                  39.90         116.41
+  Cape Town               -33.92          18.42
+  Buenos Aires            -34.60         -58.38
+#+END_SRC
+
+Loop over a map:
+
+#+BEGIN_SRC cpp 
+  auto values = std::map<std::string, double>{
+        {"x",  2.1023}
+       ,{"y",  sqrt(2)}
+       ,{"e",  exp(1)}
+       ,{"pi", 3.1415}
+       ,{"3/4", 3.0 / 4.0}
+  };
+
+  std::cout << std::fixed << std::setprecision(2);
+
+  for(std::map<std::string, double>::iterator it = values.begin(); it != values.end(); it++){
+          std::cout << std::setw(5) << std::left  << it->first
+                            << std::setw(5) << std::right << it->second
+                            << "\n";
+  }
+
+  // OR:
+  for(auto it = values.begin(); it != values.end(); it++){
+          std::cout << std::setw(5) << std::left  << it->first
+                            << std::setw(5) << std::right << it->second
+                            << "\n";
+  }
+
+  /** Output: 
+     3/4   0.75
+     e     2.72
+     pi    3.14
+     x     2.10
+     y     1.41
+   ,*/
+#+END_SRC
+
+*** For-ranged based loops 
+
+C++11 and new standards allow to iterate over any STL container or
+class with methods (member functions) .begin() or .end() using a
+simpler syntax than the old iterator loop syntax.
+
+ *Loop over a vector:*
+
+#+BEGIN_SRC cpp 
+  std::vector<std::string> xs {"Hello", "world", "C++", "HPC", "awesome"};
+
+  // Use: const auto&  to avoid uncessary copies, use auto& if there is modification of x.
+  // The const keyword will generate a compiler error if there is 
+  // any attempt to modify the value of x. 
+  for(const auto& x: xs){
+          std::cout << "word = '" << x << "' size = " << x.size() << "\n";
+  }
+
+  /** Output: 
+     word = 'Hello' size = 5
+     word = 'world' size = 5
+     word = 'C++' size = 3
+     word = 'HPC' size = 3
+     word = 'awesome' size = 7
+   ,*---------------*/
+
+#+END_SRC
+
+ *Loop over a list:*
+
+#+BEGIN_SRC cpp 
+  // Struct is a class with everything public 
+  struct Waypoint{
+          std::string name;
+          double      lat;
+          double      lon;
+          // This constructor is necessary for storing this object
+          // in STL collections/containers 
+          Waypoint(){}
+          Waypoint(const std::string& name, double lat, double lon):
+                  name(name), lat(lat), lon(lon){}
+  };
+
+  auto waypoints = std::list<Waypoint>{
+         {"Paris", 48.8566, 2.3522}
+        ,{"Tokyo", 35.6895, 139.6917}
+        ,{"Beijing", 39.9042, 116.4074}
+        ,{"Cape Town", -33.9249, 18.4241}
+        ,{"Buenos Aires", -34.6037, -58.3816}};
+
+
+  std::cout << std::fixed << std::setprecision(2);
+
+  for(const auto& wp: waypoints){
+          std::cout << std::setw(15) << std::left  << wp.name
+                            << std::setw(15) << std::right << wp.lat
+                            << std::setw(15) << wp.lon 
+                            << "\n";
+  }
+
+#+END_SRC
+
+Ouput: 
+
+#+BEGIN_SRC text 
+  Paris                    48.86           2.35
+  Tokyo                    35.69         139.69
+  Beijing                  39.90         116.41
+  Cape Town               -33.92          18.42
+  Buenos Aires            -34.60         -58.38
+#+END_SRC
+
+ *Loop over a map*
+
+#+BEGIN_SRC cpp 
+  auto values = std::map<std::string, double>{
+        {"x",  2.1023}
+       ,{"y",  sqrt(2)}
+       ,{"e",  exp(1)}
+       ,{"pi", 3.1415}
+       ,{"3/4", 3.0 / 4.0}
+  };
+
+  std::cout << std::fixed << std::setprecision(3);
+
+  for(const auto& p: values){
+          std::cout << std::setw(5) << std::left  << p.first
+                                    << std::setw(5) << std::right << p.second
+                                    << "\n";
+  }
+
+  /** Output: 
+     3/4  0.750
+     e    2.718
+     pi   3.142
+     x    2.102
+     y    1.414
+   ,*==============*/
+#+END_SRC
 
 ** C++11 - Scoped Enum
 
