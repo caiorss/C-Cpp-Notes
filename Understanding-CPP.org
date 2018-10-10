@@ -1647,25 +1647,42 @@ Complete program output of [[file:src/cpp-functor.cpp][file:src/cpp-functor.cpp]
 *** Overview 
 
 Lambda expressions, also known as lambda functions or lambda
-abstractions, are ubiquitous in functional programming, they were
-introduced by Lisp and has made its way into mainstream and has 
-arrived to C# (Cshap), Java 8 and C++11. 
+abstractions, are ubiquitous in functional programming languages such
+as Haskell, OCaml, Scala and Scheme. They were by introduced in a
+theoretical way by Alonzo Church in the lambda calculus. Lisp was
+first programming language to use lambda functions and now this
+function programming feature has made its way into mainstream and has
+arrived to C# (Cshap), Java 8 and C++11.
 
-Lambda expression can be passed as arguments as any function and also
-be defined locally at the call-site simplifying all the boilerplate
-code necessary to pass a function. In addition, they can be returned
-from functions and have state. 
+In C++, Lambda functions are not ordinary functions, actually, they
+are special function-objects or "C++ functors". Lambda abstractions
+can be passed as arguments to any function; returned from functions;
+can have state and also they can be defined locally at the call-site
+simplifying all the boilerplate code necessary to pass a function to
+callbacks, event handlers and higher order functions.
 
 Summary:
-  + Lambda functions can be:
+
+  * Lambda functions were introduced in C++11. Before C++11 lambdas
+    were available as Boost.Lambda. 
+
+  * Lambda functions can be:
     + returned from functions.
     + be passed as function parameters.
     + Can be stored in data structures.
     + Hold state and capture variables (closure).
-    + Lambdas can be converted to function pointers what is useful with
-      old C-APIs.
-  + Lambda turns C++11 is a game changer and turns C++ into an almost
-    functional programming language.
+    + Non-capturing lambdas can be converted to function pointers what
+      is useful with old C-APIs.
+
+  * Lambda turns C++11 is a *game changer* and turns C++ into an
+    quasi-functional programming language.
+
+  * Practical Use Cases:
+    + Callbacks
+    + Higher order functions
+    + Simplify design patterns
+    + Asynchronous code
+    + Create functions at runtime. 
 
 *Main parts* 
  
@@ -1682,7 +1699,16 @@ Syntax:
 Some lambda functions: 
 
 #+BEGIN_SRC cpp 
- auto fn = [](int n){ return n * 10}
+ auto fn = [](int n){ return n * 10; }
+
+ // Test in CERN's ROOT REPL
+ >> auto fn = [](int n){ return n * 10; }
+ ((lambda) &) @0x7f5e578f2010
+ >> 
+
+ >> auto fn = [](int n){ return n * 10; }
+ ((lambda) &) @0x7f5e578f2010
+ >> 
 #+END_SRC
 
 
@@ -1740,7 +1766,126 @@ Some lambda functions:
  + File: [[file:src/lambdaFun.cpp][file:src/lambdaFun.cpp]]
  + Online Compiler: http://rextester.com/SCQP30593
 
-Output: 
+Code Highlights:
+
+ - Lambda function - lambda1 
+
+#+BEGIN_SRC cpp 
+  // Example (1)
+  auto lambda1 = [](const std::string& str){
+     std::cout << "Lambda1: : I got the value = " << str << "\n";
+  };
+
+  // Alternative 1:
+  //------------------------------
+  std::function<void (const std::string&)> lambda1A = [](const std::string& str) {
+    std::cout << "Lambda1: : I got the value = " << str << endl;
+  };
+
+  // Alternative 2:
+  //------------------------------
+  std::function<auto (const std::string&) -> void> lambda1B = [](const std::string& str) {
+    std::cout << "Lambda1: : I got the value = " << str << endl;
+  };
+
+  // Alternative 3:
+  //------------------------------
+  // Type synonym 
+  using FnAction = std::function<void (const std::string&)>;
+  // Alternative type synonym: 
+  using FnAction = std::function<auto (const std::string&) -> void>;
+
+  FnAction lambda1C = [](const std::string& str) {
+    std::cout << "Lambda1: : I got the value = " << str << endl;
+  };
+
+  >> lambda1("hello world")
+  Lambda1: : I got the value = hello world
+
+  >> lambda1("hola mundo")
+  Lambda1: : I got the value = hola mundo
+
+  >> lambda1A("testing C++")
+  Lambda1: : I got the value = testing C++
+
+  >> lambda1B("Running lambda1B")
+  Lambda1: : I got the value = Running lambda1B
+
+  >> lambda1C("I am lambda1C function")
+  Lambda1: : I got the value = I am lambda1C function
+  >> 	
+#+END_SRC
+
+
+ - Higher order function which returns a lambda function which takes
+   two ints as parameters returning an int. This function captures the
+   parameter m by value, it means that the parameter is copied in the
+   function body. 
+
+#+BEGIN_SRC cpp 
+  // As it is in the code.
+  //-----------------------------------------	
+  std::function<int (int, int)> makeFunction1(int m){
+      return [m](int x, int y){ return m * (x + y); };
+  }
+
+  >> auto fn = makeFunction1(4)
+  (std::function<int (int, int)> &) @0x7fb73017f010
+  >> fn(3, 5)
+  (int) 32
+  >> fn(4, 3)
+  (int) 28
+  >> 
+
+  // Alternative 1:
+  //-----------------------------------------
+  auto makeFunction1A(int m) -> std::function<int (int, int)>{
+      return [m](int x, int y){ return m * (x + y); };
+  }
+
+  >> fna(3, 5)
+  (int) 32
+  >> fna(4, 3)
+  (int) 28
+  >> auto fna6 = makeFunction1A(6)
+  (std::function<int (int, int)> &) @0x7f696d823030
+  >> fna6(3, 5)
+  (int) 48
+  >> fna6(4, 3)
+  (int) 42
+  >> 
+
+  // Alternative 2:
+  //-----------------------------------------
+  auto makeFunction1B(int m) -> std::function<auto (int, int) -> int>{
+      return [m](int x, int y){ return m * (x + y); };
+  }
+
+  // Alternative 3:
+  //-----------------------------------------
+  // C++11 Type synonym
+  using BinaryIntFunctionA = std::function<int (int, int)>;
+  using BinaryIntFunctionB = std::function<auto (int, int) -> int>;
+  // Prior to C++11 type synonym
+  typedef std::function<auto (int, int) -> int> BinaryIntFunction;
+
+  auto makeFunction1C(int m) -> BinaryIntFunctionB {
+      return [m](int x, int y){ return m * (x + y); };
+  }
+
+  >> auto fnc = makeFunction1C(8)
+  (std::function<int (int, int)> &) @0x7f696d823050
+  >> fnc(3, 5)
+  (int) 64
+  >> fnc(6, 7)
+  (int) 104
+  >> 8 * (6 + 7)
+  (int) 104
+  >> 
+#+END_SRC
+
+
+Complete program output ([[file:src/lambdaFun.cpp][file:src/lambdaFun.cpp]]) : 
 
 #+BEGIN_SRC sh
   g++ lamdaFun.cpp -o bin/lamdaFun.bin && bin/lamdaFun.bin
