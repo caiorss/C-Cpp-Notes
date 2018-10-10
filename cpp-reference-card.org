@@ -1471,7 +1471,200 @@ t[0] = 3.5
 t[2] = -15.684
 
 #+END_SRC
+*** Conversion Operators and user-defined type conversion 
 
+Conversion operators allow to convert a class to any type implicitly
+or explicitly with type-cast operator ~static_cast<T>~. 
+
+Example: 
+ 
+ - ROOT Script File: _conversion-operator.cpp_
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+
+  #define LOGFUNCTION(type)  std::cerr << "Convert to: [" << type << "] => Called: line " \
+          << __LINE__ << "; fun = " << __PRETTY_FUNCTION__ << "\n"
+
+  // Or: struct Dummy { 
+  class Dummy{
+  public:
+          bool flag = false;
+
+          // Type conversion operator which converts an instance
+          // of dummy to double.	
+          explicit operator double() {
+                  LOGFUNCTION("double");
+                  return 10.232;
+          }	
+          #if 1
+          // Implicit conversion to int is not allowed, it is only possible to convert
+          // this object explicitly with static_cast. 	
+          explicit operator int() const {
+                  LOGFUNCTION("int");
+                  return 209;
+          }	
+          explicit operator long() const {
+                  LOGFUNCTION("long");
+                  return 100L;
+          }
+          operator std::string() const {
+                  LOGFUNCTION("std::string");
+                  return "C++ string std::string";
+          }
+          explicit operator const char*() const {
+                  LOGFUNCTION("const char*");
+                  return "C string";
+          }		
+          operator bool() const {
+                  LOGFUNCTION("bool");
+                  std::cerr << " Called " << __FUNCTION__ << "\n";
+                  return flag;
+          }
+          #endif 
+  };
+#+END_SRC
+
+Testing: 
+
+ - C-style casting
+
+#+BEGIN_SRC cpp 
+  >> .L conversion-operator.cpp 
+  >> Dummy d;  
+
+  >> (double) d
+  Convert to: [double] => Called: line 15; fun = double Dummy::operator double()
+  (double) 10.232000
+
+  >> (int) d
+  Convert to: [int] => Called: line 22; fun = int Dummy::operator int() const
+  (int) 209
+
+  >> (long) d
+  Convert to: [long] => Called: line 26; fun = long Dummy::operator long() const
+  (long) 100
+
+  >> (std::string) d
+  Convert to: [std::string] => Called: line 30; fun = std::string Dummy::operator basic_string() const
+  (std::string) "C++ string std::string"
+  >> 
+#+END_SRC
+
+ + C++ style casting:
+
+#+BEGIN_SRC cpp 
+
+  >> static_cast<int>(d)
+  Convert to: [int] => Called: line 22; fun = int Dummy::operator int() const
+  (int) 209
+  >> 
+  >> static_cast<long>(d)
+  Convert to: [long] => Called: line 26; fun = long Dummy::operator long() const
+  (long) 100
+  >> 
+  >> static_cast<double>(d)
+  Convert to: [double] => Called: line 15; fun = double Dummy::operator double()
+  (double) 10.232000
+
+  >> static_cast<std::string>(d)
+  Convert to: [std::string] => Called: line 30; fun = std::string Dummy::operator basic_string() const
+  (std::string) "C++ string std::string"
+  >> 
+
+  >> static_cast<bool>(d)
+  Convert to: [bool] => Called: line 38; fun = bool Dummy::operator bool() const
+   Called operator bool
+  (bool) false
+  >> 
+
+  >> d.flag = true
+  (bool) true
+
+  >> static_cast<bool>(d)
+  Convert to: [bool] => Called: line 38; fun = bool Dummy::operator bool() const
+   Called operator bool
+  (bool) true
+  >> 
+
+#+END_SRC
+ 
+ + Simulating implicit conversion:
+   + Note: implicitly assignment type conversion is not allowed for
+     operators annotated with explicit. So it is not possible to
+     perform the assignment: const char* s = d 
+
+#+BEGIN_SRC cpp 
+  // Implicit conversion 
+  >> std::string message = d
+  Convert to: [std::string] => Called: line 30; fun = std::string Dummy::operator basic_string() const
+  (std::string &) "C++ string std::string"
+  >> 
+  >> std::cout << "text = " << message << "\n";
+  text = C++ string std::string
+  >> 
+  >> 
+
+  >> const char* s = d
+  ROOT_prompt_16:1:13: error: no viable conversion from 'Dummy' to 'const char *'
+  const char* s = d
+              ^   ~
+  // Conversion operators marked as explicit can only casted using C-style cast or 
+  // or static_cast<T>
+  >> const char* s = static_cast<const char*>(d)
+  Convert to: [const char*] => Called: line 34; fun = const char *Dummy::operator const char *() const
+  (const char *) "C string"
+
+  >> d ? "true" : "false";
+  Convert to: [bool] => Called: line 38; fun = bool Dummy::operator bool() const
+   Called operator bool
+
+  >> d ? "true" : "false"
+  Convert to: [bool] => Called: line 38; fun = bool Dummy::operator bool() const
+   Called operator bool
+  (const char *) "true"
+
+  >> d.flag = false;
+
+  >> d ? "true" : "false"
+  Convert to: [bool] => Called: line 38; fun = bool Dummy::operator bool() const
+   Called operator bool
+  (const char *) "false"
+  >> 
+#+END_SRC
+
+ + Bool type conversion in conditional statements.
+
+#+BEGIN_SRC cpp 
+  >> d.flag = true;
+
+  >> if(d) { std::cout << "Flag is true OK" << std::endl; }
+  Convert to: [bool] => Called: line 38; fun = bool Dummy::operator bool() const
+   Called operator bool
+  Flag is true OK
+
+  >> d.flag = false;
+
+  >> if(!d) { std::cout << "Flag is false OK" << std::endl; }
+  Convert to: [bool] => Called: line 38; fun = bool Dummy::operator bool() const
+   Called operator bool
+  Flag is false OK
+  >> 
+  >> 
+#+END_SRC
+
+
+ - Note: The macro ~__PRETTY_FUNCTION__~ is only available in GCC or
+   CLANG, in MSVC use ~__FUNCSIG__~
+
+
+Further Reading:  
+ + [[https://msdn.microsoft.com/en-us/library/ts48df3y.aspx][Cast Operator: ()]]
+ + [[https://docs.microsoft.com/en-us/cpp/cpp/user-defined-type-conversions-cpp?view=vs-2017][User-Defined Type Conversions (C++) | Microsoft Docs]]
+ + [[https://stackoverflow.com/questions/1307876/how-do-conversion-operators-work-in-c][How do conversion operators work in C++? - Stack Overflow]]
+ + Explicit Conversion Operators -
+   <http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2004/n1592.pdf>
 ** Compiler flags and invocation 
 *** Overview
 
