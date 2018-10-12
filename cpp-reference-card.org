@@ -1228,7 +1228,411 @@ See:
 
  + [[https://en.cppreference.com/w/cpp/numeric/math/INFINITY][INFINITY - cppreference.com]]
 
- + [[https://en.cppreference.com/w/cpp/numeric/math/NAN][NAN - cppreference.com]]
+ + [[https://en.cppreference.com/w/cpp/numeric/math/NAN][NAN -
+   cppreference.com]]
+** C++17 std::invoke 
+   :PROPERTIES:
+   :ID:       5754cb0e-f4d3-434c-85e0-5ea55655a22f
+   :END:
+
+ Function which provides an uniform interface for invoking anything
+ callable such as class member functions (ordinary methods), static
+ member functions (static methods), functios and etc.
+
+ See: https://en.cppreference.com/w/cpp/utility/functional/invoke
+
+  + File: [[file:src/cpp17/cpp17-invoke.cpp][file:src/cpp17/cpp17-invoke.cpp]]
+  + Online Compiler: http://rextester.com/IPY88297
+
+
+ #+BEGIN_SRC cpp :tangle src/cpp17/cpp17-invoke.cpp
+   #include <iostream>
+   #include <string>
+   #include <ostream>
+
+   // std::invoke is provide by header functional
+   #include <functional> 
+
+   struct Dummy{
+           double evalme(double x)	{
+                   std::cerr << __FILE__ << ":" << __LINE__ << " I was evaluated ; 2x = " << 2 *x << '\n';
+                   return 2 * x;
+           }
+           double operator()(double x){
+                   std::cerr << __FILE__ << ":" << __LINE__ << " Call function-operator << 4 * x = " << 4 * x << '\n';
+                   return 4 * x;
+           }
+   };
+
+   double computeDouble(double x){
+           std::cerr << __FILE__ << ":" << __LINE__ << " Computed double of 2x = " << 2 * x << '\n';
+           return 2 * x;
+   }
+
+   int main(){
+           std::invoke(computeDouble, 3.0);
+           Dummy dummy;
+           std::invoke(dummy, 3.0);
+           std::invoke(Dummy(), 2.0);
+           // Call method: .evalme indirectly 
+           std::invoke(&Dummy::evalme, dummy, 3.0);
+           return 0;
+   }
+
+ #+END_SRC
+
+ Compile and run: 
+
+ #+BEGIN_SRC sh 
+   g++ cpp17-invoke.cpp -o out.bin -std=c++1z -Wall -Wextra && ./out.bin
+   cpp17-invoke.cpp:20 Computed double of 2x = 6
+   cpp17-invoke.cpp:14 Call function-operator << 4 * x = 12
+   cpp17-invoke.cpp:14 Call function-operator << 4 * x = 8
+   cpp17-invoke.cpp:9 I was evaluated ; 2x = 6
+ #+END_SRC
+
+** C++17 std::any 
+   :PROPERTIES:
+   :ID:       9397a9a0-e641-4cb6-89b7-24a82fe12d99
+   :END:
+
+This example shows how to use the C++17 std::any container which comes
+froom boost::any.
+
+See: https://en.cppreference.com/w/cpp/utility/any
+
+File:  [[file:src/cpp17/cpp17-any.cpp][file:src/cpp17/cpp17-any.cpp]] 
+
+#+BEGIN_SRC cpp :tangle src/cpp17/cpp17-any.cpp
+  #include <iostream>
+  #include <string>
+  #include <iomanip>
+  #include <ostream>
+
+  #include <any>
+
+  struct Point{
+      double x;
+      double y;
+      Point(double x, double y): x(x), y(y) {}
+
+      // Copy constructor
+      Point(const Point& p){
+          std::cerr << " -->> Copy constructor" << '\n';
+          x = p.x;
+          y = p.y;
+      }   
+  };
+
+  std::ostream& operator<<(std::ostream& os, const Point& p){
+      os << "Point(" << p.x << ", " << p.y << ") ";
+      return os;
+  }
+
+  template<typename T>
+  auto printInfo(std::any x) -> void{
+      std::cout << " x.type = " << x.type().name()
+                << " ; value(x) = "
+                << std::any_cast<T>(x)
+                << '\n';  
+  }
+
+  int main(){
+      // Print boolean as 'true', 'false', instead of 0 or 1
+      std::cout << std::boolalpha;
+      std::any x = 1;
+      printInfo<int>(x);
+      x = 10.233;
+      printInfo<double>(x);
+      x = 'k';
+      printInfo<char>(x);
+      x = "hello world";
+      printInfo<const char*>(x);
+      x = std::string("hello world");
+      printInfo<std::string>(x);  
+      x = Point(100.0, 20.0);
+      printInfo<Point>(x);
+      std::cout << "Has value: x.has_value() = " << x.has_value() << '\n';
+      x.reset();                                                         
+      std::cout << "Has value: x.has_value() = " << x.has_value() << '\n';                                                               
+      std::cout << "Try casting " << std::endl;
+      x = "testing type casting";
+      try{
+          std::any_cast<int>(x);
+      } catch (const std::bad_any_cast& ex) {
+          std::cerr << " >>> Exception: what = " << ex.what() << '\n'; 
+      }
+      std::cerr << " >>> End the program gracefully" << '\n'; 
+      return 0;
+  }
+
+#+END_SRC
+
+Compiling with gcc: 
+
+#+BEGIN_SRC sh 
+  $ g++ --version
+  g++ (GCC) 7.3.1 20180130 (Red Hat 7.3.1-2)
+  .. ... ... ... 
+
+  $ g++ cpp17-any.cpp -o out.bin -std=c++1z -Wall -Wextra && ./out.bin
+   x.type = i ; value(x) = 1
+   x.type = d ; value(x) = 10.233
+   x.type = c ; value(x) = k
+   x.type = PKc ; value(x) = hello world
+   x.type = NSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE ; value(x) = hello world
+   -->> Copy constructor
+   -->> Copy constructor
+   x.type = 5Point ; value(x) =  -->> Copy constructor
+  Point(100, 20) 
+  Has value: x.has_value() = true
+  Has value: x.has_value() = false
+  Try casting 
+   >>> Exception: what = bad any_cast
+   >>> End the program gracefully
+#+END_SRC
+
+Compile with MSVC / VC++ on Windows: 
+
+#+BEGIN_SRC sh 
+  $ cl.exe cpp17-any.cpp /EHsc /Zi /nologo /std:c++17 /Fe:out.exe && out.exe
+  cpp17-any.cpp
+   x.type = int ; value(x) = 1
+   x.type = double ; value(x) = 10.233
+   x.type = char ; value(x) = k
+   x.type = char const * __ptr64 ; value(x) = hello world
+   x.type = class std::basic_string<char,struct std::char_traits<char>,class std::allocator<char> > ; value(x) = hello world
+   -->> Copy constructor
+   -->> Copy constructor
+   -->> Copy constructor
+   x.type = struct Point ; value(x) = Point(100, 20) 
+  Has value: x.has_value() = true
+  Has value: x.has_value() = false
+  Try casting 
+   >>> Exception: what = Bad any_cast
+   >>> End the program gracefully
+#+END_SRC
+** C++17 std::variant 
+   :PROPERTIES:
+   :ID:       8232d77f-99a5-4434-96f2-c5c3cfd6d956
+   :END:
+
+C++17 new std::variant which comes from Boost.Variant provides a
+type-safe discriminated union or sum type which is similar to pattern
+matching from functional programming languages like Haskell, OCaml and
+Scala. In addition to those benefits, the std::variant is an
+out-of-the-box generic visitor design pattern and a type-safe
+replacement for old C-unions.
+
+Potential Applications: 
+ + Implement visitor OOP pattern.
+ + Simulate or emulate pattern matching from functional languages.
+ + Manipulate abstract syntax trees.
+
+Useful concepts references: 
+ + [[https://en.wikipedia.org/wiki/Tagged_union][Tagged union - Wikipedia]]
+ + [[https://en.wikipedia.org/wiki/Algebraic_data_type][Algebraic data type - Wikipedia]]
+
+Documentation: 
+ + https://en.cppreference.com/w/cpp/utility/variant
+ + [[https://www.boost.org/doc/libs/1_64_0/doc/html/variant.html][Chapter 45. Boost.Variant - 1.64.0]]
+
+Code example: 
+
+ - File: [[file:src/cpp17/variant.cpp][file:src/cpp17/variant.cpp]] 
+
+#+BEGIN_SRC cpp :tangle src/cpp17/variant.cpp
+  #include <iostream>
+  #include <variant> // C++17
+  #include <string>
+  #include <ostream>
+  #include <deque>
+  #include <vector>
+  #include <iomanip>
+
+  template <class T>
+  auto display(const std::string& name, const T& t) -> void;
+
+  // Pattern matching using constexpr => May be the more performant way 
+  template<class T>
+  auto identifyAndPrint(const T& v) -> void;
+
+  struct VisitorOperation{
+          auto operator()(int num) -> void {
+                  std::cout << "type = int     => value = " << num << "\n";
+          }
+          auto operator()(double num) -> void {
+                  std::cout << "type = double  => value = " << num << "\n";
+          }
+          auto operator()(const std::string& s){
+                  std::cout << "type = string  => value = " << s << "\n";
+          }
+  };
+
+  int main(){
+          // using <1>, <2>, ... <n> => Only available at C++17
+          using std::cout, std::endl, std::cerr;
+          auto nl = "\n";
+          std::cout << std::boolalpha;
+          cout << "========== Test 1 ==================" << nl;	
+	
+          // std::variant<int, double, std::string> somevar;
+          auto x = std::variant<int, double, std::string>();
+          x = 100;
+          std::cout << "variant has int    = " << std::holds_alternative<int>(x) << nl;
+          std::cout << "variant has double = " << std::holds_alternative<double>(x) << nl;
+          std::cout << "variant has string = " << std::holds_alternative<std::string>(x) << nl;
+          display("x", x);
+          std::cout << "-------------------" << nl;
+          x = 204.45;
+          std::cout << "variant has double = " << std::holds_alternative<double>(x) << nl;	
+          display("x", x);
+          std::cout << "-------------------" << nl;
+          x = "std::variant is awesome!";
+          std::cout << "variant has string = " << std::holds_alternative<std::string>(x) << nl;
+          display("x", x);
+
+          cout << "========== Test 2 ==================" << nl;
+          try{ 
+                  // Try to get int 
+                  int m = std::get<int>(x);
+                  std::cout << "m = " << m << "\n";
+          } catch(const std::bad_variant_access& ex){
+                  std::cerr << "Error: Failed to extract int." << nl;
+          }
+          try{ 
+                  // Try to get string 
+                  auto s = std::get<std::string>(x);
+                  std::cout << "s = " << s << nl;
+          } catch(const std::bad_variant_access& ex){
+                  std::cerr << "Error: Failed to extract string." << nl;
+          }
+
+          cout << "========== Test 3 ==================" << nl;
+          x = -100;
+          std::visit([](auto&& p){
+                                     std::cout << "x = " << p << '\n';
+                             }, x);
+          x = 20.52;
+          std::visit([](auto&& p){
+                                     std::cout << "x = " << p << '\n';
+                             }, x);
+
+          x = "<hello world std::variant>";
+          std::visit([](auto&& p){
+                                     std::cout << "x = " << p << '\n';
+                             }, x);
+
+          cout << "========== Test 4 ==================" << nl;
+          // auto + uniform initialization 
+          auto xs = std::deque<std::variant<int, double, std::string>>{10.0, 20, 5, "hello", 10, "world"};
+          for(const auto& e: xs){
+                  identifyAndPrint(e);
+          }
+          cout << "========== Test 5 ==================" << nl;
+          for(const auto& e: xs){
+                  std::visit(VisitorOperation(), e);
+          }	
+          return 0;
+  }
+
+  // It works in a similar fashion to functional languages with
+  // pattern matching such as Haskell, Scala, OCaml and so on.
+  // std::variant is also a type-safe alternative to old C-unions.
+  template <class T>
+  auto display(const std::string& name, const T& t) -> void {
+          auto nl = "\n";
+          // Boost.Variant uses boost::get<TYPE>(&t), now changed to std::get_if
+          if(auto n = std::get_if<int>(&t)){
+                  std::cout << " = " << *n << nl;
+                  return; // Early return 
+          }
+          if(auto d = std::get_if<double>(&t)){
+                  std::cout << name << " = " << *d << nl;
+                  return;
+          }	
+          if(auto s = std::get_if<std::string>(&t)){
+                  std::cout << name << " = " << *s << nl;
+                  return;
+          }
+          std::cout << "<UNKNOWN>" << std::endl;
+  }
+
+  template<class T>
+  auto identifyAndPrint(const T& v) -> void{
+          std::visit([](auto&& a){
+              using C = std::decay_t<decltype(a)>;
+              if constexpr(std::is_same_v<C, int>){
+                              std::cout << "Type is int => value = " << a << "\n";
+                              return;
+              }
+              if constexpr(std::is_same_v<C, double>){
+                              std::cout << "Type is double => value = " << a << "\n";
+                              return;
+              }
+              if constexpr(std::is_same_v<C, std::string>){
+                              std::cout << "Type is string => value = " << a << "\n";
+                              return;
+              }
+              std::cout << "Type is unknown" << "\n";
+                             }, v);
+  } // End of func. identifyAndPrint() ---//
+
+#+END_SRC
+
+Compile with GCC:
+
+#+BEGIN_SRC sh 
+ $ g++ variant.cpp -o variant.bin -std=c++1z -Wall -Wextra  && ./variant.bin 
+#+END_SRC
+
+Compile with Clang:
+
+#+BEGIN_SRC sh 
+ $ g++ variant.cpp -o variant.bin -std=c++1z -Wall -Wextra  && ./variant.bin 
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC sh 
+  g++ variant.cpp -o variant.bin -std=c++1z -Wall -Wextra  && ./variant.bin
+
+  ========== Test 1 ==================
+  variant has int    = true
+  variant has double = false
+  variant has string = false
+   = 100
+  -------------------
+  variant has double = true
+  x = 204.45
+  -------------------
+  variant has string = true
+  x = std::variant is awesome!
+  ========== Test 2 ==================
+  Error: Failed to extract int.
+  s = std::variant is awesome!
+  ========== Test 3 ==================
+  x = -100
+  x = 20.52
+  x = <hello world std::variant>
+  ========== Test 4 ==================
+  Type is double => value = 10
+  Type is int => value = 20
+  Type is int => value = 5
+  Type is string => value = hello
+  Type is int => value = 10
+  Type is string => value = world
+  ========== Test 5 ==================
+  type = double  => value = 10
+  type = int     => value = 20
+  type = int     => value = 5
+  type = string  => value = hello
+  type = int     => value = 10
+  type = string  => value = world
+
+
+#+END_SRC
+
 * General C++ Reference Card 
 ** Data Types 
 
