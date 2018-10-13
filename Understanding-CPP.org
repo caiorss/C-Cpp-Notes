@@ -3332,6 +3332,321 @@ Running:
 
   + Templates are widely used in the STL (Standard Template Library)
     and the Boost Library.
+*** Class Templates 
+**** Example: Generic stack class 
+
+Note: 
+
+  + A class template is not a class, it is factory of classes and has
+    zero cost until it is used or instantiated. For instance,
+    Stack<int> and Stack<std::string> are different classes and cannot
+    be stored in containers or accessed with the same pointer.
+
+  + When Stack<int> or Stack<double> appears in the code, the compiler
+    generates an unique object code for each of those template
+    instantiation. The C++ generics doesn't have type erasure like
+    java where all objects can be casted to an instance of Object.
+
+  + All the template code must be always in the header files. 
+
+Class Template Example: 
+
+#+BEGIN_SRC cpp 
+  #include <iostream> 
+  #include <deque> 
+  #include <string>
+
+  template<class T>
+  class Stack{
+  private:
+          std::deque<T> _stack;
+  public:
+          struct stack_empty_error: public std::exception{
+                  const char* what() const throw(){
+                          return " ==> Error: stack empty." ;
+                  }
+          };
+          void push(const T& t){
+                  _stack.push_back(t);
+          }
+          T pop(){
+                  if(_stack.empty())
+                          throw stack_empty_error();
+                  auto x = _stack.back();
+                  _stack.pop_back();
+                  return x;
+          }
+          T peek(){
+                  if(_stack.empty())
+                          throw stack_empty_error();
+                  return _stack.back();
+          }
+          size_t size(){  return _stack.size(); }
+          bool   empty(){ return _stack.empty(); }
+          void   clear(){ _stack.clear(); }
+          void print(){
+                  std::cout << " stack: ";
+                  for(const auto& x: _stack)
+                          std::cout << " " << x ;
+                  std::cout << "\n";
+          }
+  };
+
+#+END_SRC
+
+Usage example: 
+ 
+ - Instantiate class template with int parameter.
+
+#+BEGIN_SRC cpp 
+  >> Stack<int> s1;
+  >> s1.push(10)
+  >> s1.push(20)
+  >> s1.push(-30)
+  >> s1.push(15)
+  >> 
+  >> s1.size()
+  (unsigned long) 4
+  >> 
+  >> s1.empty()
+  (bool) false
+
+  >> s1.print()
+   stack:  10 20 -30 15
+
+  >> s1.peek()
+  (int) 15
+
+  >> s1.pop()
+  (int) 15
+  >> s1.pop()
+  (int) -30
+  >> s1.pop()
+  (int) 20
+  >> s1.pop()
+  (int) 10
+  >> s1.pop()
+  Error in <TRint::HandleTermInput()>: Stack<int>::stack_empty_error caught:  ==> Error: stack empty.
+  >> 
+
+  >> s1.size()
+  (unsigned long) 0
+  >> s1.empty()
+  (bool) true
+  >> 
+  >>
+#+END_SRC
+
+ - Instantiate class template with std::string parameter.
+
+#+BEGIN_SRC cpp 
+  > Stack<std::string> sd;
+  >> sd.push("hello")
+  >> sd.push("c++")
+  >> sd.push("templates")
+  >> sd.push("test")
+  >> 
+  >> sd.size()
+  (unsigned long) 4
+  >> sd.empty()
+  (bool) false
+  >> sd.peek()
+  (std::basic_string<char, std::char_traits<char>, std::allocator<char> >) "test"
+  >> 
+  >> sd.print()
+   stack:  hello c++ templates test
+  >> 
+  >> sd.pop()
+  (std::basic_string<char, std::char_traits<char>, std::allocator<char> >) "test"
+  >> sd.pop()
+  (std::basic_string<char, std::char_traits<char>, std::allocator<char> >) "templates"
+  >> sd.pop()
+  (std::basic_string<char, std::char_traits<char>, std::allocator<char> >) "c++"
+  >> sd.pop()
+  (std::basic_string<char, std::char_traits<char>, std::allocator<char> >) "hello"
+  >> 
+#+END_SRC
+
+ - Generic client code for the class stack: 
+
+#+BEGIN_SRC cpp 
+  // Non-destructive print -> Creates a copy invoking copy constructor 
+  template<typename T>
+  void printStack(Stack<T> t){
+          while(!t.empty())
+                  std::cout << t.pop() << " ";
+          std::cout << "\n";
+          std::cout.flush();
+  }
+
+  template<class T>
+  void fillStack(Stack<T> &t, const std::deque<T>& data){
+          for(const auto& d: data)
+                  t.push(d);
+  }
+#+END_SRC
+
+ - Running client code.
+
+#+BEGIN_SRC cpp 
+  >> Stack<double> stack_double1;
+  >> fillStack(stack_double1, {2.0, 5.0, 6.0, 9.0})
+  >> 
+  >> stack_double1.size()
+  (unsigned long) 4
+  >> stack_double1.peek()
+  (double) 9.0000000
+  >> 
+
+  >> printStack(stack_double1)
+  9 6 5 2 
+  >> 
+  >> printStack(stack_double1)
+  9 6 5 2 
+
+  >> Stack<std::string> stack_string;
+  >> fillStack(stack_string, {"hello", "hpc", "C++", "RULEZ", "peformance", "matters"})
+
+  >> printStack(stack_string)
+  matters peformance RULEZ C++ hpc hello
+
+  >> printStack<std::string>(stack_string)
+  matters peformance RULEZ C++ hpc hello 
+  >> 
+
+  >> stack_string.clear()
+  >> printStack3<std::string>(stack_string)
+
+  >> 
+#+END_SRC
+**** Example: Tuple of three elements 
+
+Code: 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+
+  template <class A, class B, class C>
+  struct tuple3{
+          // Empty constructor - necessary to store by value the tuple
+          // in STL containers.
+          tuple3(){}
+          tuple3(const A& a, const B& b, const C& c)
+                  : a(a), b(b), c(c){		
+          }
+          A a;
+          B b;
+          C c;	
+  };
+
+  template <class A, class B, class C>
+  auto getA(const tuple3<A, B, C>&  t) -> A{
+          return t.a; 	
+  }
+
+  template <class A, class B, class C>
+  auto getB(const tuple3<A, B, C>&  t) -> B{
+          return t.b; 	
+  }
+
+  template <class A, class B, class C>
+  auto getC(const tuple3<A, B, C>&  t) -> C{
+          return t.c; 	
+  }
+
+  template <class A, class B, class C>
+  void printTuple1(const tuple3<A, B, C>& t){
+          std::cout << "tuple3{"
+                            << " a = " << t.a
+                            << " b = " << t.b
+                            << " c = " << t.c
+                            << " } "
+                            << "\n";
+  }
+
+  template <class A, class B, class C>
+  auto printTuple2(const tuple3<A, B, C>& t) -> void {
+          std::cout << "tuple3{"
+                            << " a = " << t.a
+                            << " b = " << t.b
+                            << " c = " << t.c
+                            << " } "
+                            << "\n";
+  }
+#+END_SRC
+
+
+Running: 
+
+#+BEGIN_SRC cpp 
+  >> tuple3<double, char, std::string> h(100.23, 'x', "world")
+  (tuple3<double, char, std::string> &) @0x7f3ea8607010
+  >> 
+  >> h.a
+  (double) 100.23000
+  >> h.b
+  (char) 'x'
+  >> h.c
+  (std::basic_string<char, std::char_traits<char>, std::allocator<char> > &) "world"
+  >> 
+
+  >> getA(h)
+  (double) 100.23000
+  >> getB(h)
+  (char) 'x'
+  >> getC(h)
+  (std::basic_string<char, std::char_traits<char>, std::allocator<char> >) "world"
+
+  // Types parameter are deduced by the compiler.
+  >> printTuple1(h)
+  tuple3{ a = 100.23 b = x c = world } 
+
+  >> printTuple2(h)
+  tuple3{ a = 100.23 b = x c = world } 
+  >> 
+
+  >> printTuple1<double, char, std::string>(h)
+  tuple3{ a = -100 b = x c = world } 
+  >>
+
+  auto tdata = std::deque<tuple3<int, char, std::string>>{
+          {100, 'x', "C++"},
+          {200, 'z', "Forth"},
+          {-900, 'k', "Lisp"},
+          {66, 'p', "route"}};
+
+  for(const auto& t: tlist) printTuple1(t);
+
+  >> for(const auto& t: tdata) printTuple1(t);
+  tuple3{ a = 100 b = x c = C++ } 
+  tuple3{ a = 200 b = z c = Forth } 
+  tuple3{ a = -900 b = k c = Lisp } 
+  tuple3{ a = 66 b = p c = route } 
+  >> 
+
+  // Compiler fails to deduce arguments 
+  >> std::for_each(tdata.begin(), tdata.end(), printTuple1)
+  ROOT_prompt_32:1:1: error: no matching function for call to 'for_each'
+  std::for_each(tdata.begin(), tdata.end(), printTuple1)
+  ^~~~~~~~~
+
+  >> std::for_each(tdata.begin(), tdata.end(), printTuple1<int, char, std::string>);
+  tuple3{ a = 100 b = x c = C++ } 
+  tuple3{ a = 200 b = z c = Forth } 
+  tuple3{ a = -900 b = k c = Lisp } 
+  tuple3{ a = 66 b = p c = route } 
+  >>
+
+  >> std::for_each(tdata.begin(), tdata.end(), &printTuple1<int, char, std::string>);
+  tuple3{ a = 100 b = x c = C++ } 
+  tuple3{ a = 200 b = z c = Forth } 
+  tuple3{ a = -900 b = k c = Lisp } 
+  tuple3{ a = 66 b = p c = route } 
+  >> 
+
+#+END_SRC
+
 *** Templates and C++ iterators 
 
 Templates can be used for writing more generic and resuable code which
