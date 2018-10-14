@@ -24,9 +24,9 @@ void showVector(const char* name, vector<int> xs){
            });
 }
 
-  /*  Example (7) -- Return a function that adds x to a number.
-   *   Lambda functions can be returned from functions
-  */
+/*  Example (7) -- Return a function that adds x to a number.
+ *  Lambda functions can be returned from functions
+ */
 function<int (int, int)> makeFunction1(int m){
     return [m](int x, int y){ return m * (x + y); };
 }
