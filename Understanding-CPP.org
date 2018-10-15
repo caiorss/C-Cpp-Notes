@@ -4528,6 +4528,77 @@ Program output:
   [1] Types are not equal
   [2] Types are equal
 #+END_SRC
+*** Templates with default arguments 
+
+Example: Array allocated on the stack memory.
+
+ + File: default-template-args.C
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+  #include <ostream> 
+
+  // Array allocated on stack with size 10.
+  template <typename Element, size_t Size = 10>
+  class Array{
+  private:
+          Element m_data [Size];
+  public:
+          auto size() -> size_t {
+                  return Size;
+          }
+          auto fill(const Element& t) -> void{
+                  for(size_t i = 0; i < Size; i++)
+                          m_data[i] = t;
+          }
+          auto operator [] (size_t index) -> Element& {
+                  return m_data[index];
+          }
+          auto begin() const -> decltype(std::begin(m_data)) {
+                  return std::begin(m_data);
+          }
+          auto end() const -> decltype(std::end(m_data)) {
+                  return std::end(m_data);
+          }
+          auto print(const std::string& name, std::ostream& os = std::cout) const -> void{
+                  os << name << " = ";
+                  for(auto& x: *this)
+                          os << x << " " << std::flush;
+                  os << "\n";
+          }
+  };
+
+  void default_template_args(){
+          Array<double> s1;
+          std::cout << "s1.size() = " << s1.size() << "\n";
+          s1.fill(3.0);
+          s1[0] = 8.23;
+          s1[1] = -10.2;
+          s1[3] = 0.0;
+          s1.print("s1");
+
+          Array<std::string, 4> s2;
+          std::cout << "s2.size() = " << s2.size() << "\n";
+          s2.fill("C++");
+          s2.print("s2");
+          s2[0] = "PlusPlus";
+          s2[1] = "CPP";
+          s2[2] = "ASM";
+          s2.print("s2");
+  }
+#+END_SRC
+
+Running on CLING REPL:
+
+#+BEGIN_SRC cpp 
+  >> .X default-template-args.C 
+  s1.size() = 10
+  s1 = 8.23 -10.2 3 0 3 3 3 3 3 3 
+  s2.size() = 4
+  s2 = C++ C++ C++ C++ 
+  s2 = PlusPlus CPP ASM C++ 
+#+END_SRC
 *** Implementing Higher Order Functions with templates 
     :PROPERTIES:
     :ID:       20156a12-aa32-407d-8cc0-5c4b85ba9021
