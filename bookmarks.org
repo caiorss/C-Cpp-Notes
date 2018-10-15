@@ -355,3 +355,97 @@ examples that have been discussed in the literature.
      libraries and application code. You are expected to understand
      basic template syntax and template specialisation, and we will
      build the rest as we go along." 
+*** CppCon 2018: Steven Simpson "Source Instrumentation for Monitoring C++ in Production"
+
+ + [[https://www.youtube.com/watch?v=0WgC5jnrRx8&feature=youtu.be][CppCon 2018: Steven Simpson “Source Instrumentation for Monitoring C++ in Production” - YouTube]]
+   + "It is essential to discuss how modern C++ code can be
+     effectively instrumented, in order to effectively monitor it
+     after deployment. *This talk will focus on portable source*
+     *instrumentation techniques such as logging, tracing and*
+     *metrics*. Straightforward, but well designed code additions can
+     drastically ease the troubleshooting of functional issues, and
+     identification of performance bottlenecks, in production.  Of
+     course when dealing with C++ performance is often critical, and
+     so minimizing the cost of any instrumentation is also
+     critical. Key to this is understanding the trade-off between the
+     detail of information collected, and the overheads of exposing
+     that information. It is also important to understand how best to
+     benefit from advances in contemporary monitoring infrastructure,
+     popularised by "cloud" environments.  This talk will open with a
+     brief summary of monitoring goals, infrastructure, benefits, and
+     existing practise. It will then detail practicalities of building
+     a set of C++ source instrumentation primitives, based on proven
+     principles employed in demanding production software."
+
+ 
+   + Summary + Notes + Brainstorm:
+     * Use a logging library with the following features.
+       + Format string (or ostream)
+       + Serverity levels, [INFO], [WARNING], [FAILURE], [CRITICAL], [TRACE] ...
+       + Enable/disable at runtime
+       + Logs files + rotation
+       + Timestamp 
+       + Remote Logging
+       + OS Integration => Syslog on U*nix, or OutputDebugString on Windows.
+
+     * Error messages and exception should have context about the
+       problem such as the file where it happened, code line, what
+       caused the exception and so on. 
+
+     * Log Service infrastructure:
+       + Should support search, indexing, sorting and filtering.
+       + Structured Logging Format: json, csv, to avoid parsing and
+         writing complicated regular expressions.
+       + Logging Alert
+       + Logging can be stored in cloud services. 
+
+     * Logging X Tracing
+
+       + A more detailed logging, showing the internals of some
+         operation for debugging purposes. 
+
+       + Example about tracing: Unix utility strace which log system
+         calls perfomed by a program. $ strace -ttT cat hello.txt    
+
+     * Downsides of logging:
+       * Logging may, specially writing to IO, may cause performance
+         overhead on performance critical code. This is why tracing
+         logging in this type of code is often disabled on deployment
+         builds.
+       * Tracing can be implemented with C-preprocessor macros in
+         order to allow disabling it on debug builds. Using
+         preprocessor has also the advatange that, when the tracing is
+         disabled, it will not inccur on any rutime overhead or
+         performance cost, as string concatenation will not happen and
+         the code will be discarded. 
+  
+     * Domains where logging is essential:
+       * _Network Servers and Web Servers_. => Servers are long running
+         programs which runs in background as daemons without any
+         graphical user interface. So logging, is the only available
+         information about what is going on with the sefver.
+       * _Databases_ 
+       * _Embedded Systems_ => Usually doesn't have keyboard, monitor
+         and etc.
+       * _Industrial Instrumentation_ => Temperature, pressure, speed, ... 
+
+     * *Techniques for Program Instrumentation*
+       * Logging with some logging library
+       * Debug Build 
+         * Debugging Symbols 
+         * Assertions => Allows to check assumptions during the
+           development. 
+         * Tracing
+       * Use a proper debugger such as GDB, WindBG, LLDB for
+         instrospecting the process. 
+       * Proper error messages with enough context information. 
+       * Unit Tests or some automated testing.
+       * System call logger such as strace.
+       * Memory Leak Detector such as Valgrind.
+       * Profiler => Mesure performance.
+       * Compiler with non cryptic error messages like Clang++.
+
+     * Closing:
+       * By building observable software, the software can become its
+         own debugger. 
+
