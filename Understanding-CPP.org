@@ -3482,6 +3482,148 @@ possible with static casting.
 #+END_SRC
 
 *** Example: Reinterpret Cast 
+
+ + Casting function/pointer from and to void*
+   - Note: this is useful for type erasure and reflection and loading
+     functions/symbols from shared libraries at runtime.
+
+#+BEGIN_SRC cpp 
+  double someFunction(int x, int y){ return 3.0 * x + y; }
+  double mfun1(double x){ return x * x + 10 * x - 25; }
+
+  void* ptrErasure = nullptr;
+
+  // Testing function some function:
+  >> ptrErasure = reinterpret_cast<void*>(&someFunction)
+  (void *) 0x7fe3b065a080
+
+  >> auto fnPtr1 = reinterpret_cast<double (*) (int, int)>(ptrErasure)
+  (double (*)(int, int)) Function @0x7fe3b065a080
+	
+  >> fnPtr1(3, 5)
+  (double) 14.000000
+  >> fnPtr1(5, 5)
+  (double) 20.000000
+  >> 
+  >> reinterpret_cast<double (*) (int, int)>(ptrErasure)(3, 5)
+  (double) 14.000000
+  >> reinterpret_cast<double (*) (int, int)>(ptrErasure)(4, 5)
+  (double) 17.000000
+  >> 
+
+  // Testing with mfun
+  // --> C-style casting 	
+  >> ptrErasure = (void*) mfun1
+  (void *) 0x7f94856da090
+  >> ptrErasure = (void*) &mfun1
+  (void *) 0x7f94856da090
+  >> 
+
+  // Failed 	
+  >> ptrErasure = static_cast<void*>(&mfun1)
+  ROOT_prompt_7:1:14: error: static_cast from 'double (*)(double)' to 'void *' is not allowed
+  ptrErasure = static_cast<void*>(&mfun1)
+
+  >> auto fnPtr2 = reinterpret_cast<double (*) (double)>(mfun1)
+  (double (*)(double)) Function @0x7f94856da090
+
+  >> fnPtr2(4)
+  (double) 31.000000
+  >> fnPtr2(5)
+  (double) 50.000000
+  >> 
+
+  // It is really dangerous as it can cast anything to anything!
+  // and the compiler cannot help.	
+  >> reinterpret_cast<double (*) (double)>(4)(5)
+  // *** Break *** segmentation violation
+
+#+END_SRC
+
+ + Casting memory locations to pointer.
+   + Note: It doesn't have applicability in most cases, but it can be
+     useful for accessing memory mapped IO.
+
+#+BEGIN_SRC cpp 
+  >> double x = 10.0
+  (double) 10.000000
+  >> unsigned long n = 300
+  (unsigned long) 300
+  >> 
+
+  >> &x
+  (double *) 0x7f3fd32e9010
+  >> &n
+  (unsigned long *) 0x7f3fd32e9018
+  >> 
+
+  // =========== Variable x =================
+
+  // Failure! Doesn't compile
+  >> static_cast<double*>(0x7f3fd32e9010)
+  ROOT_prompt_4:1:1: error: cannot cast from type 'long' to pointer type 'double *'
+  static_cast<double*>(0x7f3fd32e9010)
+  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  >> 
+  >> reinterpret_cast<double*>(0x7f3fd32e9010)
+  (double *) 0x7f3fd32e9010
+  >> *reinterpret_cast<double*>(0x7f3fd32e9010)
+  (double) 10.000000
+  >> *reinterpret_cast<double*>(0x7f3fd32e9010) = 100.0
+  (double) 100.00000
+  >> x
+  (double) 100.00000
+  >> 
+
+  // =========== Variable n =================
+  >> reinterpret_cast<int*>(0x7f3fd32e9018)
+  (int *) 0x7f3fd32e9018
+  >> *reinterpret_cast<int*>(0x7f3fd32e9018)
+  (int) 300
+  >> *reinterpret_cast<int*>(0x7f3fd32e9018) = 100
+  (int) 100
+  >> int& z = *reinterpret_cast<int*>(0x7f3fd32e9018)
+  (int) 100
+  >> z  = 500
+  (int) 500
+  >> n
+  (unsigned long) 500
+  >> n = 600
+  (unsigned long) 600
+  >> z
+  (int) 600
+  >> 
+#+END_SRC
+
+
+*** References 
+
+ - Cambridge University - *Casting in C++ (intermediate level)* -
+   <http://www-h.eng.cam.ac.uk/help/tpl/languages/C++/casting.html> 
+
+ - *4.4a — Explicit type conversion (casting)* -
+   <http://www.learncpp.com/cpp-tutorial/4-4a-explicit-type-conversion-casting/> 
+
+ - https://anteru.net/blog/2007/12/18/200/index.html
+
+ - *Casting operators in C++ | Set 1 (const_cast)* -
+   <http://www.geeksforgeeks.org/casting-operators-in-c-set-1-const_cast/>
+
+ - *Casting – what could possibly go wrong?* -
+   <https://blog.feabhas.com/2013/09/casting-what-could-possibly-go-wrong/>
+
+ - *C++ Casting, or: "Oh No, They Broke Malloc!* -
+   <https://embeddedartistry.com/blog/2017/2/28/c-casting-or-oh-no-we-broke-malloc> 
+
+ - *When should static_cast, dynamic_cast, const_cast and
+   reinterpret_cast be used?* - <https://stackoverflow.com/questions/332030/when-should-static-cast-dynamic-cast-const-cast-and-reinterpret-cast-be-used>
+
+ - http://cppblogs.blogspot.com.br/2013/08/c-style-casts.html
+
+ - *Type-Conversion operators* -
+   <http://www.bogotobogo.com/cplusplus/typecast.php>
+
+
 ** Namespaces
 *** Summary 
 
