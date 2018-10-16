@@ -3595,6 +3595,53 @@ possible with static casting.
   >> 
 #+END_SRC
 
+ + Load Symbols from a DLL / Shared Object
+   + Note: Windows uses the Win32 API-Calls LoadLibrary, LoadLibraryA,
+     GetProcAddress and so on. 
+
+#+BEGIN_SRC cpp 
+  #include <dlfcn.h>
+
+  // GNU Scientific Library - Linear Algebra CBLAS 
+  auto dllPath = "/usr/lib64/libgslcblas.so";
+
+  >> void* libHandle = dlopen(dllPath, RTLD_LAZY)
+  (void *) 0x1be2de0
+  >> 
+
+  >> void* sym = dlsym(libHandle, "cblas_daxpy")
+  (void *) 0x7f3fb97d2010
+
+  >> sym == nullptr
+  (bool) false
+  >> 
+
+  >> auto cblas_daxpy = reinterpret_cast<void (*) (int, double, const double*, int, double*, int)>(sym)
+  (void (*)(int, double, const double *, int, double *, int)) Function @0x7f3fb97d2010
+  >> 
+
+  // Or 
+  using cblas_daxpy_type = void (int, double, const double*, int, double*, int);
+
+  >> auto xs = std::vector<double>{ 3.0, 5.0, 6.0, 10.0, 8.0};
+  >> auto ys = std::vector<double>{ 2.0, 2.0, 2.0,  2.0, 2.0};
+  >> 
+
+  >> cblas_daxpy(xs.size(), 4.0, &xs[0], 1, &ys[0], 1)
+  >> xs
+  (std::vector<double, std::allocator<double> > &) 
+  { 3.0000000, 5.0000000, 6.0000000, 10.000000, 8.0000000 }
+
+  >> ys
+  (std::vector<double, std::allocator<double> > &) 
+  { 14.000000, 22.000000, 26.000000, 42.000000, 34.000000 }
+  >> 
+
+  // Close the library handle (Better use SMART POINTERS!!!!)
+  >> dlclose(libHandle)
+  (int) 0
+  >> 
+#+END_SRC
 
 *** References 
 
