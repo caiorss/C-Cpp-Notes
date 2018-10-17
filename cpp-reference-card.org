@@ -497,6 +497,241 @@ Running:
 
 #+END_SRC
 
+** C++11 Tuples 
+*** Overview  
+
+Tuples are a generic containers (product type) common in functional
+languages for storing heterogeneous types. Some use cases for tuples
+are, grouping unrelated types into a single object and returning multiple
+values from functions. C++11 provide tuples in the
+standard library in the header <tuple>. 
+
+ + [[https://en.cppreference.com/w/cpp/utility/tuple][std::tuple - cppreference.com]]
+*** Example in Cling REPL 
+
+Create database row: 
+
+#+BEGIN_SRC cpp 
+ using DbRow = std::tuple<int, double, std::string>;
+#+END_SRC
+
+Create an instance of the tuple: 
+
+#+BEGIN_SRC cpp 
+  >> DbRow(200, 500.23, "Diesel Power Generator")
+  (DbRow) { 200, 500.23000, "Diesel Power Generator" }
+
+  >> DbRow(51300, 1.2, "1 kg Orange")
+  (DbRow) { 51300, 1.2000000, "1 kg Orange" }
+  >> 
+#+END_SRC
+
+Get tuple elements: (std::get<INDEX>)
+
+#+BEGIN_SRC cpp 
+  >> auto row = DbRow(51300, 1.2, "1 kg Orange")
+  { 51300, 1.2000000, "1 kg Orange" }
+
+  >> std::get<0>(row)
+  (int) 51300
+
+  >> std::get<1>(row)
+  (double) 1.2000000
+
+  >> std::get<2>(row)
+  "1 kg Orange"
+  >> 
+
+  >> std::cout << std::get<0>(row) << " / " << std::get<1>(row) << " / " << std::get<2>(row) << "\n\n" ;
+  51300 / 1.2 / 1 kg Orange
+#+END_SRC
+
+
+Split tuple elements: (std::tie)
+
+#+BEGIN_SRC cpp 
+  >> std::tie(Index, Price, Name) = row
+  (std::tuple &) { 51300, 1.2000000, "1 kg Orange" }
+
+  >> Index
+  (int) 51300
+
+  >> Price
+  (double) 1.2000000
+
+  >> Name
+  (std::string &) "1 kg Orange"
+  >> 
+
+#+END_SRC
+
+Create function to print tuple:
+
+#+BEGIN_SRC cpp 
+  void printTuple(const DbRow& row){
+          std::cout << "Id    = " << std::get<0>(row) << "\n";
+          std::cout << "Name  = " << std::get<1>(row) << "\n";
+          std::cout << "Price = " << std::get<2>(row) << "\n";
+  }
+#+END_SRC
+
+Pass tuple to function: 
+
+#+BEGIN_SRC cpp 
+  >> printTuple(row)
+  Id    = 51300
+  Name  = 1.2
+  Price = 1 kg Orange
+
+  >> printTuple(std::tuple<int, double, std::string>(100, 12.5, "1kg Fresh Bacon"))
+  Id    = 100
+  Name  = 12.5
+  Price = 1kg Fresh Bacon
+  >> 
+							   
+  >> printTuple(DbRow{100, 12.5, "1kg Fresh Bacon"})
+  Id    = 100
+  Name  = 12.5
+  Price = 1kg Fresh Bacon
+
+  >> printTuple({100, 12.5, "1kg Fresh Bacon"})
+  Id    = 100
+  Name  = 12.5
+  Price = 1kg Fresh Bacon
+  >> 												   
+#+END_SRC
+
+Return tuple from function: 
+
+#+BEGIN_SRC cpp 
+  // Profit margin in percent 
+  DbRow makeProduct(double profitMargin, int index, double price, const std::string& name){
+          double factor = (profitMargin + 100.0) / 100.0; 
+          return {index, factor * price, name };
+  }
+
+  >> auto p = makeProduct(15.0, 600, 1.5, "Water bottle 1L - Brand XPMFN")
+  { 600, 1.7250000, "Water bottle 1L - Brand XPMFN" }
+  >> 
+
+  >> std::get<0>(p)
+  (int) 600
+
+  >> std::get<1>(p)
+  (double) 1.7250000
+
+  >> std::get<2>(p)
+  "Water bottle 1L - Brand XPMFN"
+#+END_SRC
+
+Change tuple elements: 
+
+#+BEGIN_SRC cpp 
+  >> auto r = DbRow{-1, 0, "Dummy Product"}
+  { -1, 0.0000000, "Dummy Product" }
+
+  >> std::get<0>(r) 
+  (int) -1
+
+  >> std::get<0>(r) = 500
+  (int) 500
+
+  >> std::get<1>(r)
+  (double) 0.0000000
+
+  >> std::get<1>(r) = 200.0 
+  (double) 200.00000
+
+  >> std::get<2>(r)
+  "Dummy Product"
+
+  >> std::get<2>(r) = "Super high power diesel"
+  "Super high power diesel"
+
+  >> r
+  { 500, 200.00000, "Super high power diesel" }
+#+END_SRC
+
+*** Example - sample source code
+
+Example: 
+
+ + File: cpp11Tuples.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+  #include <sstream>
+  #include <vector>
+  #include <iomanip>
+  #include <tuple>
+
+  // Type synonym 
+  using DbRow = std::tuple<int, double, std::string>;
+
+  std::string toString(const DbRow& row){
+          std::stringstream ss;
+          ss << "id = "       << std::get<0>(row)
+             << " ; price = " << std::get<1>(row)
+             << "; name = "   << std::get<2>(row)
+             << std::endl;
+          return ss.str();
+  }
+
+  void printInventory(const std::vector<DbRow>& inventory){
+          using std::cout;
+          using std::endl;
+          for(auto &p: inventory){
+                  int id;
+                  double price;
+                  std::string name;
+                  std::tie(id, price, name) = p;
+                  cout << std::right << std::setw(10) << id
+                           << std::right << std::setw(10) << std::setprecision(2) << std::fixed << price
+                           << std::right << std::setw(5) << " "
+                           << std::left  << std::setw(10) << name
+                           << "\n";
+          }
+  }
+      
+  int main(){
+          using std::cout;
+          using std::endl;
+          using std::string;
+
+          // Database row 
+          std::tuple<int, double, string> row1(412, 200.41, "battery pack");
+          DbRow row2(100, 20.5, "something else");
+      
+          cout << "Product 1 = " << toString(row1) << endl;
+          cout << "Product 2 = " << toString(row2) << endl;
+
+          std::vector<DbRow> dataset = {
+                  DbRow(100, 2.5,  "apples"),
+                  DbRow(200, 1.4,  "oranges"),
+                  DbRow(300, 12.4, "sugar"),
+                  DbRow(205, 20.5, "coffee")
+          };
+
+          printInventory(dataset);         
+          return 0;
+  }
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC sh 
+  $ g++ cpp11Tuples.cpp -o cpp11Tuples.bin -g -std=c++11 -Wall -Wextra && ./cpp11Tuples.bin
+  Product 1 = id = 412 ; price = 200.41; name = battery pack
+
+  Product 2 = id = 100 ; price = 20.5; name = something else
+
+         100      2.50     apples    
+         200      1.40     oranges   
+         300     12.40     sugar     
+         205     20.50     coffee    
+#+END_SRC
+
 ** STL Algorithms 
 *** Overview 
 
