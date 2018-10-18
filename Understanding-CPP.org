@@ -4025,7 +4025,281 @@ Define a function at some namespace:
   }
 #+END_SRC
 
+** Pointer to Function or Function Pointer  
+*** Overview 
+
+In C++ functions pointers are not so common as in C, however many
+C-libraries needed to be called from C++ APIs still use function
+pointers on callbacks and event handlers. So, it is worth knowing
+about function pointers in order to interface those C-APIs.
+
+The C++ language has more powerful mechanisms for passing callbacks
+such as the polymorphic type std::function which can be used to pass
+function pointer, functors (function-objects) or C++11 lambdas as
+arguments.
+
+Use cases of function pointers in C:
+ + Callbacks
+ + Higher Order Functions
+ + Event Handlers 
+
+Use cases of function pointers in C++:
+ + Type erasure of functions.
+ + Interfacing C-libraries.
+ + Creating C++ wrappers for C-libraries.
+ + Load functions at runtime from a DLL, shared library on Windows or
+   Shared Object on U*nix (Linux, BSD, OSX, ...).
+
+
+ *Function pointer variable declaration:*
+
+#+BEGIN_SRC cpp 
+  ReturnType (* VariableName) (ArgType0, ArgType1, ArgType2 ....);
+
+  // OR -> Intitalized to null 
+  ReturnType (* VariableName) (ArgType0, ArgType1, ArgType2 ....) = nullptr;
+
+  // Initialized to the address of some function 
+  ReturnType (* VariableName) (ArgType0, ArgType1, ArgType2 ....) = FUNCTION1;
+  ReturnType (* VariableName) (ArgType0, ArgType1, ArgType2 ....) = &FUNCTION1;
+#+END_SRC 
+
+ *Function pointer Type Synonym - Prior to C++11*
+
+#+BEGIN_SRC cpp 
+  typedef ReturnType (* PointerAliasType) (ArgType0, ArgType1, ArgType2 ....);
+  PointerAliasType fp = nullptr;
+  PointerAliasType fp = &FUNCTION1;
+  PointerAliasType fp = FUNCTION1;
+ 
+  // Call 
+  ReturnType result = fp(arg0, arg1, arg2, ... argn1);
+#+END_SRC
+
+ *Function pointer Type Synonym - C++11* (better and more readable)
+
+#+BEGIN_SRC cpp 
+  using PointerAliasType = ReturnType (*) (ArgType0, ArgType1, ArgType2 ....);
+  // Or: 
+  using PointerAliasType = auto (ArgType0, ArgType1, ArgType2 ....) -> ReturnType;
+#+END_SRC
+
+Examples: 
+
+ + =void (* fpointer)(int);=
+   - Function pointer taking an integer as paremeter and returns
+     nothing, void.
+
+ + =void* (* fp)(double *);=
+   - Function pointer that points to a function taking a double
+     pointer (double *) and returns a void pointer.
+
+ + =int (* myFunPointer)(int, int);=
+   - Function pointer that points to a function that takes two
+     integers as parameters and returns an integer.
+
+ + double (* FunPointer) (double) = &sin;
+   + Function pointer initialized with the address with of the
+     function sin. 
+
+ + double (* FunPointer) (double) = sin;
+   + Function pointer initialized with the address with of the
+     function sin. 
+
+ + ~int (p2* funcp)(double, double) = NULL~
+   - Function pointer initialized to NULL or zero.
+
+ + =void (*p[10]) (void *) ()=
+   + Array of 10 pointers to a function that returns void 
+
+*** Function Pointer Declaration 
+
+#+BEGIN_SRC cpp 
+  // Declare a function pointer to a function 
+  // of type: double => double 
+  >> double (* mfunptr) (double) = nullptr;
+
+  >> mfunptr = sin
+  (double (*)(double)) Function @0x7ff56aa56f80
+
+  >> mfunptr(M_PI)
+  (double) 1.2246468e-16
+
+  >> mfunptr(M_PI_2)
+  (double) 1.0000000
+  >> 
+
+  >> mfunptr(1)
+  (double) 0.0000000
+  >> mfunptr(100)
+  (double) 2.0000000
+  >> mfunptr(1000)
+  (double) 3.0000000
+  >> 
+
+  // Pass a non-capturing lambda 
+  // --------------------------------------------
+  >> mfunptr = [](double x){ return 3 * x; }
+  (double (*)(double)) Function @0x7ff56bb000c0
+
+  >> mfunptr(3)
+  (double) 9.0000000
+
+  >> mfunptr(5)
+  (double) 15.000000
+
+  // Pass a capturing lambda => Cannot pass capturing 
+  // lambdas to function pointers.
+  // --------------------------------------------
+
+  >> double k = 10.0
+  (double) 10.000000
+
+  //
+  >> mfunptr = [&k](double x){ return 3 * x + k;}
+  ROOT_prompt_31:1:13: error: 'k' cannot be captured because it does not have automatic storage duration
+  mfunptr = [&k](double x){ return 3 * x + k;}
+              ^
+  >> mfunptr = [k](double x){ return 3 * x + k;}
+  ROOT_prompt_32:1:12: error: 'k' cannot be captured because it does not have automatic storage duration
+  mfunptr = [k](double x){ return 3 * x + k;}
+             ^
+  ROOT_prompt_28:1:8: note: 'k' declared here
+  double k = 10.0
+#+END_SRC
+ 
+*** Function Pointer Callbacks 
+
+Example 1: 
+
+#+BEGIN_SRC cpp 
+  void doTimes(int n, void (* action)(int n)){
+          for(int i = 0; i < n; i++)
+                  action(i);
+  }
+
+  void printLine(int i){
+          std::cout << "i = " << i << " \n";
+  }
+
+  >> doTimes(4, printLine)
+  i = 0 
+  i = 1 
+  i = 2 
+  i = 3 
+
+#+END_SRC
+
+Example 2: 
+
+ - Higher order function for tabulating numerical functions
+   implemented with function pointers. 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <iomanip>
+
+  // Syntax 1: 
+  void tabulateFun1(double (* MathFunc) (double)){
+          std::cout << std::setprecision(3) << std::fixed;
+          for(int i = 0; i < 10; i++)
+                  std::cout << std::setw(5) << i
+                                    << std::setw(10) << MathFunc(i)
+                                    << "\n";
+  }
+
+  // Syntax 2: 
+  void tabulateFun2(double MathFunc (double)){
+          std::cout << std::setprecision(3) << std::fixed;
+          for(int i = 0; i < 10; i++)
+                  std::cout << std::setw(5) << i
+                                    << std::setw(10) << MathFunc(i)
+                                    << "\n";
+  }
+
+  // Syntax 3 (C++11)
+  void tabulateFun3(auto MathFunc (double) -> double){
+          std::cout << std::setprecision(3) << std::fixed;
+          for(int i = 0; i < 10; i++)
+                  std::cout << std::setw(5) << i
+                                    << std::setw(10) << MathFunc(i)
+                                    << "\n";
+  }
+
+#+END_SRC
+
+The syntax can be simplified with type synonym using "using" (C++11)
+or typedef (old standard).
+
+#+BEGIN_SRC cpp 
+  // Type Synonym [1] (C++11)
+  using MathFunPtr = double (*) (double);
+  // Type Synonym [2] (C++11)
+  using MathFunPtr = auto (double) -> double;
+
+  // Type Synonym [3] (Old standards)
+  typedef double (* MathFunPtr) (double);
+
+  void tabulateFun4(MathFunPtr MathFunc){
+          std::cout << std::setprecision(3) << std::fixed;
+          for(int i = 0; i < 10; i++)
+                  std::cout << std::setw(5) << i
+                                    << std::setw(10) << MathFunc(i)
+                                    << "\n";
+  }
+#+END_SRC
+
+It is not recomended to implement this function using function
+pointers. Instead, it is better to use the type std::function
+available in the header <functional> as it can also work with 
+anything callable such as C++11 lambdas, functions-objects and
+function pointers.
+
+ + Better implementation, more C++ friendly using C++11 std::function.
+ 
+#+BEGIN_SRC cpp 
+  void tabulateFunCPP11(std::function<double (double)> MathFunc){
+          std::cout << std::setprecision(3) << std::fixed;
+          for(int i = 0; i < 10; i++)
+                  std::cout << std::setw(5) << i
+                                    << std::setw(10) << MathFunc(i)
+                                    << "\n";
+  }
+#+END_SRC
+
+Running in CLING Repl: 
+
+#+BEGIN_SRC cpp 
+  >> tabulateFun1(sin)
+      0     0.000
+      1     0.841
+      2     0.909
+      3     0.141
+     ... ... .... 
+
+  >> tabulateFun2(log)
+      0      -inf
+      1     0.000
+      2     0.693
+      3     1.099
+      4     1.386
+     ... ... .... 
+
+  >> tabulateFun3(&exp2)
+      0     1.000
+      1     2.000
+      2     4.000
+      3     8.000
+    ... ... .... 
+
+  >> tabulateFun4(&cos)
+      0     1.000
+      1     0.540
+      2    -0.416
+     ... ... .... 
+#+END_SRC
 ** Pointer to Member Function 
+
    :PROPERTIES:
    :ID:       07dc0b5f-0486-4c18-b356-226ec48d4834
    :END:
@@ -6025,3 +6299,4 @@ Papers and technical documents about Generic Programming and Template Metaprogra
  + Bjarne Stroustrup. *Tour of C++ second edition*
 
    
+ 
