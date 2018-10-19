@@ -4326,7 +4326,7 @@ Running in CLING Repl:
       2    -0.416
      ... ... .... 
 #+END_SRC
-** Pointer to Member Function 
+** Pointer to Class Member Function 
 
    :PROPERTIES:
    :ID:       07dc0b5f-0486-4c18-b356-226ec48d4834
@@ -4621,6 +4621,416 @@ Running:
    d.compute(3.0, 4.0) = 32
 
 #+END_SRC
+** Pointer to Class Member Variable 
+*** Summary  
+
+Pointers to members variables provides an way to access class member
+data indirectly. 
+
+Among other things, it has the following use cases:
+
+ + Create setters/getters
+ + Serialization 
+ + Reflection
+ + Indirect Access
+ + Security research.
+ + Get the member data pointer offset in bytes.
+
+ *Syntax for pointer to member data*
+
+ + Declare a pointer to member of a certain class of an specific
+   type. 
+
+#+BEGIN_SRC cpp 
+  MEMBER_TYPE  CLASS_NAME::* PointerVariableName;
+#+END_SRC
+
+ + Declare a pointer to member intialized to null.
+
+#+BEGIN_SRC cpp 
+  MEMBER_TYPE  CLASS_NAME::* PointerVariableName = nulltpr;
+#+END_SRC
+
+ + Declare a pointer to member intialized to the address of some
+   member variable. 
+
+#+BEGIN_SRC cpp 
+  MEMBER_TYPE  CLASS_NAME::* PointerVariableName = &CLASS_NAME::memberVariable;
+#+END_SRC
+
+ *Syntax for type alias/synonym of pointer to member data*
+
+ + *Before C++11* - type alias with the typedef keyword. 
+
+#+BEGIN_SRC cpp 
+  typedef MEMBER_TYPE CLASS_NAME::* TypeAliasName;
+  // Instance declaration: 
+  TypeAliasName pointerToMember;
+  TypeAliasName pointerToMember = nullptr;
+  TypeAliasName pointerToMember = &CLASS_NAME::MemeberVariable;
+#+END_SRC
+
+ + *C++11* - type alias with 'using' keyword
+
+#+BEGIN_SRC cpp 
+  using TypeAliasName = MEMBER_TYPE CLASS_NAME::*;
+  // Instance declaration: 
+  TypeAliasName pointerToMember;
+  TypeAliasName pointerToMember = nullptr;
+  TypeAliasName pointerToMember = &CLASS_NAME::MemeberVariable;
+#+END_SRC
+*** Example 
+
+#+BEGIN_SRC cpp 
+  // It could also be: struct Dummy{ ... }
+  class Dummy{
+  public:
+          double      x;
+          double      y;
+          int         points;
+          std::string name;
+          double      z;
+          char        ch;
+          Dummy(){}
+          Dummy(double x, double y, int points, const std::string& name):
+                  x(x), y(y), points(points), name(name){}
+  };
+#+END_SRC
+
+Creating a test object: 
+
+#+BEGIN_SRC cpp 
+  >>  auto obj = Dummy(20.2, 9.0, 10, "dummy");
+  >> obj.x
+  (double) 20.200000
+  >> obj.y
+  (double) 9.0000000
+  >> obj.points
+  (int) 10
+  >> obj.name
+  (std::string &) "dummy"
+  >> obj.z
+  (double) 0.0000000
+  >> obj.ch
+  (char) '0x00'
+
+  >> auto obj2 = Dummy(100.0, -10.0, 70, "objectx")
+  (Dummy &) @0x7fda2fd33060
+  >> 
+#+END_SRC
+
+Create an initialized to null pointer to double member data: 
+
+#+BEGIN_SRC cpp 
+>> double Dummy::* p_to_member_double = nullptr;
+>> 
+>> p_to_member_double
+(double Dummy::*) @0x43cbed0
+#+END_SRC
+
+Set pointer ~p_to_member_double~ to field x.
+
+#+BEGIN_SRC cpp 
+  >> p_to_member_double = &Dummy::x
+  (double Dummy::*) @0x46bc260
+  >> 
+
+  // Acess field x of obj 
+  >> obj.* p_to_member_double
+  (double) 20.200000
+  >> 
+  >> obj.* p_to_member_double = -90.2
+  (double) -90.200000
+  >> obj.* p_to_member_double 
+  (double) -90.200000
+  >> obj.x
+  (double) -90.200000
+  >>  
+
+  >> obj2.* p_to_member_double
+  (double) 100.00000
+  >> 
+
+  >> obj2.* p_to_member_double = 200.0
+  (double) 200.00000
+  >> obj2.x
+  (double) 200.00000
+  >> 
+#+END_SRC
+
+Set pointer ~p_to_member_double~ to field y.
+
+#+BEGIN_SRC cpp 
+  >> obj.y
+  (double) 9.0000000
+  >> 
+  >> obj.* p_to_member_double
+  (double) 9.0000000
+  >> obj.* p_to_member_double = -190.0
+  (double) -190.00000
+  >> obj.* p_to_member_double
+  (double) -190.00000
+  >> obj.y
+  (double) -190.00000
+  >> 
+  >>
+
+  >> obj2.y
+  (double) -10.000000
+  >> obj2.* p_to_member_double
+  (double) -10.000000
+  >> 
+  >> obj2.* p_to_member_double = -900.223
+  (double) -900.22300
+  >> obj2.* p_to_member_double
+  (double) -900.22300
+#+END_SRC
+
+Create a type alias to pointer to member of type double.
+
+#+BEGIN_SRC cpp 
+  // C++11 => Better!!
+  using PointerToMemberDouble = double Dummy::*;
+  // Old C++ standards => Cryptic  
+  typedef double Dummy::* PointerToMemberDoubleTypedef ; 
+
+  PointerToMemberDouble ptrdouble = &Dummy::z;
+
+  >> obj.* ptrdouble 
+  (double) 0.0000000
+
+  >> obj.z
+  (double) 0.0000000
+
+  >> obj.* ptrdouble 
+  (double) 0.0000000
+
+  >> obj.* ptrdouble = 100.0
+  (double) 100.00000
+
+  >> obj.* ptrdouble 
+  (double) 100.00000
+
+  >> obj.z
+  (double) 100.00000
+
+
+  >> obj2.z
+  (double) 0.0000000
+
+  >> obj2.z = 600.0
+  (double) 600.00000
+
+  >> obj2.* ptrdouble 
+  (double) 600.00000
+
+  >> obj2.* ptrdouble = -100.0
+  (double) -100.00000
+
+  >> obj2.* ptrdouble 
+  (double) -100.00000
+
+  >> obj2.z
+  (double) -100.00000
+  >> 
+  >> 
+
+#+END_SRC
+
+Use pointer to member with object pointer. 
+
+#+BEGIN_SRC cpp 
+  >> auto pobj1 = &obj
+  (Dummy *) @0x7ffd126ee978
+ 
+  >> pobj1->y
+  (double) -190.00000
+  >> 
+
+  >> PointerToMemberDouble ptom_double = &Dummy::y;
+  >> 
+  >> pobj1->* ptom_double
+  (double) -190.00000
+  >> 
+  >> pobj1->* ptom_double = -300.0;
+  >> 
+  >> pobj1->y
+  (double) -300.00000
+  >> 
+#+END_SRC
+
+Get member offset: 
+
+#+BEGIN_SRC cpp 
+  template<class Class, class Field>
+  size_t getOffset(Field Class::*fieldp) { 
+          return size_t(&(static_cast<Class*>(nullptr)->*fieldp));
+  }
+
+  >> auto offset_x = getOffset(&Dummy::x)
+  (unsigned long) 0
+
+  >> auto offset_y = getOffset(&Dummy::y)
+  (unsigned long) 8
+
+  >> auto offset_z = getOffset(&Dummy::z)
+  (unsigned long) 56
+  >> 
+  >> auto offset_name = getOffset(&Dummy::name)
+  (unsigned long) 24
+  >> auto offset_points = getOffset(&Dummy::points)
+  (unsigned long) 16
+#+END_SRC
+
+Access class member x using x offset.
+
+#+BEGIN_SRC cpp 
+  >> auto p = &obj
+  (Dummy *) @0x7ffd126ee978
+
+  >> reinterpret_cast<double*>(((size_t) p) + offset_x)
+  (double *) 0x7fda2fd33010
+
+  >> *reinterpret_cast<double*>(((size_t) p) + offset_x)
+  (double) -90.200000
+
+  >> *reinterpret_cast<double*>(((size_t) p) + offset_x) = -100.0
+  (double) -100.00000
+
+  >> p->x
+  (double) -100.00000
+  >> 
+  >> 
+  >> double& xref1 = *reinterpret_cast<double*>(((size_t) p) + offset_x)
+  (double) -100.00000
+  >> xref1 = 900.0
+  (double) 900.00000
+  >> p->x
+  (double) 900.00000
+  >> 
+
+
+#+END_SRC
+
+Access class member z using z offset.
+
+#+BEGIN_SRC cpp 
+  >> p->z
+  (double) 100.00000
+  >> 
+
+  >> *reinterpret_cast<double*>(((size_t) p) + offset_z)
+  (double) 100.00000
+  >> 
+
+  >> *reinterpret_cast<double*>(((size_t) p) + offset_z) = -200.0
+  (double) -200.00000
+
+  >> p->z
+  (double) -200.00000
+  >> 
+
+  >> *reinterpret_cast<double*>(((size_t) &obj2) + offset_z)
+  (double) -100.00000
+
+  >> *reinterpret_cast<double*>(((size_t) &obj2) + offset_z) = 300.0
+  (double) 300.00000
+
+  >> *reinterpret_cast<double*>(((size_t) &obj2) + offset_z) = 300.0;
+
+  >> obj2.z
+  (double) 300.00000
+  >> 
+#+END_SRC
+
+Access field 'name' using its offset.
+
+#+BEGIN_SRC cpp 
+>> obj.name
+(std::string &) "dummy"
+>> 
+>> *reinterpret_cast<std::string*>(((size_t) &obj) + offset_name)
+(std::string &) "dummy"
+
+>> *reinterpret_cast<std::string*>(((size_t) &obj) + offset_name) = "P0WN3D";
+>> obj.name
+(std::string &) "P0WN3D"
+>> 
+
+>> obj.name
+(std::string &) "P0WN3D"
+#+END_SRC
+
+Generic solution for dealing with offsets: 
+
+#+BEGIN_SRC cpp 
+  template<typename FIELD, typename CLASS>
+  FIELD* getFieldPointer(const CLASS& obj, size_t offset ){
+          return reinterpret_cast<FIELD*>(((size_t) &obj) + offset);
+  }
+
+  template<typename FIELD, typename CLASS>
+  FIELD getFieldValue(const CLASS& obj, size_t offset ){
+          return *reinterpret_cast<FIELD*>(((size_t) &obj) + offset);
+  }
+#+END_SRC
+
+Get object's members values by their offset: 
+
+#+BEGIN_SRC cpp 
+  >> auto obj3 = Dummy(120.2, -89.0, 143, "blob");
+  >> obj3.x
+  (double) 120.20000
+  >> obj3.y
+  (double) -89.000000
+  >> obj3.z
+  (double) 0.0000000
+  >> obj3.z = 45.0;
+  >> obj3.name;
+  >> 
+
+  >> 
+  >> getOffset(&Dummy::x)
+  (unsigned long) 0
+  >> getOffset(&Dummy::y)
+  (unsigned long) 8
+  >> getOffset(&Dummy::z)
+  (unsigned long) 56
+  >> getOffset(&Dummy::name)
+  (unsigned long) 24
+  >> getOffset(&Dummy::points)
+  (unsigned long) 16
+  >> 
+
+  >> obj3.x
+  (double) 120.20000
+
+  >> getFieldValue<double>(obj3, 0)
+  (double) 120.20000
+  >> 
+
+  >> obj3.y
+  (double) -89.000000
+
+  >> getFieldValue<double>(obj3, 8)
+  (double) -89.000000
+  >> 
+
+  >> obj3.z
+  (double) 0.0000000
+  >> obj3.z = 45.0;
+
+  >> getFieldValue<double>(obj3, 56)
+  (double) 45.000000
+  >> 
+
+  >> obj3.name
+  (std::string &) "blob"
+  >> 
+  >> getFieldValue<std::string>(obj3, 24)
+  "blob"
+#+END_SRC
+
 ** Template Metaprogramming or Generic Programming 
 *** Overview 
 
