@@ -6892,6 +6892,70 @@ Running:
   >> 
 #+END_SRC
 
+ *Example 3:* 
+
+Print RTTI (Runtime Type Information) about types parameters.
+
+#+BEGIN_SRC cpp 
+  struct TypeInfo
+  {
+      TypeInfo(const std::string& name, unsigned int hash_code, size_t size)
+       : name(name),
+         hash_code(hash_code),
+         size(size)
+      {		
+      }
+      std::string   name;
+      unsigned long hash_code;
+      size_t        size;	
+  };
+
+  template<typename ... Types>
+  auto printTypesInfoFromRTTI() -> void
+  {
+      auto tlist = std::vector<TypeInfo> {
+              TypeInfo{
+                 typeid(Types).name(),
+                 typeid(Types).hash_code(),
+                 sizeof(Types)
+                      } ... };
+      std::cout << std::setw(5)  << "Name"
+                << std::setw(5)  << "Size"
+                << std::setw(15) << "Hash"
+                << "\n";
+      std::stringstream ss;	
+      for(const auto& x: tlist){
+          ss.str("");
+          ss.clear();
+          ss << "0x" << std::hex << x.hash_code;
+          std::cout << std::right
+                    << std::setw(5)  << x.name
+                    << std::setw(5)  << x.size
+                    << std::setw(15) << ss.str()
+                    << "\n";
+          }
+  } //--- End of printTypesInfoFromRTTI() ----- //
+#+END_SRC
+
+Running (ROOT/Cling REPL): 
+
+#+BEGIN_SRC sh 
+   >> printTypesInfoFromRTTI<>()
+    Name Size           Hash
+   >> 
+   >> printTypesInfoFromRTTI<char>()
+    Name Size           Hash
+       c    1     0x2479fc8d
+   >> 
+   >> printTypesInfoFromRTTI<char, int, double, long double>()
+    Name Size           Hash
+       c    1     0x2479fc8d
+       i    4     0xb675de06
+       d    8     0x44573475
+       e   16     0xbbbbed2c
+#+END_SRC
+
+
 
 
 ** References and Bookmarks 
