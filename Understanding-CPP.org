@@ -6794,6 +6794,77 @@ Running:
   Number of parameters equal to = 4
 #+END_SRC
 
+** Variadic Templates arguments expansion 
+
+ + *Example 1:*
+
+Exmaple: Get deque container containing the size in bytes of every
+type from the parameter pack (arguments of a variadic template).
+
+#+BEGIN_SRC cpp 
+  // Return a deque containing the size in bytes of each type from the
+  // parameter pack (types arguments).
+  template<typename ... Types>
+  auto getSizeList() -> std::deque<size_t> {
+       // { ... } Intializer list - used for 
+       // C++11 default intialization feature. 
+       return std::deque<size_t> { sizeof(Types) ... };	
+  }
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC cpp 
+  >> getSizeList()
+  (std::deque<size_t>) {}
+
+  >> getSizeList<>()
+  (std::deque<size_t>) {}
+
+  >> getSizeList<char>()
+  (std::deque<size_t>) { 1 }
+
+  >> getSizeList<double>()
+  (std::deque<size_t>) { 8 }
+
+  >> getSizeList<char, int, double, long double, std::string>()
+  (std::deque<size_t>) { 1, 4, 8, 16, 32 }
+#+END_SRC
+
+ + *Example 2:*
+
+Example: modify example 1 for requiring at least one type parameter.
+
+#+BEGIN_SRC cpp 
+  template<typename Type0, typename ... Types>
+  auto getSizeList2() -> std::deque<size_t> {
+       return std::deque<size_t> { sizeof(Type0), sizeof(Types) ... };	
+  }
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC cpp 
+  >> getSizeList2<>()
+  ROOT_prompt_2:1:1: error: no matching function for call to 'getSizeList2'
+  getSizeList2<>()
+  ^~~~~~~~~~~~~~
+  /home/archbox/root-scripts/script-parampack.C:41:6: note: candidate template ignored: couldn't infer template argument 'Type0'
+  auto getSizeList2() -> std::deque<size_t> {
+     ^
+  >> getSizeList2<char>()
+  (std::deque<size_t>) { 1 }
+
+  >> getSizeList2<double>()
+  (std::deque<size_t>) { 8 }
+
+  >> getSizeList2<double, int, char, long double, std::string>()
+  (std::deque<size_t>) { 8, 4, 1, 16, 32 }
+  >> 
+#+END_SRC
+
+
+
 ** References and Bookmarks 
 
 General 
