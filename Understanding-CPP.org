@@ -4092,6 +4092,422 @@ Define a function at some namespace:
   }
 #+END_SRC
 
+** Error Handling and Exceptions 
+*** Overview 
+
+ *C++ has several error Handling approaches:*
+
+ + _Exceptions_: - try-catch and throw
+   * Benefits:
+     + Code Separation:
+       + Separation of error handling from the computation logic.
+     + Error notification
+       + Forces developers to handle the error by ending the the
+         program execution when the application is not ready to handle
+         the error that caused the exception. 
+     + Easier to recover from errors and failures.
+     + Stack Traces:
+   * Downsides:
+     + Increase of executable size - It should not be a concern anymore,
+       since hard driver are becoming more cheaper with the passing of
+       time.
+     + According to many sources, exceptions can be a concern in real
+       time embedded systems. 
+
+ + _Error codes in global variables_
+   * Many C APIs handle error by setting some global variable that the
+     calling code must check for some some error condition. For
+     instance, the U*nix C-API indicates error by setting the global
+     variable _errno_ that must be checked by the calling code after
+     after some operation that may set this flag. The downside of the
+     this approach is that if the program doesn't check the global
+     error flag, the program may continue its execution without
+     notifying the user that something is wrong what can lead to
+     runtime bugs hard to trace.
+
+   * Downsides:
+     + It is easy to forget handling global variables with error code.
+     + May have multi-threading racing conditions issues.
+     + Don't notify users that the program cannot handle the runtime
+       errors.
+     + Hard to trace and debug.
+
+ + _Error codes as return value_:
+   * A function can provide error notification by returning an error
+     code to the caller. For instance, a function which downloads a
+     file could return 1 for successful download, 2 for DNS resolution
+     error, 3 for network error and so on.
+   * Variations:
+     + Return a numeric error code like a bitmask 
+     + Return a null pointer to indicate the absence of an object,
+       that it was no possible to find an object or allocate memory. 
+ 
+ + _Using 'either' type_
+   + See:
+     [[https://hackernoon.com/error-handling-in-c-or-why-you-should-use-eithers-in-favor-of-exceptions-and-error-codes-f0640912eb45][Error Handling in C++ or: Why You Should Use Eithers in Favor of Exceptions and Error-codes]]
+ 
+ + _std::optional<T>_ - C++17 Maybe or Optional type. 
+
+
+ *Exceptions Good Practices:*
+ 
+ + Assertions: should not be used for argument validation since they
+   can be disabled during compilation or on release builds. 
+
+ + Exceptions should be used on objects' constructors in order to avoid
+   letting the object in an invalid state. => _Fail Fast principle_.
+
+ + Destructors should not throw exceptions as it invokers terminates()
+   shutting down the program. 
+
+ + DO NOT: catch all exceptions. Only exceptions that can be handled
+   should be caught. 
+
+ *C++ Stack Terminology*
+
+ + Exception Specification
+ + Stack Unwinding
+ + Exception-safety
+ + RAII - Resource Aquisition is Resource Initialization
+ + Smart Pointers 
+
+ *Functions related to exceptions* 
+
+ + [[https://en.cppreference.com/w/cpp/error/current_exception][std::current_exception]]
+ + [[https://en.cppreference.com/w/cpp/error/rethrow_exception][std::rethrow_exception]]
+ + [[https://en.cppreference.com/w/cpp/error/terminate][std::terminate]]
+ + [[https://en.cppreference.com/w/cpp/utility/program/abort][std::abort]]
+ + [[https://en.cppreference.com/w/cpp/error/terminate_handler][std::terminate_handler]]
+ + [[https://en.cppreference.com/w/cpp/utility/program/exit][std::exit]]
+
+ *Standard Library Exception defined in header file <exception>*
+
+| Exception             | Description                                                                                         |
+|-----------------------+-----------------------------------------------------------------------------------------------------|
+| ~std::exception~        | An exception and parent class of all the standard C++ exceptions.                                   |
+| ~std::runtime_error~    | An exception that theoretically can not be detected by reading the code.                            |
+| ~std::logic_error~      | An exception that theoretically can be detected by reading the code.                                |
+| ~std::domain_error~     | This is an exception thrown when a mathematically invalid domain is used                            |
+| ~std::invalid_argument~ | This is thrown due to invalid arguments.                                                            |
+| ~std::bad_alloc~        | This can be thrown by new.                                                                          |
+| ~std::bad_cast~         | This can be thrown by dynamic_cast.                                                                 |
+| ~std::bad_exception~    | This is useful device to handle unexpected exceptions in a C++ program                              |
+| ~std::bad_typeid~       | This can be thrown by typeid.                                                                       |
+| ~std::length_error~     | This is thrown when a too big std::string is created                                                |
+| ~std::out_of_range~     | This can be thrown by the at method from for example a std::vector and std::bitset<>::operator[](). |
+| ~std::overflow_error~   | This is thrown if a mathematical overflow occurs.                                                   |
+| ~std::range_error~      | This is occured when you try to store a value which is out of range.                                |
+| ~std::underflow_error~  | This is thrown if a mathematical underflow occurs.                                                  |
+
+
+References: 
+
+C++ Documentation: 
+ + [[https://en.cppreference.com/w/cpp/error/exception][std::exception - cppreference.com]]
+ + [[https://en.cppreference.com/w/cpp/error/exception/what][std::exception::what - cppreference.com]]
+ + [[https://isocpp.org/wiki/faq/exceptions][Exceptions and Error Handling, C++ FAQ]]
+ + [[https://wiki.sei.cmu.edu/confluence/display/cplusplus/ERR56-CPP.+Guarantee+exception+safety][ERR56-CPP. Guarantee exception safety - SEI CERT C++ Coding Standard - Confluence]]
+ + [[https://www.ibm.com/support/knowledgecenter/en/SSLTBW_2.3.0/com.ibm.zos.v2r3.cbclx01/cplr156.htm][IBM Knowledge Center - Exception specifications (C++ only)]]
+
+Misc:
+ + [[https://stackoverflow.com/questions/11938979/what-exception-classes-are-in-the-standard-c-library][What exception classes are in the standard C++ library - Stack Overflow]]
+ + [[https://en.cppreference.com/w/cpp/language/throw][throw expression - cppreference.com]]
+ + [[https://blog.mozilla.org/nnethercote/2011/01/18/the-dangers-of-fno-exceptions/][The dangers of -fno-exceptions | Nicholas Nethercote]]
+ + [[https://stackoverflow.com/questions/16182781/how-to-create-exceptions][c++ - How to create exceptions? - Stack Overflow]]
+ + [[https://dzone.com/articles/some-useful-facts-to-know-when-using-c-exceptions][Some Useful Facts to Know Before Using C++ Exceptions - DZone Performance]]
+ + [[http://www.acodersjourney.com/2016/08/top-15-c-exception-handling-mistakes-avoid/][Top 15 C++ Exception handling mistakes and how to avoid them. - A CODER'S JOURNEY]]
+
+Best: 
+
+ + [[https://blog.plan99.net/what-s-wrong-with-exceptions-nothing-cee2ed0616?gi=33a0310b3ff9][What’s wrong with exceptions? Nothing. – Mike’s blog]]
+ + [[https://isocpp.org/wiki/faq/exceptions][Exceptions and Error Handling, C++ FAQ]]
+ + [[http://www.learncpp.com/cpp-tutorial/145-exceptions-classes-and-inheritance/][14.5 — Exceptions, classes, and inheritance | Learn C++]]
+ + [[https://en.wikibooks.org/wiki/C%2B%2B_Programming/Exception_Handling][C++ Programming/Exception Handling - Wikibooks, open books for an open world]]
+ + [[http://rdiez.shoutwiki.com/wiki/Error_Handling_in_General_and_C%2B%2B_Exceptions_in_Particular][Error Handling in General and C++ Exceptions in Particular - rdiez's Personal Wiki]]
+ 
+*** Exception Basics 
+
+C++ can throw any type as exception: 
+
+#+BEGIN_SRC cpp 
+  >> throw 10
+  Error in <TRint::HandleTermInput()>: Exception caught!
+  >> 
+  >> throw "hello world"
+  Error in <TRint::HandleTermInput()>: Exception caught!
+  >> 
+  >> throw 34.212
+  Error in <TRint::HandleTermInput()>: Exception caught!
+  >> 
+  >> throw std::runtime_error("Illegal state exception!")
+  Error in <TRint::HandleTermInput()>: std::runtime_error caught: Illegal state exception!
+
+  >> throw std::invalid_argument("Error: number of elements cannot be negative.")
+  Error in <TRint::HandleTermInput()>: std::invalid_argument caught: Error: number of elements cannot be negative.
+  >> 
+  >> throw std::out_of_range("Invalid element index. Aborting operation!")
+  Error in <TRint::HandleTermInput()>: std::out_of_range caught: Invalid element index. Aborting operation!
+
+#+END_SRC
+
+Catching exceptions: 
+
+#+BEGIN_SRC cpp 
+  void testException(std::function<void ()> action){
+          try {
+                  action();
+          }
+          // handle of std::invalid_argument
+          catch(const std::invalid_argument& ex){
+                  std::cerr << " [ERROR] {std::invalid_argument} \n => "
+                                    << ex.what() << "\n";
+                  return;
+          }
+          // handle of std::out_of_range
+          catch(const std::out_of_range& ex){
+                  std::cerr << " [ERROR] {std::out_of_range} \n => "
+                                    << ex.what() << "\n";
+                  return;
+          }
+          catch(const std::exception& ex){
+                  std::cerr << " [ERROR] {std::exception} \n => "
+                                    << ex.what() << "\n";
+                  return;
+          }
+          std::cout << " [INFO] Executed gracefully. OK" << "\n";
+  }
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC cpp 
+  >> testException([](){ throw std::runtime_error("Fatal error 0xBAF5F8");})
+   [ERROR] {std::exception} 
+   => Fatal error 0xBAF5F8
+
+  >> testException([](){ throw std::invalid_argument("Expected x = 10");})
+   [ERROR] {std::invalid_argument} 
+   => Expected x = 10
+  >> 
+
+  >> testException([](){ throw std::out_of_range("Error: given invalid index.");})
+   [ERROR] {std::out_of_range} 
+   => Error: given invalid index.
+  >> 
+
+  // Crash the program as it cannot handle this exception 
+  >> testException([](){ throw 10 ;})
+  Error in <TRint::HandleTermInput()>: Exception caught!
+
+  // Crash again!
+  >> testException([](){ throw "hello world" ;})
+  Error in <TRint::HandleTermInput()>: Exception caught!
+  >> 
+
+  >> testException([](){ throw std::overflow_error("Number cannot be represented. Overflow error!");})
+   [ERROR] {std::exception} 
+   => Number cannot be represented. Overflow error!
+  >> 
+#+END_SRC
+
+*** Custom Exceptions 
+
+Example: 
+
+#+BEGIN_SRC cpp 
+  enum class ErrorFlags : unsigned {
+          MemoryError     =  0x2A,
+          NetWorkFailure  =  0xFA,
+          DNSFailure      =  0x50, 
+          UnknownError    =  0xAF
+  };
+
+  struct DownloadException: public std::exception {
+          ErrorFlags errorCode;
+          DownloadException(ErrorFlags errorCode)
+                  :errorCode{errorCode}{}	
+          auto what() const throw() -> const char* {
+                  return "Error: Download failure. See error code. ";
+          }
+  };
+
+  void testDownloadException(std::function<void ()> action){
+          std::exception_ptr p;
+          try {
+                  action();
+          } catch(const DownloadException& ex){
+                  std::cerr << ex.what() << "\n";
+                  std::cerr << "[FAILURE] Error code = "
+                                    << std::hex <<  static_cast<unsigned>(ex.errorCode)
+                                    << std::dec
+                                    << "\n";
+                  return;
+          } catch(...){
+                  // Catch all exceptions, log and rethrow		
+                  std::cerr << "[FAILURE] Unknown exception." << "\n";
+                  p = std::current_exception();
+                  std::rethrow_exception( p);		
+          }
+          std::cout << " [INFO] Download ended gracefully. OK." << "\n";
+  }
+#+END_SRC
+
+Testing: 
+
+#+BEGIN_SRC cpp
+  >> testDownloadException([](){})
+   [INFO] Download ended gracefully. OK.
+
+  >> testDownloadException([](){ throw DownloadException(ErrorFlags::NetWorkFailure); })
+  Error: Download failure. See error code. 
+  [FAILURE] Error code = fa
+  >> 
+  >> testDownloadException([](){ throw DownloadException(ErrorFlags::DNSFailure); })
+  Error: Download failure. See error code. 
+  [FAILURE] Error code = 50
+  >> 
+  >> testDownloadException([](){ throw DownloadException(ErrorFlags::UnknownError); })
+  Error: Download failure. See error code. 
+  [FAILURE] Error code = af
+  >> 
+
+  >> testDownloadException([](){ throw std::runtime_error("Fatal kernel failure!!"); })
+  [FAILURE] Unknown exception.
+  Error in <TRint::HandleTermInput()>: std::runtime_error caught: Fatal kernel failure!!
+
+  >> testDownloadException([](){ throw std::out_of_range("Invalid index"); })
+  [FAILURE] Unknown exception.
+  Error in <TRint::HandleTermInput()>: std::out_of_range caught: Invalid index
+  >> 
+#+END_SRC
+
+*** Example - code 
+
+ File: exceptions.cpp 
+
+ #+BEGIN_SRC cpp 
+   #include <iostream>
+   #include <string>
+   #include <iomanip>
+   #include <ostream>
+   #include <exception>
+
+   struct Error{
+   public:
+       const char* reason;
+       const int errorCode;    
+       Error(int errorCode, const char* reason): errorCode(errorCode), reason(reason) {};
+       void display(std::ostream& os){
+           os << "Error code = " << errorCode << "; reason = " << reason << "\n";
+       }
+   };
+
+   class NetworkFailure : public std::exception {
+   public:
+       const char* what () const throw(){
+           return " ==> Error: network failure.";
+       }
+   } networkFailure;
+
+   struct OutOfmemoryError : std::exception {
+       const char* what() const throw(){
+           return "==> Error: there is no enough memory.";
+       }
+   };
+
+   struct UnknownError {};
+
+   // Any object, class or type can be thrown like an Exception.
+   void exceptionThrower(int code){
+       NetworkFailure networkFailure;
+       switch(code){
+       case 0:
+           throw "Error (1) has happened";
+           break;
+       case 1:
+           throw 4090;
+           break;
+       case 2:
+           throw 'x';
+           break;
+       case 3:
+           throw Error(0xffa, "Failure to download update.");
+           break;
+       case 4:
+           throw Error(0xff5, "Invalide input parameters.");
+           break;
+       case 5:
+           throw std::runtime_error("Runtime error happened.");
+           break;
+       case 6:
+           throw std::bad_alloc();
+           break;
+       case 7:
+           throw OutOfmemoryError();
+           break;
+       case 8:
+           throw networkFailure;
+           break;  
+       default:
+           throw UnknownError();
+       }
+   }
+
+   void handleException(int n){
+       try {
+           exceptionThrower(n);
+       } catch (const char* perror){
+           std::cerr << "==> [String] An error of type string happened: " << perror << std::endl;
+       } catch (int errorCode){
+           std::cerr << "==> [Int   ] Returned error code = " << errorCode << std::endl;       
+       } catch (char x){
+           std::cerr << "==> [Char  ] Returned char error code = " << x << std::endl;      
+       } catch (Error err){
+           err.display(std::cerr);
+       } catch (const std::exception& ex){
+           std::cerr << "Catch an std::exception. = " << ex.what() << std::endl;
+       } // Catch all exceptions - Not recommeded. 
+       catch (...) {
+           std::cerr << "==> Unknown exception." << std::endl;
+       }
+   }
+
+   int main(){
+       handleException(0);
+       handleException(1);
+       handleException(2);
+       handleException(3);
+       handleException(4);
+       handleException(5);
+       handleException(6);
+       handleException(7);
+       handleException(8);
+       handleException(100);
+       std::cout << "Finish successfully" << std::endl;    
+       return 0;
+   }
+
+ #+END_SRC
+
+ Compiling and running:
+
+ #+BEGIN_SRC sh 
+   $ clang++ -std=c++11 exceptions.cpp -o out.bin && ./out.bin
+
+   ==> [String] An error of type string happened: Error (1) has happened
+   ==> [Int   ] Returned error code = 4090
+   ==> [Char  ] Returned char error code = x
+   Error code = 4090; reason = Failure to download update.
+   Error code = 4085; reason = Invalide input parameters.
+   Catch an std::exception. = Runtime error happened.
+   Catch an std::exception. = std::bad_alloc
+   Catch an std::exception. = ==> Error: there is no enough memory.
+   Catch an std::exception. =  ==> Error: network failure.
+   ==> Unknown exception.
+   Finish successfully
+
+ #+END_SRC
+
 ** Pointer to Function or Function Pointer  
 *** Overview 
 
