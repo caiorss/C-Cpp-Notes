@@ -1396,6 +1396,109 @@ Videos:
  + 
 
  + 
+** RAII - Resource Aquisition Is Initialization
+
+Comes from book: _C++ Programming with Design Patterns Revealed_ 
+
+RAII is a design pattern which takes advantage of C++'s deterministic
+destructor feature for deallocating resources such as pointers to
+objects allocated on the heap memory, database handlers, socket
+handlers and etc. The RAAI technique uses an object allocated on the
+stack which acquires the resource as a constructor argument and
+performs the resource cleanup in the destructor method which is called
+when when the wrapper object goes out scope or an exception happens.
+
+ + Note: This pattern is specific for C++, for Java and Scala use _try_
+   _finally_ statements. Python has the _with_ statement and C# has the
+   _using_ statement. In addition, this pattern needs the
+   *deterministic destructor* feature which is unique to C++.
+
+Note: It is no longer necessary to design any class for RAII since
+C++11 has smart pointers which already implements this
+pattern. However, it is important to understand how this idiom works
+and the problem that it solves.
+ + In C++ >= C++ 11, it is better to use ~unique_ptr~ for handling
+   resources as shown at [[https://msdn.microsoft.com/en-us/library/hh438480.aspx][Objects Own Resources (RAII)]] 
+
+RAII is described as the process of: 
+ + Acquiring a resouce and wrapping it as an object's state.
+ + Using the resource 
+ + Releasing the resource in the object's destructor member function
+   which is executed when the object goes out of escope.
+
+What i solves: 
+ + Avoid memory leaks.
+ + Avoid resource leaks. 
+
+Known uses: 
+ + C++11 _shared_ptr_ (Smart pointer)
+ + C++11 _unique_ptr_ (Smart pointer)
+
+ *Example 1:* Naive code - If an exception happens, the resource will not
+be released and the code will be vulnerable against memory leak or
+resource leak.  
+
+#+BEGIN_SRC cpp 
+  Handler* handle  = getDatabaseHandler(); 
+  // Throw exception => Resource leak 
+  performInvalidOperation(handle);  
+  ...
+  // Forget to release resource!
+  deleteResource(handle); 
+#+END_SRC
+
+Or: 
+
+#+BEGIN_SRC cpp 
+   Object* heapObject = new Object(param0, param1, ....);
+   peformOperation(heapObject); 
+   heapObject->method1; 
+
+   // Throw exception!! ==> Memory Leak!
+
+   // If the user forget this statement, 
+   // a memory leak will happen. 
+   delete heapObject; 
+#+END_SRC
+ 
+ *Solution - RAAI Pattern*
+
+ - An object is used to control the lifetime of a resource ensuring
+   that is released when the object goes out of scope or an exception
+   happens. The resource is aquired by the constructor and realeased
+   by the destructor.
+
+#+BEGIN_SRC cpp 
+  template<class Resource>
+  class RaaiHandler {
+  public:  
+     // Consructor: Acquire resource on the constructor 
+     RaaiHandler(Resource* rawHandle_) : (rawHandle_) {};
+
+     // Destructor: Releases resource 
+     // The destructor is always called when the object goes out of scope 
+     // or an exception happens.
+     ~RaiiHandler() {
+        delete _handler; 
+      }      
+  private:
+     RaiiHandler* _handler;
+  };
+
+  // Object created without new keyword is allocated in the stack, not in the heap.
+  RaiiHandler hnd(createNewResource());
+  // .. . Peform operation 
+  Operation(hnd);
+  // Once the escope is gone, the resource is released.
+#+END_SRC
+
+ *References*
+
+ + [[https://www.codeproject.com/Articles/580077/ResourceplusAcquisitionplusisplusInitializationplu][Resource Acquisition is Initialization (RAII) - CodeProject]]
+ + [[https://stackoverflow.com/questions/2321511/what-is-meant-by-resource-acquisition-is-initialization-raii][c++ - What is meant by Resource Acquisition is Initialization (RAII)? - Stack Overflow]]
+ + [[https://www.codeproject.com/Articles/122129/RAII-Resource-Acquisition-Is-Initialization-C-Help][RAII (Resource Acquisition Is Initialization) C# Helper Classes - CodeProject]]
+ + [[http://jrdodds.blogs.com/blog/2004/08/raii_in_c.html/][RAII in C++ (constructive nonconformist)]]
+
 ** Cross platform code with conditional compilation (C++ Only)
 
 Note: It is not a design pattern, but a useful for techinque for
