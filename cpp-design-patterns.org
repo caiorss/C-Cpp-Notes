@@ -1396,7 +1396,7 @@ Videos:
  + 
 
  + 
-** RAII - Resource Aquisition Is Initialization
+** RAII - Resource Aquisition Is Initialization (C++ Only)
 
 Comes from book: _C++ Programming with Design Patterns Revealed_ 
 
@@ -1587,3 +1587,181 @@ Example:
   }
 #+END_SRC
 
+** Multiple booleans encoded as bitmask
+
+Note: It is not a design pattern, but a technique for encoding
+multiple booleans or flags inside a single value, passing multiple
+booleans as function parameters or returning multiple booleans as a
+single value.
+
+Example: 
+
+ - File:  [[file:src/design-patterns/boolean-bitmask.C][file:src/design-patterns/boolean-bitmask.C]]  (CLING script)
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <vector>
+  #include <ostream> // Operator: (<<)
+  #include <string>
+
+  enum class Permissions: unsigned {
+      executable = 0x01,  // decimal = 1 or (1 << 0)
+      writeable  = 0x02,  // decimal = 2 or (1 << 1)
+      readable   = 0x04   // decimal = 4 or (1 << 2)
+  };
+
+  Permissions operator | (Permissions lhs, Permissions rhs){
+      return static_cast<Permissions>(static_cast<unsigned>(lhs) | static_cast<unsigned>(rhs));
+  }
+  bool operator & (Permissions lhs, Permissions rhs){
+      return static_cast<unsigned>(lhs) & static_cast<unsigned>(rhs);
+  }
+  // Make permissions enum printable. 
+  std::ostream& operator<<(std::ostream& os, const Permissions& p){
+      os << std::boolalpha; // Make bool printable as 'true' or 'false' instead of 0 or 1
+      os << "readable = "   << (p & Permissions::readable)   << "; "
+         << "writeable = "  << (p & Permissions::writeable)  << "; "
+         << "executable = " << (p & Permissions::executable);
+      return os;
+  }
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC cpp 
+  // Load script 
+  >> .L boolean-bitmask.C 
+
+  >> std::cout << Permissions::readable << std::endl;
+  readable = true; writeable = false; executable = false
+
+  >> std::cout << Permissions::readable << "\n";
+  readable = true; writeable = false; executable = false
+
+  >> std::cout << Permissions::writeable << "\n";
+  readable = false; writeable = true; executable = false
+
+  >> std::cout << Permissions::executable << "\n";
+  readable = false; writeable = false; executable = true
+
+  >> auto p1 = Permissions::executable | Permissions::readable ;
+  >> std::cout << "p1 => " << p1 << "\n";
+  p1 => readable = true; writeable = false; executable = true
+  >> 
+
+  >> auto p2 = Permissions::executable | Permissions::readable | Permissions::writeable ;
+  >> std::cout << "p2 => " << p2 << "\n";
+  p2 => readable = true; writeable = true; executable = true
+  >> 
+
+  >> if(p1 & Permissions::readable) { std::cout << "File is readable" << "\n"; }
+  File is readable
+  >> 
+
+#+END_SRC
+
+Shows all flags or all bits that are set: 
+
+#+BEGIN_SRC cpp 
+  void showPermissions(Permissions p){
+          std::cout << "Is readable?     : " << (p & Permissions::readable)   << '\n';
+          std::cout << "Is writeable?    : " << (p & Permissions::writeable)  << '\n';
+          std::cout << "Is executable?   : " << (p & Permissions::executable) << '\n';
+  }
+
+  >> showPermissions(p1)
+  Is readable?     : true
+  Is writeable?    : false
+  Is executable?   : true
+  >> 
+  >> showPermissions(p2)
+  Is readable?     : true
+  Is writeable?    : true
+  Is executable?   : true
+  >> 
+#+END_SRC
+
+Design 1: Function uses multiple bools creating a file with some
+permissions. 
+
+#+BEGIN_SRC cpp 
+  using FilePerms = std::tuple<bool, bool, bool>;
+
+  // Design 1:
+  FilePerms createFileDD1(
+       std::string name,
+       bool readable,
+       bool writeable,
+       bool executable ){
+       std::cout << std::boolalpha
+                 << "Create file = " << name << "\n"
+                 << " with the following permissions" << "\n"
+                 << "  + readable   = " << readable   << "\n"
+                 << "  + writeable  = " << writeable  << "\n"
+                 << "  + executable = " << executable << "\n"
+                 << "\n";
+       return FilePerms {readable, writeable, executable};	
+  }
+
+  >> auto pd1 = createFileDD1("dataset.txt", true, false, false)
+  Create file = dataset.txt
+   with the following permissions
+    + readable   = true
+    + writeable  = false
+    + executable = false
+
+  >> pd1
+  (std::tuple<bool, bool, bool> &) { true, false, false }
+  >> 
+
+  >> std::cout << "R = " << std::get<0>(pd1) << "\n";
+  R = true
+  >> std::cout << "W = " << std::get<1>(pd1) << "\n";
+  W = false
+  >> std::cout << "X = " << std::get<2>(pd1) << "\n";
+  X = false
+  >> 
+#+END_SRC
+
+Design 2: Use bitmask flags instead of bools. The advantage is more
+readability and less functions parameters. 
+
+#+BEGIN_SRC cpp 
+  // Design 1:
+  Permissions createFileDD2(std::string name, Permissions p){
+       std::cout << std::boolalpha
+                 << "Create file = " << name << "\n"
+                 << " with the following permissions" << "\n"
+                 << "  + readable   = " << (p & Permissions::readable)   << "\n"
+                 << "  + writeable  = " << (p & Permissions::writeable)  << "\n"
+                 << "  + executable = " << (p & Permissions::executable) << "\n"
+                 << "\n";
+       return p;
+  }
+
+  >> auto pd2 = createFileDD2("Sales-report.xls", Permissions::readable | Permissions::writeable)
+  Create file = Sales-report.xls
+   with the following permissions
+    + readable   = true
+    + writeable  = true
+    + executable = false
+
+  (Permissions)  : (unsigned int) 6
+  >> 
+
+  >> createFileDD2("parser.exe", Permissions::readable | Permissions::writeable | Create file = parser.exe
+   with the following permissions
+    + readable   = true
+    + writeable  = true
+    + executable = true
+
+  (Permissions)  : (unsigned int) 7
+  >> 
+
+  >> std::cout << "R = " << (pd2 & Permissions::readable) << "\n";
+  R = true
+  >> std::cout << "W = " << (pd2 & Permissions::writeable) << "\n";
+  W = true
+  >> std::cout << "X = " << (pd2 & Permissions::executable) << "\n";
+  X = false
+#+END_SRC
