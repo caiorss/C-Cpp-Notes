@@ -419,6 +419,103 @@ Usage:
   mutant1.setPosition(x)
 #+END_SRC
 
+** GOF - Template Pattern 
+
+It is stated by GOF as: "Defines the skeleton of an algorithm in a
+method, deferring some steps to subclasses. Template Method lets
+subclasses redefine certain steps of an algorithm without changing the
+algorithms structure."
+
+ + Intent: Create an algorithm template that allows redefine some
+   steps without changing its structure.
+
+The parent abstract class has four different types of methods:
+ + _Concrete methods_: Methods implemented in the abstract class.
+
+ + _Abstract methods_: Methods without implementation that must be
+   implemented by subclasses.
+
+ + _Hook methods_: Methods with default implementation that can be
+   overriden by subclasses.
+
+ + _Template methods_: Method that calls concrete methods, abstract
+   methods or hook methods.
+
+Participants: 
+ + _Base Class_: Defines an algorithm which calls primitive methods (aka
+   hook methods) that will be defined by the derived classes.
+ + _Derived Class_: Implements primitive methods (virtual methods or
+   methods that can be overriden) defined in the _base class_.
+
+Features: 
+ + The base class defines an algorithm stub, however some steps are
+   required to be implemented by the derived class.
+ + This pattern provides an _inverse control structure_, the algorithm
+   defined in the base class which calls the primitive methods which
+   are algorithm steps declared in the base class.
+ + This pattern can be the base of an framework. 
+
+Example: 
+
+#+BEGIN_SRC cpp 
+  class IntervalSummation{
+  public:
+   // Algorithm or entry point which calls the derived class method.
+   // This is the template method 
+   double summation(int lower, int upper) const{
+           double sum = 0;
+           for(int i = lower; i <= upper; i++)
+                   sum += this->stepFn(i);
+           return sum; 
+   }
+  protected:
+      // Hook method or to be defined by the derived class
+      virtual double stepFn(double x) const = 0 ;
+  };
+
+  class SumOfSquares: public IntervalSummation{
+  private:
+      double stepFn(double x) const { return x * x; }
+  };
+
+  class SumOfCubes: public IntervalSummation{
+  private:
+      double stepFn(double x) const { return x * x * x; }
+  };
+
+  void clientCode(const IntervalSummation& obj){
+      std::cout << "Summation at [0, 15] = " << obj.summation(0, 15) << std::endl;
+  }
+
+#+END_SRC
+
+Running in CERN's ROOT REPL:
+
+#+BEGIN_SRC sh 
+  >> sq.summation(0, 10)
+  (double) 385.00000
+
+  >> sc.summation(0, 10)
+  (double) 3025.0000
+
+  >> clientCode(sq)
+  Summation at [0, 15] = 1240
+
+  >> clientCode(sc)
+  Summation at [0, 15] = 14400
+  >> 
+#+END_SRC
+
+References: 
+
+ + Template Method, Factory Method, and Composite. -
+   <http://condor.depaul.edu/cjones1/depaul/se455/notes/lecture07.pdf>
+ + Template Method - <http://cs.unb.ca/~wdu/cs4015/ch5k.pdf>
+ + Encapsulating Algorithms with the Template Method Design Pattern -
+   <https://redlich.net/pdf/publications/jupitermedia/template.pdf>
+ + Template Method Design Pattern in Java -
+   <https://www.journaldev.com/1763/template-method-design-pattern-in-java>
+
 ** PIMPL - Pointer to Implementation (C++ Specific)
 
 The PIMPL - Pointer to Implementation idiom, also known as compiler
