@@ -4,6 +4,229 @@
 #+STARTUP: content 
 
 * Design Patterns 
+** Named constructor - static factory method
+
+The named constructor or static factory design pattern uses static
+methods instead of constructors for instantiating objects. This
+approach has many advantages over constructor instantiation. Named
+constructors are more readable than ordinary constructors and unlike
+constructors, many named constructors static methods sharing the same
+type signature can coexist. Another benefit is that this technique
+allows objects to be instantiated in many different ways from several
+different data representation.
+
+Side note: It should not be confused with factory design pattern or
+abstract factory design pattern.
+
+Example:
+
+#+BEGIN_SRC cpp   :results output pp :exports both 
+  #include <iostream>
+  #include <ostream>
+  #include <cstdint>
+
+  // #include <stdint>   // WARNING - It may not be available
+
+  // Unsigned byte from 0 to 255 or 0x00 to 0xFF
+  // ---> typedef uint8_t ubyte;
+  using ubyte = uint8_t ; 
+
+  class Color{
+  private:
+      ubyte m_r;
+      ubyte m_g;
+      ubyte m_b;
+  public:
+      Color(ubyte red, ubyte green, ubyte blue):
+          m_r(red), m_g(green), m_b(blue) {}
+      ubyte red(){
+          return m_r;
+      }
+      ubyte blue(){
+          return m_b;
+      }
+      ubyte green(){
+          return m_g;
+      }
+      // Named constructor or static factory method which builds the object
+      // From the RGB tuple data representation 
+      static Color fromRGB(ubyte red, ubyte green, ubyte blue){
+          return Color(red, green, blue);
+      }
+      // Named constructor which builds Color object 
+      // from hexadecimal data representation 
+      static Color fromHex(int color){
+          int r = color & 0xFF;
+          int g = (color >> 8 ) & 0xFF;
+          int b = (color >> 16) & 0xFF;
+          return Color(r, g, b);
+      }
+      // Named constructor which builds a specific color.
+      static Color colorRED(){
+          return fromRGB(255, 0, 0);
+      }
+      static Color colorBLUE(){
+          return fromRGB(0, 255, 0);
+      }
+      static Color colorGREEN(){
+          return fromRGB(0, 0, 255);
+      }
+      friend std::ostream& operator <<(std::ostream& os, const Color& c){
+          os << "Color(r = "
+             << static_cast<int>(c.m_r)
+             << ", g = " << static_cast<int>(c.m_g)
+             << ", b = " << static_cast<int>(c.m_b) << ")";
+          return os;
+      }      
+  };
+
+  int main(){
+      std::cout << "Red    = " << Color::colorRED()   << "\n";
+      std::cout << "Blue   = " << Color::colorBLUE()  << "\n";
+      std::cout << "Green  = " << Color::colorGREEN() << "\n";
+      std::cout << "Color1 = " << Color::fromRGB(20, 90, 200) << "\n";
+      std::cout << "Color2 = " << Color::fromHex(0xFF8AB5) << "\n";
+      std::cout.flush();
+      return 0;
+  }
+#+END_SRC
+
+#+RESULTS:
+: Red    = Color(r = 255, g = 0, b = 0)
+: Blue   = Color(r = 0, g = 255, b = 0)
+: Green  = Color(r = 0, g = 0, b = 255)
+: Color1 = Color(r = 20, g = 90, b = 200)
+: Color2 = Color(r = 181, g = 138, b = 255)
+** Builder Design Pattern (Joshua Blosh)
+
+The purpose of the builder design pattern proposed by Joshua Bloch is
+to simplify the instantiation of objects with many constructor
+parameters or many optional parameters. Note: it should not be
+confused with the GOF (Gang of Four) builder pattern.
+
+Example: 
+
+ - File: builder.cpp 
+
+#+BEGIN_SRC cpp 
+  // Joshua Bloch's Builder Pattern for simplifying the instantiation
+  // of objects with many constructor parameters. It is not the
+  // GOF (Gang of Four) builder pattern. 
+  #include <iostream>
+  #include <string>
+
+  // Function meta object 
+  class UserData{
+  public:
+          using ulong = unsigned long;
+  private:
+          ulong          _userID = 0;
+          std::string    _name;
+          std::string    _lastName;
+          std::string    _email;
+          UserData() = default;
+  public:
+          // Explicit is better than implicit 
+          ~UserData() = default;
+	
+          auto show() -> void
+          {
+              std::cout << "\nUser{"
+                        << "\n" << "  id        = " << _userID
+                        << "\n" << "  name      = " << _name
+                        << "\n" << "  last name = " << _lastName
+                        << "\n" << "  email     = " << _email
+                        << "\n" << "}"
+                        << "\n";
+          }
+	
+          // Allow builder class access UserData's private data
+          friend class UserBuilder;
+  }; //--- EoF class UserData --- //
+
+  class UserBuilder{
+  private:
+          //class UserData;
+          UserData _data{};
+  public:
+          UserBuilder(){
+                  // _data = UserData();
+          }		
+          auto setID(ulong userID ) -> UserBuilder& {
+             _data._userID = userID;
+             return *this;
+          }
+          auto setName(const std::string& name) -> UserBuilder& {
+              _data._name = name;
+              return *this;
+          }
+          auto setLastName(const std::string& name) -> UserBuilder& {
+              _data._lastName = name;
+              return *this;
+          }
+          auto setEmail(const std::string& email) -> UserBuilder& {
+             _data._email = email;
+             return *this;
+          }
+          auto build() -> UserData {
+             return this->_data;
+          }
+  }; //--- EoF class UserData::builder --- //
+
+  int main(){
+      auto user0 =
+              UserBuilder()
+              .setID(2065)
+              .setName("John")
+              .setLastName("Von Neumman")
+              .setEmail("nx098774a@sknmap.co")
+              .build();
+      auto user1 =
+              UserBuilder()
+              .setID(1065)
+              .setName("Enrico")
+              .setLastName("Fermi")
+              .setEmail("dummyEmail@service1.co.uk")
+              .build();
+      auto user2 =
+              UserBuilder()
+              .setID(2001)
+              .setName("Stanislaw")
+              .setLastName("Ulam")
+              .setEmail("wsx752@couk.com.sk")
+              .build();
+      user0.show();
+      user1.show();		
+      user2.show();
+      return EXIT_SUCCESS;
+  }
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC sh 
+   $ g++ builder.cpp -o builder.bin -g -std=c++1z -Wall -Wextra && ./builder.bin
+   User{
+     id        = 2065
+     name      = John
+     last name = Von Neumman
+     email     = nx098774a@sknmap.co
+   }
+
+   User{
+     id        = 1065
+     name      = Enrico
+     last name = Fermi
+     email     = dummyEmail@service1.co.uk
+   }
+
+   User{
+     id        = 2001
+     name      = Stanislaw
+     last name = Ulam
+     email     = wsx752@couk.com.sk
+   }
+#+END_SRC
 ** Type Erasure 
 *** Overview  
 
@@ -290,135 +513,4 @@ Compiling and running: (File: [[file:src/design-patterns/type-erasure1.cpp][file
   I am the class C
 #+END_SRC
 
-** Builder Design Pattern (Joshua Blosh)
 
-The purpose of the builder design pattern proposed by Joshua Bloch is
-to simplify the instantiation of objects with many constructor
-parameters or many optional parameters. Note: it should not be
-confused with the GOF (Gang of Four) builder pattern.
-
-Example: 
-
- - File: builder.cpp 
-
-#+BEGIN_SRC cpp 
-  // Joshua Bloch's Builder Pattern for simplifying the instantiation
-  // of objects with many constructor parameters. It is not the
-  // GOF (Gang of Four) builder pattern. 
-  #include <iostream>
-  #include <string>
-
-  // Function meta object 
-  class UserData{
-  public:
-          using ulong = unsigned long;
-  private:
-          ulong          _userID = 0;
-          std::string    _name;
-          std::string    _lastName;
-          std::string    _email;
-          UserData() = default;
-  public:
-          // Explicit is better than implicit 
-          ~UserData() = default;
-	
-          auto show() -> void
-          {
-              std::cout << "\nUser{"
-                        << "\n" << "  id        = " << _userID
-                        << "\n" << "  name      = " << _name
-                        << "\n" << "  last name = " << _lastName
-                        << "\n" << "  email     = " << _email
-                        << "\n" << "}"
-                        << "\n";
-          }
-	
-          // Allow builder class access UserData's private data
-          friend class UserBuilder;
-  }; //--- EoF class UserData --- //
-
-  class UserBuilder{
-  private:
-          //class UserData;
-          UserData _data{};
-  public:
-          UserBuilder(){
-                  // _data = UserData();
-          }		
-          auto setID(ulong userID ) -> UserBuilder& {
-             _data._userID = userID;
-             return *this;
-          }
-          auto setName(const std::string& name) -> UserBuilder& {
-              _data._name = name;
-              return *this;
-          }
-          auto setLastName(const std::string& name) -> UserBuilder& {
-              _data._lastName = name;
-              return *this;
-          }
-          auto setEmail(const std::string& email) -> UserBuilder& {
-             _data._email = email;
-             return *this;
-          }
-          auto build() -> UserData {
-             return this->_data;
-          }
-  }; //--- EoF class UserData::builder --- //
-
-  int main(){
-      auto user0 =
-              UserBuilder()
-              .setID(2065)
-              .setName("John")
-              .setLastName("Von Neumman")
-              .setEmail("nx098774a@sknmap.co")
-              .build();
-      auto user1 =
-              UserBuilder()
-              .setID(1065)
-              .setName("Enrico")
-              .setLastName("Fermi")
-              .setEmail("dummyEmail@service1.co.uk")
-              .build();
-      auto user2 =
-              UserBuilder()
-              .setID(2001)
-              .setName("Stanislaw")
-              .setLastName("Ulam")
-              .setEmail("wsx752@couk.com.sk")
-              .build();
-      user0.show();
-      user1.show();		
-      user2.show();
-      return EXIT_SUCCESS;
-  }
-#+END_SRC
-
-Running: 
-
-#+BEGIN_SRC sh 
-   $ g++ builder.cpp -o builder.bin -g -std=c++1z -Wall -Wextra && ./builder.bin
-   User{
-     id        = 2065
-     name      = John
-     last name = Von Neumman
-     email     = nx098774a@sknmap.co
-   }
-
-   User{
-     id        = 1065
-     name      = Enrico
-     last name = Fermi
-     email     = dummyEmail@service1.co.uk
-   }
-
-   User{
-     id        = 2001
-     name      = Stanislaw
-     last name = Ulam
-     email     = wsx752@couk.com.sk
-   }
-#+END_SRC
-
- 
