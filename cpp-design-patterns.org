@@ -97,6 +97,154 @@ Example:
 : Green  = Color(r = 0, g = 0, b = 255)
 : Color1 = Color(r = 20, g = 90, b = 200)
 : Color2 = Color(r = 181, g = 138, b = 255)
+** Singleton 
+
+Singleton is a creational design pattern where there is only a single
+instance of a class and client code is forbidden from creating new
+instances.
+
+Note: Despite that there are lots of objections against this design
+pattern, it is still worth knowing how it works.
+
++ File: [[file:src/design-patterns/singleton1.cpp][file:src/design-patterns/singleton1.cpp]]
+
+#+BEGIN_SRC cpp
+   class FileRepository
+   {
+   private:
+       std::deque<std::string> _files;	
+       // Forbid client code instating a new instance. 
+       FileRepository(){}	
+       // Forbid client code from creating a copy or using the
+       // copy constructor.
+       FileRepository(const FileRepository&){}
+   public:
+       // Return a reference to not allow client code 
+       // to delete object. 
+       static auto getInstance() -> FileRepository& {
+           // Initialized once - lazy initialization 
+           static auto _instance = std::unique_ptr<FileRepository>(new FileRepository);
+           return *_instance.get();
+       }
+       void addFile(std::string fname){
+           _files.push_back(fname);
+       }
+       void clearFiles(){
+               _files.clear();
+       }
+       // C++11 member function declaration looks better. 
+       auto showFiles() -> void {
+           for(const auto& file: _files){
+               std::cout << " File = " << file << "\n";
+           }
+       }
+   };
+#+END_SRC
+
+Test in CERN ROOT/Clign REPL:
+
+#+BEGIN_SRC cpp 
+   // Load C++ code as it was a script.
+   >> .L singleton1.cpp
+
+   // Try to instantiate singleton object without reference. 
+   //------------------------------------------------------
+   >> FileRepository repo = FileRepository::getInstance()
+   ROOT_prompt_2:1:23: error: calling a private constructor of class 'FileRepository'
+   FileRepository repo = FileRepository::getInstance()
+                         ^
+   singleton1.cpp:21:5: note: declared private here
+       FileRepository(const FileRepository&){}
+       ^
+   >> FileRepository& repo = FileRepository::getInstance()
+   (FileRepository &) @0x2fc9640
+   >> 
+
+   >> FileRepository& repo = FileRepository::getInstance()
+   (FileRepository &) @0x2fc9640
+   >> 
+
+   >> repo.showFiles()
+   >> 
+   >> repo.addFile("quarterly-sales-report.dat")
+   >> repo.addFile("interest-payments.txt")
+   >> repo.addFile("taxes-report.xls")
+   >> repo.showFiles()
+    File = quarterly-sales-report.dat
+    File = interest-payments.txt
+    File = taxes-report.xls
+   >> 
+   >> 
+
+   // Try to copy object. 
+   >> FileRepository r = repo;
+   ROOT_prompt_9:1:20: error: calling a private constructor of class 'FileRepository'
+   FileRepository r = repo;
+                      ^
+   singleton1.cpp:21:5: note: declared private here
+       FileRepository(const FileRepository&){}
+       ^
+   >> 
+
+   // Try to create a new object 
+   >> FileRepository& repo2 = FileRepository::getInstance()
+   (FileRepository &) @0x2fc9640
+   >> repo2.showFiles()
+    File = quarterly-sales-report.dat
+    File = interest-payments.txt
+    File = taxes-report.xls
+   >> 
+
+   // Check whether repo and repo2 are the same object (reference equality)
+   // -> They are equal under reference equality criteria if they have the same address.
+   >> &repo == &repo2
+   (bool) true
+   >> 
+#+END_SRC
+
+Main function: 
+
+#+BEGIN_SRC cpp
+  FileRepository& repo1 = FileRepository::getInstance();
+  repo1.addFile("CashFlowStatement.txt");
+  repo1.addFile("Balance-Sheet.dat");
+  repo1.addFile("Sales-Report.csv");
+
+  FileRepository& repo2 = FileRepository::getInstance();
+
+  std::cout << std::boolalpha << "Same object? (&repo == &repo1 ?) = "
+            << (&repo1 == &repo2)
+            << "\n";
+  std::cout << "Repository files" << std::endl;
+  repo2.showFiles();
+
+  std::cout << "Add more files" << std::endl;
+  repo2.addFile("fileX1.pdf");
+  repo2.addFile("fileX2.pdf");
+  repo2.addFile("fileX3.pdf");
+  repo2.showFiles();
+#+END_SRC
+
+Compiling and running ([[file:src/design-patterns/singleton1.cpp][file:src/design-patterns/singleton1.cpp]]): 
+
+#+BEGIN_SRC txt 
+  $ clang++ singleton1.cpp -o singleton1.bin -g -std=c++1z -Wall -Wextra 
+  $ ./singleton1.bin
+
+  Same object? (&repo == &repo1 ?) = true
+  Repository files
+   File = CashFlowStatement.txt
+   File = Balance-Sheet.dat
+   File = Sales-Report.csv
+  Add more files
+   File = CashFlowStatement.txt
+   File = Balance-Sheet.dat
+   File = Sales-Report.csv
+   File = fileX1.pdf
+   File = fileX2.pdf
+   File = fileX3.pdf
+#+END_SRC
+
 ** Builder Design Pattern (Joshua Blosh)
 
 The purpose of the builder design pattern proposed by Joshua Bloch is
