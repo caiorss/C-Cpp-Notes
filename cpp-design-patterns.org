@@ -1,0 +1,210 @@
+#+INCLUDE: theme/style.org 
+#+TITLE: CPP / C++ Notes - Design Patterns 
+#+DESCRIPTION: cpp/c++ c++ design patterns gneric programming object oriented metaprogramming
+#+STARTUP: content 
+
+* Design Patterns 
+** Type Erasure 
+*** Overview  
+
+Type erasure is a set of techniques for providing an uniform interface
+for many different types by hiding the type information from the
+client code. In C++ type erasure can be implemented with a combination
+of object oriented programming and generic programming, in other
+words, inheritance and templates. The fundamental building blocks of
+this pattern are a base class, called _concept_, which provides the
+uniform interface to the wrapped types and a derived templatized
+class, called _model_, inherting the concept class which adapts the
+wrapped type to the concept class. The inheritance allows any template
+instantation of the model to be treated as it was the base class, thus
+this approach hides the type information which can be later recovered
+by downcasting the base class to the derived class.
+
+ - Definition by Dave Abrahams and Aleksey Curtovoy in, *C++ Template*
+   *Metaprogramming.*
+
+#+BEGIN_QUOTE
+  In its fullest expression, type erasure is the process of turning a
+  wide variety of types with a common interface into one type with that
+  same interface
+#+END_QUOTE
+
+Parts: 
+
+ + *Concept class*
+   - base class - definines the interface being enforced. 
+ + *Model class*
+   - templatized class inherting the concept class adpating the
+     wrapped type to the concept class and holding an instance of the
+     wrapped type. 
+ + *Type Erasure class* (outter class)
+   - Both the concept and model classes are private inner classes of
+     the type erasure class.
+   - The type erasure class takes an instance of the model class in the
+     constructor.
+   - This class stores a pointer variable to the concept class, but
+     storing a pointer to the model class (dynamic polymorphism).
+ + *Wrapped Type* or Objects 
+   + Types wrapped by the model class wich will be erased. 
+
+Use-cases: 
+
+ + Create a common interface for many different types. 
+ + Store wrapped types without a common base class in STL containers.
+ + Store templatized classes in STL containers.
+ + Implement dynamic or runtime polymorphism with value semantics.
+ + Take advantage of the commonality of many unrelated classes without
+   a common base class without modifying their source code. 
+
+Known uses in C++ standard library: 
+
+ + std::function (C++11, formber Boost.Function)
+
+ + std::any (C++17, former Boost.Any)
+   + A container which can store anything and the type of the stored
+     object is not known at runtime. 
+
+ + std::variant (C++17, former Boost.Variant)
+   + Provides an interface for sum types or disjoint union or _visitor_ OO
+     design pattern which is useful for manipulating abstract syntax
+     tree, creating interpreters, tree data structures and fixed class
+     hierarchies. 
+
+ + void* - Void pointer in many C-APIs. 
+
+
+
+
+
+
+*** Example 1 
+
+_Problem:_ Handle the classes A, B and C which don't have a common base
+class and their source code cannot be modified, using dynamic (aka
+runtime) polymorphism taking advantage of their commonality, the
+method .getName().
+
+ - Complete source code:
+   + File: [[file:src/design-patterns/type-erasure1.cpp][file:src/design-patterns/type-erasure1.cpp]]
+
+#+BEGIN_SRC cpp 
+  class A{
+  public:
+      std::string getName() const {
+          return "class A";
+      }
+      void sayA(){
+          std::cout << "I am the class A" << "\n";
+      }
+  };
+
+  class B{
+  public:
+      std::string getName() const  {
+          return "class B";
+      }
+      void sayB(){
+          std::cout << "I am the class B" << "\n";
+      }	
+  };
+
+  class C{
+  public:
+      std::string getName() const  {
+          return "class C";
+      }
+      void sayB() const {
+          std::cout << "I am the class C" << "\n";
+      }
+  };
+#+END_SRC
+
+Solution: Type erasure design pattern. 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <vector>
+  #include <deque>
+  #include <memory> // Smart pointers 
+
+  class TypeErasure{
+  private:
+      //  --- Forward declarations ----
+      class Concept;
+      template<class T> class Model;
+
+      // --- Member Variables ----- // 
+      std::shared_ptr<Concept> _concept_ptr;
+      // Optional: 
+      // RTTI (runtime type information) for recovering wrapped type
+      // by downcasting 
+      const std::type_info& _tinfo;
+  public:
+       template<typename T> 
+       TypeErasure(const T& obj)
+        : _concept_ptr(std::make_shared<Model<T>>(obj))
+        ,_tinfo(typeid(T)) 
+       {		
+       }
+
+       auto getName() const -> std::string {
+           return _concept_ptr->getName();
+       }
+
+       // Recover reference to wrapped type 
+       template<typename T>
+       auto recover() -> T {		
+           if(typeid(T) != _tinfo)
+              throw std::runtime_error("Error: cannot cast to this type");
+           // Note: static_cast downcasting to wrong type has undefined behavior,
+           // use with care!
+           return static_cast<Model<T>*>(_concept_ptr.get())->obj_;
+       }
+
+       template<typename T>
+       auto hasType() -> bool {
+           return _tinfo == typeid(T);
+       }
+  private:
+       // Concept class defines the interface to be enforced
+       // In general, it is an interface class, a class with only pure virtual
+       // methods (abstract methods), in other words methods without implementation.
+       class Concept{
+       public:
+           virtual auto getName() const -> std::string = 0;
+           virtual ~Concept() = default;
+       };
+
+       // Adapt the wrapped type (T) to the concept
+       template<typename T>
+       class Model: public Concept {
+       public:
+          // Instance of the wrapped type 
+          T _obj;
+          // Initialize _opj by copying the parameter 
+          Model(const T& obj): _obj(obj){}
+          auto getName() const -> std::string {
+             return _obj.getName();
+          }
+       };
+  };
+#+END_SRC
+
+Testing in Cling REPL: 
+
+#+BEGIN_SRC cpp 
+
+auto tlist = std::deque<TypeErasure>();
+tlist.emplace_back(A())
+tlist.emplace_back(B())
+tlist.emplace_back(C())
+ 
+>> for(const auto& t: tlist) { std::cout << "Class type = " << t.getName() << "\n"; }
+Class type = class A
+Class type = class B
+Class type = class C
+>> 
+
+
+
+#+END_SRC
