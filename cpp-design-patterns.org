@@ -375,7 +375,142 @@ Running:
      email     = wsx752@couk.com.sk
    }
 #+END_SRC
-** Type Erasure 
+
+** PIMPL - Pointer to Implementation (C++ Specific)
+
+The PIMPL - Pointer to Implementation idiom, also known as compiler
+firewall, is a widely used technique  in C++ for completly hiding class
+private members in the public header file. This technique uses an
+opaque pointer to an internal non declared class in the current header
+file encapsulating all fields of the outer class.
+
+Also known as: 
+ + PIMPL - Pointer to Implementation
+ + Compiler firewall idiom
+ + Cheshire Cat
+
+Motivation and Benefits: 
+
+ + Reduce compilation time as the number of #include headers in the
+   class header is not changed.
+
+ + Makes the class data member in the public header really private.
+
+ + Changing of private members of the class which are encapsulated in
+   the opaque pointer class does not require recompilation of client
+   code. This feature is very important for library development as it
+   avoid client code recompilation as the public headers are not
+   changed.
+
+ + Less likely to breaking binary compatibility - ABI Application
+   Binary Interface.
+
+ + Note: Changing class member variables or member functions (methods)
+   breaks the ABI and requires the recompilation of client code. The
+   pimpl maintains the binary compatibility by not changing class'
+   private members.
+
+ + TL;DR
+   + PIMPL: Allow changes to implementation without the
+     need to recompile client code.
+
+Drawbacks: 
+
+ + More complexity and work for API implementators.
+ + Not convenient when there are protected members which needs to be
+   accessed by subclasses. 
+ + Runtime performance overhead due to the pointer indirection. 
+
+Example: All private members of class CashFlow are conained in the
+opaque type Impl which is not defined in the header file.
+
+ - file: _CashFlow.h_  -> Class public interface.
+
+#+BEGIN_SRC cpp 
+  #ifndef _CashFlow_H_
+  #define _CashFlow_H_
+
+  // C++ 11's smart pointers
+  #include <memory>
+
+  class CashFlow{
+  private:
+      // Forward declaration of incomplete type.
+      struct Impl;
+      // This opaque type encapsulate the outer class' private member 
+      // Pointer to implementation (PIMPL)
+      std::unique_ptr<Impl> m_pimpl;
+  public:
+      // Default ctor 
+      CashFlow();
+      void show();
+      void add(double x);
+      int  size();
+      // Net Present Value - NPV of cash flow for a given rate of return 
+      double npv(double rate); 
+      // Compute IRR - Internal rate of return 
+      double irr(); 
+  };
+
+  #endif // --- EOF ---- // 
+#+END_SRC
+
+ - file: _CashFlow.cpp_  -> Class implementation.
+
+#+BEGIN_SRC cpp 
+  // C++ 11's smart pointers
+  #include <memory>
+  #include "CashFlow.h"
+
+  // Struct is just class with all members
+  // public by default 
+  struct CashFlow::Impl{
+      // cash flow vector 
+      std::vector<double> m_clf;
+      // Default ctor 
+      Impl(){}
+      // Default dtor 
+      ~Impl() = default;  
+  };
+
+  // Default ctor 
+  CashFlow::~CashFlow = default;
+  // Ctor 
+  CashFlow::CashFlow(): m_pimpl(new Impl()) {}
+
+  void CashFlow::add(double x){
+      m_pimpl->m_clf.push_back(x);
+  }
+
+  double CashFlow::get(int i){
+      return m_pimpl->m_clf[i];
+  }
+     ... ... ... .... 
+#+END_SRC  
+
+References and further: 
+
+ + *Pimpl Idiom* - <>
+ 
+ + *Best Friends: C++11 Move Semantics and Pimpl* -
+   <https://www.embeddeduse.com/2016/05/30/best-friends-cpp11-move-semantics-and-pimpl/>
+
+ + *Improving C++ Encapsulation with the Pimpl Idiom* -
+   <https://visualstudiomagazine.com/articles/2012/11/29/the-pimpl-idiom-in-c-plus-plus.aspx> 
+
+ + *Why every C++ developer should know about the pimpl idiom pattern* -
+   <https://tonka2013.wordpress.com/2013/08/31/why-every-c-developer-should-know-about-the-pimpl-idiom-pattern/> 
+
+ + *Passing Containing Parent to pimpl idiom implementation class* -
+   http://www.sharprobotica.com/2010/04/passing-containing-parent-to-pimpl-idiom-implementation-class/
+
+ + *Dive in to C++ and survive* -
+   <https://www.embedded.com/print/4008235> 
+ 
+ + *Modern and Lucid C++ Advanced for Professional Programmers* -
+   <https://wiki.ifs.hsr.ch/CppAdvanced/files/lecture_12_advanced_library_design.pdf> 
+
+** Type Erasure (C++ Specific)
 *** Overview  
 
 Type erasure is a set of techniques for providing an uniform interface
@@ -660,5 +795,3 @@ Compiling and running: (File: [[file:src/design-patterns/type-erasure1.cpp][file
   I am the class B
   I am the class C
 #+END_SRC
-
-
