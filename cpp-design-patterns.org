@@ -814,7 +814,7 @@ Code Example:
   };
 #+END_SRC
 
-** PIMPL - Pointer to Implementation (C++ Specific)
+** PIMPL - Pointer to Implementation (C++ Only)
 
 The PIMPL - Pointer to Implementation idiom, also known as compiler
 firewall, is a widely used technique  in C++ for completly hiding class
@@ -948,7 +948,7 @@ References and further:
  + *Modern and Lucid C++ Advanced for Professional Programmers* -
    <https://wiki.ifs.hsr.ch/CppAdvanced/files/lecture_12_advanced_library_design.pdf> 
 
-** Type Erasure (C++ Specific)
+** Type Erasure (C++ Only)
 *** Overview  
 
 Type erasure is a set of techniques for providing an uniform interface
@@ -1232,5 +1232,255 @@ Compiling and running: (File: [[file:src/design-patterns/type-erasure1.cpp][file
    [FAILURE]Error: cannot cast to this type
   I am the class B
   I am the class C
+#+END_SRC
+** CRTP - Curious Recurring Template Pattern (C++ Only)
+*** Overview 
+
+It is a variation of GOF template design pattern where an algorithm
+defined by the base class is customized or specified by the derived 
+class. However, unlike the GOF one, this version uses C++ template
+metaprogramming for emulating dynamic polymorphism or inheritance
+at compile time. So it makes the code faster by eliminating virtual
+function-calls.
+
+Features: 
+ + Coined by James Coplien - 1995
+ + Static polymorphism technique based on template metaprogramming for
+   speeding up the code eliminating virtual functions.
+
+Use cases:
+ + Reduce virtual function call overhead - by simulating dynamic
+   polymorphism through static polymorphism. 
+ + Implement state machines.
+ + Implement high performance numerical libraries.
+ + Code injection.
+
+Libraries using this pattern:
+ + Boost.Iterator
+ + Boost.Python
+ + Boost.Serialization 
+
+Also known as: 
+ + Code injection
+ + Barton‐Nackman Trick
+ + Mixin - Name used outside C++ community 
+
+*** Example 
+
+ *Approach 1 - GOF - OOP template pattern* 
+
+ - Code 1: GOF Template method design pattern using virtual functions.
+
+ #+BEGIN_SRC cpp 
+   class IntervalSummation{
+   public:
+           // Algorithm or entry point which calls the derived class method.
+           // This is the template method 
+           double summation(int lower, int upper) const{
+                   double sum = 0;
+                   for(int i = lower; i <= upper; i++)
+                           sum += this->stepFn(i);
+                   return sum; 
+           }
+   protected:
+           // Hook method or to be defined by the derived class
+           virtual double stepFn(double x) const = 0 ;
+   };
+
+   class SumOfSquares: public IntervalSummation{
+   private:
+           double stepFn(double x) const { return x * x; }
+   };
+
+   class SumOfCubes: public IntervalSummation{
+   private:
+           double stepFn(double x) const { return x * x * x; }
+   };
+
+   void clientCode(const IntervalSummation& obj){
+           std::cout << "Summation at [0, 15] = " << obj.summation(0, 15) << std::endl;
+   }
+#+END_SRC
+
+  *Approach 2 - CRTP generic programming pattern* 
+
+ - Code 2: Code rewritten using CRTP for eliminating virtual function
+   calls. The advantage is that this code can run faster than the
+   previous one, however the cost is the higher complexity, loss of
+   readability and runtime polymorphism. For instance, now is not
+   possible to store multiple implementations of IntervalSummation in
+   a data structure or refer to them with the same pointer.
+
+File: crtp.cpp 
+
+#+BEGIN_SRC cpp
+  #include <iostream>
+
+  template<class Implementation>
+  class IntervalSummation{
+  public:
+     double summation(int lower, int upper) const {
+        double sum = 0;
+        for(int i = lower; i <= upper; i++)
+           sum += static_cast<Implementation const * const>(this)->stepFn(i);
+        return sum; 
+     }
+  };
+
+  class SumOfSquares: public IntervalSummation<SumOfSquares>{
+  public:
+       double stepFn(double x) const { return x * x; }
+  };
+
+  class SumOfCubes: public IntervalSummation<SumOfCubes>{
+  public:
+      double stepFn(double x) const { return x * x * x; }
+  };
+
+  template<class T>
+  void clientCode(const IntervalSummation<T>& obj){
+      std::cout << "Summation at [0, 15] = " << obj.summation(0, 15) << std::endl;
+  }
+
+  int main(){
+     SumOfSquares sq;
+     SumOfCubes   sc;
+     std::cout << "Sum of squares in [0, 10] = " << sq.summation(0, 10) << std::endl;
+     std::cout << "Sum of cubes   in [0, 10] = " << sc.summation(0, 10)   << std::endl;
+     clientCode(sq);
+     clientCode(sc);
+     return 0;
+  }
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC sh 
+  $ clang++ crtp.cpp -o crtp.bin -std=c++1z -Wall -Wextra  && ./crtp.bin
+  Sum of squares in [0, 10] = 385
+  Sum of cubes   in [0, 10] = 3025
+  Summation at [0, 15] = 1240
+  Summation at [0, 15] = 14400
+#+END_SRC
+
+References: 
+
+ + [[https://www.codeproject.com/Tips/537606/Cplusplus-Prefer-Curiously-Recurring-Template-Patt][C++: Prefer Curiously Recurring Template Pattern (CRTP) to Template Pattern - CodeProject]]
+ + [[https://mklimenko.github.io/english/2018/07/02/platform-dependent-crtp/][CRTP-based platform-dependent optimizations | GNSS C++ solutions]]
+ + http://stevedewhurst.com/once_weakly/once-weakly20170328/once-weakly20170328.pdf
+ + [[http://enki-tech.blogspot.com/2012/08/c11-generic-singleton.html][Enki :: Technical Blog: C++11: A generic Singleton]]
+ + IDENTIFYING PROGRAMMING IDIOMS IN C++ GENERIC LIBRARIES -
+   <https://etd.ohiolink.edu/rws_etd/document/get/kent1259116053/inline>
+ + [[http://www.masaers.com/2014/01/22/CRTP-operator-hijacking.html][Using CRTP to easily hijack operators in c++11 | masaers’ blog]]
+ + https://github.com/nojhan/crtp_functor_ttp
+ + [[https://web.archive.org/web/20060211034709/http://devnet.developerpipeline.com/documents/s=9843/cuj0601diggins/][Developer::Pipelines | Building More Flexible Types with Mixins]]
+ + [[https://accu.org/index.php/journals/296][ACCU :: Better Encapsulation for the Curiously Recurring Template Pattern]]
+ + [[http://www.di.unipi.it/~nids/docs/templates_vs_inheritance.html][Replacing Virtual Methods with Templates]]
+ + http://gsd.web.elte.hu/lectures/bolyai/2018/mixin_crtp/mixin_crtp.pdf
+ + https://faithandbrave.hateblo.jp/entry/20071206/1196934096
+ + [[https://nativecoding.wordpress.com/2015/06/05/virtual-methods-vs-crtp-benchmark-2/][Virtual Methods vs CRTP Benchmark – Native Coding]]
+ + https://nativecoding.wordpress.com/2015/01/11/important-c-idioms/
+ + http://barngoggles.com/visitor-with-crtp/
+
+Best Links: 
+
+ + https://nativecoding.wordpress.com/2015/01/11/important-c-idioms/
+ + https://marcoarena.wordpress.com/2012/04/29/use-crtp-for-polymorphic-chaining/
+ + http://thothonegan.tumblr.com/post/157363120503/crtp-curiously-recurring-template-pattern
+
+Videos: 
+
+ + Curiously Recurring Template Pattern (CRTP) -
+   <https://www.youtube.com/watch?v=C3Pi5GlIfjs>
+
+ + 
+
+ + 
+** Cross platform code with conditional compilation (C++ Only)
+
+Note: It is not a design pattern, but a useful for techinque for
+designing cross platform code in C++.
+
+Macros are useful for writing cross-platform code by hiding and
+isolating platform-specific details, such as specific hardware
+registers address, compiler extensions, APIs and system calls. This
+example shows how to use conditional compilation to write code which
+can be compiled on an Unix-like operating system, such as Linux or OSX
+and Windows.
+
+Example: 
+
+#+BEGIN_SRC cpp 
+  // Scoped enum is used to identify the operating system the code 
+  // was copiled against.
+  enum class SystemType{
+      WindowsNT,
+      Linux,
+      MacOSX,
+      FreeBSD,
+      Unknown
+  };
+
+  /**  Returns the current operating system that the 
+    ,*  library was compiled against.
+  ,*/
+  auto getSystemType() -> SystemType {
+       #ifdef __apple__
+          return SystemType::MacOSX;
+       #elif defined __linux__
+          return SystemType::Linux;
+       #elif defined _WIN32 || defined _WIN64
+         return SystemType::WindowsNT;
+       #else
+         return SystemType::Unknown;
+       #endif
+  }
+
+  auto getOperatingSystem() -> std::string {
+       SystemType type = getSystemType();
+       if (type == SystemType::Linux)
+               return "Linux";
+       else if(type == SystemType::MacOSX)
+               return "MacOSX";
+       else if(type == SystemType::WindowsNT)
+               return "Windows NT";
+       else if(type == SystemType::FreeBSD)
+               return "FreeBSD";
+       else
+               return "Unknown operating system";
+  }
+
+  auto isWindows() -> bool {
+      return getSystemType() == SystemType::WindowsNT;
+  }
+
+  // Check whether is U-N-I-X like 
+  auto isNixLike() -> bool {
+       auto t = getSystemType();
+       return t == SystemType::Linux
+               || t == SystemType::FreeBSD
+               || t == SystemType::MacOSX;
+  }
+
+  /** Cross platform code for creating directory */
+  void makeDirectory(std::string path){
+       #if defined __linux__ || defined __apple__
+      /** ==== U-NIX Specific code ==== */
+          mkdir(path.c_str(), 0777);
+       #elif _WIN32
+      /** ==== Windows Specific Code ==== */
+          CreateDirectoryA(path.c_str(), NULL);
+       #endif
+  }
+
+  /** Get home directory, ~/ or $HOME on Unix or %USERPROFILE% 
+   ,* environment variable on Windows 
+   ,*/
+  std::string getHomeDir(){
+      if (getSystemType() == SystemType::WindowsNT)
+         return getEnv("USERPROFILE");
+       else
+        return getEnv("HOME");
+  }
 #+END_SRC
 
