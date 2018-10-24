@@ -604,6 +604,199 @@ Running:
      email     = wsx752@couk.com.sk
    }
 #+END_SRC
+** Strategy Design Pattern 
+*** Overview  
+
+Intent: A behavioral design pattern from GOF which allows the client
+code to select and change an algorithm encapsulated as an object at
+runtime.
+
+Note: this design pattern is similar to a callback and can be
+simplified with functional programming. 
+
+ *Parts:*
+
+ + _Context_:
+   + Object that has a reference to an strategy objects and sets the
+     strategy at runtime.
+   + Resposibilities:
+     + Set strategy
+     + Change strategy
+     + Invoke strategy
+
+ + _IStrategy_: (Algorithm interface)
+   + Strategt interface define the algorithm operations.
+
+ + _Concrete strategy_.
+   + Strategies objects or implementation of IStrategy class.
+*** Example 
+
+Code: 
+ + File: [[file:src/design-patterns/strategy-pattern1.cpp][file:src/design-patterns/strategy-pattern1.cpp]]
+ + Online Compiler: https://rextester.com/WQO93455
+
+Strategy interface: 
+
+#+BEGIN_SRC cpp 
+  // Strategy interface 
+  struct IStrategy{
+    virtual ~IStrategy(){}
+    // Essential: Algorithm encapsulated by strategy object 
+    virtual auto compute(double x, double y) const -> double = 0;  
+    // Optional: Provides strategy metadata 
+    virtual auto name() const -> const std::string = 0;
+    // Clone this object (Note: This is a virtual constructor)
+    virtual auto clone() const -> IStrategy* = 0;
+  };
+#+END_SRC
+
+Context Class: 
+ - Selects and switch the strategy (aka algorithm).
+
+#+BEGIN_SRC cpp 
+  class Context{
+  private: 
+    std::unique_ptr<IStrategy> _strategy;
+  public:
+    Context()
+      : _strategy{nullptr} { }
+    Context(IStrategy* s)
+      : _strategy{s} { }
+    Context(const IStrategy& s)
+      : _strategy{s.clone()} { }
+    auto setStrategy(IStrategy* s){
+      _strategy.reset(s);
+    }
+    auto setStrategy(const IStrategy& s){
+      _strategy.reset(s.clone());
+    }  
+    auto compute(double x, double y) -> void {
+      if(_strategy == nullptr)
+        std::runtime_error("Error: strategy not set");
+      double result = _strategy->compute(x, y);
+      std::cout << " strategy = " << _strategy->name() << " "
+                << "( x = " << x << " ; "
+                << "y = " << y << " )"
+                << "\n" ;
+      std::cout << "Result = " << result << "\n";
+    }
+  };
+#+END_SRC
+
+Concrete strategies: 
+
+ - add => algorithm which adds two numbers.
+
+#+BEGIN_SRC cpp 
+  class AddStrategy: public IStrategy {
+  public:
+    auto name() const -> const std::string{
+      return "add";
+    }
+    auto compute(double x, double y) const -> double {
+      return x + y;
+    }
+    auto clone() const -> IStrategy* {
+      std::cerr << " [TRACE] AddStrategy => I was cloned" << "\n";
+      return new AddStrategy(*this);
+    }
+  };
+#+END_SRC
+
+ + Multiplication 
+
+#+BEGIN_SRC cpp 
+  struct MulStrategy: public IStrategy {
+  public:
+    auto name() const -> const std::string{
+      return "mul";
+    }  
+    double compute(double x, double y) const {
+      return x + y;
+    }
+    auto clone() const -> IStrategy* {
+      std::cerr << " [TRACE] MulStrategy => I was cloned" << "\n";
+      return new MulStrategy(*this);
+    }  
+  };
+#+END_SRC
+
+ + Linear Combination: 
+
+#+BEGIN_SRC cpp 
+  struct LinearCombStrategy: public IStrategy {
+    double a, b, c;
+    LinearCombStrategy(double a, double b, double c)
+      : a(a), b(b), c(c)
+    {
+    }
+    auto name() const -> const std::string{
+      return "Linear combination a * x + b * y + c";
+    }    
+    auto compute(double x, double y) const -> double{
+      return a * x + b * y + c;
+    }
+    auto clone() const -> IStrategy* {
+      std::cerr << " [TRACE] LinearCombStrategy => I was cloned" << "\n";
+      return new LinearCombStrategy(*this);
+    }  
+  };
+#+END_SRC
+
+Main function: 
+
+#+BEGIN_SRC cpp 
+  Context ctx;
+  std::cout << "==== Strategy = add ====" << "\n";
+  ctx.setStrategy(new AddStrategy);
+  ctx.compute(3.0, 4.0);
+
+  std::cout << "==== Strategy = mul ====" << "\n";
+  ctx.setStrategy(new MulStrategy);
+  ctx.compute(3.0, 4.0);
+
+  std::cout << "==== Strategy = Linear combination ====" << "\n";
+  ctx.setStrategy(new LinearCombStrategy(5, 3, 4));
+  ctx.compute(3.0, 4.0);
+
+  std::cout << "==== Strategy = Linear combination [2] ====" << "\n";
+  auto comb1 = LinearCombStrategy(6.0, 5.0, 10.0);
+  // Copy stack-allocated object comb1 using the virtual constructor
+  ctx.setStrategy(comb1);
+  ctx.compute(5.0, 3.0);  
+
+  std::cout << "==== Strategy = Linear combination [2] ====" << "\n";  
+  // Copy stack-allocated temporary object comb1 using the virtual constructor
+  // clone
+  ctx.setStrategy(LinearCombStrategy{6.0, 5.0, 10.0});
+  ctx.compute(2.0, 6.0);  
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC txt 
+  $ clang++ strategy-pattern1.cpp -o strategy-pattern1.bin -g -std=c++1z -Wall -Wextra 
+  $ ./strategy-pattern1.bin
+  ==== Strategy = add ====
+   strategy = add ( x = 3 ; y = 4 )
+  Result = 7
+  ==== Strategy = mul ====
+   strategy = mul ( x = 3 ; y = 4 )
+  Result = 7
+  ==== Strategy = Linear combination ====
+   strategy = Linear combination a * x + b * y + c ( x = 3 ; y = 4 )
+  Result = 31
+  ==== Strategy = Linear combination [2] ====
+   [TRACE] LinearCombStrategy => I was cloned
+   strategy = Linear combination a * x + b * y + c ( x = 5 ; y = 3 )
+  Result = 55
+  ==== Strategy = Linear combination [2] ====
+   [TRACE] LinearCombStrategy => I was cloned
+   strategy = Linear combination a * x + b * y + c ( x = 2 ; y = 6 )
+  Result = 52
+
+#+END_SRC
+
 ** Method Chaining - Fluent API
 
 #+BEGIN_SRC cpp 
