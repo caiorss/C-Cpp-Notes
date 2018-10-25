@@ -870,7 +870,7 @@ Documentation:
  + [[http://www.cplusplus.com/reference/sstream/][<sstream> - C++ Reference]]
  + [[http://www.cplusplus.com/reference/sstream/stringstream/][stringstream - C++ Reference]]
 
- *Example 1:*
+ *Example 1:* Parse integers from string. 
 
 #+BEGIN_SRC cpp 
   #include <iostream>
@@ -900,9 +900,7 @@ Output:
   x[5] = 440
 #+END_SRC
 
- *Example 2:*
-
-Extract all unique words from a given line: 
+ *Example 2:* Extract all unique words from a given line: 
 
 #+BEGIN_SRC cpp 
   #include <iostream>
@@ -942,6 +940,193 @@ Extract all unique words from a given line:
   words
   >> 
 #+END_SRC
+
+ *Example 3:* Extract lines from string. 
+
+#+BEGIN_SRC cpp 
+  std::string text;
+  text += "C++ => FEM -> Finite Element Methods\n";
+  text += "C++ => High Performance Computing\n";
+  text += "C++ => Monte Carlo Simulations\n";
+
+  >> std::cout << text << "\n";
+  C++ => FEM -> Finite Element Methods
+  C++ => High Performance Computing
+  C++ => Monte Carlo Simulations
+
+  std::deque<std::string> lines;
+  std::string line;
+  // Input Stream                                                                
+  auto is = std::stringstream {text};
+
+  while(std::getline(is, line)) lines.emplace_back(line);
+
+  >> lines
+  { "C++ => FEM -> Finite Element Methods", "C++ => High Performance Computing", "C++ => Monte Carlo Simulations" }
+  >> 
+
+  >> for(const auto& lin: lines) { std::cout << " + line = " << lin << "\n"; }
+   + line = C++ => FEM -> Finite Element Methods
+   + line = C++ => High Performance Computing
+   + line = C++ => Monte Carlo Simulations
+  >> 
+#+END_SRC
+
+Or, putting it all together: 
+
+ + Version: read lines from string 
+
+#+BEGIN_SRC cpp 
+  // Requires: <string> <sstream> and <iostream>                                 
+  auto splitLines1(const std::string& text)
+    -> std::deque<std::string>
+  {
+    auto lines = std::deque<std::string>{};
+    auto line  = std::string{};
+    auto is    = std::stringstream{text};
+    while(std::getline(is, line))
+      lines.emplace_back(line);
+    return lines;
+  }
+
+  std::string text;
+  text += "=> FEM -> Finite Element Methods\n";
+  text += "=> High Performance Computing\n";
+  text += "=> Monte Carlo Simulations\n";
+  text += "=> Global Markets Trends\n";
+  text += "=> Growth forecast survery.\n";
+
+  >> for(const auto& lin: splitLines1(text)) { std::cout << " +=> " << lin << "\n"; }
+   +=> => FEM -> Finite Element Methods
+   +=> => High Performance Computing
+   +=> => Monte Carlo Simulations
+   +=> => Global Markets Trends
+   +=> => Growth forecast survery.
+  >> 
+#+END_SRC
+
+  *Example 4:* Extract lines from input stream. 
+
+ + Read lines from input stream - this second version can read from
+   any sublcass of std::istream, thus, it can also get lines from
+   files and starndard input stream std::cin (console or stdin).
+
+#+BEGIN_SRC cpp 
+  // Read all lines from stram to container Requires: <string> <sstream>
+  // and <iostream>
+  auto splitLines2(std::istream& is) -> std::deque<std::string>
+  {
+    std::cerr << " [INFO] L-value reference."
+    auto lines = std::deque<std::string>{};
+    auto line  = std::string{};
+    while(std::getline(is, line))
+      lines.emplace_back(line);
+    return lines;
+  }
+  // Overload to work with temporary objects (R-values)
+  auto splitLines2(std::istream&& is) -> std::deque<std::string>
+  {
+    std::cerr << " [INFO] R-value reference."
+    auto lines = std::deque<std::string>{};
+    auto line  = std::string{};
+    while(std::getline(is, line))
+      lines.emplace_back(line);
+    return lines;
+  }
+
+#+END_SRC
+
+Running: 
+
+ + Read lines from string
+
+#+BEGIN_SRC cpp 
+  std::string text;
+  text += "=> FEM -> Finite Element Methods\n";
+  text += "=> High Performance Computing\n";
+  text += "=> Monte Carlo Simulations\n";
+  text += "=> Global Markets Trends\n";
+  text += "=> Growth forecast survery.\n";
+
+  auto ss = std::stringstream(text) ;
+
+  // Read from an L-value (object bounded to a memory location)
+  >> auto ss = std::stringstream(text) ;
+  >> auto lines = splitLines2(ss);
+   [INFO] L-value reference.
+
+  >> lines2
+  { "=> FEM -> Finite Element Methods", "=> High Performance Computing", ...}
+  >> 
+
+  // Read from an R-value (temporary object)
+  >> auto lines = splitLines2(std::stringstream(text));
+   [INFO] R-value reference.
+  >> lines
+   { "=> FEM -> Finite Element Methods", "=> High Performance Computing", ...}
+  >> 
+#+END_SRC
+
+ + Read lines from file 
+
+#+BEGIN_SRC cpp 
+  // Read lines from file: 
+  >> res = splitLines2(std::ifstream("/etc/protocols"));
+   [INFO] R-value reference.
+
+  >> res.size()
+  (unsigned long) 162
+  >> 
+
+  >> for(const auto& lin: res) { std::cout << " + line = " << lin << "\n";}
+   + line = # /etc/protocols:
+   + line = # $Id: protocols,v 1.12 2016/07/08 12:27 ovasik Exp $
+   + line = #
+   + line = # Internet (IP) protocols
+   + line = #
+   + line = #	from: @(#)protocols	5.1 (Berkeley) 4/17/89
+   + line = #
+   + line = # Updated for NetBSD based on RFC 1340, Assigned Numbers (July 1992).
+   + line = # Last IANA update included dated 2011-05-03
+   + line = #
+     ... ... ... ... .... 
+#+END_SRC
+
+ + Read lines from console 
+
+#+BEGIN_SRC cpp 
+  // Type CTRL + D (Send EOF - End Of File) when you done:
+  >> auto res2 = splitLines2(std::cin);
+   [INFO] L-value reference.
+  hello world
+  c++ C++11 is awesome
+  C++17 is amazing
+  C++20 RULEZ! High peformance technical computing
+    Monte Carlo Methods
+    High Energy Physics
+    Electronic Engineering - Embedded Processors    
+  >> 
+
+  >> res2
+   { "hello world", "c++ C++11 is awesome", "C++17 is amazing", ...}
+  >> 
+
+  >> auto res2copy = std::vector<std::string>(res2.begin(), res2.end())
+   { "hello world", "c++ C++11 is awesome", "C++17 is amazing", ...}
+  >> 
+
+  >> for(const auto& lin: res2){ std::cout << " [+] line = " << lin << "\n";}
+   [+] line = hello world
+   [+] line = c++ C++11 is awesome
+   [+] line = C++17 is amazing
+   [+] line = C++20 RULEZ! High peformance technical computing
+   [+] line =   Monte Carlo Methods
+   [+] line =   High Energy Physics
+   [+] line =   Electronic Engineering - Embedded Processors
+  >> 
+
+#+END_SRC
+
 
 
 ** Value Semantics X Reference Semantics 
@@ -3644,7 +3829,6 @@ Running:
    Disconnecting from generic driver - id = unknown
 
  #+END_SRC
-
 
 *** STL containers and polymorphism 
 
