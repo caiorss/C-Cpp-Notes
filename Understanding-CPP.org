@@ -3699,7 +3699,497 @@ Running:
     *new* operator. Functions like this are called factory functions and
     in this case, it is better to wrap the pointer in smart pointer,
     ~unique_ptr~ or ~shared_ptr~.
-*** Dynamic Polymorphism example 
+*** OOP - Dynamic Polymorphism in deep
+
+ + File: [[file:src/polymorphism1.C][file:src/polymorphism1.C]] (CLING - Script)
+
+Classes in the script [[file:src/polymorphism1.C][file:src/polymorphism1.C]]
+
+#+BEGIN_SRC cpp 
+  class Base{
+  public:
+     Base(){}
+     // Copy constructor
+     Base(const Base& rhs){
+         std::cerr << " [TRACE] " << __FILE__ << ":" << __LINE__ << " "
+                   << " Base copy constructor invoked." << "\n";
+     }
+     // Copy assignment operator
+     Base& operator= (const Base& rhs){
+          std::cerr << " [TRACE] " << __FILE__ << ":" << __LINE__ << " " 
+                    << " Base copy assignment operator invoked." << "\n";
+          return *this;
+     }
+     // The base class always need a virtual
+     // destructor 
+     virtual ~Base() = default;	
+
+     virtual std::string getType() const {
+        return "Base";
+     }	
+     std::string getType2() const {
+        return "Base";
+     }
+     void showType(){
+        // OR: std::cout << "Class type = " << getType() << "\n";
+        std::cout << "Class type = " << this->getType() << "\n";
+     }
+  };
+
+  class DerivedA: public Base{
+  public:
+      DerivedA(){}
+      std::string getType() const {
+         return "DerivedA";
+      }
+      std::string getType2() const {
+         return "DerivedA";
+      }		
+  };
+
+  class DerivedB: public Base{
+  public:
+     DerivedB(){}
+     std::string getType() const {
+        return "DerivedB";
+     }
+     std::string getType2() const {
+        return "DerivedB";
+     }		
+  };
+#+END_SRC
+
+
+Load classes from script and create instances.
+
+#+BEGIN_SRC cpp 
+  >> .L polymorphism1.C
+  Base base;
+  DerivedA da;
+  DerivedB db;
+#+END_SRC
+
+ *Testing methods:*
+
+#+BEGIN_SRC cpp 
+  // Test method getType
+  >> base.getType()
+  (std::string) "Base"
+
+  >> da.getType()
+  (std::string) "DerivedA"
+
+  >> db.getType()
+  (std::string) "DerivedB"
+  >> 
+
+  // Test method get
+  >> base.showType()
+  Class type = Base
+  >> da.showType()
+  Class type = DerivedA
+  >> db.showType()
+  Class type = DerivedB
+  >> 
+#+END_SRC
+
+ *Testing object slicing on assingment by value*
+
+ - Object: slicing => Happens when the an object of derived class is
+   assigned to a base class object, the virtual methods overridden in
+   the derived class are sliced off from the derived class. As a
+   result, any method call performed by the assigned object will call
+   the method base version, instead of the method overridden by the
+   derived class.
+   - Summary: An object loses its polymorphic abilities when assigned
+     by value.
+ - Note: assignment in C++, is different from assignment in Java and
+   other OO languages. In C++, the assignment copies the object from
+   right side to the assigned object discarding all previous state
+   from the assigned object. In Java and other OO languages, the
+   assignment copies the reference (pointer) from the right-hand side
+   object to the left-hand side object, thus the assigned object
+   becomes an alias or mirror to right-hand side object.
+
+#+BEGIN_SRC cpp 
+  >> base = da
+   [TRACE] polymorphism1.C:19  Base copy assignment operator invoked.
+  (Base &) @0x7f9882578010
+  >> 
+  // It should print "DerivedA", however due to object slicing, it prints "Base"
+  >> base.getType()
+  (std::string) "Base"
+
+  >> base.showType()
+  Class type = Base
+  >> 
+  >> 
+
+  >> da.getType()
+  (std::string) "DerivedA"
+  >> da.showType()
+  Class type = DerivedA
+#+END_SRC
+
+ *Assignment by pointer*
+
+The solution for avoiding object slicing on assignment is to assign by
+pointer instead of assigning by value.
+
+#+BEGIN_SRC cpp 
+  >> Base* p = nullptr;
+
+  // Point to object base ------------------------------------
+  >> p = &base;
+  >> p->getType()
+  (std::string) "Base"
+  >> p->getType2()
+  (std::string) "Base"
+  >> p->showType()
+  Class type = Base
+  >> 
+
+  // Point to object da (class DerivedA)
+  //------------------------------------
+  >> p = &da;
+  >> p->getType()
+  (std::string) "DerivedA"
+  // Note: overriding doesn't work because getType2() is annotated as virtual· 
+  >> p->getType2()
+  (std::string) "Base"
+  >> p->showType()
+  Class type = DerivedA
+  >> 
+
+  // Point to object da (class DerivedB)
+  //------------------------------------
+  >> p = &db;
+  >> p->getType()
+  (std::string) "DerivedB"
+  >> p->getType2()
+  (std::string) "Base"
+  >> p->showType()
+  Class type = DerivedB
+  >> 
+#+END_SRC
+
+ *Assigning by reference*
+
+Another solution for keeping the polymorphic behavior and avoid object
+slicing is using references. 
+ + Note: Unlike pointers, references cannot be reassigned once they
+   are created. 
+
+#+BEGIN_SRC cpp 
+  >> Base& refb = base;
+
+  >> refb.getType()
+  (std::string) "Base"
+
+  >> refb.getType2()
+  (std::string) "Base"
+
+  >> refb.showType()
+  Class type = Base
+  >> 
+
+  // Failure: object slicing!
+  >> refb = da;
+   [TRACE] polymorphism1.C:19  Base copy assignment operator invoked.
+  >> 
+  >> refb.getType()
+  (std::string) "Base"
+  >> refb.showType()
+  Class type = Base
+  >> 
+
+  // Now, it works.
+  >> Base& refda = da;
+  >> refda.getType()
+  (std::string) "DerivedA"
+  >> refda.getType()
+  (std::string) "DerivedA"
+  >> refda.showType()
+  Class type = DerivedA
+  >> refda.getType2()
+  (std::string) "Base"
+#+END_SRC
+
+ *Passing by value*
+
+Testing object slicing on passing parameters by value: 
+ + Object slicing also happens when objects are passed by value. 
+
+#+BEGIN_SRC cpp 
+  void printClassNameValue(Base obj){
+       std::cout << "Object type is: " << obj.getType() << "\n";
+  }
+
+  >> printClassNameValue(base)
+   [TRACE] polymorphism1.C:13  Base copy constructor invoked.
+  Object type is: Base
+  >> 
+  // Should print Object type is: DerivedA 
+  >> printClassNameValue(da)
+   [TRACE] polymorphism1.C:13  Base copy constructor invoked.
+  Object type is: Base
+  >> 
+  // Should print Object type is: DerivedB 
+  >> printClassNameValue(db)
+   [TRACE] polymorphism1.C:13  Base copy constructor invoked.
+  Object type is: Base
+  >> 
+#+END_SRC
+
+ *Passing by Pointer*
+
+The solution for avoiding *object slicing* is passing objects by pointer
+or reference:
+
+#+BEGIN_SRC cpp
+  // Pass by pointer => Object slicling doesn't happen.
+  void printClassNamePtr(const Base* obj){
+       std::cout << "Object type is: " << obj->getType() << "\n";
+  }
+
+  >> printClassNamePtr(&base)
+  Object type is: Base
+
+  >> printClassNamePtr(&da)
+  Object type is: DerivedA
+
+  >> printClassNamePtr(&db)
+  Object type is: DerivedB
+  >> 
+  >> Base* ptr = nullptr;
+  >> ptr = &da;
+  >> printClassNamePtr(ptr)
+  Object type is: DerivedA
+  >> 
+  >> ptr = &db;
+  >> printClassNamePtr(ptr)
+  Object type is: DerivedB
+  >> 
+
+#+END_SRC
+
+ *Passing by Reference*
+
+ + Passing by reference
+   + Note: In most object oriented languages, objects are passed by
+     reference by default, unlike C++ where objects are passed by
+     value.
+
+#+BEGIN_SRC cpp 
+  void printClassNameRef(const Base& obj){
+       std::cout << "Object type is: " << obj.getType() << "\n";
+  }
+
+  >> printClassNameRef(base)
+  Object type is: Base
+
+  >> printClassNameRef(da)
+  Object type is: DerivedA
+
+  >> printClassNameRef(db)
+  Object type is: DerivedB
+  >> 
+#+END_SRC
+
+ *Factory function:*
+
+ + A factory function returns any instance of any derived class of a
+   given base class. 
+
+Object slicing also happens when polymorphic types are returned by
+value: 
+
+#+BEGIN_SRC cpp 
+  // This factory functon will fail due to object slicing 
+  Base factoryFunctionValue(const std::string& type){
+       if(type == "base")
+               return Base();
+       if(type == "da")
+               return DerivedA();
+       if(type == "db")
+               return DerivedB();
+       throw std::runtime_error("Error: class type not found.");
+  }
+
+  >> Base rbase = factoryFunctionValue("base")
+  (Base &) @0x7f9882578038
+  >> rbase.getType()
+  (std::string) "Base"
+  >> rbase.showType()
+  Class type = Base
+  >> 
+
+  >> Base rda = factoryFunctionValue("da")
+   [TRACE]/home/archbox/root-scripts/polymorphism1.C:13  Base copy constructor invoked.
+  (Base &) @0x7f9882578040
+
+  // Fails! It should return derivedA 
+  >> rda.getType()
+  (std::string) "Base"
+  >> rda.showType()
+  Class type = Base
+  >> 
+#+END_SRC
+
+An workaround to the object slicing problem could be returning by
+reference. However, this approach doesn't work because the function
+_factoryFunctionRef_ returns a reference to the object p allocated on
+the stack which is destroyed when the function returns, thus any
+attempt to use this returned reference a destroyed object will result
+in segmentation fault.
+
+#+BEGIN_SRC cpp 
+   // This factory functon will fail due to object slicing 
+  Base& factoryFunctionRef(const std::string& type){
+       Base p;
+       if(type == "base")
+          p = Base();
+       else if(type == "da")
+          p = DerivedA();
+       else if(type == "db")
+          p = DerivedB();
+       else throw std::runtime_error("Error: class type not found.");
+       return p;
+  }
+
+  >> Base& retda2 = factoryFunctionRef("da");
+   [TRACE]/home/archbox/root-scripts/polymorphism1.C:19  Base copy assignment operator invoked.
+  >> retda2.getType()
+
+   ,*** Break *** segmentation violation
+
+#+END_SRC
+
+An alternative approach is to return a pointer an object allocated on
+the heap. 
+
+#+BEGIN_SRC cpp 
+  Base* factoryFunctionRawPointer(const std::string& type){
+        if(type == "base")
+           return new Base();
+        else if(type == "da")
+           return new DerivedA();
+        if(type == "db")
+           return new DerivedB();
+        return nullptr;
+  }
+
+  // Instantiate of class Base
+  //--------------------------------
+  >> Base* ptr_base1 = factoryFunctionRawPointer("base")
+  (Base *) 0x2564130
+  >> ptr_base1->getType()
+  (std::string) "Base"
+  >> ptr_base1->getType2()
+  (std::string) "Base"
+  >> ptr_base1->showType()
+  Class type = Base
+  >> 
+  // 
+
+  // Every heap-allocated object must be disposed when no longer 
+  // needed by calling the operator delete. 
+  >> delete ptr_base1 ;
+  // It is advisable to set the pointer of disposed heap-allocated
+  // object to null.
+  >> ptr_base1 = nullptr;
+  >> 
+
+  // Instantiate of class DerivedA 
+  //--------------------------------
+  >> Base* ptr_da = factoryFunctionRawPointer("da")
+  (Base *) 0x334e4c0
+
+  >> ptr_da->getType()
+  (std::string) "DerivedA"
+
+  >> ptr_da->getType2()
+  (std::string) "Base"
+
+  >> ptr_da->showType()
+  Class type = DerivedA
+  >> 
+
+  >> delete ptr_da;
+  >> ptr_da = nullptr;
+  >> 
+#+END_SRC
+
+ *Safer Factory Function with smart pointers*
+
+The factory function factoryFunctionRawPointer is vulnerable to memory
+leaks since it returns a raw pointer to a heap-allocated object which
+needs to be disposed with the operator delete once the object is no
+longer needed. However it is easy to forget to call delete and to
+track all possible return paths and objects needing this pointer. A
+solution to this problem is to use smart pointers, which are
+stack-allocated objects that delete the pointed objects when the the
+they go out of scope. It is possible to use ~unique_ptr~ which is only
+movable and not copiable or ~shared_ptr~ which is copiable. 
+
+#+BEGIN_SRC cpp 
+  // Requires header: <memory>
+  std::unique_ptr<Base> 
+  factoryFunctionSafe(const std::string& type){
+      if(type == "base")
+         return std::make_unique<Base>();
+      else if(type == "da")
+         return std::make_unique<DerivedA>();
+      if(type == "db")
+         return std::make_unique<DerivedB>();
+      return nullptr;
+  }
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC cpp 
+  >> auto uptr_base = factoryFunctionSafe("base");
+
+  >> uptr_base
+  (std::unique_ptr<Base, std::default_delete<Base> > &) @0x7f9882578088
+
+  >> uptr_base->getType()
+  (std::string) "Base"
+
+  >> uptr_base->showType()
+  Class type = Base
+
+
+  >> auto uptr_da = factoryFunctionSafe("da");
+
+  >> uptr_da->getType()
+  (std::string) "DerivedA"
+
+  >> uptr_da->getType2()
+  (std::string) "Base"
+
+  >> uptr_da->showType()
+  Class type = DerivedA
+#+END_SRC
+
+ *Summary:* 
+
+ + An object loses its polymorphic abilities if assigned by value,
+   passed by value or returned by value. It is called *object slicing*. 
+
+ + In C++, polymorphism only works when objects are assigned by
+   pointer or reference or when passed by pointer or reference.
+   + *Polymorphism (dynamic) only works with references or pointers.*
+
+ + Methods, aka member functions not annotated as virtual cannot be
+   overridden by derived classes.
+
+ + The only way to return polymorphic objects from functions is to
+   return pointers (prone to memory leaks) or smart-pointers (safer)
+   to heap-allocated objects.
+
+*** Dynamic Polymorphism example - code 
 
  File: polymorphism.cpp 
 
