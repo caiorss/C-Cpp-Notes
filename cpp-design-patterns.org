@@ -820,11 +820,24 @@ Output:
           ... ... 
           return *this;
       }   
+     
+      // Method / member function declaration, the implemention is in a different file.
+      CharacterSuperMutant& CharacterSuperMutant::setPosition(double x, double y, double z);
+
+      // C++11 
+      auto CharacterSuperMutant::setStamina(double x, double y, double z) -> CharacterSuperMutant&;
   };
 
+  // Example: Method implemented separated from class declaration in .cpp file.
   CharacterSuperMutant& CharacterSuperMutant::setPosition(double x, double y, double z){
-          m_x = x; m_y = y; m_z  = z;
-          return *this;
+      m_x = x; m_y = y; m_z  = z;
+      return *this;
+  }
+
+  // C++11 auto syntax 
+  auto CharacterSuperMutant::setStamina(double x, double y, double z) -> CharacterSuperMutant& {
+      // ... ... ... 
+      return *this;
   }
 
 #+END_SRC
@@ -1499,53 +1512,51 @@ Also known as:
 
   *Approach 2 - CRTP generic programming pattern* 
 
- - Code 2: Code rewritten using CRTP for eliminating virtual function
+ + Code 2: Code rewritten using CRTP for eliminating virtual function
    calls. The advantage is that this code can run faster than the
    previous one, however the cost is the higher complexity, loss of
    readability and runtime polymorphism. For instance, now is not
    possible to store multiple implementations of IntervalSummation in
    a data structure or refer to them with the same pointer.
 
-File: crtp.cpp 
+ + File: [[file:src/design-patterns/crtp1.cpp][file:src/design-patterns/crtp1.cpp]]
+ + Online Compiler: https://rextester.com/ZLZH2040
 
-#+BEGIN_SRC cpp
-  #include <iostream>
-
+#+BEGIN_SRC cpp 
   template<class Implementation>
   class IntervalSummation{
   public:
-     double summation(int lower, int upper) const {
-        double sum = 0;
-        for(int i = lower; i <= upper; i++)
-           sum += static_cast<Implementation const * const>(this)->stepFn(i);
-        return sum; 
-     }
+          // Get reference to implementation 
+          Implementation& self(){
+                  return *static_cast<Implementation*>(this);
+          }
+          // Overload method 
+          const Implementation& self() const {
+                  return *static_cast<Implementation const * const>(this);
+          } 	
+          double summation(int lower, int upper) const {
+          double sum = 0;
+          for(int i = lower; i <= upper; i++)
+                sum += self().stepFn(i);
+          return sum; 
+          }
   };
 
   class SumOfSquares: public IntervalSummation<SumOfSquares>{
   public:
-       double stepFn(double x) const { return x * x; }
+          double stepFn(double x) const { return x * x; }
   };
 
   class SumOfCubes: public IntervalSummation<SumOfCubes>{
   public:
-      double stepFn(double x) const { return x * x * x; }
+          double stepFn(double x) const { return x * x * x; }
   };
 
   template<class T>
   void clientCode(const IntervalSummation<T>& obj){
-      std::cout << "Summation at [0, 15] = " << obj.summation(0, 15) << std::endl;
+          std::cout << "Summation at [0, 15] = " << obj.summation(0, 15) << std::endl;
   }
 
-  int main(){
-     SumOfSquares sq;
-     SumOfCubes   sc;
-     std::cout << "Sum of squares in [0, 10] = " << sq.summation(0, 10) << std::endl;
-     std::cout << "Sum of cubes   in [0, 10] = " << sc.summation(0, 10)   << std::endl;
-     clientCode(sq);
-     clientCode(sc);
-     return 0;
-  }
 #+END_SRC
 
 Running: 
