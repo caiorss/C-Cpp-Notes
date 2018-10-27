@@ -4183,6 +4183,126 @@ Running:
   Class type = DerivedA
 #+END_SRC
 
+ *STL Containers and Polymorphic Types* 
+
+ + Storing by value => Leads to object slicing. 
+
+#+BEGIN_SRC cpp 
+  // NOTE: Objects base, da and db are copied to the vector, not stored in the vector.
+  >>  std::vector<Base> objlist = {base, da, db};
+   [TRACE] polymorphism1.C:13  Base copy constructor invoked.
+   [TRACE] polymorphism1.C:13  Base copy constructor invoked.
+   [TRACE] polymorphism1.C:13  Base copy constructor invoked.
+   [TRACE] polymorphism1.C:13  Base copy constructor invoked.
+   [TRACE] polymorphism1.C:13  Base copy constructor invoked.
+   [TRACE] polymorphism1.C:13  Base copy constructor invoked.
+
+   >> objlist[0].getType()
+   (std::string) "Base"
+   // Expected DerivedA 
+   >> objlist[1].getType()
+   (std::string) "Base"
+   // Expected DerivedB
+   >> objlist[2].getType()
+   (std::string) "Base"
+   >> 
+
+   // Objects stored in the vector don't have 
+   // the same memory location as the following objects.
+   >> &objlist[0] == &base
+   (bool) false
+   >> &objlist[1] == &da
+   (bool) false
+   >> &objlist[2] == &db
+   (bool) false
+   >> 
+#+END_SRC
+ 
+ + Storing by Pointer => Object Slicing does not happen. 
+
+#+BEGIN_SRC cpp 
+  >> auto objects = std::deque<Base*>{}
+  (std::deque<Base *, std::allocator<Base *> > &) {}
+  >> objects.push_back(&base)
+  >> objects.push_back(&da)
+  >> objects.push_back(&db)
+
+  >> for(const auto& e : objects) { std::cout << "type = " << e->getType() << "\n";}
+  type = Base
+  type = DerivedA
+  type = DerivedB
+  >> 
+
+  >> 
+  >> objects[0]->getType()
+  (std::string) "Base"
+  >> objects[0]->showType()
+  Class type = Base
+
+  >> objects[1]->getType()
+  (std::string) "DerivedA"
+  >> objects[1]->showType()
+  Class type = DerivedA
+
+  >> objects[2]->getType()
+  (std::string) "DerivedB"
+  >> objects[2]->showType()
+  Class type = DerivedB
+  >> 
+#+END_SRC
+
+ + Storing by Reference (Since C++11 with reference wrapper) => Object
+   Slicing does not happen.
+   + See: [[https://en.cppreference.com/w/cpp/utility/functional/reference_wrapper][std::reference_wrapper]]
+   + Requires: C++11 and header <functional>
+
+#+BEGIN_SRC cpp 
+  #include <functional> // Provides: std::reference_wrapper
+
+  // DOES NOT WORK: Ugly, cryptic and verbose  error!! 
+  >> std::vector<Base&> objRef;
+    18: error: 'pointer' declared as a pointer to a reference of type 'Base &'
+         typedef _Tp*       pointer;
+
+  // Header: 
+  >> std::vector<std::reference_wrapper<Base>> objRef;
+  >> auto objRefList = std::vector<std::reference_wrapper<Base>>{};
+
+  >> objRefList.push_back(base)
+  >> objRefList.push_back(da)
+  >> objRefList.push_back(db)
+
+  >> objRefList[0].get()
+  (Base &) @0x7f3604aa6010
+
+  >> objRefList[0].get().getType()
+  (std::string) "Base"
+
+  >> objRefList[1].get().getType()
+  (std::string) "DerivedA"
+
+  >> objRefList[2].get().getType()
+  (std::string) "DerivedB"
+  >> 
+
+  >> for(const auto& p: objRefList){ std::cout << "type = " << p.get().getType() << "\n";}
+  type = Base
+  type = DerivedA
+  type = DerivedB
+  >> 
+
+  // Check whether objects stored in the vector were not copied.
+  >> &objRefList[0].get() == &base
+  (bool) true
+  >> &objRefList[1].get() == &da
+  (bool) true
+  >> &objRefList[2].get() == &db
+  (bool) true
+  >> 
+#+END_SRC
+
+
+
  *Summary:* 
 
  + An object loses its polymorphic abilities if assigned by value,
