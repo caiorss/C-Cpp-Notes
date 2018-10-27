@@ -4301,12 +4301,80 @@ Running:
   >> 
 #+END_SRC
 
+ + Storing objects heap-allocated objects (aka free store or dynamic memory)
+   * Requires: C++11 + header <memory> which provides smart pointers.
+   * See: [[http://www.cplusplus.com/reference/memory/][<memory>]]
+   * In order to avoid memory leaks, it is better to store
+     heap-allocated objects in STL containers using smart pointers as
+     they delete the allocated objects when out of scope or an
+     exception happens (RAII). If raw pointers were used, the heap
+     allocated-objects would not be disposed automatically without the
+     _delete_ operator, as a result, a memory leak could happen.
+   * Note: this example assumes single ownership of the allocated
+     objects, in other words, only the container is responsible for
+     deleting the objects. So, shared_ptr is a better option when
+     multiple ownership is required, 
 
+#+BEGIN_SRC cpp 
+  #include <functional>
+  #include <memory>
+  // Custom deleter type alias 
+  using Deleter = std::function<void (Base*)>;
+
+  // Type synonym for unique_ptr which manages objects 
+  // from class Base and its classes.
+  //-----------------------------------
+  // To use without the custom delter: 
+  // using Ubase = std::unique_ptr<Base>;
+  using Ubase = std::unique_ptr<Base, Deleter>;
+
+  // Custom deleter used for logging 
+  // and demonstrate what the smart pointer does.
+  auto deleter = [](Base* b){
+    std::cerr << " [TRACE] Deleted  object of type = " << b->getType() << "\n";
+    delete b;
+  };
+
+  auto xlist = std::deque<Ubase>{};
+  xlist.emplace_back(new Base, deleter)
+  xlist.emplace_back(new DerivedA, deleter)
+  xlist.emplace_back(new DerivedB, deleter)
+
+  >> xlist[0]->getType()
+  (std::string) "Base"
+
+  >> xlist[1]->getType()
+  (std::string) "DerivedA"
+
+  >> xlist[2]->getType()
+  (std::string) "DerivedB"
+  >> 
+
+  >> for(int i = 0; i < xlist.size(); i++) { std::cout << "type = " << xlist[i]->getType() << "\n";}
+  type = Base
+  type = DerivedA
+  type = DerivedB
+  >> 
+
+  >> xlist.clear()
+   [TRACE] Deleted  object of type = Base
+   [TRACE] Deleted  object of type = DerivedA
+   [TRACE] Deleted  object of type = DerivedB
+  >> 
+
+  >> xlist.size()
+  (unsigned long) 0
+  >> 
+#+END_SRC
 
  *Summary:* 
 
  + An object loses its polymorphic abilities if assigned by value,
-   passed by value or returned by value. It is called *object slicing*. 
+   passed by value or returned by value. It is called *object slicing*.
+
+ + Polymorphic types cannot be stored by value in STL containers due
+   to object slicing. The only way to store them is by pointer or
+   reference. 
 
  + In C++, polymorphism only works when objects are assigned by
    pointer or reference or when passed by pointer or reference.
