@@ -730,7 +730,115 @@ Operators:
 | Insertion Operator  | <<       | std::ostream / Output | std::cout, std::cerr, std::ofstream         |
 | Extraction Operator | >>       | std::istream / Input  | std::cin, std::ifstream, std::sstringstream |
 |---------------------+----------+-----------------------+---------------------------------------------|
-*** Examples in ROOT/CLING REPL
+*** Example - Old C-IO functions 
+
+Sometimes the old C-IO functions such as printf, puts and perror may
+be convenient due to its simplicity and less verbosity.
+
+ + Header: [[https://en.cppreference.com/w/cpp/header/cstdio][<cstdio>]]
+
+Functions puts, perror 
+
+#+BEGIN_SRC cpp 
+  // C++ header equivalent to C <stdio.h>
+  #include <cstdio>
+  #include <string>
+
+  // Print to STDOUT (cout)
+  >> std::puts(" => System programming.");
+   => System programming.
+
+  // Print to STDERR (cerr)
+  >> std::perror(" => Print error and logging to stderr.");
+   => Print error and logging to stderr.: No such file or directory
+
+
+  // Write to file (disk file, or pseudo-files such as stderr or stdout)
+  // U-nix where C comes from see everything as files. 
+
+  >> std::fputs("Hello world\n", stdout);
+  Hello world
+  >> std::fputs("Hello world\n", stderr);
+  Hello world
+  >> 
+
+#+END_SRC
+
+Functions puts, perror and fputs with C++ strings 
+
+#+BEGIN_SRC cpp 
+  >> std::string text;
+  >> text = "Hello world C-IO facilities\n";
+
+  // Failure => Cannot print C++ string, only const char 
+  >> std::puts(text);
+  ROOT_prompt_5:1:11: error: no viable conversion from 'std::string' ...
+
+  >> std::puts(text.c_str());
+  Hello world C-IO facilities
+
+  >> std::perror(text.c_str());
+  Hello world C-IO facilities
+
+#+END_SRC
+
+Old C-printf and fprintf 
+
+#+BEGIN_SRC cpp  
+   #include <cstdio>
+   #include <cmath>
+
+   >> std::printf("The value of pi is equal to: %.4f\n", M_PI);
+   The value of pi is equal to: 3.1416
+
+   >> std::printf("The value of pi is equal to: %.5f\n", M_PI);
+   The value of pi is equal to: 3.14159
+   >> 
+   >> std::fprintf(stdout, "The value of pi is equal to: %.5f\n", M_PI);
+   The value of pi is equal to: 3.14159
+   >> 
+   >> std::fprintf(stderr, "The value of pi is equal to: %.5f\n", M_PI);
+   The value of pi is equal to: 3.14159
+   >> 
+
+   std:string userName = "Julius Caesar";
+   int points = 200;
+
+   >> std::printf(" => User = '%s' ; Points = %d\n", userName.c_str(), points);
+    => User = 'Julius Caesar' ; Points = 200
+
+   >> std::fprintf(stdout, " => User = '%s' ; Points = %d\n", userName.c_str(), points) 
+    => User = 'Julius Caesar' ; Points = 200
+
+   >> std::fprintf(stderr, " => User = '%s' ; Points = %d\n", userName.c_str(), points) 
+    => User = 'Julius Caesar' ; Points = 200
+   >> 
+#+END_SRC
+
+Printf is not type safe: 
+
+ + It is easy to get a segmentation fault and runtime crash if the
+   printf arguments are not correct. Another problem is that the
+   compiler cannot give any help to catch this bug.
+ + See:
+   + [[http://www.zverovich.net/2015/02/26/comparison-of-cppformat-and-printf.html][Comparison of C++ Format and C library's printf]]
+   + [[https://stackoverflow.com/questions/17789396/how-cout-is-more-typesafe-than-printf][c++ - How cout is more typesafe than printf() - Stack Overflow]]
+
+#+BEGIN_SRC cpp 
+   std:string userName = "Julius Caesar";
+   int points = 200;
+
+   >> std::printf("User = '%s' ; Points = %d\n", points, userName.c_str());
+   *** Break *** segmentation violation
+
+   // Expected "c-string" (const char*) but provided int
+   >> std::printf("%s\n", 100);
+   *** Break *** segmentation violation
+#+END_SRC
+
+
+
+*** Example - Reading from Console
 
  *Reading a single variable from console (stdin):*
 
