@@ -1378,7 +1378,6 @@ Reverse string:
 #+END_SRC
 
 
-
 *** Numerical Parsers Functions (C++11)
 
 Header: <string> 
@@ -2122,6 +2121,108 @@ Encapsulating into a function:
   (std::deque<std::string>) { "", "ey  value=" }
   >> 
 #+END_SRC
+*** Parse comma separated value - CSV row 
+
+Note: the following CSV parser functions fails for heterogeneous data
+or when there are quotes characters. It is better to use a proper CSV
+parser library as CSV is not a standardized data exchange format and
+has lots of tricky edge cases.
+
+ + Example: Simple CSV line parser. 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <vector>
+  #include <string>
+  #include <sstream>
+
+  std::vector<double> parseCSVRow(const std::string& line, char delim = ','){
+    auto out   = std::vector<double>{};
+    auto token = std::string{};
+    auto ss    = std::stringstream{line};
+    while(std::getline(ss, token, delim)){
+      out.push_back(std::stod(token));
+    }
+    return out;
+  }
+#+END_SRC
+
+Testing: 
+
+#+BEGIN_SRC cpp 
+  std::string raw_data = "100,   200,  400, -100.23, 60.23, 90.32";
+
+  >> parseCSVRow(raw_data)
+  (std::vector<double>) { 100.00000, 200.00000, 400.00000, -100.23000, 60.230000, 90.320000 }
+  >> auto xs = parseCSVRow(raw_data);
+  >> xs[0]
+  (double) 100.00000
+  >> xs[1]
+  (double) 200.00000
+  >> xs[2]
+  (double) 400.00000
+  >> xs[3]
+  (double) -100.23000
+  >> 
+#+END_SRC
+
+ + Example: Generic CSV line Parser. 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <vector>
+  #include <string>
+  #include <sstream>
+
+  template<class Type = double>
+  std::vector<Type> parseCSVRowGeneric(const std::string& line,
+                                       char delim = ','
+                                       ){
+    auto out   = std::vector<Type>{};
+    auto token = std::string{};
+    auto ss    = std::stringstream{line};
+    auto is    = std::stringstream{};
+    Type value{};
+    while(std::getline(ss, token, delim)){
+      // Clear error flags                                                                                                                              
+      is.clear();
+      // Set is stream value to token                                                                                                                   
+      is.str(token);
+      // Extract from 'is' stream                                                                                                                       
+      is >> value;
+      out.push_back(value);
+    }
+    return out;
+  }
+#+END_SRC
+
+Testing: 
+
+#+BEGIN_SRC cpp 
+  // Test data
+  std::string lineB = "2002.23, 434.34, 90.23, -23.23, 1e3";
+  std::string lineC = "100; 200; 300; 150; 500; 600";
+  std::string lineD = "Apple: oranges : juice beans : rice";
+
+  >> parseCSVRowGeneric(lineB)
+  (std::vector<double>) { 2002.2300, 434.34000, 90.230000, -23.230000, 1000.0000 }
+
+  >> parseCSVRowGeneric<>(lineB)
+  (std::vector<double>) { 2002.2300, 434.34000, 90.230000, -23.230000, 1000.0000 }
+  >> 
+
+  >> parseCSVRowGeneric<double>(lineB, ',')
+  (std::vector<double>) { 2002.2300, 434.34000, 90.230000, -23.230000, 1000.0000 }
+  >> 
+
+  >> parseCSVRowGeneric<int>(lineC, ';')
+  (std::vector<int>) { 100, 200, 300, 150, 500, 600 }
+  >> 
+
+  >> parseCSVRowGeneric<std::string>(lineD, ':')
+  { "Apple", "oranges", "juice", "rice" }
+#+END_SRC
+
 ** C++11 - Uniform Initialization
 
 The C++11 uniform initialization feature allows classes, STL
