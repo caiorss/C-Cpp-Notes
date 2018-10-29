@@ -30,14 +30,17 @@ programming languages are:
  + Direct Access to Memory which is important on embedded systems for
    accessing memory-mapped IO devices.
 
- + Perfomance-friendly language, C++ has many features which can help
+ + Perfomance-friendly language: C++ has many features which can help
    get the maximum performance as possible from the hardware:
    + Strong static typing 
    + Inline functions
    + Templates
+   + Inline-assembly -> The inline-assembly support is compiler
+     specific and not required by the standard. Assembly is also
+     processor-specific and not protable.
    + Pointers 
    + Compiler optmizations
-   + Lots of standard data structures (STL containers).
+   + Lots of optmized standard data structures (STL containers) 
 
  *Disadvantages:*
 
@@ -694,19 +697,202 @@ Running:
    ... ... ... 
 #+END_SRC
 ** Basic Console IO 
+*** Overview 
 
- + std::cout
-   + (stdout) Basic output stream used for displaying program output. 
+C++ input/output system is object oriented which means that it is
+possible to write input-agnostic or output-agnostic code which can be
+reused without any rewritten for reading data from console, file,
+string and other end-points.
 
- + std::cerr
-   + (stderr) Basic error output stream used for displaying program
+C++ Has the following global objects for performing IO. 
+
+ + *std::cout* 
+   + (stdout) Standard output stream used for displaying program output. 
+
+ + *std::cerr* 
+   + (stderr) Stadnard error output stream used for displaying program
      error and logging output. It prints by default to the
      console. The output of the stream std::cerr (stderr) can be separated from
      std::cout (stdout) output by redirecting the stederr output to a
-     log file or discarding it. 
+     log file or discarding it.
 
- + std::cin  => Basic Input stream or stdin. Used for reading data
+ + *std::clog*
+   + (stderr) => Standard logging output stream. 
+
+ + *std::cin*  => Basic Input stream or stdin. Used for reading data
    from console. 
+
+Operators: 
+
+| Name                | Operator | Parent class          | Derived Classes                             |
+|---------------------+----------+-----------------------+---------------------------------------------|
+| Insertion Operator  | <<       | std::ostream / Output | std::cout, std::cerr, std::ofstream         |
+| Extraction Operator | >>       | std::istream / Input  | std::cin, std::ifstream, std::sstringstream |
+|---------------------+----------+-----------------------+---------------------------------------------|
+*** Examples in ROOT/CLING REPL
+
+ *Reading a single variable from console (stdin):*
+
+#+BEGIN_SRC cpp 
+  #include <iostream> 
+  #include <string> 
+
+  >> double x;
+  >> std::cin >> x;
+  342.34
+  >> x
+  (double) 342.34000
+  >> 
+  >> std::cout << "Enter x: "; std::cin >> x; std::cout << " => x = " << x << "\n";
+  Enter x: 100
+   => x = 100
+  >> 
+
+  >> std::string user;
+  >> std::cout << "Name: "; std::cin >> user; std::cout << " => user is = " << user <<Name: Julius Caesar
+   => user is = Julius
+  >> 
+#+END_SRC
+
+ *Read multiple variables from console (stdin):*
+
+#+BEGIN_SRC cpp 
+  #include <iostream> 
+  #include <string> 
+
+  int         id, quantity;
+  double      price;
+  std::string name;
+
+  // Read from console
+  >> std::cin >> id >> name >> quantity >> price ;
+  2351 Cooking-oil 20 3.12
+
+  >> id
+  (int) 2351
+  >> quantity
+  (int) 20
+  >> name
+  (std::string &) "Cooking-oil"
+  >> price
+  (double) 3.1200000
+  >> 
+#+END_SRC
+
+ *Reading structured data from console:*
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+  #include <deque>
+
+  struct Product{
+      unsigned long id;
+      std::string   name;		
+      double        price;
+      unsigned int  quantity;
+      Product(){}
+  };
+
+  // Or it could also be:
+  class Product{
+  public:
+      unsigned long id;
+      std::string   name;		
+      double        price;
+      unsigned int  quantity;
+      Product(){}
+  };
+
+  Product readProductFromConsole(){
+      Product p;
+      std::cin >> p.id >> p.name >> p.price >> p.quantity;
+      return p;
+  };
+
+  // Type Alias 	
+  using Inventory = std::deque<Product>;
+
+  Inventory readInventory(){
+     Inventory inv;
+     std::cin.clear();
+     std::cout << "Enter product ID, product Name, product Price, product Quantity." << "\n";
+     std::cout << "Type CTRL+D on U-nix or CTRL+Z on Windows when you are done." << "\n";   	
+     while(std::cin.good() && !std::cin.eof()){
+             std::cout << " => ";
+             inv.push_back(readProductFromConsole());
+     }
+     return inv;
+  }																		   
+#+END_SRC
+
+ + Reading a single object / record: 
+
+#+BEGIN_SRC cpp 
+  // User types "2000 Sugar 1.45 9000" and then types RETURN when he is done.
+  //------------------------------------------
+  >> auto x = readProductFromConsole()
+  2000 Sugar 1.45 9000
+  (Product &) @0x7f16eb8fc010
+
+  >> x.id
+  (unsigned long) 2000
+	
+  >> x.name
+  (std::string &) "Sugar"
+	
+  >> x.price
+  (double) 1.4500000
+	
+  >> x.quantity
+  (unsigned int) 9000
+#+END_SRC
+
+ + Reading multiple data:
+
+#+BEGIN_SRC cpp 
+  >> auto inventory = readInventory()
+  Enter product ID, product Name, product Price, product Quantity.
+  Type CTRL+D on U-nix or CTRL+Z on Windows when you are done.
+   => 803 Cooking-oil 10.23 200
+   => 2001 Sugar 2.40 500
+   => 9134 Car-battery 50.0 6000
+   => 8023 Milk 4.50 300 
+#+END_SRC
+
+ + Print inventory value: 
+
+#+BEGIN_SRC cpp 
+     // Print inventory data: 
+     for(const auto& prod: inventory){
+         double value = prod.quantity * prod.price;
+         std::cout << "Id       = " << prod.id       << "\n"
+                   << "Name     = " << prod.name     << "\n"
+                   << "Quantity = " << prod.quantity << "\n"		
+                   << "Price    = " << prod.price    << "\n"
+                   << "Value    = " << value         << "\n"
+                   << "----------------------------" << "\n";
+     }
+
+     //--------- Output -------------
+     Id       = 803
+     Name     = Cooking-oil
+     Quantity = 200
+     Price    = 10.23
+     Value    = 2046
+     ----------------------------
+     Id       = 2001
+     Name     = Sugar
+     Quantity = 500
+     Price    = 2.4
+     Value    = 1200
+     ----------------------------
+    ... ... .... 
+#+END_SRC
+
+*** Basic IO program 
+
+ *Example*
 
 File: [[file:src/basic-io.cpp][file:src/basic-io.cpp]]
 
@@ -805,7 +991,6 @@ Running:
    Max  = 100.34
    Dataset = [  30.12 40.23 100.34 90.23 52.00] 
 #+END_SRC
-
 
 ** String Manipulation 
 *** Class std::string 
