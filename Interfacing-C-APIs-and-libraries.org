@@ -1,0 +1,113 @@
+#+INCLUDE: theme/style.org 
+#+TITLE: CPP / C++ Notes - Integration with C-APIs
+#+DESCRIPTION: cpp/c++ code examples and demonstrations.
+#+STARTUP: content 
+
+* Interfacing C APIs and libraries 
+** Definitions 
+
+ + U*nix like: Any operating system based on UNIX (Tradermark of
+   Opengroup) such as Linux, Android, BSD, MacOX and so on.  
+
+** Example: U-nix functioon gethostname (std::string)
+
+Get the computer hostname. This function needs two arguments, an array
+of chars, which is used for returning the hostname, and the size of
+the array. If the array size is not enough for returning the hostname,
+the function returns -1, otherwise it returns 0. The size of
+hostname "string" is limited to ~HOST_NAME_MAX~.
+
+#+BEGIN_SRC cpp 
+   #include <unistd.h>
+   int gethostname(char *name, size_t len);
+#+END_SRC
+
+Example: Using this function in *C* (Root REPL). 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <unistd.h>
+  char hname[HOST_NAME_MAX];
+
+  >> HOST_NAME_MAX
+  (int) 64
+  >> 
+
+  >> hname
+  (char [64]) "\0\0\0\0\0\0\0\0\0\0\0\0\0\...."
+
+  >> gethostname(hname, HOST_NAME_MAX)
+  (int) 0
+  >> 
+
+  >> hname
+  (char [64]) "localhost.localdomain\0\0\0\..."
+
+#+END_SRC
+
+Example: Using gethostname with std::string 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <unistd.h>
+
+  // Create a string with filled with '\0' null character of size HOST_NAME_MAX
+  >> std::string shname(HOST_NAME_MAX, 0)
+  (std::string &) "\0\0\0\0\0\0\0\0\0\0\0...."
+  >> 
+
+  >> shname.size()
+  (unsigned long) 64
+
+
+  >> gethostname(&shname[0], shname.size())
+  (int) 0
+
+  >> shname
+  (std::string &) "localhost.localdomain\0\0\0\0\0\0\0\0\..."
+  >> 
+
+  >> std::cout << "Hostname = " << shname << "\n";
+  Hostname = localhost.localdomain
+  >> 
+
+  // Remove trailing \0 characters 
+  >> std::string x;
+  >> std::getline(std::stringstream(shname), x, '\0')
+  >> x
+  (std::string &) "localhost.localdomain"
+  >> 
+#+END_SRC
+
+Putting it all together in a C++ wrapper: 
+
+#+BEGIN_SRC cpp 
+    #include <iostream>
+    #include <string>
+    #include <sstream>
+    #include <unistd.h>
+
+    // C++ Wrapper or C++ interface 
+    std::string getHostname(){
+        std::string shname(HOST_NAME_MAX, 0);
+        int status = gethostname(&shname[0], shname.size());
+        if(status < 0)
+                throw std::runtime_error("Error: failed to retrieve hostname.");
+        std::string out;
+        std::getline(std::stringstream(shname), out, '\0');	
+        return out;
+   }
+
+   >> getHostname()
+   (std::string) "localhost.localdomain"
+   >> 
+#+END_SRC
+
+ *References:*
+
+ + FreeBSD - [[https://www.freebsd.org/cgi/man.cgi?query=gethostname][gethostname]]
+ + [[https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man3/gethostname.3.html][Mac OS X Manual Page For gethostname(3)]]
+ + [[https://www.ibm.com/support/knowledgecenter/en/SSB23S_1.1.0.15/gtpc2/cpp_gethostname.html][IBM Knowledge Center - gethostname: Return host name]]
+ + [[https://www.gnu.org/software/libc/manual/html_node/Host-Identification.html][Host Identification (The GNU C Library)]]
+
+
