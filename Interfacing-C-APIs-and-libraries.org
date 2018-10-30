@@ -6,10 +6,126 @@
 * Interfacing C APIs and libraries 
 ** Definitions 
 
- + U*nix like: Any operating system based on UNIX (Tradermark of
-   Opengroup) such as Linux, Android, BSD, MacOX and so on.  
+ + *Nix* like: Any operating system based or inspiered on UNIX
+   (Tradermark of Opengroup) such as Linux, Android, BSD, MacOX and so
+   on. No operating system can call itself UNIX without the Opengroup
+   certification.
+   + See:
+     + [[http://www.unix.org/trademark.html][UNIX Trademark]]
+     + [[https://en.wikipedia.org/wiki/Unix][Unix - Wikipedia]]
+     + [[https://www.cnet.com/news/apple-in-court-dispute-over-unix/][Apple in court dispute over Unix]]
 
-** Example: U-nix functioon gethostname (std::string)
+** Example: Nix / getcwd and chdir 
+
+ *getcwd* 
+
+ + Brief: Get the current working directory.
+
+ + Description: "These functions return a null-terminated string
+   containing an absolute pathname that is the current working
+   directory of the calling process.  The pathname is returned as the
+   function result and via the argument buf, if present."
+   + [[http://man7.org/linux/man-pages/man3/getcwd.3.html][(gecwd - Linux Manual)]]
+
+#+BEGIN_SRC cpp 
+  #include <unistd.h>
+  char *getcwd(char *buf, size_t size);
+#+END_SRC
+
+ *chdir* 
+
+ + Brief: Change the current working directory.
+ + Description: On success returns zero and on failure returns -1 and
+   set the flag *errno*. 
+
+#+BEGIN_SRC cpp 
+  #include <unistd.h>
+  int chdir(const char *path);
+#+END_SRC
+
+Using those APIs in C: 
+
+#+BEGIN_SRC cpp 
+  #include <unistd.h>
+
+  >> getcwd(NULL, 0)
+  (char *) "/home/archbox"
+  >>
+
+  >> getcwd(nullptr, 0)
+  (char *) "/home/archbox"
+  >> 
+
+  >> chdir("/var/log")
+  (int) 0
+  >> getcwd(NULL, 0)
+  (char *) "/var/log"
+  >> 
+#+END_SRC
+
+Using those functions with C++ string std::string. 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+
+  #include <unistd.h>
+
+  >> std::string dirpath = "/etc/";
+
+  // Problem: Pass a std::string where const char* is expected 
+  >> chdir(dirpath)
+  ROOT_prompt_67:1:1: error: no matching function for call to 'chdir'
+  chdir(dirpath)
+  ^~~~~
+  /usr/include/unistd.h:497:12: note: candidate function not viable: no known conversion from 'std::string'
+
+  // Solution: 
+  >> chdir(dirpath.c_str())
+  (int) 0
+  >>
+
+  >> dirpath.c_str()
+  (const char *) "/etc/"
+  >> 
+
+  >> getcwd(nullptr, 0)
+  (char *) "/etc"
+
+  >> std::string(getcwd(nullptr, 0))
+  (std::string) "/etc"
+  >> 
+#+END_SRC
+
+C++ Wrapper: 
+
+#+BEGIN_SRC cpp 
+  auto getCWD() -> std::string {
+       return std::string(getcwd(nullptr, 0));
+  }
+
+  auto setCWD(const std::string& path) -> void {
+       int status = ::chdir(path.c_str());
+       if(status < 0)
+           throw std::runtime_error("Failed to change directory.");
+  }
+
+  >> setCWD("/tmp")
+  >> getCWD()
+  (std::string) "/tmp"
+  >> 
+
+  >> setCWD("/tmp/dummy")
+  Error in <TRint::HandleTermInput()>: std::runtime_error caught: Failed to change directory.
+  >> 
+#+END_SRC
+
+
+References: 
+ + [[http://man7.org/linux/man-pages/man3/getcwd.3.html][getcwd(3) - Linux manual page]]
+ + [[https://linux.die.net/man/2/chdir][chdir(2): change working directory - Linux man page]]
+
+** Example: Nix / gethostname (std::string)
 
 Get the computer hostname. This function needs two arguments, an array
 of chars, which is used for returning the hostname, and the size of
@@ -109,5 +225,3 @@ Putting it all together in a C++ wrapper:
  + [[https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man3/gethostname.3.html][Mac OS X Manual Page For gethostname(3)]]
  + [[https://www.ibm.com/support/knowledgecenter/en/SSB23S_1.1.0.15/gtpc2/cpp_gethostname.html][IBM Knowledge Center - gethostname: Return host name]]
  + [[https://www.gnu.org/software/libc/manual/html_node/Host-Identification.html][Host Identification (The GNU C Library)]]
-
-
