@@ -13,7 +13,8 @@
    + See:
      + [[http://www.unix.org/trademark.html][UNIX Trademark]]
      + [[https://en.wikipedia.org/wiki/Unix][Unix - Wikipedia]]
-     + [[https://www.cnet.com/news/apple-in-court-dispute-over-unix/][Apple in court dispute over Unix]]
+
+ + *GSL* - GNU Scientifc Library 
 
 ** Example: Nix / getcwd and chdir 
 
@@ -224,4 +225,262 @@ Putting it all together in a C++ wrapper:
  + FreeBSD - [[https://www.freebsd.org/cgi/man.cgi?query=gethostname][gethostname]]
  + [[https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man3/gethostname.3.html][Mac OS X Manual Page For gethostname(3)]]
  + [[https://www.ibm.com/support/knowledgecenter/en/SSB23S_1.1.0.15/gtpc2/cpp_gethostname.html][IBM Knowledge Center - gethostname: Return host name]]
- + [[https://www.gnu.org/software/libc/manual/html_node/Host-Identification.html][Host Identification (The GNU C Library)]]
+ + [[https://www.gnu.org/software/libc/manual/html_node/Host-Identification.html][Host
+   Identification (The GNU C Library)]]
+** Example: GSL / C++ Class Wrapper to an C-API in OOP style or with opaque pointers. 
+
+This example shows how to build a C++ wrapper for C-APIs written in
+object-oriented C style. It means, C-APIs which emulates OOP concepts
+by using functions which encode class methods and a pointer pointer
+for emulating an object. In this style, the pointer to the data
+representation is passed around the functions emulating class methods.
+
+This style can also use opaque pointers for full encapsulation and
+data hiding. Opaque pointers to incomplete types where the data
+representation struct is not exposed to the client code. Many old
+C-libraries uses this style, including Windows Win32 API. 
+
+In example case, it will be used the [[https://www.gnu.org/software/gsl/manual/html_node/Vectors.html#Vectors][vector "class"]] from GNU
+Scientific library, but this approach can be used in other similar
+scenarios. 
+
+See more at:
+  + [[https://en.wikipedia.org/wiki/Opaque_pointer][Opaque pointer - Wikipedia]]
+  + [[https://en.wikipedia.org/wiki/Handle_(computing)][Handle (computing) - Wikipedia]]
+  + [[https://www.codementor.io/michaelsafyan/object-oriented-programming-in-c-du1081gw2][Object-Oriented Programming (OOP) in C | Codementor]]
+  + [[https://dmitryfrank.com/articles/oop_in_c][Object-oriented techniques in C - Dmitry Frank]]
+  + [[https://nullprogram.com/blog/2014/10/21/][C Object Oriented Programming « null program]]
+
+ *GSL C-Vector API*
+
+Basic Functions: 
+
+#+BEGIN_SRC cpp 
+  // Constructor: new gsl_vector(10)
+  // Allocate vector -> Similar to a constructor 
+  gsl_vector* gsl_vector_alloc (size_t n)
+
+  // Destructor: ~gsl_vector(){}
+  // Deallocate vector -> Similar to a destructor 
+  void        gsl_vector_free (gsl_vector* v);
+
+  // Accessor method => double x = vector.get(index)
+  // Get vector element 
+  double      gsl_vector_get (const gsl_vector * v, const size_t i)
+
+  // Mutator mehtod => vector.set(10, 2.34);
+  // Set vector element
+  void        gsl_vector_set (gsl_vector* v, const size_t i, double x)
+
+  // Mutator method => vector.setall(1.25)
+  // This function sets all the elements of the vector v to the value x.
+  void        gsl_vector_set_all (gsl_vector* v, double x)
+  // This function sets all the elements of the vector v to zero.
+  void        gsl_vector_set_zero (gsl_vector* v)
+#+END_SRC
+
+Vector Operations: 
+
+ + [[https://www.gnu.org/software/gsl/manual/html_node/Vector-operations.html#Vector-operations][GNU Scientific Library – Reference Manual: Vector operations]]
+
+#+BEGIN_SRC cpp
+  // a <- a + b 
+  int gsl_vector_add (gsl_vector * a, const gsl_vector * b)
+  // a <- a - b
+  int gsl_vector_sub (gsl_vector * a, const gsl_vector * b)
+  // a <- a * b
+  int gsl_vector_mul (gsl_vector * a, const gsl_vector * b)
+  // a[i] <- a[i] * SCALE
+  int gsl_vector_scale (gsl_vector * a, const double x)
+  // a[i] <- a[i] + CONSTANT 
+  int gsl_vector_add_constant (gsl_vector * a, const double x)
+#+END_SRC
+
+ *C++ Wrapper* 
+
+ + Class GSLVector - encapsulates the GNU Scientific library vector
+   "object" which is written in *object-oriented C style*. In this
+   style, methods are encoded as C-functions and the object is encoded
+   as pointer which is passed as function argument. Despite the style
+   this GLS API is written, it still not convenient for using in
+   C++. This example shows how to encapsulate an API like this in a
+   C++ class.
+
+Complete file: [[file:src/gsl-vector-wrapper.cpp][file:src/gsl-vector-wrapper.cpp]]
+
+#+BEGIN_SRC cpp 
+  class GSLVector{
+  private:
+      gsl_vector* m_hnd;
+      int m_size;
+  public:
+      GSLVector(int m_size) {
+          this->m_size = m_size;
+          this->m_hnd = gsl_vector_alloc(m_size);
+      }
+      // Overloaded constructor
+      GSLVector(int m_size, double x) {        
+          this->m_size = m_size;
+          this->m_hnd = gsl_vector_alloc(m_size);
+          gsl_vector_set_all(m_hnd, x);
+      }
+      // Copy constructor 
+      GSLVector(const GSLVector& src){
+          m_size = src.m_size;
+          m_hnd = gsl_vector_alloc(src.m_size);
+          gsl_vector_memcpy(m_hnd, src.m_hnd);
+      }
+          // Copy assignment operator
+      GSLVector& operator= (const GSLVector& src){
+          std::cerr << " [TRACE] Copy assignment operator." << "\n";
+          if(m_size != src.m_size){
+             gsl_vector_free(m_hnd);
+             m_hnd = gsl_vector_alloc(src.m_size);
+           }        
+          gsl_vector_memcpy(m_hnd, src.m_hnd);
+          return *this;
+      }	
+      // Destructor 
+      ~GSLVector(){
+          if(m_hnd != nullptr)
+             gsl_vector_free(m_hnd);
+      }
+      size_t size() const { return m_size; }
+
+      gsl_vector* data(){
+          return this->m_hnd;
+      }
+      struct ElementProxy{
+           GSLVector* ptr;
+           size_t     index;
+           ElementProxy(GSLVector* ptr, size_t index): ptr(ptr), index(index){}
+           ElementProxy& operator=(double x){
+               gsl_vector_set(ptr->data(), index, x);
+               return *this;
+           }
+           double get() const {
+                return gsl_vector_get(ptr->data(), index);
+           }
+      };
+
+      ElementProxy operator[](size_t index){
+         return ElementProxy(this, index);
+         // return gsl_vector_get(m_hnd, index);
+      }
+      // double operator[](int index){
+      //     return gsl_vector_get(m_hnd, index);
+      // }	
+      void set(int index, double x){
+          gsl_vector_set(m_hnd, index, x);
+      }
+      double max() const {
+          return gsl_vector_max(m_hnd);        
+      }
+      double min() const {
+          return gsl_vector_min(m_hnd);
+      }
+      GSLVector operator + (const GSLVector& va){
+          // Invoke copy constructor 
+          GSLVector vec2 = *this;
+          gsl_vector_add(vec2.m_hnd, va.m_hnd);
+          return vec2;
+      }
+      GSLVector operator * (double scale){
+          // Invoke copy constructor 
+          GSLVector vec2 = *this;
+          gsl_vector_scale(vec2.m_hnd, scale);
+          return vec2;
+      }
+      friend std::ostream& operator<<(std::ostream& os, const GSLVector& vec){
+          os << "[" << vec.m_size << "](";
+          for(int i = 0; i < vec.m_size; i++){
+              os << std::setprecision(4) << std::fixed << " " << gsl_vector_get(vec.m_hnd, i);
+          }
+          os << ") ";
+          return os;
+      }
+  };
+#+END_SRC
+
+Loading in CERN's ROOT REPL:
+
+#+BEGIN_SRC cpp 
+  >> .L gsl-vector-wrapper.cpp 
+  >> GSLVector v(5);
+  >> 
+  >> v.size()
+  (unsigned long) 5
+  >> 
+  >> std::cout << "v = " << v << "\n";
+  v = [5]( 0.0000 0.0000 0.0000 0.0000 0.0000) 
+  >> 
+
+  >> v.set(0, 3.0); v.set(1, 4.5); v.set(2, 3.25);
+  >> std::cout << "v = " << v << "\n";
+  v = [5]( 3.0000 4.5000 3.2500 0.0000 0.0000) 
+  >> 
+
+  >> std::cout << "v * 2.0 = " << v * 2.0 << "\n";
+  v * 2.0 = [5]( 6.0000 9.0000 6.5000 0.0000 0.0000) 
+  >> 
+
+  >> auto a =  v * 2.0;
+  >> std::cout << "a = " << a << "\n";
+  a = [5]( 6.0000 9.0000 6.5000 0.0000 0.0000) 
+  >> 
+  >> std::cout << "v = " << v << "\n";
+  v = [5]( 3.0000 4.5000 3.2500 0.0000 0.0000) 
+  >> 
+
+  >> v.max()
+  (double) 4.5000000
+  >> v.min()
+  (double) 2.3715151e-322
+  >>   
+#+END_SRC
+
+Main function: 
+
+#+BEGIN_SRC cpp 
+    GSLVector vec1(5, 2.45);
+    vec1.set(0, -3.45);
+
+    std::cout << std::boolalpha;
+    std::cout << "vec1 = " << vec1 << "\n";
+    // test copy constructor
+    std::puts("Create vec2 - before invoke copy constructor");
+    GSLVector vec2 = vec1;
+    std::cout << "vec1 = " << vec2 << "\n";
+    std::cout << "&vec2 == &vec1: " << (&vec1 == &vec2) << "\n";
+    assert(&vec2 != &vec1);
+    vec2.set(0, 10.0);
+    vec2.set(1, 25.0);
+    vec2[3] = 2.30;
+    std::cout << "vec2 = " << vec2 << "\n";
+
+    GSLVector vec3 = vec1 + vec2;
+    std::cout << "vec3 = " << vec3 << "\n";
+    std::cout << "vec1 * 3 + vec2 * 2.5 = " << vec1 * 1.5 + vec2 * 2.5 << "\n";
+
+#+END_SRC
+
+Compilation Output: 
+
+#+BEGIN_SRC cpp 
+  $ clang++ gsl-vector-wrapper.cpp -std=c++11 -Wall -Wextra -g -lgsl -lgslcblas -o out.bin 
+  $ ./out.bin
+
+  vec1 = [5]( -3.4500 2.4500 2.4500 2.4500 2.4500) 
+  Create vec2 - before invoke copy constructor
+  vec1 = [5]( -3.4500 2.4500 2.4500 2.4500 2.4500) 
+  &vec2 == &vec1: false
+  vec2 = [5]( 10.0000 25.0000 2.4500 2.3000 2.4500) 
+  vec3 = [5]( 6.5500 27.4500 4.9000 4.7500 4.9000) 
+  vec1 * 3 + vec2 * 2.5 = [5]( 19.8250 66.1750 9.8000 9.4250 9.8000) 
+#+END_SRC
+
+
+References: 
+ + [[https://www.gnu.org/software/gsl/manual/html_node/Vector-allocation.html#Vector-allocation][GNU Scientific Library – Reference Manual: Vector allocation]]
+ + [[https://www.gnu.org/software/gsl/manual/html_node/Initializing-vector-elements.html#Initializing-vector-elements][GNU Scientific Library – Reference Manual: Initializing vector elements]]
+ + [[https://www.gnu.org/software/gsl/manual/html_node/Vector-operations.html#Vector-operations][GNU Scientific Library – Reference Manual: Vector operations]]
