@@ -3,7 +3,7 @@
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
-<!-- 2018-10-30 Tue 12:19 -->
+<!-- 2018-10-30 Tue 15:48 -->
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>CPP / C++ Notes - Integration with C-APIs</title>
@@ -239,12 +239,13 @@ for the JavaScript code in this tag.
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents">
 <ul>
-<li><a href="#org357cee3">1. Interfacing C APIs and libraries</a>
+<li><a href="#org520f6dd">1. Interfacing C APIs and libraries</a>
 <ul>
-<li><a href="#org122b3fa">1.1. Definitions</a></li>
-<li><a href="#org2415e00">1.2. Example: Nix / getcwd and chdir</a></li>
-<li><a href="#orge226444">1.3. Example: Nix / gethostname (std::string)</a></li>
-<li><a href="#orgfa1693f">1.4. Example: GSL / C++ Class Wrapper to an C-API in OOP style or with opaque pointers.</a></li>
+<li><a href="#org68fbbec">1.1. Definitions</a></li>
+<li><a href="#org2a50235">1.2. Example: Nix / getcwd and chdir</a></li>
+<li><a href="#org4ff638f">1.3. Example: Nix / gethostname (std::string)</a></li>
+<li><a href="#org140547e">1.4. Example: Passing std::vector to a C-array APIs</a></li>
+<li><a href="#orge44f4d4">1.5. Example: GSL / C++ Class Wrapper to an C-API in OOP style or with opaque pointers.</a></li>
 </ul>
 </li>
 </ul>
@@ -254,12 +255,12 @@ for the JavaScript code in this tag.
 <li><a href='index.html'>Index</a></li>
 </ul>
 
-<div id="outline-container-org357cee3" class="outline-2">
-<h2 id="org357cee3"><span class="section-number-2">1</span> Interfacing C APIs and libraries</h2>
+<div id="outline-container-org520f6dd" class="outline-2">
+<h2 id="org520f6dd"><span class="section-number-2">1</span> Interfacing C APIs and libraries</h2>
 <div class="outline-text-2" id="text-1">
 </div>
-<div id="outline-container-org122b3fa" class="outline-3">
-<h3 id="org122b3fa"><span class="section-number-3">1.1</span> Definitions</h3>
+<div id="outline-container-org68fbbec" class="outline-3">
+<h3 id="org68fbbec"><span class="section-number-3">1.1</span> Definitions</h3>
 <div class="outline-text-3" id="text-1-1">
 <ul class="org-ul">
 <li><b>Nix</b> like: Any operating system based or inspiered on UNIX
@@ -279,8 +280,8 @@ certification.
 </div>
 </div>
 
-<div id="outline-container-org2415e00" class="outline-3">
-<h3 id="org2415e00"><span class="section-number-3">1.2</span> Example: Nix / getcwd and chdir</h3>
+<div id="outline-container-org2a50235" class="outline-3">
+<h3 id="org2a50235"><span class="section-number-3">1.2</span> Example: Nix / getcwd and chdir</h3>
 <div class="outline-text-3" id="text-1-2">
 <p>
 <b>getcwd</b> 
@@ -417,8 +418,8 @@ References:
 </div>
 </div>
 
-<div id="outline-container-orge226444" class="outline-3">
-<h3 id="orge226444"><span class="section-number-3">1.3</span> Example: Nix / gethostname (std::string)</h3>
+<div id="outline-container-org4ff638f" class="outline-3">
+<h3 id="org4ff638f"><span class="section-number-3">1.3</span> Example: Nix / gethostname (std::string)</h3>
 <div class="outline-text-3" id="text-1-3">
 <p>
 Get the computer hostname. This function needs two arguments, an array
@@ -537,9 +538,146 @@ Identification (The GNU C Library)</a></li>
 </ul>
 </div>
 </div>
-<div id="outline-container-orgfa1693f" class="outline-3">
-<h3 id="orgfa1693f"><span class="section-number-3">1.4</span> Example: GSL / C++ Class Wrapper to an C-API in OOP style or with opaque pointers.</h3>
+<div id="outline-container-org140547e" class="outline-3">
+<h3 id="org140547e"><span class="section-number-3">1.4</span> Example: Passing std::vector to a C-array APIs</h3>
 <div class="outline-text-3" id="text-1-4">
+<p>
+Many C APIs, such as BLAS and LPACK for linear algebra, provide
+functions like shown in the following code expecting a C array
+(pointer to the first address array[0]) and its size. Some functions
+arguments are used input and other as return value or both. The
+objective is to build a C++ wrapper using STL-vector for interfacing
+those APIs. 
+</p>
+
+<ul class="org-ul">
+<li>C-APIs with C-arrays.</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-type">double</span> <span class="org-function-name">average</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">size_t</span> <span class="org-variable-name">size</span>, <span class="org-type">double</span>* <span class="org-keyword">const</span> <span class="org-variable-name">xs</span> <span class="org-rainbow-delimiters-depth-1">){</span>
+     <span class="org-type">double</span> <span class="org-variable-name">sum</span> = 0.0;
+     <span class="org-keyword">for</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">size_t</span> <span class="org-variable-name">i</span> = 0; i &lt; size; i++<span class="org-rainbow-delimiters-depth-2">)</span>
+             sum += xs<span class="org-rainbow-delimiters-depth-2">[</span>i<span class="org-rainbow-delimiters-depth-2">]</span>;
+     <span class="org-keyword">return</span> sum / size;
+<span class="org-rainbow-delimiters-depth-1">}</span>
+
+<span class="org-comment-delimiter">// </span><span class="org-comment">xs[i] &lt;- x[i] + a * ys[i]</span>
+<span class="org-type">void</span> <span class="org-function-name">arraySum</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">size_t</span> <span class="org-variable-name">size</span>, <span class="org-type">double</span> <span class="org-variable-name">a</span>, <span class="org-type">double</span> *<span class="org-variable-name">xs</span>,  <span class="org-type">double</span>* <span class="org-keyword">const</span> <span class="org-variable-name">ys</span><span class="org-rainbow-delimiters-depth-1">){</span>
+     <span class="org-keyword">for</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">size_t</span> <span class="org-variable-name">i</span> = 0; i &lt; size; i++<span class="org-rainbow-delimiters-depth-2">)</span>
+         xs<span class="org-rainbow-delimiters-depth-2">[</span>i<span class="org-rainbow-delimiters-depth-2">]</span> = xs<span class="org-rainbow-delimiters-depth-2">[</span>i<span class="org-rainbow-delimiters-depth-2">]</span> + a * ys<span class="org-rainbow-delimiters-depth-2">[</span>i<span class="org-rainbow-delimiters-depth-2">]</span>;
+<span class="org-rainbow-delimiters-depth-1">}</span>
+</pre>
+</div>
+
+<p>
+Testing: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp">&gt;&gt; <span class="org-type">double</span> arr <span class="org-rainbow-delimiters-depth-1">[]</span> = <span class="org-rainbow-delimiters-depth-1">{</span>1.0, 2.0, 3.0, 4.0, 5.0<span class="org-rainbow-delimiters-depth-1">}</span>;
+&gt;&gt; 
+&gt;&gt; average<span class="org-rainbow-delimiters-depth-1">(</span>5, arr<span class="org-rainbow-delimiters-depth-1">)</span>
+<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">double</span><span class="org-rainbow-delimiters-depth-1">)</span> 3.0000000
+&gt;&gt; 
+
+&gt;&gt; <span class="org-type">double</span> xs <span class="org-rainbow-delimiters-depth-1">[]</span> = <span class="org-rainbow-delimiters-depth-1">{</span>1.0, 3.0, 4.0, 5.0<span class="org-rainbow-delimiters-depth-1">}</span>;
+&gt;&gt; <span class="org-type">double</span> ys <span class="org-rainbow-delimiters-depth-1">[]</span> = <span class="org-rainbow-delimiters-depth-1">{</span>3.0, 5.0, 6.0, 3.4<span class="org-rainbow-delimiters-depth-1">}</span>;
+&gt;&gt; 
+<span class="org-comment-delimiter">// </span><span class="org-comment">=====&gt; Before &lt;&lt;&lt;=========</span>
+&gt;&gt; xs
+<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">double</span> <span class="org-rainbow-delimiters-depth-2">[</span>4<span class="org-rainbow-delimiters-depth-2">]</span><span class="org-rainbow-delimiters-depth-1">)</span> <span class="org-rainbow-delimiters-depth-1">{</span> 1.0000000, 3.0000000, 4.0000000, 5.0000000 <span class="org-rainbow-delimiters-depth-1">}</span>
+&gt;&gt; ys
+<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">double</span> <span class="org-rainbow-delimiters-depth-2">[</span>4<span class="org-rainbow-delimiters-depth-2">]</span><span class="org-rainbow-delimiters-depth-1">)</span> <span class="org-rainbow-delimiters-depth-1">{</span> 3.0000000, 5.0000000, 6.0000000, 3.4000000 <span class="org-rainbow-delimiters-depth-1">}</span>
+&gt;&gt; 
+
+<span class="org-comment-delimiter">//</span><span class="org-comment">======&gt; After &lt;&lt;=========</span>
+&gt;&gt; arraySum<span class="org-rainbow-delimiters-depth-1">(</span>4, 2.0, xs, ys<span class="org-rainbow-delimiters-depth-1">)</span>
+&gt;&gt; xs
+<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">double</span> <span class="org-rainbow-delimiters-depth-2">[</span>4<span class="org-rainbow-delimiters-depth-2">]</span><span class="org-rainbow-delimiters-depth-1">)</span> <span class="org-rainbow-delimiters-depth-1">{</span> 7.0000000, 13.000000, 16.000000, 11.800000 <span class="org-rainbow-delimiters-depth-1">}</span>
+&gt;&gt; ys
+<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">double</span> <span class="org-rainbow-delimiters-depth-2">[</span>4<span class="org-rainbow-delimiters-depth-2">]</span><span class="org-rainbow-delimiters-depth-1">)</span> <span class="org-rainbow-delimiters-depth-1">{</span> 3.0000000, 5.0000000, 6.0000000, 3.4000000 <span class="org-rainbow-delimiters-depth-1">}</span>
+</pre>
+</div>
+
+<p>
+C++ stl vectors with C-array APIs 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-function-name">std</span>::<span class="org-type">vector</span><span class="org-rainbow-delimiters-depth-1">&lt;</span><span class="org-type">double</span><span class="org-rainbow-delimiters-depth-1">&gt;</span> xsv = <span class="org-rainbow-delimiters-depth-1">{</span>1.0, 3.0, 4.0, 5.0<span class="org-rainbow-delimiters-depth-1">}</span>;
+<span class="org-function-name">std</span>::<span class="org-type">vector</span><span class="org-rainbow-delimiters-depth-1">&lt;</span><span class="org-type">double</span><span class="org-rainbow-delimiters-depth-1">&gt;</span> ysv = <span class="org-rainbow-delimiters-depth-1">{</span>3.0, 5.0, 6.0, 3.4<span class="org-rainbow-delimiters-depth-1">}</span>;
+&gt;&gt; 
+
+&gt;&gt; average<span class="org-rainbow-delimiters-depth-1">(</span>xsv.size<span class="org-rainbow-delimiters-depth-2">()</span>, xsv.data<span class="org-rainbow-delimiters-depth-2">()</span><span class="org-rainbow-delimiters-depth-1">)</span>
+<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">double</span><span class="org-rainbow-delimiters-depth-1">)</span> 3.2500000
+&gt;&gt; 
+
+&gt;&gt; arraySum<span class="org-rainbow-delimiters-depth-1">(</span>xsv.size<span class="org-rainbow-delimiters-depth-2">()</span>, 2.0, xsv.data<span class="org-rainbow-delimiters-depth-2">()</span>, ysv.data<span class="org-rainbow-delimiters-depth-2">()</span><span class="org-rainbow-delimiters-depth-1">)</span>
+&gt;&gt; 
+&gt;&gt; xsv
+<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-constant">std</span>::<span class="org-type">vector</span><span class="org-rainbow-delimiters-depth-2">&lt;</span><span class="org-type">double</span><span class="org-rainbow-delimiters-depth-2">&gt;</span> &amp;<span class="org-rainbow-delimiters-depth-1">)</span> <span class="org-rainbow-delimiters-depth-1">{</span> 7.0000000, 13.000000, 16.000000, 11.800000 <span class="org-rainbow-delimiters-depth-1">}</span>
+&gt;&gt; ysv
+<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-constant">std</span>::<span class="org-type">vector</span><span class="org-rainbow-delimiters-depth-2">&lt;</span><span class="org-type">double</span><span class="org-rainbow-delimiters-depth-2">&gt;</span> &amp;<span class="org-rainbow-delimiters-depth-1">)</span> <span class="org-rainbow-delimiters-depth-1">{</span> 3.0000000, 5.0000000, 6.0000000, 3.4000000 <span class="org-rainbow-delimiters-depth-1">}</span>
+&gt;&gt; 
+</pre>
+</div>
+
+<p>
+C++ Wrapper: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-keyword">namespace</span> <span class="org-constant">CPPWrapper</span><span class="org-rainbow-delimiters-depth-1">{</span>
+   <span class="org-keyword">auto</span> <span class="org-function-name">average</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-keyword">const</span> <span class="org-constant">std</span>::<span class="org-type">vector</span><span class="org-rainbow-delimiters-depth-3">&lt;</span><span class="org-type">double</span><span class="org-rainbow-delimiters-depth-3">&gt;</span>&amp; <span class="org-variable-name">xs</span><span class="org-rainbow-delimiters-depth-2">)</span> -&gt; <span class="org-type">double</span> <span class="org-rainbow-delimiters-depth-2">{</span>
+       <span class="org-keyword">return</span> ::average<span class="org-rainbow-delimiters-depth-3">(</span>xs.size<span class="org-rainbow-delimiters-depth-4">()</span>, <span class="org-keyword">const_cast</span><span class="org-rainbow-delimiters-depth-4">&lt;</span><span class="org-constant">std</span>::<span class="org-type">vector</span><span class="org-rainbow-delimiters-depth-5">&lt;</span><span class="org-type">double</span><span class="org-rainbow-delimiters-depth-5">&gt;</span>&amp;<span class="org-rainbow-delimiters-depth-4">&gt;(</span>xs<span class="org-rainbow-delimiters-depth-4">)</span>.data<span class="org-rainbow-delimiters-depth-4">()</span><span class="org-rainbow-delimiters-depth-3">)</span>;
+   <span class="org-rainbow-delimiters-depth-2">}</span>
+   <span class="org-keyword">auto</span> <span class="org-function-name">linearComb</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">double</span> <span class="org-variable-name">a</span>,
+                   <span class="org-keyword">const</span> <span class="org-constant">std</span>::<span class="org-type">vector</span><span class="org-rainbow-delimiters-depth-3">&lt;</span><span class="org-type">double</span><span class="org-rainbow-delimiters-depth-3">&gt;</span>&amp; <span class="org-variable-name">xs</span>,
+                   <span class="org-keyword">const</span> <span class="org-constant">std</span>::<span class="org-type">vector</span><span class="org-rainbow-delimiters-depth-3">&lt;</span><span class="org-type">double</span><span class="org-rainbow-delimiters-depth-3">&gt;</span>&amp; <span class="org-variable-name">ys</span><span class="org-rainbow-delimiters-depth-2">)</span> -&gt; <span class="org-constant">std</span>::<span class="org-type">vector</span><span class="org-rainbow-delimiters-depth-2">&lt;</span><span class="org-type">double</span><span class="org-rainbow-delimiters-depth-2">&gt;</span> <span class="org-rainbow-delimiters-depth-2">{</span>
+      <span class="org-keyword">auto</span> <span class="org-variable-name">xscopy</span> = xs;
+      <span class="org-keyword">auto</span>&amp; <span class="org-variable-name">ysref</span>  = <span class="org-keyword">const_cast</span><span class="org-rainbow-delimiters-depth-3">&lt;</span><span class="org-constant">std</span>::<span class="org-type">vector</span><span class="org-rainbow-delimiters-depth-4">&lt;</span><span class="org-type">double</span><span class="org-rainbow-delimiters-depth-4">&gt;</span>&amp;<span class="org-rainbow-delimiters-depth-3">&gt;(</span>ys<span class="org-rainbow-delimiters-depth-3">)</span>; 
+      ::arraySum<span class="org-rainbow-delimiters-depth-3">(</span>xs.size<span class="org-rainbow-delimiters-depth-4">()</span>, a, xscopy.data<span class="org-rainbow-delimiters-depth-4">()</span>, ysref.data<span class="org-rainbow-delimiters-depth-4">()</span><span class="org-rainbow-delimiters-depth-3">)</span>;
+      <span class="org-keyword">return</span> xscopy;
+   <span class="org-rainbow-delimiters-depth-2">}</span>
+<span class="org-rainbow-delimiters-depth-1">}</span>;
+</pre>
+</div>
+
+<p>
+Testing wrapper: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-function-name">std</span>::<span class="org-type">vector</span><span class="org-rainbow-delimiters-depth-1">&lt;</span><span class="org-type">double</span><span class="org-rainbow-delimiters-depth-1">&gt;</span> xsv = <span class="org-rainbow-delimiters-depth-1">{</span>1.0, 3.0, 4.0, 5.0<span class="org-rainbow-delimiters-depth-1">}</span>;
+<span class="org-function-name">std</span>::<span class="org-type">vector</span><span class="org-rainbow-delimiters-depth-1">&lt;</span><span class="org-type">double</span><span class="org-rainbow-delimiters-depth-1">&gt;</span> ysv = <span class="org-rainbow-delimiters-depth-1">{</span>3.0, 5.0, 6.0, 3.4<span class="org-rainbow-delimiters-depth-1">}</span>;
+
+&gt;&gt; <span class="org-constant">CPPWrapper</span>::average<span class="org-rainbow-delimiters-depth-1">(</span>xsv<span class="org-rainbow-delimiters-depth-1">)</span>
+<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">double</span><span class="org-rainbow-delimiters-depth-1">)</span> 3.2500000
+&gt;&gt; 
+
+&gt;&gt; <span class="org-constant">CPPWrapper</span>::linearComb<span class="org-rainbow-delimiters-depth-1">(</span>2.0, xsv, ysv<span class="org-rainbow-delimiters-depth-1">)</span>
+<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-constant">std</span>::<span class="org-type">vector</span><span class="org-rainbow-delimiters-depth-2">&lt;</span><span class="org-type">double</span><span class="org-rainbow-delimiters-depth-2">&gt;</span><span class="org-rainbow-delimiters-depth-1">)</span> <span class="org-rainbow-delimiters-depth-1">{</span> 7.0000000, 13.000000, 16.000000, 11.800000 <span class="org-rainbow-delimiters-depth-1">}</span>
+&gt;&gt; 
+
+&gt;&gt; <span class="org-constant">CPPWrapper</span>::linearComb<span class="org-rainbow-delimiters-depth-1">(</span>3.0, xsv, ysv<span class="org-rainbow-delimiters-depth-1">)</span>
+<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-constant">std</span>::<span class="org-type">vector</span><span class="org-rainbow-delimiters-depth-2">&lt;</span><span class="org-type">double</span><span class="org-rainbow-delimiters-depth-2">&gt;</span><span class="org-rainbow-delimiters-depth-1">)</span> <span class="org-rainbow-delimiters-depth-1">{</span> 10.000000, 18.000000, 22.000000, 15.200000 <span class="org-rainbow-delimiters-depth-1">}</span>
+&gt;&gt; 
+
+<span class="org-comment-delimiter">// </span><span class="org-comment">Check whether the vectors were modified. </span>
+&gt;&gt; xsv
+<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-constant">std</span>::<span class="org-type">vector</span><span class="org-rainbow-delimiters-depth-2">&lt;</span><span class="org-type">double</span><span class="org-rainbow-delimiters-depth-2">&gt;</span> &amp;<span class="org-rainbow-delimiters-depth-1">)</span> <span class="org-rainbow-delimiters-depth-1">{</span> 1.0000000, 3.0000000, 4.0000000, 5.0000000 <span class="org-rainbow-delimiters-depth-1">}</span>
+&gt;&gt; ysv
+<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-constant">std</span>::<span class="org-type">vector</span><span class="org-rainbow-delimiters-depth-2">&lt;</span><span class="org-type">double</span><span class="org-rainbow-delimiters-depth-2">&gt;</span> &amp;<span class="org-rainbow-delimiters-depth-1">)</span> <span class="org-rainbow-delimiters-depth-1">{</span> 3.0000000, 5.0000000, 6.0000000, 3.4000000 <span class="org-rainbow-delimiters-depth-1">}</span>
+&gt;&gt; 
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orge44f4d4" class="outline-3">
+<h3 id="orge44f4d4"><span class="section-number-3">1.5</span> Example: GSL / C++ Class Wrapper to an C-API in OOP style or with opaque pointers.</h3>
+<div class="outline-text-3" id="text-1-5">
 <p>
 This example shows how to build a C++ wrapper for C-APIs written in
 object-oriented C style. It means, C-APIs which emulates OOP concepts
@@ -840,7 +978,7 @@ References:
 </div>
 </div>
 <div id="postamble" class="status">
-<p class="date">Created: 2018-10-30 Tue 12:19</p>
+<p class="date">Created: 2018-10-30 Tue 15:48</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
 </body>
