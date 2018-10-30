@@ -229,6 +229,123 @@ Putting it all together in a C++ wrapper:
  + [[https://www.ibm.com/support/knowledgecenter/en/SSB23S_1.1.0.15/gtpc2/cpp_gethostname.html][IBM Knowledge Center - gethostname: Return host name]]
  + [[https://www.gnu.org/software/libc/manual/html_node/Host-Identification.html][Host
    Identification (The GNU C Library)]]
+** Example: Passing std::vector to a C-array APIs
+
+Many C APIs, such as BLAS and LPACK for linear algebra, provide
+functions like shown in the following code expecting a C array
+(pointer to the first address array[0]) and its size. Some functions
+arguments are used input and other as return value or both. The
+objective is to build a C++ wrapper using STL-vector for interfacing
+those APIs. 
+
+ + C-APIs with C-arrays. 
+
+#+BEGIN_SRC cpp 
+  double average(size_t size, double* const xs ){
+       double sum = 0.0;
+       for(size_t i = 0; i < size; i++)
+               sum += xs[i];
+       return sum / size;
+  }
+
+  // xs[i] <- x[i] + a * ys[i]
+  void arraySum(size_t size, double a, double *xs,  double* const ys){
+       for(size_t i = 0; i < size; i++)
+           xs[i] = xs[i] + a * ys[i];
+  }
+#+END_SRC
+
+Testing: 
+
+#+BEGIN_SRC cpp 
+  >> double arr [] = {1.0, 2.0, 3.0, 4.0, 5.0};
+  >> 
+  >> average(5, arr)
+  (double) 3.0000000
+  >> 
+
+  >> double xs [] = {1.0, 3.0, 4.0, 5.0};
+  >> double ys [] = {3.0, 5.0, 6.0, 3.4};
+  >> 
+  // =====> Before <<<=========
+  >> xs
+  (double [4]) { 1.0000000, 3.0000000, 4.0000000, 5.0000000 }
+  >> ys
+  (double [4]) { 3.0000000, 5.0000000, 6.0000000, 3.4000000 }
+  >> 
+ 
+  //======> After <<=========
+  >> arraySum(4, 2.0, xs, ys)
+  >> xs
+  (double [4]) { 7.0000000, 13.000000, 16.000000, 11.800000 }
+  >> ys
+  (double [4]) { 3.0000000, 5.0000000, 6.0000000, 3.4000000 }
+#+END_SRC
+
+C++ stl vectors with C-array APIs 
+
+#+BEGIN_SRC cpp 
+  std::vector<double> xsv = {1.0, 3.0, 4.0, 5.0};
+  std::vector<double> ysv = {3.0, 5.0, 6.0, 3.4};
+  >> 
+
+  >> average(xsv.size(), xsv.data())
+  (double) 3.2500000
+  >> 
+
+  >> arraySum(xsv.size(), 2.0, xsv.data(), ysv.data())
+  >> 
+  >> xsv
+  (std::vector<double> &) { 7.0000000, 13.000000, 16.000000, 11.800000 }
+  >> ysv
+  (std::vector<double> &) { 3.0000000, 5.0000000, 6.0000000, 3.4000000 }
+  >> 
+#+END_SRC
+
+C++ Wrapper: 
+
+#+BEGIN_SRC cpp 
+   namespace CPPWrapper{
+      auto average(const std::vector<double>& xs) -> double {
+          return ::average(xs.size(), const_cast<std::vector<double>&>(xs).data());
+      }
+      auto linearComb(double a,
+                      const std::vector<double>& xs,
+                      const std::vector<double>& ys) -> std::vector<double> {
+         auto xscopy = xs;
+         auto& ysref  = const_cast<std::vector<double>&>(ys); 
+         ::arraySum(xs.size(), a, xscopy.data(), ysref.data());
+         return xscopy;
+      }
+   };
+#+END_SRC
+
+Testing wrapper: 
+
+#+BEGIN_SRC cpp 
+  std::vector<double> xsv = {1.0, 3.0, 4.0, 5.0};
+  std::vector<double> ysv = {3.0, 5.0, 6.0, 3.4};
+
+  >> CPPWrapper::average(xsv)
+  (double) 3.2500000
+  >> 
+
+  >> CPPWrapper::linearComb(2.0, xsv, ysv)
+  (std::vector<double>) { 7.0000000, 13.000000, 16.000000, 11.800000 }
+  >> 
+
+  >> CPPWrapper::linearComb(3.0, xsv, ysv)
+  (std::vector<double>) { 10.000000, 18.000000, 22.000000, 15.200000 }
+  >> 
+
+  // Check whether the vectors were modified. 
+  >> xsv
+  (std::vector<double> &) { 1.0000000, 3.0000000, 4.0000000, 5.0000000 }
+  >> ysv
+  (std::vector<double> &) { 3.0000000, 5.0000000, 6.0000000, 3.4000000 }
+  >> 
+#+END_SRC
+
 ** Example: GSL / C++ Class Wrapper to an C-API in OOP style or with opaque pointers. 
 
 This example shows how to build a C++ wrapper for C-APIs written in
