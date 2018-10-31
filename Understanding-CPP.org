@@ -6459,13 +6459,54 @@ Notes and remarks:
    other words, any class with at least one virtual member function.
 
  + _dynamic_cast_ operator only works with _pointers_  or _references_ to
-   classes. 
+   classes with at least one virtual method. 
 
- + _static_cast_ downcasting is unsafe, if the conversion is not
-   possible, the result is undefined.
+ + _static_cast_ downcasting is unsafe. There is undefined behavior if
+   the conversion is not possible.
 
+ *Casting Pointers*
 
-Example: 
+If the conversion fails, the pointer to the derived class is set to
+null and no exception is thrown. 
+
+#+BEGIN_SRC cpp 
+  BaseClass* pointerToBase = &objectOfDerivedA;
+
+  // Downcast pointer from base to derived class
+  DerivedClass* pointertoDerived = dynamic_cast<DerivedClass*>(pointerToBase);
+  // Or
+  auto pointertoDerived = dynamic_cast<DerivedClass*>(pointerToBase);
+
+  if(pointertoDerived){
+    std::cout << "It is the derived class" << "\n";
+    pointertoDerived->exclusiveMethod1();
+    ... ... .. 
+  } else { 
+    std::cout << "Conversion failed." << "\n";
+  }
+#+END_SRC
+
+ *Casting References*
+
+In this case, if the casting fails, it throws a *std::bad_cast*
+exception. 
+
+#+BEGIN_SRC cpp 
+   BaseClass& refBaseClass = objectOfDerivedA;   
+   try{
+      // Downcast reference 
+      DerivedClass& refDerived = dynamic_cast<DerivedClass&>(refBaseClass);
+      std::cout << "Found derived class ..." << "\n";
+      refDerived.exclusiveMethod1(); 
+      refDerived.exclusiveMethod2(); 
+   } catch(const std::bad_cast& ex){
+      std::cerr << "Error: casting not possible." << "\n";
+      std::cerr << " [ERROR] " << ex.what() << "\n";
+   }
+
+#+END_SRC
+
+ *Example:*
 
 #+BEGIN_SRC cpp 
   class Base{
