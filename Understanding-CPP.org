@@ -6427,6 +6427,225 @@ References:
  + How to correctly use std::reference_wrappers -
    <https://stackoverflow.com/questions/18127469/how-to-correctly-use-stdreference-wrappers>
 ** TODO OOP RTTI - Runtime Type Identification 
+*** Overview 
+
+RTTI - Runtime Type Identification is the ability to provide
+information about types at rutime rather than at compile time. It is a
+limited form of reflection. In C++, the RTTI functionality is provided
+by the operators *typeid* getting type information and *dynamic_cast* used
+for safely casting polymorphic types.
+
+ *RTTI in C++:*
+
+ + Operator *dynamic_cast*
+ + Operator *typeid*
+ + Class      std::type_info
+ + Exception: std::bad_typeid (derived class of std::exception)
+ 
+*** Operator dynamic_cast 
+
+The operator _dynamic_cast_ is used for safely downcasting a base class
+a particular derived class and also for checking if a pointer to base
+class refers to an instance of a particular derived class.
+
+The operator _static_cast_ can also be used for downcasting, however if
+the operation is not possible, the result is undefined, thus using
+_static_cast_ is unsafe. It is only safe using _static_cast_, if there is
+no doubt that the conversion is possible.
+
+Notes and remarks: 
+
+ + The operator _dynamic_cast_ only works with polymorphic types, in
+   other words, any class with at least one virtual member function.
+
+ + _dynamic_cast_ operator only works with _pointers_  or _references_ to
+   classes. 
+
+ + _static_cast_ downcasting is unsafe, if the conversion is not
+   possible, the result is undefined.
+
+
+Example: 
+
+#+BEGIN_SRC cpp 
+  class Base{
+  public:
+      Base() = default;
+      // Destructor of base class must always be virtual 
+      virtual ~Base() = default;   
+        virtual auto getType() const -> std::string {
+        return "Base";
+     }	
+     void showType(){
+        std::cout << "Class type = " << this->getType() << "\n";
+     }
+  };
+
+  class DerivedA: public Base{
+  public:
+     DerivedA(){}
+     auto getType() const  -> std::string {
+        return "DerivedA";
+     }
+  };
+
+  class DerivedB: public Base{
+  public:
+     DerivedB(){}
+     auto getType() const -> std::string {
+        return "DerivedB";
+     }
+  };
+#+END_SRC
+
+Creating testing objects: 
+
+#+BEGIN_SRC cpp 
+  Base base;
+  DerivedA da;
+  DerivedB db;
+ #+END_SRC
+
+#+BEGIN_SRC cpp 
+>> Base *ptr = nullptr;
+
+// Point to stack-object base 
+>> ptr = &base
+(Base *) 0x7f6d9a022010
+
+// Check whether pointed object is of type base 
+>> Base* ptrBase = dynamic_cast<Base*>(ptr);
+
+>> if(ptrBase) { std::cout << "Object of type Base" << "\n";}
+Object of type Base
+>> 
+
+>> if(dynamic_cast<Base*>(ptr)) { std::cout << "Object of type Base" << "\n";}
+Object of type Base
+>> 
+#+END_SRC
+
+Point to the object da (DerivedA)
+
+#+BEGIN_SRC cpp
+  >> ptr = &da;
+
+  // Cast pointer 
+  >> DerivedA* ptrDA = dynamic_cast<DerivedA*>(ptr)
+  (DerivedA *) 0x7f6d9a022018
+
+  >> if(ptrDA != nullptr){ std::puts("Object of type DerivedA"); }
+  Object of type DerivedA
+
+  >> if(ptrDA){ std::puts("Object of type DerivedA"); }
+  Object of type DerivedA
+  >> 
+
+  >> ptrDA->showType()
+  Class type = DerivedA
+  >> 
+
+  // Check whether pointer refers to an object of type DerivedA
+  >> if(dynamic_cast<DerivedA*>(ptr)) { std::cout << "Object of type A" << "\n";}
+  Object of type A
+#+END_SRC
+
+Check whether pointer refers to an object of type DerivedB
+
+ + If the casting is not possible, the dynamic_cast operator returns a
+   null pointer. 
+
+#+BEGIN_SRC cpp 
+  >> ptr = &da;
+
+  >> DerivedB* ptrDB = dynamic_cast<DerivedB*>(ptr)
+  (DerivedB *) nullptr
+  >> 
+
+  >> if(ptrDB != nullptr) { std::puts("=> Type DerivedB"); } else { std::puts("Casting failed"); }
+  Casting failed
+  >> 
+
+  >> if(ptrDB){ std::puts("=> Type DerivedB"); } else { std::puts("Casting failed"); }
+  Casting failed
+  >> 
+
+  >> if(dynamic_cast<DerivedB*>(ptr)) { std::puts("=> Type DerivedB"); } else { std::puts("Casting failed"); }
+  Casting failed
+  >> 
+
+  >> if(dynamic_cast<DerivedA*>(ptr)) { std::puts("=> Type DerivedA"); } else { std::puts("Casting failed"); }
+  => Type DerivedA
+  >> 
+#+END_SRC
+
+Function which applies operations specific to the derived class using pointers:  
+
+#+BEGIN_SRC cpp 
+  void processType(Base* ptr){
+       auto ptrA = dynamic_cast<DerivedA*>(ptr);
+       if(ptrA){
+           std::puts("Found object of type = DerivedA");
+           std::cout << ".getType() = " << ptrA->getType() << "\n";
+           return;
+       }
+       auto ptrB = dynamic_cast<DerivedB*>(ptr);
+       if(ptrB){
+          std::puts(" Found object of type = DerivedB");
+          std::cout << ".getType() = " << ptrB->getType() << "\n";
+          return;
+       }
+       if(ptr){
+          std::puts("Found object of type Base");
+          std::cout << ".getType() = " << ptr->getType() << "\n";
+          return;
+       }
+       std::puts("Null pointer or cannot determine instance type.");
+  }
+
+
+  >> processType(&da)
+  Found object of type = DerivedA
+  .getType() = DerivedA
+
+  >> processType(&db)
+   Found object of type = DerivedB
+  .getType() = DerivedB
+
+  >> processType(&base)
+  Found object of type Base
+  .getType() = Base
+
+  >> processType(nullptr)
+  Null pointer or cannot determine instance type.
+#+END_SRC
+
+Dynamic casting references: 
+
+ + Note: References to polymorphic objects can be casted with dynamic
+   cast too. In this case if the operation fails, it throws an
+   _std::bad_cast_ exception.
+
+#+BEGIN_SRC cpp
+  >> Base& refb1 = base;
+
+  // Throws exception, casting failed 
+  >> DerivedA& refa1 = dynamic_cast<DerivedA&>(refb1)
+  Error in <TRint::HandleTermInput()>: std::bad_cast caught: std::bad_cast
+  >> 
+
+  >> Base& refb2 = da;
+  >> 
+  >> DerivedA& refa2 = dynamic_cast<DerivedA&>(refb2)
+  (DerivedA &) @0x7f9d32750018
+  >> 
+  >> refa2.getType()
+  (std::string) "DerivedA"
+  >> 
+#+END_SRC
+
+
+
 ** Namespaces
 *** Summary 
 
