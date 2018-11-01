@@ -6441,17 +6441,204 @@ for safely casting polymorphic types.
  + Operator *typeid*
  + Class      std::type_info
  + Exception: std::bad_typeid (derived class of std::exception)
+
+ *Further Reading* 
+
+ + *Inneficiences of C++ - Fact or Fiction*
+   + <https://www.iar.com/globalassets/about-us/events/atc2015/inefficiencies-of-c.pdf>
+
+ + *How C++ Works*
+   + <http://pages.cpsc.ucalgary.ca/~bdstephe/585_W11/d403_C++.pdf>
+
+ + *Const, RTTI and Efficiency*
+   + <https://www.artima.com/intv/const2.html>
+
+ + *RTTI and Reflection*
+   + <http://www.cs.huji.ac.il/course/2004/ood/docs/lec08.pdf>
+
+ + *Visual RTTI Inspection*
+   + https://blog.quarkslab.com/visual-c-rtti-inspection.html
+
+ + *C++ RTTI - casting around*
+   + http://www.two-sdg.demon.co.uk/curbralan/papers/RTTI.html
+
+ + *Practical RTTI For Games*
+   + https://gamedevcoder.wordpress.com/2013/02/16/c-plus-plus-rtti-for-games/
+
+ + [[https://stackoverflow.com/questions/281818/unmangling-the-result-of-stdtype-infoname][c++ - Unmangling the result of std::type_info::name - Stack Overflow]]
+
+ + [[https://stackoverflow.com/questions/579887/how-expensive-is-rtti][c++ - How expensive is RTTI? - Stack Overflow]]
  
+*** Operator typeid 
+
+The operator typeid retrives information about a given type by
+returning a reference to an object of type _typeinfo_.
+
+Header: 
+ + <typeinfo>
+
+ *Operator typeid:*
+
+ + Documentaiton: [[https://en.cppreference.com/w/cpp/language/typeid][typeid operator - cppreference.com]]
+
+#+BEGIN_SRC cpp
+ const typeinfo& typeid(ARGUMENT);
+#+END_SRC
+
+Use cases: 
+
+ + Compare types.
+ + Recover wrapped type from type erasure. This approach is used by
+   Boost.Any and std::any from C++17.
+ + Debugging 
+
+ *Class std::type_info:*
+
+ + Documentation: [[https://en.cppreference.com/w/cpp/types/type_info][std::type_info - cppreference.com]]
+
+#+BEGIN_SRC cpp 
+  class type_info{
+  public:
+     virtual ~type_info();
+     bool operator==(cons type_info& rhs) const;
+     bool operator!=(cons type_info& rhs) const;
+     bool before( const type_info& rhs ) const;
+     const char* name() const;
+     // Since: C++11
+     size_t hash_code() const;
+  };
+#+END_SRC
+
+Note: the type name returned by method .name() of type_info returns
+the decorated name of type or the mangled name of type. The value
+returned is compiler-dependent which means that a code should not rely
+on the returned name. 
+
+ *Example:*
+
+Get type name: 
+
+#+BEGIN_SRC cpp
+  >> typeid(int).name()
+  (const char *) "i"
+
+  >> typeid(double).name()
+  (const char *) "d"
+
+  >> typeid(float).name()
+  (const char *) "f"
+
+  >> typeid(long).name()
+  (const char *) "l"
+
+  >> typeid(int*).name()
+  (const char *) "Pi"
+
+  >> typeid(double*).name()
+  (const char *) "Pd"
+
+  >> typeid(float*).name()
+  (const char *) "Pf"
+
+  >> typeid(long*).name()
+  (const char *) "Pl"
+
+  >> typeid(void).name()
+  (const char *) "v"
+
+  >> typeid(void*).name()
+  (const char *) "Pv"
+
+  >> typeid(void**).name()
+  (const char *) "PPv"
+  >> 
+
+  >> typeid(std::vector<double>).name()
+  (const char *) "St6vectorIdSaIdEE"
+
+  >> typeid(std::deque<double>).name()
+  (const char *) "St5dequeIdSaIdEE"
+#+END_SRC
+
+Explore type_info object:
+
+#+BEGIN_SRC cpp 
+  >> const std::type_info& ti = typeid(3.434);
+  >> ti.name()
+  (const char *) "d"
+
+  >> ti.hash_code()
+  (unsigned long) 14494284460613645429
+
+  // Check whether type is int 
+  >> ti == typeid(int)
+  (bool) false
+
+  // Check whether type is double 
+  >> ti == typeid(double)
+  (bool) true
+
+  // Return the managled name of type 
+  >> typeid(std::string).name()
+  (const char *) "NSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE"
+ 
+  >> typeid(std::string*).name()
+  (const char *) "PNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE"
+
+
+  >> typeid(std::string).hash_code()
+  (unsigned long) 5774750460303204477
+#+END_SRC
+
+typeid and polymorphic types: 
+
+#+BEGIN_SRC cpp 
+  class Base{ virtual void dummy(){} };
+  class Da: public Base{};
+  class Db: public Base{};
+
+  >> typeid(Base).name()
+  (const char *) "4Base"
+
+  >> typeid(Da).name()
+  (const char *) "2Da"
+
+  >> typeid(Db).name()
+  (const char *) "2Db"
+
+  >> typeid(Base*).name()
+  (const char *) "P4Base"
+
+  >> typeid(Da*).name()
+  (const char *) "P2Da"
+#+END_SRC
+
 *** Operator dynamic_cast 
 
 The operator _dynamic_cast_ is used for safely downcasting a base class
-a particular derived class and also for checking if a pointer to base
-class refers to an instance of a particular derived class.
+to a particular derived class and is also for checking whether a
+pointer to the base class refers to an instance of a particular
+derived class. In general, dynamic casting should be avoided as it
+violates OOP good practices, for instance, the client code in most
+cases should have no knowledge about which particular derived class it
+is dealing with and it also should be able to work with new derived
+classes without any modification. The usage of dynamic cast and
+if-else in a client code for performing operation specific for each
+derived class can be avoided by adding new a virtual member function
+to the base class or by using the visitor design pattern or double
+dispatching. 
 
 The operator _static_cast_ can also be used for downcasting, however if
 the operation is not possible, the result is undefined, thus using
 _static_cast_ is unsafe. It is only safe using _static_cast_, if there is
 no doubt that the conversion is possible.
+
+Dynamic cast use case(s): 
+ 
+ + Extend the functionality of a class hierarchy without modifying the
+   base class or adding new virtual member functions. However, it will
+   require modification of client code if a new derived class is
+   created. 
 
 Notes and remarks: 
 
@@ -6463,6 +6650,10 @@ Notes and remarks:
 
  + _static_cast_ downcasting is unsafe. There is undefined behavior if
    the conversion is not possible.
+
+ + _static_cast_ is a compile-time construct.
+
+ + _dynamic_cast_ is a run-time construct.
 
  *Casting Pointers*
 
@@ -6684,7 +6875,6 @@ Dynamic casting references:
   (std::string) "DerivedA"
   >> 
 #+END_SRC
-
 
 
 ** Namespaces
