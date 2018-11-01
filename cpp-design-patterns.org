@@ -6,247 +6,6 @@
 - [[wiki:index][Index]]
 
 * Design Patterns 
-** Named constructor - static factory method
-
-The named constructor or static factory design pattern uses static
-methods instead of constructors for instantiating objects. This
-approach has many advantages over constructor instantiation. Named
-constructors are more readable than ordinary constructors and unlike
-constructors, many named constructors static methods sharing the same
-type signature can coexist. Another benefit is that this technique
-allows objects to be instantiated in many different ways from several
-different data representation.
-
-Side note: It should not be confused with factory design pattern or
-abstract factory design pattern.
-
-Example:
-
-#+BEGIN_SRC cpp   :results output pp :exports both 
-  #include <iostream>
-  #include <ostream>
-  #include <cstdint>
-
-  // #include <stdint>   // WARNING - It may not be available
-
-  // Unsigned byte from 0 to 255 or 0x00 to 0xFF
-  // ---> typedef uint8_t ubyte;
-  using ubyte = uint8_t ; 
-
-  class Color{
-  private:
-      ubyte m_r;
-      ubyte m_g;
-      ubyte m_b;
-  public:
-      Color(ubyte red, ubyte green, ubyte blue):
-          m_r(red), m_g(green), m_b(blue) {}
-      ubyte red(){
-          return m_r;
-      }
-      ubyte blue(){
-          return m_b;
-      }
-      ubyte green(){
-          return m_g;
-      }
-      // Named constructor or static factory method which builds the object
-      // From the RGB tuple data representation 
-      static Color fromRGB(ubyte red, ubyte green, ubyte blue){
-          return Color(red, green, blue);
-      }
-      // Named constructor which builds Color object 
-      // from hexadecimal data representation 
-      static Color fromHex(int color){
-          int r = color & 0xFF;
-          int g = (color >> 8 ) & 0xFF;
-          int b = (color >> 16) & 0xFF;
-          return Color(r, g, b);
-      }
-      // Named constructor which builds a specific color.
-      static Color colorRED(){
-          return fromRGB(255, 0, 0);
-      }
-      static Color colorBLUE(){
-          return fromRGB(0, 255, 0);
-      }
-      static Color colorGREEN(){
-          return fromRGB(0, 0, 255);
-      }
-      friend std::ostream& operator <<(std::ostream& os, const Color& c){
-          os << "Color(r = "
-             << static_cast<int>(c.m_r)
-             << ", g = " << static_cast<int>(c.m_g)
-             << ", b = " << static_cast<int>(c.m_b) << ")";
-          return os;
-      }      
-  };
-
-  int main(){
-      std::cout << "Red    = " << Color::colorRED()   << "\n";
-      std::cout << "Blue   = " << Color::colorBLUE()  << "\n";
-      std::cout << "Green  = " << Color::colorGREEN() << "\n";
-      std::cout << "Color1 = " << Color::fromRGB(20, 90, 200) << "\n";
-      std::cout << "Color2 = " << Color::fromHex(0xFF8AB5) << "\n";
-      std::cout.flush();
-      return 0;
-  }
-#+END_SRC
-
-#+RESULTS:
-: Red    = Color(r = 255, g = 0, b = 0)
-: Blue   = Color(r = 0, g = 255, b = 0)
-: Green  = Color(r = 0, g = 0, b = 255)
-: Color1 = Color(r = 20, g = 90, b = 200)
-: Color2 = Color(r = 181, g = 138, b = 255)
-** Singleton 
-
-Singleton is a creational design pattern where there is only a single
-instance of a class and client code is forbidden from creating new
-instances.
-
-Note: Despite that there are lots of objections against this design
-pattern, it is still worth knowing how it works.
-
-+ File: [[file:src/design-patterns/singleton1.cpp][file:src/design-patterns/singleton1.cpp]]
-
-#+BEGIN_SRC cpp
-   class FileRepository
-   {
-   private:
-       std::deque<std::string> _files;	
-       // Forbid client code instating a new instance. 
-       FileRepository(){}	
-       // Forbid client code from creating a copy or using the
-       // copy constructor.
-       FileRepository(const FileRepository&){}
-   public:
-       // Return a reference to not allow client code 
-       // to delete object. 
-       static auto getInstance() -> FileRepository& {
-           // Initialized once - lazy initialization 
-           static auto _instance = std::unique_ptr<FileRepository>(new FileRepository);
-           return *_instance.get();
-       }
-       void addFile(std::string fname){
-           _files.push_back(fname);
-       }
-       void clearFiles(){
-               _files.clear();
-       }
-       // C++11 member function declaration looks better. 
-       auto showFiles() -> void {
-           for(const auto& file: _files){
-               std::cout << " File = " << file << "\n";
-           }
-       }
-   };
-#+END_SRC
-
-Test in CERN ROOT/Clign REPL:
-
-#+BEGIN_SRC cpp 
-   // Load C++ code as it was a script.
-   >> .L singleton1.cpp
-
-   // Try to instantiate singleton object without reference. 
-   //------------------------------------------------------
-   >> FileRepository repo = FileRepository::getInstance()
-   ROOT_prompt_2:1:23: error: calling a private constructor of class 'FileRepository'
-   FileRepository repo = FileRepository::getInstance()
-                         ^
-   singleton1.cpp:21:5: note: declared private here
-       FileRepository(const FileRepository&){}
-       ^
-   >> FileRepository& repo = FileRepository::getInstance()
-   (FileRepository &) @0x2fc9640
-   >> 
-
-   >> FileRepository& repo = FileRepository::getInstance()
-   (FileRepository &) @0x2fc9640
-   >> 
-
-   >> repo.showFiles()
-   >> 
-   >> repo.addFile("quarterly-sales-report.dat")
-   >> repo.addFile("interest-payments.txt")
-   >> repo.addFile("taxes-report.xls")
-   >> repo.showFiles()
-    File = quarterly-sales-report.dat
-    File = interest-payments.txt
-    File = taxes-report.xls
-   >> 
-   >> 
-
-   // Try to copy object. 
-   >> FileRepository r = repo;
-   ROOT_prompt_9:1:20: error: calling a private constructor of class 'FileRepository'
-   FileRepository r = repo;
-                      ^
-   singleton1.cpp:21:5: note: declared private here
-       FileRepository(const FileRepository&){}
-       ^
-   >> 
-
-   // Try to create a new object 
-   >> FileRepository& repo2 = FileRepository::getInstance()
-   (FileRepository &) @0x2fc9640
-   >> repo2.showFiles()
-    File = quarterly-sales-report.dat
-    File = interest-payments.txt
-    File = taxes-report.xls
-   >> 
-
-   // Check whether repo and repo2 are the same object (reference equality)
-   // -> They are equal under reference equality criteria if they have the same address.
-   >> &repo == &repo2
-   (bool) true
-   >> 
-#+END_SRC
-
-Main function: 
-
-#+BEGIN_SRC cpp
-  FileRepository& repo1 = FileRepository::getInstance();
-  repo1.addFile("CashFlowStatement.txt");
-  repo1.addFile("Balance-Sheet.dat");
-  repo1.addFile("Sales-Report.csv");
-
-  FileRepository& repo2 = FileRepository::getInstance();
-
-  std::cout << std::boolalpha << "Same object? (&repo == &repo1 ?) = "
-            << (&repo1 == &repo2)
-            << "\n";
-  std::cout << "Repository files" << std::endl;
-  repo2.showFiles();
-
-  std::cout << "Add more files" << std::endl;
-  repo2.addFile("fileX1.pdf");
-  repo2.addFile("fileX2.pdf");
-  repo2.addFile("fileX3.pdf");
-  repo2.showFiles();
-#+END_SRC
-
-Compiling and running ([[file:src/design-patterns/singleton1.cpp][file:src/design-patterns/singleton1.cpp]]): 
-
-#+BEGIN_SRC txt 
-  $ clang++ singleton1.cpp -o singleton1.bin -g -std=c++1z -Wall -Wextra 
-  $ ./singleton1.bin
-
-  Same object? (&repo == &repo1 ?) = true
-  Repository files
-   File = CashFlowStatement.txt
-   File = Balance-Sheet.dat
-   File = Sales-Report.csv
-  Add more files
-   File = CashFlowStatement.txt
-   File = Balance-Sheet.dat
-   File = Sales-Report.csv
-   File = fileX1.pdf
-   File = fileX2.pdf
-   File = fileX3.pdf
-#+END_SRC
-
 ** Interface Class 
 *** Overview  
 
@@ -474,6 +233,562 @@ References and further reading:
  + [[https://en.wikibooks.org/wiki/More_C%2B%2B_Idioms/Interface_Class][More C++ Idioms/Interface Class - Wikibooks, open books for an open world]]
  + [[https://accu.org/index.php/journals/269][ACCU - Separating Interface and Implementation in C++]]
  + [[https://www.boost.org/doc/libs/1_63_0/libs/smart_ptr/sp_techniques.html][Smart Pointer Programming Techniques - 1.63.0]]
+** Singleton 
+
+Singleton is a creational design pattern where there is only a single
+instance of a class and client code is forbidden from creating new
+instances.
+
+Note: Despite that there are lots of objections against this design
+pattern, it is still worth knowing how it works.
+
++ File: [[file:src/design-patterns/singleton1.cpp][file:src/design-patterns/singleton1.cpp]]
+
+#+BEGIN_SRC cpp
+   class FileRepository
+   {
+   private:
+       std::deque<std::string> _files;	
+       // Forbid client code instating a new instance. 
+       FileRepository(){}	
+       // Forbid client code from creating a copy or using the
+       // copy constructor.
+       FileRepository(const FileRepository&){}
+   public:
+       // Return a reference to not allow client code 
+       // to delete object. 
+       static auto getInstance() -> FileRepository& {
+           // Initialized once - lazy initialization 
+           static auto _instance = std::unique_ptr<FileRepository>(new FileRepository);
+           return *_instance.get();
+       }
+       void addFile(std::string fname){
+           _files.push_back(fname);
+       }
+       void clearFiles(){
+               _files.clear();
+       }
+       // C++11 member function declaration looks better. 
+       auto showFiles() -> void {
+           for(const auto& file: _files){
+               std::cout << " File = " << file << "\n";
+           }
+       }
+   };
+#+END_SRC
+
+Test in CERN ROOT/Clign REPL:
+
+#+BEGIN_SRC cpp 
+   // Load C++ code as it was a script.
+   >> .L singleton1.cpp
+
+   // Try to instantiate singleton object without reference. 
+   //------------------------------------------------------
+   >> FileRepository repo = FileRepository::getInstance()
+   ROOT_prompt_2:1:23: error: calling a private constructor of class 'FileRepository'
+   FileRepository repo = FileRepository::getInstance()
+                         ^
+   singleton1.cpp:21:5: note: declared private here
+       FileRepository(const FileRepository&){}
+       ^
+   >> FileRepository& repo = FileRepository::getInstance()
+   (FileRepository &) @0x2fc9640
+   >> 
+
+   >> FileRepository& repo = FileRepository::getInstance()
+   (FileRepository &) @0x2fc9640
+   >> 
+
+   >> repo.showFiles()
+   >> 
+   >> repo.addFile("quarterly-sales-report.dat")
+   >> repo.addFile("interest-payments.txt")
+   >> repo.addFile("taxes-report.xls")
+   >> repo.showFiles()
+    File = quarterly-sales-report.dat
+    File = interest-payments.txt
+    File = taxes-report.xls
+   >> 
+   >> 
+
+   // Try to copy object. 
+   >> FileRepository r = repo;
+   ROOT_prompt_9:1:20: error: calling a private constructor of class 'FileRepository'
+   FileRepository r = repo;
+                      ^
+   singleton1.cpp:21:5: note: declared private here
+       FileRepository(const FileRepository&){}
+       ^
+   >> 
+
+   // Try to create a new object 
+   >> FileRepository& repo2 = FileRepository::getInstance()
+   (FileRepository &) @0x2fc9640
+   >> repo2.showFiles()
+    File = quarterly-sales-report.dat
+    File = interest-payments.txt
+    File = taxes-report.xls
+   >> 
+
+   // Check whether repo and repo2 are the same object (reference equality)
+   // -> They are equal under reference equality criteria if they have the same address.
+   >> &repo == &repo2
+   (bool) true
+   >> 
+#+END_SRC
+
+Main function: 
+
+#+BEGIN_SRC cpp
+  FileRepository& repo1 = FileRepository::getInstance();
+  repo1.addFile("CashFlowStatement.txt");
+  repo1.addFile("Balance-Sheet.dat");
+  repo1.addFile("Sales-Report.csv");
+
+  FileRepository& repo2 = FileRepository::getInstance();
+
+  std::cout << std::boolalpha << "Same object? (&repo == &repo1 ?) = "
+            << (&repo1 == &repo2)
+            << "\n";
+  std::cout << "Repository files" << std::endl;
+  repo2.showFiles();
+
+  std::cout << "Add more files" << std::endl;
+  repo2.addFile("fileX1.pdf");
+  repo2.addFile("fileX2.pdf");
+  repo2.addFile("fileX3.pdf");
+  repo2.showFiles();
+#+END_SRC
+
+Compiling and running ([[file:src/design-patterns/singleton1.cpp][file:src/design-patterns/singleton1.cpp]]): 
+
+#+BEGIN_SRC txt 
+  $ clang++ singleton1.cpp -o singleton1.bin -g -std=c++1z -Wall -Wextra 
+  $ ./singleton1.bin
+
+  Same object? (&repo == &repo1 ?) = true
+  Repository files
+   File = CashFlowStatement.txt
+   File = Balance-Sheet.dat
+   File = Sales-Report.csv
+  Add more files
+   File = CashFlowStatement.txt
+   File = Balance-Sheet.dat
+   File = Sales-Report.csv
+   File = fileX1.pdf
+   File = fileX2.pdf
+   File = fileX3.pdf
+#+END_SRC
+** Named constructor - static factory method
+
+The named constructor or static factory design pattern uses static
+methods instead of constructors for instantiating objects. This
+approach has many advantages over constructor instantiation. Named
+constructors are more readable than ordinary constructors and unlike
+constructors, many named constructors static methods sharing the same
+type signature can coexist. Another benefit is that this technique
+allows objects to be instantiated in many different ways from several
+different data representation.
+
+Side note: It should not be confused with factory design pattern or
+abstract factory design pattern.
+
+Example:
+
+#+BEGIN_SRC cpp   :results output pp :exports both 
+  #include <iostream>
+  #include <ostream>
+  #include <cstdint>
+
+  // #include <stdint>   // WARNING - It may not be available
+
+  // Unsigned byte from 0 to 255 or 0x00 to 0xFF
+  // ---> typedef uint8_t ubyte;
+  using ubyte = uint8_t ; 
+
+  class Color{
+  private:
+      ubyte m_r;
+      ubyte m_g;
+      ubyte m_b;
+  public:
+      Color(ubyte red, ubyte green, ubyte blue):
+          m_r(red), m_g(green), m_b(blue) {}
+      ubyte red(){
+          return m_r;
+      }
+      ubyte blue(){
+          return m_b;
+      }
+      ubyte green(){
+          return m_g;
+      }
+      // Named constructor or static factory method which builds the object
+      // From the RGB tuple data representation 
+      static Color fromRGB(ubyte red, ubyte green, ubyte blue){
+          return Color(red, green, blue);
+      }
+      // Named constructor which builds Color object 
+      // from hexadecimal data representation 
+      static Color fromHex(int color){
+          int r = color & 0xFF;
+          int g = (color >> 8 ) & 0xFF;
+          int b = (color >> 16) & 0xFF;
+          return Color(r, g, b);
+      }
+      // Named constructor which builds a specific color.
+      static Color colorRED(){
+          return fromRGB(255, 0, 0);
+      }
+      static Color colorBLUE(){
+          return fromRGB(0, 255, 0);
+      }
+      static Color colorGREEN(){
+          return fromRGB(0, 0, 255);
+      }
+      friend std::ostream& operator <<(std::ostream& os, const Color& c){
+          os << "Color(r = "
+             << static_cast<int>(c.m_r)
+             << ", g = " << static_cast<int>(c.m_g)
+             << ", b = " << static_cast<int>(c.m_b) << ")";
+          return os;
+      }      
+  };
+
+  int main(){
+      std::cout << "Red    = " << Color::colorRED()   << "\n";
+      std::cout << "Blue   = " << Color::colorBLUE()  << "\n";
+      std::cout << "Green  = " << Color::colorGREEN() << "\n";
+      std::cout << "Color1 = " << Color::fromRGB(20, 90, 200) << "\n";
+      std::cout << "Color2 = " << Color::fromHex(0xFF8AB5) << "\n";
+      std::cout.flush();
+      return 0;
+  }
+#+END_SRC
+
+#+RESULTS:
+: Red    = Color(r = 255, g = 0, b = 0)
+: Blue   = Color(r = 0, g = 255, b = 0)
+: Green  = Color(r = 0, g = 0, b = 255)
+: Color1 = Color(r = 20, g = 90, b = 200)
+: Color2 = Color(r = 181, g = 138, b = 255)
+
+See: 
+ + [[https://en.wikipedia.org/wiki/Factory_(object-oriented_programming)][Factory (object-oriented programming) - Wikipedia]]
+
+** Factory Method
+*** Overview  
+
+Factory method design pattern allows instatiating classes from a class
+hierarchy without hardcoding the class name and kwnowing the class
+implementation. There are many variations of this design pattern,
+however the most common form is a class with method which returns an
+instance of a derived class based on some input such as a number,
+code, class name as string or number.
+
+Definitions: 
+
+ + Factory method or factory functions are any methods or functions
+   which returns an instance of a class or derived class.
+
+Note: The factory design pattern in this document is the variation
+which creates an instance of a set of derived classes based on some
+input. 
+
+*** Factory Method Pattern Variations 
+
+Some variations: 
+
+ + _An ordinary function_ whith if-else statements which returns an
+   instance of a set of derived  classes according to some
+   input.
+   + Disadvantage: Adding new derived classes requires code
+     modification.
+
+ + _A static method_ with if-else statements. This is mostly used on
+   languages where there are not free functions or ordinary
+   functions.
+   + Disadvantage: Requires modifying the code when new classes are
+     added to the hierarchy. 
+
+ + _Registry-based factory_ (mostly known as Polymorphic Factory)- A
+   class contains a factory method for instantiating derived classes
+   based on some input and a hash table for registration of derived
+   classes.
+   + Disadvantage: Possibly requires manual registration during the
+     program initialization.
+
+   + Example:
+     + Factory.register("sql",   SQLCreator)
+     + Factory.register("mysql", MYSQLCreator)
+     + DBDrivef driver = Factory.create("sqlite");
+
+ + _Reflection-base factory_ - Some implementations uses reflection
+   registration of derived classes.
+   + Disadvantage: May not be possible in languages without reflection
+     such as C++.
+
+*** Sample Class Heirarchy 
+
+Consider the following class hierarchy: 
+
+ + Base class 
+
+#+BEGIN_SRC cpp 
+  class Base{
+  public:
+     Base() = default;
+      // Destructor of base class must always be virtual 
+      virtual ~Base() = default;   
+      virtual auto getType() const -> std::string {
+        return "Base";
+     }	
+     void showType(){
+        std::cout << "Class type = " << this->getType() << "\n";
+     }
+  };
+#+END_SRC
+
+ + Derived class A 
+
+#+BEGIN_SRC cpp 
+class DerivedA: public Base{
+public:
+    DerivedA(){}
+    auto getType() const  -> std::string {
+       return "DerivedA";
+    }
+};
+#+END_SRC
+
+ + Derived class B
+
+#+BEGIN_SRC cpp 
+  class DerivedB: public Base{
+  public:
+     DerivedB(){}
+     auto getType() const -> std::string {
+        return "DerivedB";
+     }
+  };
+#+END_SRC
+
+*** Simple factory - if-else statement
+
+Note: This implementation uses a factory function instead of a factory
+method. The function creates an instance of Base, DerivedA or DerivedB
+based on the provided name. The problem of this implementation is that
+it requires modification of the code when new derived classes are
+added.
+
+#+BEGIN_SRC cpp 
+  #include <memory> // smart pointers 
+ 
+  auto simpleFactory(const std::string& name) -> std::unique<Base> {
+       if(name == "Base")
+           return std::make_unique<Base>();
+       if(name == "DerivedA")
+           return std::make_unique<DerivedA>();
+       if(name == "DerivedB")
+           return std::make_unique<DerivedB>();
+       return nullptr;
+  }
+
+  >> auto base = simpleFactory("Base");
+  >> if(base) { std::puts("Ok, then proceed."); }
+  Ok, then proceed.
+
+  >> base->getType()
+  (std::string) "Base"
+
+  >> auto da = simpleFactory("DerivedA");
+  >> da->getType()
+  (std::string) "DerivedA"
+  >> 
+#+END_SRC
+
+*** Polymorphic Factory* - registry based factory
+
+Despite this implementation be more complex than a factory-method
+pattern implementation using if-else statement, this one doesn't
+require source modification if new derived classes are added to the
+hierarchy. 
+
+The class Factory is used for instantiating derived classes of Base
+class based on the class name provided as a string. The factory
+methods in this class are makeUnique and makeRaw.
+
+ + File:
+   + [[file:src/design-patterns/factory-pattern1.cpp][file:src/design-patterns/factory-pattern1.cpp]]
+ + Online Compiler:
+   + https://rextester.com/ILKI85678
+
+#+BEGIN_SRC cpp 
+  class Factory{
+  private:
+      using FactoryMap = std::map<std::string, Factory*>;
+      // Force global variable to be initialized, thus it avoid
+      // the inialization order fisaco. 
+      static auto getRegister() -> FactoryMap& {
+         static FactoryMap classRegister{};
+         return classRegister;
+      }
+  public:	
+      /** Register factory object of derived class */
+      static
+      auto registerFactory(const std::string& name, Factory* factory) -> void {
+           auto& reg = Factory::getRegister();
+           reg[name] = factory;
+      }
+      /** Show all registered classes */
+      static
+      auto showClasses() -> void {
+           std::cout << " Registered classes. " << "\n";
+           std::cout << " =================== " << "\n";
+           for(const auto& pair: Factory::getRegister())
+                   std::cout << " + " << pair.first << "\n";
+      }		
+      /**  Construct derived class returning a raw pointer */
+      static
+      auto makeRaw(const std::string& name) -> Base* {
+           auto it = Factory::getRegister().find(name);
+           if(it != Factory::getRegister().end())
+                   return it->second->construct();
+           return nullptr;
+      }
+
+      /** Construct derived class returning an unique ptr  */
+      static
+      auto makeUnique(const std::string& name) -> std::unique_ptr<Base>{
+          return std::unique_ptr<Base>(Factory::makeRaw(name));
+      }
+
+      // Destructor 
+      virtual
+      ~Factory() = default;
+
+      virtual
+      auto construct() const -> Base* = 0;
+  };
+#+END_SRC
+ 
+Concrete Factory: 
+ + Template class used for creating static object which registers the
+   associated derived class during the program initialization before
+   the function main. 
+
+#+BEGIN_SRC cpp 
+  template<typename DerivedClass>
+  class ConcreteFactory: Factory{
+  public:
+     // Register this global object on the Factory register 
+     ConcreteFactory(const std::string& name){
+        std::cerr << " [TRACE] " << " Registered Class = " << name << "\n";
+        Factory::registerFactory(name, this);
+     }
+     auto construct() const -> Base* {
+        return new DerivedClass;
+     }	
+  };
+#+END_SRC
+
+Manual class registration: 
+
+#+BEGIN_SRC cpp 
+  // Register Base class
+  namespace {
+     // Anonymous namespace is used to make the definitions here private to the current
+     // compilation unit (current file). It is equivalent to the old C static keyword.
+     // It could be placed at Base.cpp 
+     ConcreteFactory<Base> factoryBase("Base");
+  }
+#+END_SRC
+
+Class registration with macros:
+
+#+BEGIN_SRC cpp 
+  // Macro for class registration 
+  #define REGISER_FACTORY(derivedClass) \
+          namespace { auto registry_ ## derivedClass = ConcreteFactory<derivedClass>(#derivedClass);  }
+
+  //  Registration with macro. 
+  REGISER_FACTORY(DerivedA);
+  REGISER_FACTORY(DerivedB);
+#+END_SRC
+
+Main function: 
+
+#+BEGIN_SRC cpp 
+    Factory::showClasses();
+    std::cout << "\n";
+    std::unique_ptr<Base> objBase = Factory::makeUnique("Base");
+    std::cout << " type of objBase = " << objBase->getType() << "\n";
+
+    std::unique_ptr<Base> objDA = Factory::makeUnique("DerivedA");
+    std::cout << " type of derivedA = " << objDA->getType() << "\n";
+
+    std::unique_ptr<Base> objDB = Factory::makeUnique("DerivedB");
+    std::cout << " type of derivedA = " << objDB->getType() << "\n";
+
+    std::unique_ptr<Base> objDC = Factory::makeUnique("Derived-error");
+    if(!objDC)
+       std::cout << " ==> Error: object not found in factory" << '\n';
+#+END_SRC
+
+Output:
+
+#+BEGIN_SRC txt 
+  $ clang++ factory-pattern1.cpp -o factory-pattern1.bin -g -std=c++1z -Wall -Wextra $
+
+  $ ./factory-pattern1.bin
+   [TRACE]  Registered Class = Base
+   [TRACE]  Registered Class = DerivedA
+   [TRACE]  Registered Class = DerivedB
+   Registered classes. 
+   =================== 
+   + Base
+   + DerivedA
+   + DerivedB
+
+   type of objBase = Base
+   type of derivedA = DerivedA
+   type of derivedA = DerivedB
+   ==> Error: object not found in factory
+#+END_SRC
+
+*** References
+
+ + Bruce Eckel - *Thinking in Patterns with Java* - Page: 53
+   + <http://www.cs.huji.ac.il/~noam/intro2cs2001/www/TIPatterns.pdf>
+
+ + Bruce Eckel - *Thinking in C++, 2nd edition, Volume 2*
+   + <http://www.cs.cmu.edu/~gregjor/project/eckelbook/volume2/Chap11.htm>
+
+ + http://www.lsi.us.es/~jtorres/LibroJava/TIJ2R3-17_.html
+
+ + [[http://www.andypatterns.com/index.php/blog/from_strategy_to_bridge/][AndyPatterns - From Strategy to Bridge]]
+
+ + [[http://www.thedevpiece.com/cdi-polymorphism-and-the-factory-pattern/][CDI, Polymorphism and The Factory Pattern]]
+
+ + Design patterns - OOD Lecture 6 -
+   <https://www.it.uu.se/edu/course/homepage/ood/ht12/overview/patterns/Lecture6.pdf>
+
+ + Creational Patterns for Variability
+   + <http://www-st.inf.tu-dresden.de/Lehre/WS04-05/dpf/slides/2b-creational-variability-2p.pdf>
+
+ + the Factory Design Pattern -
+   <https://cs.anu.edu.au/courses/comp2500/notes/15factory.slides.pdf>
+
+ + Design Patterns as Quality Influencing Factor in Object Oriented
+   Design Approach - <https://arxiv.org/pdf/1402.2372.pdf>
+
+ + [[https://www.journaldev.com/1392/factory-design-pattern-in-java][Factory Design Pattern in Java - JournalDev]]
+
+ + [[https://industriallogic.com/xp/refactoring/polymorphicCreationFactory.html][Introduce Polymorphic Creation with Factory Method]]
+
+ + Factory Method -
+   <https://www.dofactory.com/net/factory-method-design-pattern> 
 ** Builder Design Pattern (Joshua Blosh)
 
 The purpose of the builder design pattern proposed by Joshua Bloch is
