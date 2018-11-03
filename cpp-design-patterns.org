@@ -5,234 +5,7 @@
 
 - [[wiki:index][Index]]
 
-* Design Patterns 
-** Interface Class 
-*** Overview  
-
-Unlike C# and Java, C++ doesn't have any keyword for implementing
-interface, however it can be implemented by creating a class with only
-pure virtual functions, in other words, only abstract methods or
-methods without implementation. 
-
-The interface class has a runtime overhead due to the virtual methods
-that are resolved at runtime. An alternative solution when the virtual
-methods calls performance overhead is not acceptable, is to use
-generic programming or templates which doesn't have runtime cost since
-the methods to be called are resolved at compile-time.
-
-Note: 
- + The annotation *virtual* - means that the method (member function)
-   can be overriden by the derived class. Methods in the base class
-   not annotated as virtual cannot be overriden in the derived
-   classes. Unlike Java, C++ methods are not virtual by default. 
-
- + The annotation (=0) - means a pure virtual member function, aka
-   pure virtual function which is an _abstract method_, method without
-   implementation. 
-
- *Example*: Interface Class Declaration: 
-
-#+BEGIN_SRC cpp 
-  class IStack{
-  public:
-      virtual ~IStack() = default;
-      virtual int    size()         const = 0;
-      virtual void   push(double x)       = 0;
-      virtual double pop()                = 0;
-      virtual double peek()         const = 0;
-  };
-#+END_SRC
-
-Or: 
-
-#+BEGIN_SRC cpp 
-  struct IStack{
-      virtual ~IStack() = default;
-      virtual int    size()         const = 0;
-      virtual void   push(double x)       = 0;
-      virtual double pop()                = 0;
-      virtual double peek()         const = 0;
-  };
-#+END_SRC
-
-Or using C++ auto keyword for functions: 
-
-#+BEGIN_SRC cpp 
-  struct IStack{
-      virtual ~IStack() = default;
-      virtual auto size() const   -> int    = 0;
-      virtual auto push(double x) -> void   = 0;
-      virtual auto pop()          -> double = 0;
-      virtual auto peek() const   -> double = 0;
-  };
-#+END_SRC
-*** Example 
-
- *Complete Code Example*
- - File:  [[file:src/design-patterns/interface-class.cpp][file:src/design-patterns/interface-class.cpp]]
-
-Interface class declaration:
-
-#+BEGIN_SRC cpp 
-  // Interface Stack. (Should be placed in the header file.) 
-  class IStack{
-  public:
-          virtual ~IStack() = default;
-          virtual int    size()         const = 0;
-          virtual void   push(double x)       = 0;
-          virtual double pop()                = 0;
-          virtual double peek()         const = 0;
-  };
-#+END_SRC
-
-Example: Interface implementations. 
-
- - Implementation of interface IStack using vector as internal
-   representation.
-
-#+BEGIN_SRC cpp 
-  class StackVector: public IStack{
-  public:
-          StackVector(){}
-          StackVector(const std::initializer_list<double>& xs){
-                  _stack.insert(_stack.begin(), xs.begin(), xs.end());
-          }
-          int size() const {
-                  return _stack.size();
-          }	
-          void push(double x){
-                  _stack.push_back(x);
-          }   
-          double pop(){
-                  if(this->size() == 0)
-                          throw std::runtime_error("Error: stack is empty");
-                  double top = _stack.back();
-                  _stack.pop_back();
-                  return top;
-          }
-          double peek() const {
-                  if(this->size() == 0)
-                          throw std::runtime_error("Error: stack is empty");		
-                  return _stack.back();
-          }
-  private:
-          std::vector<double> _stack{};
-  };
-#+END_SRC
-
- - Implementation using deque as internal representation:
-
-#+BEGIN_SRC cpp 
-  class StackDeque: public IStack{
-  public:
-          StackDeque(){}
-          StackDeque(const std::initializer_list<double>& xs){
-                  _stack.insert(_stack.begin(), xs.begin(), xs.end());
-          }	
-          int size() const {
-                  return _stack.size();
-          }	
-          void push(double x){
-                  _stack.push_back(x);
-          }   
-          double pop(){
-                  if(this->size() == 0)
-                          throw std::runtime_error("Error: stack is empty");
-                  double top = _stack.back();
-                  _stack.pop_back();
-                  return top;
-          }
-          double peek() const {
-                  if(this->size() == 0)
-                          throw std::runtime_error("Error: stack is empty");		
-                  return _stack.back();
-          }
-  private:
-          std::deque<double> _stack{};
-  };
-#+END_SRC
-
- - Sample client code: 
-
-#+BEGIN_SRC cpp 
-
-  auto stack_sum(IStack& s) -> double{
-          //std::cerr << " ==> stack_sum for references" << std::endl;
-          double sum = 0.0;
-          if(s.size() == 0)
-                  return sum;
-          while(s.size() != 0)
-                  sum += s.pop();
-          return sum;
-  }
-
-  auto stack_sum(IStack* s) -> double{
-          // std::cerr << " ==> stack_sum for pointers" << std::endl;
-          double sum = 0.0;
-          if(s->size() == 0)
-                  return sum;
-          while(s->size() != 0)
-                  sum += s->pop();
-          return sum;
-  }
-#+END_SRC
-
-Function main: 
-
-#+BEGIN_SRC cpp 
-   StackVector sv = {1.0, 2.0, 3.0, 5.0, 6.0};
-   StackDeque  sd = {1.0, 2.0, 3.0, 5.0, 6.0};
-   // The same client code works with any implementation of the interface. 
-   std::cout << "stack_sum(sv) = " << stack_sum(sv) << std::endl;
-   std::cout << "stack_sum(sd) = " << stack_sum(sd) << std::endl;
-
-   IStack* spointer = nullptr;
-   StackVector sv2 = {1.0, 2.0, 3.0, 5.0, 6.0};
-   StackDeque  sd2 = {1.0, 2.0, 3.0, 5.0, 6.0};
-   spointer = &sv2;
-   std::cout << "stack_sum(spointer) = " << stack_sum(spointer) << std::endl;
-   spointer = &sd2;
-   std::cout << "stack_sum(spointer) = " << stack_sum(spointer) << std::endl;
-
-   auto sptr = std::unique_ptr<IStack, std::function<void (IStack*)>>{
-           nullptr,
-           // Custom deleter 
-           [](IStack* p){
-                   std::cerr << " ==== Stack deleted OK" << std::endl ;
-                   delete p;
-           }
-   };
-   sptr.reset(new StackVector());
-   sptr->push(10);
-   sptr->push(25.0);
-   sptr->push(20.0);
-   std::cout << "stack_sum(sptr) = " << stack_sum(*sptr) << std::endl;
-   sptr.reset(new StackDeque());
-   sptr->push(10);
-   sptr->push(25.0);
-   sptr->push(20.0);
-   std::cout << "stack_sum(sptr) = " << stack_sum(*sptr) << std::endl;
-#+END_SRC
-
-Compiling Running: 
-
-#+BEGIN_SRC txt 
-   $ clang++ interface-class.cpp -o interface-class.bin -g -std=c++1z -Wall -Wextra 
-   $ ./interface-class.bin
-   stack_sum(sv) = 17
-   stack_sum(sd) = 17
-   stack_sum(spointer) = 17
-   stack_sum(spointer) = 17
-   stack_sum(sptr) = 55
-    ==== Stack deleted OK
-   stack_sum(sptr) = 55
-    ==== Stack deleted OK
-#+END_SRC
-
-References and further reading: 
- + [[https://en.wikibooks.org/wiki/More_C%2B%2B_Idioms/Interface_Class][More C++ Idioms/Interface Class - Wikibooks, open books for an open world]]
- + [[https://accu.org/index.php/journals/269][ACCU - Separating Interface and Implementation in C++]]
- + [[https://www.boost.org/doc/libs/1_63_0/libs/smart_ptr/sp_techniques.html][Smart Pointer Programming Techniques - 1.63.0]]
+* General Design Patterns 
 ** Singleton 
 
 Singleton is a creational design pattern where there is only a single
@@ -477,7 +250,7 @@ Example:
 See: 
  + [[https://en.wikipedia.org/wiki/Factory_(object-oriented_programming)][Factory (object-oriented programming) - Wikipedia]]
 
-** Factory Method
+** Factory Method 
 *** Overview  
 
 Factory method design pattern allows instatiating classes from a class
@@ -1141,8 +914,7 @@ Try creating a class which is not registered
  + *Self Registering Classes - Taking polymorphism to the limit*
    + <https://accu.org/index.php/journals/597>
 
- 
-** Builder Design Pattern (Joshua Blosh)
+** Builder (Joshua Blosh)
 
 The purpose of the builder design pattern proposed by Joshua Bloch is
 to simplify the instantiation of objects with many constructor
@@ -1272,7 +1044,7 @@ Running:
      email     = wsx752@couk.com.sk
    }
 #+END_SRC
-** Strategy Design Pattern 
+** Strategy
 *** Overview  
 
 Intent: A behavioral design pattern from GOF which allows the client
@@ -1690,7 +1462,415 @@ Code Example:
   };
 #+END_SRC
 
-** PIMPL - Pointer to Implementation (C++ Only)
+** Multiple booleans encoded as bitmask
+
+Note: It is not a design pattern, but a technique for encoding
+multiple booleans or flags inside a single value, passing multiple
+booleans as function parameters or returning multiple booleans as a
+single value.
+
+Example: 
+
+ - File:  [[file:src/design-patterns/boolean-bitmask.C][file:src/design-patterns/boolean-bitmask.C]]  (CLING script)
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <vector>
+  #include <ostream> // Operator: (<<)
+  #include <string>
+
+  enum class Permissions: unsigned {
+      executable = 0x01,  // decimal = 1 or (1 << 0)
+      writeable  = 0x02,  // decimal = 2 or (1 << 1)
+      readable   = 0x04   // decimal = 4 or (1 << 2)
+  };
+
+  Permissions operator | (Permissions lhs, Permissions rhs){
+      return static_cast<Permissions>(static_cast<unsigned>(lhs) | static_cast<unsigned>(rhs));
+  }
+  bool operator & (Permissions lhs, Permissions rhs){
+      return static_cast<unsigned>(lhs) & static_cast<unsigned>(rhs);
+  }
+  // Make permissions enum printable. 
+  std::ostream& operator<<(std::ostream& os, const Permissions& p){
+      os << std::boolalpha; // Make bool printable as 'true' or 'false' instead of 0 or 1
+      os << "readable = "   << (p & Permissions::readable)   << "; "
+         << "writeable = "  << (p & Permissions::writeable)  << "; "
+         << "executable = " << (p & Permissions::executable);
+      return os;
+  }
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC cpp 
+  // Load script 
+  >> .L boolean-bitmask.C 
+
+  >> std::cout << Permissions::readable << std::endl;
+  readable = true; writeable = false; executable = false
+
+  >> std::cout << Permissions::readable << "\n";
+  readable = true; writeable = false; executable = false
+
+  >> std::cout << Permissions::writeable << "\n";
+  readable = false; writeable = true; executable = false
+
+  >> std::cout << Permissions::executable << "\n";
+  readable = false; writeable = false; executable = true
+
+  >> auto p1 = Permissions::executable | Permissions::readable ;
+  >> std::cout << "p1 => " << p1 << "\n";
+  p1 => readable = true; writeable = false; executable = true
+  >> 
+
+  >> auto p2 = Permissions::executable | Permissions::readable | Permissions::writeable ;
+  >> std::cout << "p2 => " << p2 << "\n";
+  p2 => readable = true; writeable = true; executable = true
+  >> 
+
+  >> if(p1 & Permissions::readable) { std::cout << "File is readable" << "\n"; }
+  File is readable
+  >> 
+
+#+END_SRC
+
+Shows all flags or all bits that are set: 
+
+#+BEGIN_SRC cpp 
+  void showPermissions(Permissions p){
+          std::cout << "Is readable?     : " << (p & Permissions::readable)   << '\n';
+          std::cout << "Is writeable?    : " << (p & Permissions::writeable)  << '\n';
+          std::cout << "Is executable?   : " << (p & Permissions::executable) << '\n';
+  }
+
+  >> showPermissions(p1)
+  Is readable?     : true
+  Is writeable?    : false
+  Is executable?   : true
+  >> 
+  >> showPermissions(p2)
+  Is readable?     : true
+  Is writeable?    : true
+  Is executable?   : true
+  >> 
+#+END_SRC
+
+Design 1: Function uses multiple bools creating a file with some
+permissions. 
+
+#+BEGIN_SRC cpp 
+  using FilePerms = std::tuple<bool, bool, bool>;
+
+  // Design 1:
+  FilePerms createFileDD1(
+       std::string name,
+       bool readable,
+       bool writeable,
+       bool executable ){
+       std::cout << std::boolalpha
+                 << "Create file = " << name << "\n"
+                 << " with the following permissions" << "\n"
+                 << "  + readable   = " << readable   << "\n"
+                 << "  + writeable  = " << writeable  << "\n"
+                 << "  + executable = " << executable << "\n"
+                 << "\n";
+       return FilePerms {readable, writeable, executable};	
+  }
+
+  >> auto pd1 = createFileDD1("dataset.txt", true, false, false)
+  Create file = dataset.txt
+   with the following permissions
+    + readable   = true
+    + writeable  = false
+    + executable = false
+
+  >> pd1
+  (std::tuple<bool, bool, bool> &) { true, false, false }
+  >> 
+
+  >> std::cout << "R = " << std::get<0>(pd1) << "\n";
+  R = true
+  >> std::cout << "W = " << std::get<1>(pd1) << "\n";
+  W = false
+  >> std::cout << "X = " << std::get<2>(pd1) << "\n";
+  X = false
+  >> 
+#+END_SRC
+
+Design 2: Use bitmask flags instead of bools. The advantage is more
+readability and less functions parameters. 
+
+#+BEGIN_SRC cpp 
+  // Design 1:
+  Permissions createFileDD2(std::string name, Permissions p){
+       std::cout << std::boolalpha
+                 << "Create file = " << name << "\n"
+                 << " with the following permissions" << "\n"
+                 << "  + readable   = " << (p & Permissions::readable)   << "\n"
+                 << "  + writeable  = " << (p & Permissions::writeable)  << "\n"
+                 << "  + executable = " << (p & Permissions::executable) << "\n"
+                 << "\n";
+       return p;
+  }
+
+  >> auto pd2 = createFileDD2("Sales-report.xls", Permissions::readable | Permissions::writeable)
+  Create file = Sales-report.xls
+   with the following permissions
+    + readable   = true
+    + writeable  = true
+    + executable = false
+
+  (Permissions)  : (unsigned int) 6
+  >> 
+
+  >> createFileDD2("parser.exe", Permissions::readable | Permissions::writeable | Create file = parser.exe
+   with the following permissions
+    + readable   = true
+    + writeable  = true
+    + executable = true
+
+  (Permissions)  : (unsigned int) 7
+  >> 
+
+  >> std::cout << "R = " << (pd2 & Permissions::readable) << "\n";
+  R = true
+  >> std::cout << "W = " << (pd2 & Permissions::writeable) << "\n";
+  W = true
+  >> std::cout << "X = " << (pd2 & Permissions::executable) << "\n";
+  X = false
+#+END_SRC
+
+* C++ Specific Design Pattern and Idioms
+** Interface Class 
+*** Overview  
+
+Unlike C# and Java, C++ doesn't have any keyword for implementing
+interface, however it can be implemented by creating a class with only
+pure virtual functions, in other words, only abstract methods or
+methods without implementation. 
+
+The interface class has a runtime overhead due to the virtual methods
+that are resolved at runtime. An alternative solution when the virtual
+methods calls performance overhead is not acceptable, is to use
+generic programming or templates which doesn't have runtime cost since
+the methods to be called are resolved at compile-time.
+
+Note: 
+ + The annotation *virtual* - means that the method (member function)
+   can be overriden by the derived class. Methods in the base class
+   not annotated as virtual cannot be overriden in the derived
+   classes. Unlike Java, C++ methods are not virtual by default. 
+
+ + The annotation (=0) - means a pure virtual member function, aka
+   pure virtual function which is an _abstract method_, method without
+   implementation. 
+
+ *Example*: Interface Class Declaration: 
+
+#+BEGIN_SRC cpp 
+  class IStack{
+  public:
+      virtual ~IStack() = default;
+      virtual int    size()         const = 0;
+      virtual void   push(double x)       = 0;
+      virtual double pop()                = 0;
+      virtual double peek()         const = 0;
+  };
+#+END_SRC
+
+Or: 
+
+#+BEGIN_SRC cpp 
+  struct IStack{
+      virtual ~IStack() = default;
+      virtual int    size()         const = 0;
+      virtual void   push(double x)       = 0;
+      virtual double pop()                = 0;
+      virtual double peek()         const = 0;
+  };
+#+END_SRC
+
+Or using C++ auto keyword for functions: 
+
+#+BEGIN_SRC cpp 
+  struct IStack{
+      virtual ~IStack() = default;
+      virtual auto size() const   -> int    = 0;
+      virtual auto push(double x) -> void   = 0;
+      virtual auto pop()          -> double = 0;
+      virtual auto peek() const   -> double = 0;
+  };
+#+END_SRC
+*** Example 
+
+ *Complete Code Example*
+ - File:  [[file:src/design-patterns/interface-class.cpp][file:src/design-patterns/interface-class.cpp]]
+
+Interface class declaration:
+
+#+BEGIN_SRC cpp 
+  // Interface Stack. (Should be placed in the header file.) 
+  class IStack{
+  public:
+          virtual ~IStack() = default;
+          virtual int    size()         const = 0;
+          virtual void   push(double x)       = 0;
+          virtual double pop()                = 0;
+          virtual double peek()         const = 0;
+  };
+#+END_SRC
+
+Example: Interface implementations. 
+
+ - Implementation of interface IStack using vector as internal
+   representation.
+
+#+BEGIN_SRC cpp 
+  class StackVector: public IStack{
+  public:
+          StackVector(){}
+          StackVector(const std::initializer_list<double>& xs){
+                  _stack.insert(_stack.begin(), xs.begin(), xs.end());
+          }
+          int size() const {
+                  return _stack.size();
+          }	
+          void push(double x){
+                  _stack.push_back(x);
+          }   
+          double pop(){
+                  if(this->size() == 0)
+                          throw std::runtime_error("Error: stack is empty");
+                  double top = _stack.back();
+                  _stack.pop_back();
+                  return top;
+          }
+          double peek() const {
+                  if(this->size() == 0)
+                          throw std::runtime_error("Error: stack is empty");		
+                  return _stack.back();
+          }
+  private:
+          std::vector<double> _stack{};
+  };
+#+END_SRC
+
+ - Implementation using deque as internal representation:
+
+#+BEGIN_SRC cpp 
+  class StackDeque: public IStack{
+  public:
+          StackDeque(){}
+          StackDeque(const std::initializer_list<double>& xs){
+                  _stack.insert(_stack.begin(), xs.begin(), xs.end());
+          }	
+          int size() const {
+                  return _stack.size();
+          }	
+          void push(double x){
+                  _stack.push_back(x);
+          }   
+          double pop(){
+                  if(this->size() == 0)
+                          throw std::runtime_error("Error: stack is empty");
+                  double top = _stack.back();
+                  _stack.pop_back();
+                  return top;
+          }
+          double peek() const {
+                  if(this->size() == 0)
+                          throw std::runtime_error("Error: stack is empty");		
+                  return _stack.back();
+          }
+  private:
+          std::deque<double> _stack{};
+  };
+#+END_SRC
+
+ - Sample client code: 
+
+#+BEGIN_SRC cpp 
+
+  auto stack_sum(IStack& s) -> double{
+          //std::cerr << " ==> stack_sum for references" << std::endl;
+          double sum = 0.0;
+          if(s.size() == 0)
+                  return sum;
+          while(s.size() != 0)
+                  sum += s.pop();
+          return sum;
+  }
+
+  auto stack_sum(IStack* s) -> double{
+          // std::cerr << " ==> stack_sum for pointers" << std::endl;
+          double sum = 0.0;
+          if(s->size() == 0)
+                  return sum;
+          while(s->size() != 0)
+                  sum += s->pop();
+          return sum;
+  }
+#+END_SRC
+
+Function main: 
+
+#+BEGIN_SRC cpp 
+   StackVector sv = {1.0, 2.0, 3.0, 5.0, 6.0};
+   StackDeque  sd = {1.0, 2.0, 3.0, 5.0, 6.0};
+   // The same client code works with any implementation of the interface. 
+   std::cout << "stack_sum(sv) = " << stack_sum(sv) << std::endl;
+   std::cout << "stack_sum(sd) = " << stack_sum(sd) << std::endl;
+
+   IStack* spointer = nullptr;
+   StackVector sv2 = {1.0, 2.0, 3.0, 5.0, 6.0};
+   StackDeque  sd2 = {1.0, 2.0, 3.0, 5.0, 6.0};
+   spointer = &sv2;
+   std::cout << "stack_sum(spointer) = " << stack_sum(spointer) << std::endl;
+   spointer = &sd2;
+   std::cout << "stack_sum(spointer) = " << stack_sum(spointer) << std::endl;
+
+   auto sptr = std::unique_ptr<IStack, std::function<void (IStack*)>>{
+           nullptr,
+           // Custom deleter 
+           [](IStack* p){
+                   std::cerr << " ==== Stack deleted OK" << std::endl ;
+                   delete p;
+           }
+   };
+   sptr.reset(new StackVector());
+   sptr->push(10);
+   sptr->push(25.0);
+   sptr->push(20.0);
+   std::cout << "stack_sum(sptr) = " << stack_sum(*sptr) << std::endl;
+   sptr.reset(new StackDeque());
+   sptr->push(10);
+   sptr->push(25.0);
+   sptr->push(20.0);
+   std::cout << "stack_sum(sptr) = " << stack_sum(*sptr) << std::endl;
+#+END_SRC
+
+Compiling Running: 
+
+#+BEGIN_SRC txt 
+   $ clang++ interface-class.cpp -o interface-class.bin -g -std=c++1z -Wall -Wextra 
+   $ ./interface-class.bin
+   stack_sum(sv) = 17
+   stack_sum(sd) = 17
+   stack_sum(spointer) = 17
+   stack_sum(spointer) = 17
+   stack_sum(sptr) = 55
+    ==== Stack deleted OK
+   stack_sum(sptr) = 55
+    ==== Stack deleted OK
+#+END_SRC
+
+References and further reading: 
+ + [[https://en.wikibooks.org/wiki/More_C%2B%2B_Idioms/Interface_Class][More C++ Idioms/Interface Class - Wikibooks, open books for an open world]]
+ + [[https://accu.org/index.php/journals/269][ACCU - Separating Interface and Implementation in C++]]
+ + [[https://www.boost.org/doc/libs/1_63_0/libs/smart_ptr/sp_techniques.html][Smart Pointer Programming Techniques - 1.63.0]]
+
+** PIMPL - Pointer to Implementation
 
 The PIMPL - Pointer to Implementation idiom, also known as compiler
 firewall, is a widely used technique  in C++ for completly hiding class
@@ -1823,8 +2003,115 @@ References and further:
  
  + *Modern and Lucid C++ Advanced for Professional Programmers* -
    <https://wiki.ifs.hsr.ch/CppAdvanced/files/lecture_12_advanced_library_design.pdf> 
+** RAII - Resource Aquisition Is Initialization
 
-** Type Erasure (C++ Only)
+Comes from book: _C++ Programming with Design Patterns Revealed_ 
+
+RAII is a design pattern which takes advantage of C++'s deterministic
+destructor feature for deallocating resources such as pointers to
+objects allocated on the heap memory, database handlers, socket
+handlers and etc. The RAAI technique uses an object allocated on the
+stack which acquires the resource as a constructor argument and
+performs the resource cleanup in the destructor method which is called
+when when the wrapper object goes out scope or an exception happens.
+
+ + Note: This pattern is specific for C++, for Java and Scala use _try_
+   _finally_ statements. Python has the _with_ statement and C# has the
+   _using_ statement. In addition, this pattern needs the
+   *deterministic destructor* feature which is unique to C++.
+
+Note: It is no longer necessary to design any class for RAII since
+C++11 has smart pointers which already implements this
+pattern. However, it is important to understand how this idiom works
+and the problem that it solves.
+ + In C++ >= C++ 11, it is better to use ~unique_ptr~ for handling
+   resources as shown at [[https://msdn.microsoft.com/en-us/library/hh438480.aspx][Objects Own Resources (RAII)]] 
+
+RAII is described as the process of: 
+ + Acquiring a resouce and wrapping it as an object's state.
+ + Using the resource 
+ + Releasing the resource in the object's destructor member function
+   which is executed when the object goes out of escope.
+
+Problems solved by the pattern.
+ + Avoid [[https://en.wikipedia.org/wiki/Memory_leak][memory leak]] 
+ + Avoid [[https://en.wikipedia.org/wiki/Resource_leak][resource leak]]
+ + Save and restore context. => An object allocated on the stack could
+   be used to set the current directory and restore saved directory
+   when the destructor is invoked when the object goes out scope. The
+   same technique could be used to save and restore std::cout or
+   std::cerr flags. 
+
+Known uses: 
+ + C++11 _shared_ptr_ (Smart pointer)
+ + C++11 _unique_ptr_ (Smart pointer)
+
+ *Example 1:* Naive code - If an exception happens, the resource will not
+be released and the code will be vulnerable against memory leak or
+resource leak.  
+
+#+BEGIN_SRC cpp 
+  Handler* handle  = getDatabaseHandler(); 
+  // Throw exception => Resource leak 
+  performInvalidOperation(handle);  
+  ...
+  // Forget to release resource!
+  deleteResource(handle); 
+#+END_SRC
+
+Or: 
+
+#+BEGIN_SRC cpp 
+   Object* heapObject = new Object(param0, param1, ....);
+   peformOperation(heapObject); 
+   heapObject->method1; 
+
+   // Throw exception!! ==> Memory Leak!
+
+   // If the user forget this statement, 
+   // a memory leak will happen. 
+   delete heapObject; 
+#+END_SRC
+ 
+ *Solution - RAAI Pattern*
+
+ - An object is used to control the lifetime of a resource ensuring
+   that is released when the object goes out of scope or an exception
+   happens. The resource is aquired by the constructor and realeased
+   by the destructor.
+
+#+BEGIN_SRC cpp 
+  template<class Resource>
+  class RaaiHandler {
+  public:  
+     // Consructor: Acquire resource on the constructor 
+     RaaiHandler(Resource* rawHandle_) : (rawHandle_) {};
+
+     // Destructor: Releases resource 
+     // The destructor is always called when the object goes out of scope 
+     // or an exception happens.
+     ~RaiiHandler() {
+        delete _handler; 
+      }      
+  private:
+     RaiiHandler* _handler;
+  };
+
+  // Object created without new keyword is allocated in the stack, not in the heap.
+  RaiiHandler hnd(createNewResource());
+  // .. . Peform operation 
+  Operation(hnd);
+  // Once the escope is gone, the resource is released.
+#+END_SRC
+
+ *References*
+
+ + [[https://www.codeproject.com/Articles/580077/ResourceplusAcquisitionplusisplusInitializationplu][Resource Acquisition is Initialization (RAII) - CodeProject]]
+ + [[https://stackoverflow.com/questions/2321511/what-is-meant-by-resource-acquisition-is-initialization-raii][c++ - What is meant by Resource Acquisition is Initialization (RAII)? - Stack Overflow]]
+ + [[https://www.codeproject.com/Articles/122129/RAII-Resource-Acquisition-Is-Initialization-C-Help][RAII (Resource Acquisition Is Initialization) C# Helper Classes - CodeProject]]
+ + [[http://jrdodds.blogs.com/blog/2004/08/raii_in_c.html/][RAII in C++ (constructive nonconformist)]]
+
+** Type Erasure
 *** Overview  
 
 Type erasure is a set of techniques for providing an uniform interface
@@ -2109,7 +2396,7 @@ Compiling and running: (File: [[file:src/design-patterns/type-erasure1.cpp][file
   I am the class B
   I am the class C
 #+END_SRC
-** CRTP - Curious Recurring Template Pattern (C++ Only)
+** CRTP - Curious Recurring Template Pattern
 *** Overview 
 
 It is a variation of GOF template design pattern where an algorithm
@@ -2270,115 +2557,7 @@ Videos:
  + 
 
  + 
-** RAII - Resource Aquisition Is Initialization (C++ Only)
-
-Comes from book: _C++ Programming with Design Patterns Revealed_ 
-
-RAII is a design pattern which takes advantage of C++'s deterministic
-destructor feature for deallocating resources such as pointers to
-objects allocated on the heap memory, database handlers, socket
-handlers and etc. The RAAI technique uses an object allocated on the
-stack which acquires the resource as a constructor argument and
-performs the resource cleanup in the destructor method which is called
-when when the wrapper object goes out scope or an exception happens.
-
- + Note: This pattern is specific for C++, for Java and Scala use _try_
-   _finally_ statements. Python has the _with_ statement and C# has the
-   _using_ statement. In addition, this pattern needs the
-   *deterministic destructor* feature which is unique to C++.
-
-Note: It is no longer necessary to design any class for RAII since
-C++11 has smart pointers which already implements this
-pattern. However, it is important to understand how this idiom works
-and the problem that it solves.
- + In C++ >= C++ 11, it is better to use ~unique_ptr~ for handling
-   resources as shown at [[https://msdn.microsoft.com/en-us/library/hh438480.aspx][Objects Own Resources (RAII)]] 
-
-RAII is described as the process of: 
- + Acquiring a resouce and wrapping it as an object's state.
- + Using the resource 
- + Releasing the resource in the object's destructor member function
-   which is executed when the object goes out of escope.
-
-Problems solved by the pattern.
- + Avoid [[https://en.wikipedia.org/wiki/Memory_leak][memory leak]] 
- + Avoid [[https://en.wikipedia.org/wiki/Resource_leak][resource leak]]
- + Save and restore context. => An object allocated on the stack could
-   be used to set the current directory and restore saved directory
-   when the destructor is invoked when the object goes out scope. The
-   same technique could be used to save and restore std::cout or
-   std::cerr flags. 
-
-Known uses: 
- + C++11 _shared_ptr_ (Smart pointer)
- + C++11 _unique_ptr_ (Smart pointer)
-
- *Example 1:* Naive code - If an exception happens, the resource will not
-be released and the code will be vulnerable against memory leak or
-resource leak.  
-
-#+BEGIN_SRC cpp 
-  Handler* handle  = getDatabaseHandler(); 
-  // Throw exception => Resource leak 
-  performInvalidOperation(handle);  
-  ...
-  // Forget to release resource!
-  deleteResource(handle); 
-#+END_SRC
-
-Or: 
-
-#+BEGIN_SRC cpp 
-   Object* heapObject = new Object(param0, param1, ....);
-   peformOperation(heapObject); 
-   heapObject->method1; 
-
-   // Throw exception!! ==> Memory Leak!
-
-   // If the user forget this statement, 
-   // a memory leak will happen. 
-   delete heapObject; 
-#+END_SRC
- 
- *Solution - RAAI Pattern*
-
- - An object is used to control the lifetime of a resource ensuring
-   that is released when the object goes out of scope or an exception
-   happens. The resource is aquired by the constructor and realeased
-   by the destructor.
-
-#+BEGIN_SRC cpp 
-  template<class Resource>
-  class RaaiHandler {
-  public:  
-     // Consructor: Acquire resource on the constructor 
-     RaaiHandler(Resource* rawHandle_) : (rawHandle_) {};
-
-     // Destructor: Releases resource 
-     // The destructor is always called when the object goes out of scope 
-     // or an exception happens.
-     ~RaiiHandler() {
-        delete _handler; 
-      }      
-  private:
-     RaiiHandler* _handler;
-  };
-
-  // Object created without new keyword is allocated in the stack, not in the heap.
-  RaiiHandler hnd(createNewResource());
-  // .. . Peform operation 
-  Operation(hnd);
-  // Once the escope is gone, the resource is released.
-#+END_SRC
-
- *References*
-
- + [[https://www.codeproject.com/Articles/580077/ResourceplusAcquisitionplusisplusInitializationplu][Resource Acquisition is Initialization (RAII) - CodeProject]]
- + [[https://stackoverflow.com/questions/2321511/what-is-meant-by-resource-acquisition-is-initialization-raii][c++ - What is meant by Resource Acquisition is Initialization (RAII)? - Stack Overflow]]
- + [[https://www.codeproject.com/Articles/122129/RAII-Resource-Acquisition-Is-Initialization-C-Help][RAII (Resource Acquisition Is Initialization) C# Helper Classes - CodeProject]]
- + [[http://jrdodds.blogs.com/blog/2004/08/raii_in_c.html/][RAII in C++ (constructive nonconformist)]]
-
-** Cross platform code with conditional compilation (C++ Only)
+** Cross platform code with conditional compilation
 
 Note: It is not a design pattern, but a useful for techinque for
 designing cross platform code in C++.
@@ -2465,181 +2644,4 @@ Example:
   }
 #+END_SRC
 
-** Multiple booleans encoded as bitmask
 
-Note: It is not a design pattern, but a technique for encoding
-multiple booleans or flags inside a single value, passing multiple
-booleans as function parameters or returning multiple booleans as a
-single value.
-
-Example: 
-
- - File:  [[file:src/design-patterns/boolean-bitmask.C][file:src/design-patterns/boolean-bitmask.C]]  (CLING script)
-
-#+BEGIN_SRC cpp 
-  #include <iostream>
-  #include <vector>
-  #include <ostream> // Operator: (<<)
-  #include <string>
-
-  enum class Permissions: unsigned {
-      executable = 0x01,  // decimal = 1 or (1 << 0)
-      writeable  = 0x02,  // decimal = 2 or (1 << 1)
-      readable   = 0x04   // decimal = 4 or (1 << 2)
-  };
-
-  Permissions operator | (Permissions lhs, Permissions rhs){
-      return static_cast<Permissions>(static_cast<unsigned>(lhs) | static_cast<unsigned>(rhs));
-  }
-  bool operator & (Permissions lhs, Permissions rhs){
-      return static_cast<unsigned>(lhs) & static_cast<unsigned>(rhs);
-  }
-  // Make permissions enum printable. 
-  std::ostream& operator<<(std::ostream& os, const Permissions& p){
-      os << std::boolalpha; // Make bool printable as 'true' or 'false' instead of 0 or 1
-      os << "readable = "   << (p & Permissions::readable)   << "; "
-         << "writeable = "  << (p & Permissions::writeable)  << "; "
-         << "executable = " << (p & Permissions::executable);
-      return os;
-  }
-#+END_SRC
-
-Running: 
-
-#+BEGIN_SRC cpp 
-  // Load script 
-  >> .L boolean-bitmask.C 
-
-  >> std::cout << Permissions::readable << std::endl;
-  readable = true; writeable = false; executable = false
-
-  >> std::cout << Permissions::readable << "\n";
-  readable = true; writeable = false; executable = false
-
-  >> std::cout << Permissions::writeable << "\n";
-  readable = false; writeable = true; executable = false
-
-  >> std::cout << Permissions::executable << "\n";
-  readable = false; writeable = false; executable = true
-
-  >> auto p1 = Permissions::executable | Permissions::readable ;
-  >> std::cout << "p1 => " << p1 << "\n";
-  p1 => readable = true; writeable = false; executable = true
-  >> 
-
-  >> auto p2 = Permissions::executable | Permissions::readable | Permissions::writeable ;
-  >> std::cout << "p2 => " << p2 << "\n";
-  p2 => readable = true; writeable = true; executable = true
-  >> 
-
-  >> if(p1 & Permissions::readable) { std::cout << "File is readable" << "\n"; }
-  File is readable
-  >> 
-
-#+END_SRC
-
-Shows all flags or all bits that are set: 
-
-#+BEGIN_SRC cpp 
-  void showPermissions(Permissions p){
-          std::cout << "Is readable?     : " << (p & Permissions::readable)   << '\n';
-          std::cout << "Is writeable?    : " << (p & Permissions::writeable)  << '\n';
-          std::cout << "Is executable?   : " << (p & Permissions::executable) << '\n';
-  }
-
-  >> showPermissions(p1)
-  Is readable?     : true
-  Is writeable?    : false
-  Is executable?   : true
-  >> 
-  >> showPermissions(p2)
-  Is readable?     : true
-  Is writeable?    : true
-  Is executable?   : true
-  >> 
-#+END_SRC
-
-Design 1: Function uses multiple bools creating a file with some
-permissions. 
-
-#+BEGIN_SRC cpp 
-  using FilePerms = std::tuple<bool, bool, bool>;
-
-  // Design 1:
-  FilePerms createFileDD1(
-       std::string name,
-       bool readable,
-       bool writeable,
-       bool executable ){
-       std::cout << std::boolalpha
-                 << "Create file = " << name << "\n"
-                 << " with the following permissions" << "\n"
-                 << "  + readable   = " << readable   << "\n"
-                 << "  + writeable  = " << writeable  << "\n"
-                 << "  + executable = " << executable << "\n"
-                 << "\n";
-       return FilePerms {readable, writeable, executable};	
-  }
-
-  >> auto pd1 = createFileDD1("dataset.txt", true, false, false)
-  Create file = dataset.txt
-   with the following permissions
-    + readable   = true
-    + writeable  = false
-    + executable = false
-
-  >> pd1
-  (std::tuple<bool, bool, bool> &) { true, false, false }
-  >> 
-
-  >> std::cout << "R = " << std::get<0>(pd1) << "\n";
-  R = true
-  >> std::cout << "W = " << std::get<1>(pd1) << "\n";
-  W = false
-  >> std::cout << "X = " << std::get<2>(pd1) << "\n";
-  X = false
-  >> 
-#+END_SRC
-
-Design 2: Use bitmask flags instead of bools. The advantage is more
-readability and less functions parameters. 
-
-#+BEGIN_SRC cpp 
-  // Design 1:
-  Permissions createFileDD2(std::string name, Permissions p){
-       std::cout << std::boolalpha
-                 << "Create file = " << name << "\n"
-                 << " with the following permissions" << "\n"
-                 << "  + readable   = " << (p & Permissions::readable)   << "\n"
-                 << "  + writeable  = " << (p & Permissions::writeable)  << "\n"
-                 << "  + executable = " << (p & Permissions::executable) << "\n"
-                 << "\n";
-       return p;
-  }
-
-  >> auto pd2 = createFileDD2("Sales-report.xls", Permissions::readable | Permissions::writeable)
-  Create file = Sales-report.xls
-   with the following permissions
-    + readable   = true
-    + writeable  = true
-    + executable = false
-
-  (Permissions)  : (unsigned int) 6
-  >> 
-
-  >> createFileDD2("parser.exe", Permissions::readable | Permissions::writeable | Create file = parser.exe
-   with the following permissions
-    + readable   = true
-    + writeable  = true
-    + executable = true
-
-  (Permissions)  : (unsigned int) 7
-  >> 
-
-  >> std::cout << "R = " << (pd2 & Permissions::readable) << "\n";
-  R = true
-  >> std::cout << "W = " << (pd2 & Permissions::writeable) << "\n";
-  W = true
-  >> std::cout << "X = " << (pd2 & Permissions::executable) << "\n";
-  X = false
-#+END_SRC
