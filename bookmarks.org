@@ -747,26 +747,71 @@ _Rust_
      not quite the end of their journey, as the dynamic linker awaits
      to bring them to yet a higher plane of existence as complete C++
      programs running on a machine."
-*** CppCon 2017: Mathieu Ropert "API & ABI Versioning"
+** Type Erasure and Polymorphism
+*** NDC Conference 2017 - Sean Parent -  Better Code: Runtime Polymorphism
 
-- [[https://www.youtube.com/watch?v=Ia3IDPjA-d0][CppCon 2017: Mathieu Ropert “API & ABI Versioning...” - YouTube]]
-  - "Software keeps changing, but not always as fast as its
-    clients. A key to maintaining a library in the long run is to
-    ensure a proper versioning of the API and ABI. Not only does this
-    gives a clear picture of both source and binary compatibility
-    between the versions, but it also helps design by making breaking
-    changes explicit to the developer.  In this talk I will define
-    API and ABI in terms of impacts on compatibility, explain the
-    difference between breaking and non-breaking changes and present
-    a few techniques to handle them.  We will quickly explain what
-    APIs are, with an emphasis on the notion of contracts. Then the
-    usually lesser known notion of ABI will be explained, going over
-    the concepts of call syntax, mangling and most importantly sizes,
-    alignment and offsets in data structures. We will see how to use
-    semantic versioning (semver) in C++ by considering not only
-    changes to the API but also to the ABI and offer some advice on
-    how to change API and ABI over time and how to minimize the
-    impacts."
+ + [[https://www.youtube.com/watch?v=QGcVXgEVMJg][Better Code: Runtime Polymorphism - Sean Parent - YouTube]]
+
+   + Description: "This talk explains why (and how) to implement
+     polymorphism without inheritance in C++. The talk contains many
+     C++ tips and techniques, including many new features from
+     C++11. During the course of that talk a key feature from
+     Photoshop will be demonstrated and implemented."
+
+   + Notes: This talk is about how to preserve value semantics and
+     polymorphism without using inheritance in the client code. It is
+     done by using the *type erasure* design pattern. Actually, the
+     solution presented do use inheritance, but inside the ~object_t~
+     class.
+
+   + Benefits of the presented *type erasure* implementation:
+
+     + Greater interoperability between software components as classes
+       doesn't need to inherit froms same base class, the only
+       requirement is to satisfy the constructor template constraints.
+
+     + Alows value semantics to cohexist with polymorphism with
+       minimal performance penalty. It combines the benefits of
+       dynamic and static polymorphism.
+
+     + A factory function can return a value rather than a pointer or
+       smart pointer and still preserve the value semantics.
+
+     + Non-intrusive for client code. A client code doesn't need to be
+       aware of polymorphism. For instance, a client code _double describeArea(const Shape& sh)_ 
+       cannot be used directly with objects returned by a factory
+       function, for instance   std::unique_ptr<Shape>. By using 
+       type erasure, this code  doesn't need to modified as the
+       factory function can returns a value instead of a pointer and 
+       still preserve the polymorphism.
+       + Less error prone
+       + Client code doesn't need heap allocation. (Actually, the heap
+         allocation is hidden in the type erasure wrapper)
+       + The client code doesn't need to worry about object ownership
+         or lifetime.
+       + Exception safe
+       + Thread safe
+
+     + _Referenced Book_: Stepanov, Alexander and Paul McJones -
+       *Elements of Programming* - Addison Wesley - Professional 2009. 
+
+   + Key Moments 
+
+     + https://youtu.be/QGcVXgEVMJg?t=2032
+       + The class structure is composed by concept class (interface),
+         model classes inheriting the concept and the outter class
+         that hides the inheritance and wraps any argument which
+         statifies the template constraints.
+
+     + https://youtu.be/QGcVXgEVMJg?t=2072
+       + A virtual copy constructor is used in the concept class for
+         allowing the wrapper class (outer class) object_t to preserve
+         copy semantics by performing deep copying, instead of shallow
+         copying.
+
+     + https://youtu.be/QGcVXgEVMJg?t=2136 and https://youtu.be/QGcVXgEVMJg?t=2156
+       + Templates used at constructor and the model. 
+         
 *** C++Now 2018: Louis Dionne "Runtime Polymorphism: Back to the Basics"
 
 - [[https://www.youtube.com/watch?v=OtU51Ytfe04][C++Now 2018: Louis Dionne “Runtime Polymorphism: Back to the Basics” - YouTube]]
@@ -809,6 +854,7 @@ _Rust_
           as argument. Then the proxy object can forward any method
           call or message to the wrapped heap object.
         + Deal with it and accept as it is for performance reasons.
+
 ** Functional Programming 
 *** CPPCON-2017: Klaus Iglberger - Free Your Functions
 
@@ -1246,3 +1292,23 @@ examples that have been discussed in the literature.
 
  + [[https://www.youtube.com/watch?v=a4iFJuNBx7U][CppComponents- A Modern Portable C++11 Component System - YouTube]]
 
+*** CppCon 2017: Mathieu Ropert "API & ABI Versioning"
+
+- [[https://www.youtube.com/watch?v=Ia3IDPjA-d0][CppCon 2017: Mathieu Ropert “API & ABI Versioning...” - YouTube]]
+  - "Software keeps changing, but not always as fast as its
+    clients. A key to maintaining a library in the long run is to
+    ensure a proper versioning of the API and ABI. Not only does this
+    gives a clear picture of both source and binary compatibility
+    between the versions, but it also helps design by making breaking
+    changes explicit to the developer.  In this talk I will define
+    API and ABI in terms of impacts on compatibility, explain the
+    difference between breaking and non-breaking changes and present
+    a few techniques to handle them.  We will quickly explain what
+    APIs are, with an emphasis on the notion of contracts. Then the
+    usually lesser known notion of ABI will be explained, going over
+    the concepts of call syntax, mangling and most importantly sizes,
+    alignment and offsets in data structures. We will see how to use
+    semantic versioning (semver) in C++ by considering not only
+    changes to the API but also to the ABI and offer some advice on
+    how to change API and ABI over time and how to minimize the
+    impacts."
