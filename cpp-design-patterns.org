@@ -608,7 +608,7 @@ added.
   >> 
 #+END_SRC
 
-*** Polymorphic Factory* - registry based factory
+*** Polymorphic Factory - registry based factory
 
 Despite this implementation be more complex than a factory-method
 pattern implementation using if-else statement, this one doesn't
@@ -674,6 +674,7 @@ methods in this class are makeUnique and makeRaw.
 #+END_SRC
  
 Concrete Factory: 
+
  + Template class used for creating static object which registers the
    associated derived class during the program initialization before
    the function main. 
@@ -757,7 +758,328 @@ Output:
    ==> Error: object not found in factory
 #+END_SRC
 
+*** Universal Polymorphic Factory 
+
+This customized implementation of the polymorphic factory can
+instantiate objects of any type, even if they don't have the same base
+class. Another feature is that the factory class doesn't need to have
+any knowledge about any base class. The trick used were templates;
+void* pointers for type erasure of heap-objects; static objects for
+registering classes in the factory and RTTI - for generating better
+error messages and making the conversion from void* to the particular
+class being instantiated safer.
+
+ + File: [[file:src/design-patterns/factory-universal1.cpp][file:src/design-patterns/factory-universal1.cpp]]
+ + Online Compiler: https://rextester.com/GKEBF89553
+
+The class ~runtime_error_location~ class is used for providing exception
+with better context information with the line and the file the
+exception was generated.
+
+#+BEGIN_SRC cpp 
+  #define RUNTIME_ERROR_LOCATION(message)  \
+          runtime_error_location(__LINE__, __FILE__, message)
+
+  struct runtime_error_location: public std::exception {
+      std::string  message;
+      runtime_error_location(const std::string& text)
+                  : message{text}
+      {
+      }
+      runtime_error_location(
+                  unsigned int line,
+                  const std::string& file,
+                  const std::string& text
+                  )
+          {
+            message = file + ":" + std::to_string(line) + ": " + "Error: " + text;
+          }
+      auto what() const noexcept -> const char* {
+          return message.c_str();
+      }
+  };
+#+END_SRC
+
+The UniversalFactory contains the static factory methods make and makeSafe
+which returns an unique_ptr to an object instantiated on the heap. If
+the factory method make fails it returns a nullptr without throwing an
+exception and makeSafe returns an ~runtime_error_location~ exception if
+there is a failure to instantiate.
+
+Once the classes are registered, objects can be instantiated with: 
+
+ + std::unique_ptr<BaseA> objectD = UniversalFactory::make<BaseClass>("DerivedClassD");
+ + std::unique_ptr<BaseX> object1 = UniversalFactory::make<BaseClass>("DerivedClassY");
+
+#+BEGIN_SRC cpp 
+  class UniversalFactory{
+  private:
+        using FactoryMap = std::map<std::string, UniversalFactory*>;
+        // Force global variable to be initialized, thus it avoid the
+        // inialization order fisaco.
+        static auto getRegister() -> FactoryMap& {
+           static FactoryMap classRegister{};
+           return classRegister;
+        }
+  public:
+      // ========== Instance Methods ========//
+
+      // Destructor
+      virtual
+      ~UniversalFactory() = default;
+
+      // Encapsulates class constructor.
+      // The type void* performs pointer type erasure
+      virtual
+      auto create() const -> void* = 0;
+
+      // Encapsulates destructor 
+      virtual
+      auto destroy(void* object) const -> void = 0;
+
+      virtual
+      auto size() const -> size_t = 0;
+
+      virtual
+      auto typeinfo() const -> const std::type_info& = 0;
+
+      // ========== Static Methods ========//
+
+      /** Register factory object of derived class */
+      static
+      auto registerFactory(const std::string& name, UniversalFactory* factory) -> void {
+           auto& reg = UniversalFactory::getRegister();
+           reg[name] = factory;
+      }
+      /** Show all registered classes printing their name to stdout. */
+      static
+      auto showClasses() -> void {
+          std::cout << " Registered classes. " << "\n";
+          std::cout << " =================== " << "\n";
+          for(const auto& pair: UniversalFactory::getRegister())
+               std::cout << " + " << pair.first
+                         << " ; RTTI name = "
+                         << pair.second->typeinfo().name()
+                         << " ; size (bytes) = "
+                         << pair.second->size()
+                         << "\n";
+      }
+
+      /** Attemp to instantiate a class, if it is not possible, returns nullptr */
+      template<class BaseClass>
+      static
+      auto make(const std::string& name) -> std::unique_ptr<BaseClass> {
+              FactoryMap& reg = UniversalFactory::getRegister();
+              auto it = reg.find(name);
+              if(it == reg.end())
+                      return nullptr;
+              // Avoid core dump if the conversion is not possible.
+              if(it->second->typeinfo() != typeid(BaseClass))
+                      return nullptr;
+              void* ptr = it->second->create();
+              return std::unique_ptr<BaseClass>(reinterpret_cast<BaseClass*>(ptr));
+      }
+
+      /** Attempt to instantiate class, if it is not possible throws an exception. */
+      template<class BaseClass>
+      static
+      auto makeSafe(const std::string& name) -> std::unique_ptr<BaseClass> {
+         // Throw exception for providing better context information and avoid
+         // Core dump due to dangerous reinterpret_cast<>.
+         auto object = UniversalFactory::make<BaseClass>(name);
+         if(object == nullptr)
+            throw RUNTIME_ERROR_LOCATION(
+                 std::string("Cannot create type. Failed to cast void* to: ") + name);
+         return object;
+      }
+  };  // -------- End Of class UniversalFactory() ------//
+
+#+END_SRC
+
+The class FactoryImpl is used for creating static objects (global
+objects) for registering classes in the factory during the program
+initialization. This class also performs type erasure of the
+constructor and destructor by using void* for allowing it to work with
+any type. 
+
+#+BEGIN_SRC cpp 
+  template<typename DerivedClass, typename BaseClass = DerivedClass>
+  class FactoryImpl: UniversalFactory{
+  private:
+       const std::type_info& _tinfo;
+  public:
+       // Register this global object on the Factory register
+       FactoryImpl(const std::string& name)
+               : _tinfo(typeid(BaseClass))
+       {
+           std::cerr << " [TRACE] " << " Registered Class = " << name << "\n";
+           UniversalFactory::registerFactory(name, this);
+       }
+       // Capture class default constructor => constructor type erasure 
+       auto create() const -> void* override {
+               return new DerivedClass;
+       }
+       // Capture destructor => Destructor type erasure 
+       auto destroy(void* object) const -> void override {
+               delete reinterpret_cast<BaseClass*>(object);
+       }	
+       auto typeinfo() const -> const std::type_info& override {
+               return _tinfo;
+       }
+       auto size() const -> size_t override {
+               return sizeof(DerivedClass);
+       }
+  };
+
+#+END_SRC
+
+ *Class Registration with static objects.*
+
+Classes can be registered in the factory by creating an static
+instance (static object) of the class FactoryImpl, which registers the
+class or type passed as template parameter, during the object
+initialization. 
+
+
+ + The first template parameter is the class to be registered and the
+   second one is its base class. If the class to be registered, doesn't
+   have base class, it can omitted. The constructor argument is the name
+   of the class to be registered as string.
+
+ + The anonymous namespace in this example is used for defining
+   internal linkage and making the static objects private or only
+   visible in the current compilation unit or file for avoiding name
+   clashes.
+
+ + Note: The registered classes doesn't need to have a common base
+   class, thus it is possible to register any class as the class
+   NonDerived in the code below. 
+
+#+BEGIN_SRC cpp 
+  namespace {
+     
+     auto register_Base       = FactoryImpl<Base, Base>("Base");
+     auto register_DerivedA   = FactoryImpl<DerivedA, Base>("DerivedA");
+     auto register_DerivedB   = FactoryImpl<DerivedB, Base>("DerivedB");
+
+     // Classes without a base class doesn't need the second template paramter 
+     auto register_NonDerived = FactoryImpl<NonDerived>("NonDerived");
+  }
+#+END_SRC
+
+The registration boilerplate can be eliminated by using macros:
+
+#+BEGIN_SRC cpp 
+  // Register a non-polymorphic class -> It means a class without base class 
+  #define REGISTER_CLASS_TO_FACTORY1(aclass) \
+          namespace {  auto register_ ## derived = FactoryImpl<aclass, aclass>( #aclass ); }
+
+  // Register a polymorphic class to the factory.
+  #define REGISTER_CLASS_TO_FACTORY2(derivedClass, baseClass) \
+          namespace {  auto register_ ## derivedClass = FactoryImpl<derivedClass, baseClass>( #derivedClass ); }
+
+  REGISTER_CLASS_TO_FACTORY2(Base, Base);
+  REGISTER_CLASS_TO_FACTORY2(DerivedA, Base);
+  REGISTER_CLASS_TO_FACTORY2(DerivedB, Base);
+  REGISTER_CLASS_TO_FACTORY1(NonDerived);
+#+END_SRC
+
+ *Usage example in CERN's ROOT/Cling REPL:*
+
+Load the proof-of-concept file
+
+#+BEGIN_SRC cpp  
+  >> .L factory-universal1.cpp 
+   [TRACE]  Registered Class = Base
+   [TRACE]  Registered Class = DerivedA
+   [TRACE]  Registered Class = DerivedB
+   [TRACE]  Registered Class = NonDerived
+  >> 
+  >> 
+#+END_SRC
+
+Instantiate some classes: 
+
+#+BEGIN_SRC cpp 
+  >> auto base = UniversalFactory::make<Base>("Base")
+  (std::unique_ptr<Base, std::default_delete<Base> > &) @0x7f768c558088
+  >> 
+
+  >> base->getType()
+  (std::string) "Base"
+  >> 
+
+  >> auto derivA = UniversalFactory::make<Base>("DerivedA")
+  (std::unique_ptr<Base, std::default_delete<Base> > &) @0x7f768c5581f8
+
+  >> derivA->showType()
+  Class type = DerivedA
+
+  >> auto derivB = UniversalFactory::make<Base>("DerivedB")
+  (std::unique_ptr<Base, std::default_delete<Base> > &) @0x7f768c558238
+
+  >> derivB->showType()
+  Class type = DerivedB
+  >> 
+
+  for(const auto& cls : {"Base", "DerivedA", "DerivedB"} ){
+      auto obj = UniversalFactory::makeSafe<Base>(cls);
+      std::cout << "Class [" << cls << " ] = " << obj->getType() << " \n";
+  }
+  // Output: 
+  Class [Base ] = Base 
+  Class [DerivedA ] = DerivedA 
+  Class [DerivedB ] = DerivedB 
+  >> 
+
+#+END_SRC
+
+Show all registered classes 
+
+#+BEGIN_SRC cpp  
+  >> UniversalFactory::showClasses()
+   Registered classes. 
+   =================== 
+   + Base ; RTTI name = 4Base ; size (bytes) = 8
+   + DerivedA ; RTTI name = 4Base ; size (bytes) = 8
+   + DerivedB ; RTTI name = 4Base ; size (bytes) = 8
+   + NonDerived ; RTTI name = 10NonDerived ; size (bytes) = 1
+  >> 
+#+END_SRC
+
+Instantiate a non-derived class: 
+
+#+BEGIN_SRC cpp 
+  // Instantiate a non derived class of Base 
+  >> auto ndc = UniversalFactory::make<NonDerived>("NonDerived")
+  (std::unique_ptr<NonDerived, std::default_delete<NonDerived> > &) @0x7f768c558138
+  >> 
+
+  >> ndc->printMessage();
+   ==> I am a non derived class
+  >> 
+#+END_SRC
+
+Try creating a class which is not registered
+
+#+BEGIN_SRC cpp 
+  // Returns a null pointer if there is a failure. 
+  >> UniversalFactory::make<Base>("Error") == nullptr
+  (bool) true
+
+  >> UniversalFactory::make<DerivedA>("Error") == nullptr
+  (bool) true
+  >> 
+
+  // makeSafe throws an exception 
+  >> auto dummy = UniversalFactory::makeSafe<Base>("NonDerived");
+  Error in <TRint::HandleTermInput()>: runtime_error_location caught: 
+  factory-universal1.cpp:123: Error: Cannot create type. Failed to cast void* to: NonDerived
+  >> 
+#+END_SRC
 *** References
+
+ *References*
 
  + Bruce Eckel - *Thinking in Patterns with Java* - Page: 53
    + <http://www.cs.huji.ac.il/~noam/intro2cs2001/www/TIPatterns.pdf>
@@ -789,6 +1111,37 @@ Output:
 
  + Factory Method -
    <https://www.dofactory.com/net/factory-method-design-pattern> 
+
+ *Further Reading* 
+
+ + *Doing something on shared library initialization*
+   + <http://zerohour.net/~reed/dylib_init.html>
+
+ + *Factory Design Pattern in C++*
+   + <http://blog.fourthwoods.com/2011/06/04/factory-design-pattern-in-c/>
+
+ + *Abstract Factory Step-by-Step Implementation in C++*
+   + <http://www.dorodnic.com/blog/2014/03/29/abstract-factory/>
+
+ + *Sutter's Mill - GotW #90 Solution: Factories*
+   + <https://herbsutter.com/2013/05/30/gotw-90-solution-factories/>
+
+ + *Unforgettable Factory Registration*
+   + <http://www.nirfriedman.com/2018/04/29/unforgettable-factory/>
+
+ + *C++: Factory With Self-Registering Types*
+   + <https://dzone.com/articles/factory-with-self-registering-types>
+
+ + *Object Factories in a Static Library*
+   + <http://www.sourcexr.com/articles/2014/06/21/object-factory-in-a-static-library>
+
+ + *Automatic object factory in C++*
+   + <https://blog.noctua-software.com/object-factory-c++.html>
+
+ + *Self Registering Classes - Taking polymorphism to the limit*
+   + <https://accu.org/index.php/journals/597>
+
+ 
 ** Builder Design Pattern (Joshua Blosh)
 
 The purpose of the builder design pattern proposed by Joshua Bloch is
