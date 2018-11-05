@@ -172,18 +172,18 @@ int main()
 	std::cout << "Type of shape 3 = " << visitor3.get() << "\n";
 
 	std::cout << "===> Experiment 4: FunctionAdapter " << "\n";
-	// Creates operation to compute shape perimiter
+	// Creates operation to compute shape perimeter
 	auto visitor4 = FunctionAdapter<double>{
 		[](Circle& s){ return 2 * 3.1415 * s.radius * s.radius ; },
 		[](Square& s){ return 4.0 * s.side; },
 		[](Blob&    ){ return -100.0;   },
 	 };	
 	s1.accept(visitor4);
-	std::cout << "Perimiter of shape 1 = " << visitor4.get() << "\n";
+	std::cout << "Perimeter of shape 1 = " << visitor4.get() << "\n";
 	s2.accept(visitor4);
-	std::cout << "Perimiter of shape 2 = " << visitor4.get() << "\n";
+	std::cout << "Perimeter of shape 2 = " << visitor4.get() << "\n";
 	s3.accept(visitor4);
-	std::cout << "Perimiter of shape 3 = " << visitor4.get() << "\n";
+	std::cout << "Perimeter of shape 3 = " << visitor4.get() << "\n";
 	
 	return 0;
 }
