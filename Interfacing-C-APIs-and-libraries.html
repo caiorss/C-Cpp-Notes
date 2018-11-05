@@ -3,7 +3,7 @@
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
-<!-- 2018-10-30 Tue 15:51 -->
+<!-- 2018-11-04 Sun 23:27 -->
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>CPP / C++ Notes - Integration with C-APIs</title>
@@ -239,13 +239,24 @@ for the JavaScript code in this tag.
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents">
 <ul>
-<li><a href="#orge393264">1. Interfacing C APIs and libraries</a>
+<li><a href="#orgd6baad6">1. Interfacing C APIs and libraries</a>
 <ul>
-<li><a href="#orgd4acc8a">1.1. Definitions</a></li>
-<li><a href="#orgc9763cc">1.2. Example: Nix / getcwd and chdir</a></li>
-<li><a href="#orga3d8cf2">1.3. Example: Nix / gethostname (std::string)</a></li>
-<li><a href="#org7621fed">1.4. Example: Passing std::vector to a C-array APIs</a></li>
-<li><a href="#org7848343">1.5. Example: GSL / C++ Class Wrapper to an C-API in OOP style or with opaque pointers.</a></li>
+<li><a href="#orgc9cc4e7">1.1. Definitions</a></li>
+<li><a href="#org9a984ac">1.2. Widely Used C Functions</a>
+<ul>
+<li><a href="#orgaaa3220">1.2.1. Overview</a></li>
+<li><a href="#orgf0332a6">1.2.2. string manipulation</a></li>
+<li><a href="#orge64e584">1.2.3. C memory/buffer management functions - memset, memcpy and etc</a></li>
+</ul>
+</li>
+<li><a href="#org3af245f">1.3. C++ Wrappers for C libraries or APIs</a>
+<ul>
+<li><a href="#org48eb524">1.3.1. Example: Nix / getcwd and chdir</a></li>
+<li><a href="#org72b34a5">1.3.2. Example: Nix / gethostname (std::string)</a></li>
+<li><a href="#orgbd9bdfa">1.3.3. Example: Passing std::vector to a C-array APIs</a></li>
+<li><a href="#org41f5696">1.3.4. Example: GSL / C++ Class Wrapper to an C-API in OOP style or with opaque pointers.</a></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>
@@ -255,12 +266,12 @@ for the JavaScript code in this tag.
 <li><a href='index.html'>Index</a></li>
 </ul>
 
-<div id="outline-container-orge393264" class="outline-2">
-<h2 id="orge393264"><span class="section-number-2">1</span> Interfacing C APIs and libraries</h2>
+<div id="outline-container-orgd6baad6" class="outline-2">
+<h2 id="orgd6baad6"><span class="section-number-2">1</span> Interfacing C APIs and libraries</h2>
 <div class="outline-text-2" id="text-1">
 </div>
-<div id="outline-container-orgd4acc8a" class="outline-3">
-<h3 id="orgd4acc8a"><span class="section-number-3">1.1</span> Definitions</h3>
+<div id="outline-container-orgc9cc4e7" class="outline-3">
+<h3 id="orgc9cc4e7"><span class="section-number-3">1.1</span> Definitions</h3>
 <div class="outline-text-3" id="text-1-1">
 <ul class="org-ul">
 <li><b>Nix</b> like: Any operating system based or inspiered on UNIX
@@ -280,9 +291,365 @@ certification.
 </div>
 </div>
 
-<div id="outline-container-orgc9763cc" class="outline-3">
-<h3 id="orgc9763cc"><span class="section-number-3">1.2</span> Example: Nix / getcwd and chdir</h3>
+
+<div id="outline-container-org9a984ac" class="outline-3">
+<h3 id="org9a984ac"><span class="section-number-3">1.2</span> Widely Used C Functions</h3>
 <div class="outline-text-3" id="text-1-2">
+</div>
+<div id="outline-container-orgaaa3220" class="outline-4">
+<h4 id="orgaaa3220"><span class="section-number-4">1.2.1</span> Overview</h4>
+<div class="outline-text-4" id="text-1-2-1">
+<p>
+Those functions appear quite often in C code and old C++ codes, thus
+it is important understanding them for accessing or consuming or C
+APIs and also creating C++ wrappers for those libraries.
+</p>
+
+<p>
+Header: for C++ - &lt;cstring&gt;, for C - &lt;string.h&gt;
+</p>
+
+<ul class="org-ul">
+<li>"String" (character array) Manipulation 
+<ul class="org-ul">
+<li>strcat  - Concatenate strings (const char*)</li>
+<li>strcpy  - Copy strings</li>
+<li>strcmp  - Compare strings</li>
+</ul></li>
+
+<li>Memory/buffer manipulation - Header &lt;string.H&gt;
+<ul class="org-ul">
+<li>memset    - Fill memory</li>
+<li>memcpy    - Copy memory</li>
+<li>memmove   - Move data from one location to another</li>
+</ul></li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-orgf0332a6" class="outline-4">
+<h4 id="orgf0332a6"><span class="section-number-4">1.2.2</span> string manipulation</h4>
+<div class="outline-text-4" id="text-1-2-2">
+</div>
+<ol class="org-ol">
+<li><a id="org6bca302"></a>strcmp<br />
+<div class="outline-text-5" id="text-1-2-2-1">
+<ul class="org-ul">
+<li><span class="underline">strcmp</span> 
+<ul class="org-ul">
+<li>Compare two C-strings returning 0 if they are equal.</li>
+</ul></li>
+</ul>
+
+<p>
+Signature: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-type">int</span> <span class="org-function-name">strcmp</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-keyword">const</span> <span class="org-type">char</span> *<span class="org-variable-name">s1</span>, <span class="org-keyword">const</span> <span class="org-type">char</span> *<span class="org-variable-name">s2</span><span class="org-rainbow-delimiters-depth-1">)</span>;
+</pre>
+</div>
+
+<p>
+Example: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">cstring</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span> <span class="org-comment-delimiter">// </span><span class="org-comment">Or in C: #include &lt;string.h&gt;</span>
+
+&gt;&gt; strcmp<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-string">"hello"</span>, <span class="org-string">"hello"</span><span class="org-rainbow-delimiters-depth-1">)</span>
+<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">int</span><span class="org-rainbow-delimiters-depth-1">)</span> 0
+&gt;&gt; 
+&gt;&gt; strcmp<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-string">"hello world"</span>, <span class="org-string">"hello"</span><span class="org-rainbow-delimiters-depth-1">)</span>
+<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">int</span><span class="org-rainbow-delimiters-depth-1">)</span> 32
+
+<span class="org-comment-delimiter">// </span><span class="org-comment">If strings are equal, the function returns 0.</span>
+&gt;&gt; strcmp<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-string">"hello world"</span>, <span class="org-string">"hello world"</span><span class="org-rainbow-delimiters-depth-1">)</span>
+<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">int</span><span class="org-rainbow-delimiters-depth-1">)</span> 0
+
+&gt;&gt; strcmp<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-string">"hello world"</span>, <span class="org-string">"hello wo"</span><span class="org-rainbow-delimiters-depth-1">)</span>
+<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">int</span><span class="org-rainbow-delimiters-depth-1">)</span> 114
+&gt;&gt; 
+&gt;&gt; <span class="org-keyword">if</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-negation-char">!</span>strcmp<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">"hello world"</span>, <span class="org-string">"hello world"</span><span class="org-rainbow-delimiters-depth-2">)</span><span class="org-rainbow-delimiters-depth-1">){</span> <span class="org-constant">std</span>::puts<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">"equal"</span><span class="org-rainbow-delimiters-depth-2">)</span>; <span class="org-rainbow-delimiters-depth-1">}</span>
+equal
+&gt;&gt; <span class="org-keyword">if</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-negation-char">!</span>strcmp<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">"hello wo"</span>, <span class="org-string">"hello world"</span><span class="org-rainbow-delimiters-depth-2">)</span><span class="org-rainbow-delimiters-depth-1">){</span> <span class="org-constant">std</span>::puts<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">"equal"</span><span class="org-rainbow-delimiters-depth-2">)</span>; <span class="org-rainbow-delimiters-depth-1">}</span>
+&gt;&gt;  
+</pre>
+</div>
+</div>
+</li>
+
+<li><a id="org54fe8a4"></a>strcat<br />
+<div class="outline-text-5" id="text-1-2-2-2">
+<ul class="org-ul">
+<li><span class="underline">strcat</span>
+<ul class="org-ul">
+<li>Append string src (null terminated character array, terminated at
+\0) to the dest string.</li>
+<li>WARNING: "If dest is not large enough, program behavior is
+unpredictable; buffer overruns are a favorite avenue for
+attacking secure programs."</li>
+<li>Return: It returns the pointer to the dest array.</li>
+</ul></li>
+</ul>
+
+<p>
+Signature: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-type">char</span> *<span class="org-function-name">strcat</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">char</span> *<span class="org-variable-name">dest</span>, <span class="org-keyword">const</span> <span class="org-type">char</span> *<span class="org-variable-name">src</span><span class="org-rainbow-delimiters-depth-1">)</span>;
+</pre>
+</div>
+
+<p>
+Example: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">cstring</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span> <span class="org-comment-delimiter">// </span><span class="org-comment">In C: #include &lt;string.h&gt;</span>
+
+&gt;&gt; <span class="org-type">char</span> str <span class="org-rainbow-delimiters-depth-1">[</span>200<span class="org-rainbow-delimiters-depth-1">]</span> = <span class="org-string">"Hello world C++ "</span> ;
+&gt;&gt; str
+<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">char</span> <span class="org-rainbow-delimiters-depth-2">[</span>200<span class="org-rainbow-delimiters-depth-2">]</span><span class="org-rainbow-delimiters-depth-1">)</span> <span class="org-string">"Hello world C++ \0\0\0\0\0\0\0\0\0..."</span>
+
+&gt;&gt; strcat<span class="org-rainbow-delimiters-depth-1">(</span>str, <span class="org-string">" C++11"</span><span class="org-rainbow-delimiters-depth-1">)</span>
+<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">char</span> *<span class="org-rainbow-delimiters-depth-1">)</span> <span class="org-string">"Hello world C++  C++11"</span>
+&gt;&gt; strcat<span class="org-rainbow-delimiters-depth-1">(</span>str, <span class="org-string">" C++14"</span><span class="org-rainbow-delimiters-depth-1">)</span>
+<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">char</span> *<span class="org-rainbow-delimiters-depth-1">)</span> <span class="org-string">"Hello world C++  C++11 C++14"</span>
+&gt;&gt; strcat<span class="org-rainbow-delimiters-depth-1">(</span>str, <span class="org-string">" C++17"</span><span class="org-rainbow-delimiters-depth-1">)</span>
+<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">char</span> *<span class="org-rainbow-delimiters-depth-1">)</span> <span class="org-string">"Hello world C++  C++11 C++14 C++17"</span>
+&gt;&gt; 
+
+&gt;&gt; str
+<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">char</span> <span class="org-rainbow-delimiters-depth-2">[</span>200<span class="org-rainbow-delimiters-depth-2">]</span><span class="org-rainbow-delimiters-depth-1">)</span> <span class="org-string">"Hello world C++  C++11 C++14 C++17\0\0\0\.."</span>
+
+&gt;&gt; 
+&gt;&gt; <span class="org-constant">std</span>::cout &lt;&lt; <span class="org-string">"str = "</span> &lt;&lt; str &lt;&lt; <span class="org-string">"\n"</span>;
+str = Hello world C++  C++11 C++14 C++17
+&gt;&gt; 
+</pre>
+</div>
+</div>
+</li>
+
+<li><a id="org6314c1b"></a>strcpy<br />
+<div class="outline-text-5" id="text-1-2-2-3">
+<ul class="org-ul">
+<li><span class="underline">strcpy</span>
+<ul class="org-ul">
+<li>Copies the string pointed by src (null-terminated char array) to
+the buffer pointed by dest.</li>
+<li>WARNING: The strings may not overlap, and the destination string
+dest must be large enough to receive the copy.  Beware of buffer
+overruns!  (See BUGS.)</li>
+</ul></li>
+</ul>
+
+<p>
+Signature:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-type">char</span> *<span class="org-function-name">strcpy</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">char</span> *<span class="org-variable-name">dest</span>, <span class="org-keyword">const</span> <span class="org-type">char</span> *<span class="org-variable-name">src</span><span class="org-rainbow-delimiters-depth-1">)</span>;
+</pre>
+</div>
+
+<p>
+Example:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">cstring</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span> <span class="org-comment-delimiter">// </span><span class="org-comment">In C: #include &lt;string.h&gt;</span>
+
+<span class="org-comment-delimiter">// </span><span class="org-comment">Usage example: </span>
+<span class="org-type">char</span> <span class="org-variable-name">arr</span><span class="org-rainbow-delimiters-depth-1">[</span>200<span class="org-rainbow-delimiters-depth-1">]</span>; 
+
+&gt;&gt; <span class="org-type">char</span> arr<span class="org-rainbow-delimiters-depth-1">[</span>200<span class="org-rainbow-delimiters-depth-1">]</span>; 
+&gt;&gt; arr
+<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">char</span> <span class="org-rainbow-delimiters-depth-2">[</span>200<span class="org-rainbow-delimiters-depth-2">]</span><span class="org-rainbow-delimiters-depth-1">)</span> <span class="org-string">"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\..."</span>
+
+&gt;&gt; strcpy<span class="org-rainbow-delimiters-depth-1">(</span>arr, <span class="org-string">"Interfacing C APIs and libraries"</span><span class="org-rainbow-delimiters-depth-1">)</span>
+<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">char</span> *<span class="org-rainbow-delimiters-depth-1">)</span> <span class="org-string">"Interfacing C APIs and libraries"</span>
+
+&gt;&gt; arr
+<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">char</span> <span class="org-rainbow-delimiters-depth-2">[</span>200<span class="org-rainbow-delimiters-depth-2">]</span><span class="org-rainbow-delimiters-depth-1">)</span> <span class="org-string">"Interfacing C APIs and libraries\0\0\0\0\0..."</span>
+
+&gt;&gt; <span class="org-constant">std</span>::cout &lt;&lt; <span class="org-string">"arr = "</span> &lt;&lt; arr &lt;&lt; <span class="org-string">"\n"</span>;
+arr = Interfacing C APIs <span class="org-keyword">and</span> libraries
+&gt;&gt; 
+</pre>
+</div>
+</div>
+</li>
+</ol>
+</div>
+<div id="outline-container-orge64e584" class="outline-4">
+<h4 id="orge64e584"><span class="section-number-4">1.2.3</span> C memory/buffer management functions - memset, memcpy and etc</h4>
+<div class="outline-text-4" id="text-1-2-3">
+</div>
+<ol class="org-ol">
+<li><a id="org6a29638"></a>Overview<br />
+<div class="outline-text-5" id="text-1-2-3-1">
+<p>
+Note: Those functions are defined in the library &lt;string.h&gt; (for C++ &lt;cstring&gt;) for the C
+programming language.
+</p>
+
+<p>
+Buffer/Memory manipulation functions: 
+</p>
+
+<ul class="org-ul">
+<li>memset   - Fill memory</li>
+<li>memcpy   - Copy memory</li>
+<li>memmmove - Move data from one location to another.</li>
+</ul>
+
+<p>
+<b>References</b> 
+</p>
+
+<ul class="org-ul">
+<li><a href="https://fresh2refresh.com/c-programming/c-buffer-manipulation-function/">C Buffer manipulation functions</a></li>
+<li>QNX <a href="http://www.qnx.com/developers/docs/7.0.0/#com.qnx.doc.neutrino.lib_ref/topic/m/memcpy.html">- memcpy()</a></li>
+</ul>
+</div>
+</li>
+
+<li><a id="org39867a8"></a>memset<br />
+<div class="outline-text-5" id="text-1-2-3-2">
+<p>
+Initializes buffers with some value. 
+</p>
+
+<p>
+Arguments: 
+</p>
+<ul class="org-ul">
+<li>s - Pointer to the buffer that will be initialized</li>
+<li>c - Value that will be used to initialize all bytes of the buffer.</li>
+<li>n - Number of bytes of the buffer that will be initialized.</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-type">void</span> *<span class="org-function-name">memset</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">void</span> *<span class="org-variable-name">s</span>, <span class="org-type">int</span> <span class="org-variable-name">c</span>, <span class="org-type">size_t</span> <span class="org-variable-name">n</span><span class="org-rainbow-delimiters-depth-1">)</span>;
+</pre>
+</div>
+
+<p>
+Equivalent to: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-keyword">for</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">int</span> <span class="org-variable-name">i</span> = 0; i &lt; n; i++<span class="org-rainbow-delimiters-depth-1">){</span>
+    <span class="org-rainbow-delimiters-depth-2">(</span>s + i<span class="org-rainbow-delimiters-depth-2">)</span>* = c;
+<span class="org-rainbow-delimiters-depth-1">}</span>
+</pre>
+</div>
+
+<p>
+Example: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-type">char</span> <span class="org-variable-name">buffer</span><span class="org-rainbow-delimiters-depth-1">[</span>100<span class="org-rainbow-delimiters-depth-1">]</span>;
+memset<span class="org-rainbow-delimiters-depth-1">(</span>buffer, <span class="org-string">'\0'</span>, 100<span class="org-rainbow-delimiters-depth-1">)</span>;
+
+<span class="org-comment-delimiter">// </span><span class="org-comment">Initialize an array of 100 integers with 1</span>
+<span class="org-type">int</span> <span class="org-variable-name">arr</span><span class="org-rainbow-delimiters-depth-1">[</span>100<span class="org-rainbow-delimiters-depth-1">]</span>;
+memset<span class="org-rainbow-delimiters-depth-1">(</span>arr, 1, <span class="org-keyword">sizeof</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">int</span><span class="org-rainbow-delimiters-depth-2">)</span> * 100<span class="org-rainbow-delimiters-depth-1">)</span>;
+</pre>
+</div>
+</div>
+</li>
+
+<li><a id="orgdc34841"></a>memcpy<br />
+<div class="outline-text-5" id="text-1-2-3-3">
+<p>
+Copy bytes from one buffer to another: 
+</p>
+
+<p>
+Arguments: 
+</p>
+<ul class="org-ul">
+<li>dst - (destination) - Pointer to destination location where the data will be copied,</li>
+<li>src - (source) - Pointer to source location where the data will be copied from.</li>
+<li>n   - Number of bytes that will be copied to the destination.</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-type">void</span>* <span class="org-function-name">memcpy</span><span class="org-rainbow-delimiters-depth-1">(</span> <span class="org-type">void</span>* <span class="org-variable-name">dst</span>,
+              <span class="org-keyword">const</span> <span class="org-type">void</span>* <span class="org-variable-name">src</span>,
+              <span class="org-type">size_t</span> <span class="org-variable-name">n</span> <span class="org-rainbow-delimiters-depth-1">)</span>;
+</pre>
+</div>
+
+<p>
+This function is equivalent to: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-keyword">for</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">int</span> <span class="org-variable-name">i</span> = 0; i &lt; n; ++i<span class="org-rainbow-delimiters-depth-1">){</span>
+    <span class="org-rainbow-delimiters-depth-2">(</span>dst + i<span class="org-rainbow-delimiters-depth-2">)</span>* = <span class="org-rainbow-delimiters-depth-2">(</span>src + i<span class="org-rainbow-delimiters-depth-2">)</span>*;
+<span class="org-rainbow-delimiters-depth-1">}</span>
+</pre>
+</div>
+
+
+<p>
+Example: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-type">char</span> <span class="org-variable-name">buffer</span><span class="org-rainbow-delimiters-depth-1">[</span>100<span class="org-rainbow-delimiters-depth-1">]</span>;
+memcpy<span class="org-rainbow-delimiters-depth-1">(</span>buffer, <span class="org-string">"hello world!"</span>, 12<span class="org-rainbow-delimiters-depth-1">)</span>;
+printf<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-string">"message = %s\n"</span>, buffer<span class="org-rainbow-delimiters-depth-1">)</span>;
+</pre>
+</div>
+
+<p>
+Example 2: 
+</p>
+
+<p>
+&#x2013; <a href="https://cboard.cprogramming.com/c-programming/148722-when-should-i-use-memcpy.html">when should I use memcpy()?</a>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-comment-delimiter">/* </span><span class="org-comment">Packet capture buffer */</span>
+<span class="org-keyword">struct</span> <span class="org-type">pcbuffer</span> <span class="org-rainbow-delimiters-depth-1">{</span>
+     <span class="org-keyword">struct</span> <span class="org-type">pcap_pkthdr</span> *<span class="org-variable-name">pkt_header</span>;
+    <span class="org-type">u_char</span> *<span class="org-variable-name">pkt_data</span>;
+    <span class="org-type">int</span> <span class="org-variable-name">length</span>;    
+<span class="org-rainbow-delimiters-depth-1">}</span>;
+<span class="org-keyword">typedef</span> <span class="org-keyword">struct</span> <span class="org-type">pcbuffer</span> <span class="org-type">packet_capture</span>;
+<span class="org-type">packet_capture</span> <span class="org-variable-name">packets</span><span class="org-rainbow-delimiters-depth-1">[</span>PC_BUFFERSIZE<span class="org-rainbow-delimiters-depth-1">]</span>;
+
+
+<span class="org-keyword">struct</span> <span class="org-type">pcap_pkthdr</span> *<span class="org-variable-name">pkt_header</span>;              <span class="org-comment-delimiter">/* </span><span class="org-comment">I defined it as a pointer */</span>
+...
+pcap_next_ex<span class="org-rainbow-delimiters-depth-1">(</span>phandle, &amp;pkt_header, &amp;pkt_data<span class="org-rainbow-delimiters-depth-1">)</span>;
+...
+<span class="org-comment-delimiter">// </span><span class="org-comment">we have a pointer, but it doesn't point to a valid object, so malloc space for it</span>
+packets<span class="org-rainbow-delimiters-depth-1">[</span>in<span class="org-rainbow-delimiters-depth-1">]</span>.pkt_header = malloc<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-keyword">sizeof</span><span class="org-rainbow-delimiters-depth-2">(</span>*<span class="org-rainbow-delimiters-depth-3">(</span>packets<span class="org-rainbow-delimiters-depth-4">[</span>in<span class="org-rainbow-delimiters-depth-4">]</span>.pkt_header<span class="org-rainbow-delimiters-depth-3">)</span><span class="org-rainbow-delimiters-depth-2">)</span><span class="org-rainbow-delimiters-depth-1">)</span>;
+memcpy<span class="org-rainbow-delimiters-depth-1">(</span>packets<span class="org-rainbow-delimiters-depth-2">[</span>in<span class="org-rainbow-delimiters-depth-2">]</span>.pkt_header, pkt_header, <span class="org-keyword">sizeof</span><span class="org-rainbow-delimiters-depth-2">(</span>*<span class="org-rainbow-delimiters-depth-3">(</span>packets<span class="org-rainbow-delimiters-depth-4">[</span>in<span class="org-rainbow-delimiters-depth-4">]</span>.pkt_header<span class="org-rainbow-delimiters-depth-3">)</span><span class="org-rainbow-delimiters-depth-2">)</span><span class="org-rainbow-delimiters-depth-1">)</span>;
+</pre>
+</div>
+</div>
+</li>
+</ol>
+</div>
+</div>
+
+<div id="outline-container-org3af245f" class="outline-3">
+<h3 id="org3af245f"><span class="section-number-3">1.3</span> C++ Wrappers for C libraries or APIs</h3>
+<div class="outline-text-3" id="text-1-3">
+</div>
+<div id="outline-container-org48eb524" class="outline-4">
+<h4 id="org48eb524"><span class="section-number-4">1.3.1</span> Example: Nix / getcwd and chdir</h4>
+<div class="outline-text-4" id="text-1-3-1">
 <p>
 <b>getcwd</b> 
 </p>
@@ -418,9 +785,9 @@ References:
 </div>
 </div>
 
-<div id="outline-container-orga3d8cf2" class="outline-3">
-<h3 id="orga3d8cf2"><span class="section-number-3">1.3</span> Example: Nix / gethostname (std::string)</h3>
-<div class="outline-text-3" id="text-1-3">
+<div id="outline-container-org72b34a5" class="outline-4">
+<h4 id="org72b34a5"><span class="section-number-4">1.3.2</span> Example: Nix / gethostname (std::string)</h4>
+<div class="outline-text-4" id="text-1-3-2">
 <p>
 Get the computer hostname. This function needs two arguments, an array
 of chars, which is used for returning the hostname, and the size of
@@ -538,9 +905,9 @@ Identification (The GNU C Library)</a></li>
 </ul>
 </div>
 </div>
-<div id="outline-container-org7621fed" class="outline-3">
-<h3 id="org7621fed"><span class="section-number-3">1.4</span> Example: Passing std::vector to a C-array APIs</h3>
-<div class="outline-text-3" id="text-1-4">
+<div id="outline-container-orgbd9bdfa" class="outline-4">
+<h4 id="orgbd9bdfa"><span class="section-number-4">1.3.3</span> Example: Passing std::vector to a C-array APIs</h4>
+<div class="outline-text-4" id="text-1-3-3">
 <p>
 Many C APIs, such as BLAS and LPACK for linear algebra, provide
 functions like shown in the following code expecting a C array
@@ -675,9 +1042,9 @@ Testing wrapper:
 </div>
 </div>
 
-<div id="outline-container-org7848343" class="outline-3">
-<h3 id="org7848343"><span class="section-number-3">1.5</span> Example: GSL / C++ Class Wrapper to an C-API in OOP style or with opaque pointers.</h3>
-<div class="outline-text-3" id="text-1-5">
+<div id="outline-container-org41f5696" class="outline-4">
+<h4 id="org41f5696"><span class="section-number-4">1.3.4</span> Example: GSL / C++ Class Wrapper to an C-API in OOP style or with opaque pointers.</h4>
+<div class="outline-text-4" id="text-1-3-4">
 <p>
 This example shows how to build a C++ wrapper for C-APIs written in
 object-oriented C style. It means, C-APIs which emulates OOP concepts
@@ -977,8 +1344,9 @@ References:
 </div>
 </div>
 </div>
+</div>
 <div id="postamble" class="status">
-<p class="date">Created: 2018-10-30 Tue 15:51</p>
+<p class="date">Created: 2018-11-04 Sun 23:27</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
 </body>
