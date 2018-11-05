@@ -578,325 +578,6 @@ Output:
    ==> Error: object not found in factory
 #+END_SRC
 
-*** Universal Polymorphic Factory 
-
-This customized implementation of the polymorphic factory can
-instantiate objects of any type, even if they don't have the same base
-class. Another feature is that the factory class doesn't need to have
-any knowledge about any base class. The trick used were templates;
-void* pointers for type erasure of heap-objects; static objects for
-registering classes in the factory and RTTI - for generating better
-error messages and making the conversion from void* to the particular
-class being instantiated safer.
-
- + File: [[file:src/design-patterns/factory-universal1.cpp][file:src/design-patterns/factory-universal1.cpp]]
- + Online Compiler: https://rextester.com/GKEBF89553
-
-The class ~runtime_error_location~ class is used for providing exception
-with better context information with the line and the file the
-exception was generated.
-
-#+BEGIN_SRC cpp 
-  #define RUNTIME_ERROR_LOCATION(message)  \
-          runtime_error_location(__LINE__, __FILE__, message)
-
-  struct runtime_error_location: public std::exception {
-      std::string  message;
-      runtime_error_location(const std::string& text)
-                  : message{text}
-      {
-      }
-      runtime_error_location(
-                  unsigned int line,
-                  const std::string& file,
-                  const std::string& text
-                  )
-          {
-            message = file + ":" + std::to_string(line) + ": " + "Error: " + text;
-          }
-      auto what() const noexcept -> const char* {
-          return message.c_str();
-      }
-  };
-#+END_SRC
-
-The UniversalFactory contains the static factory methods make and makeSafe
-which returns an unique_ptr to an object instantiated on the heap. If
-the factory method make fails it returns a nullptr without throwing an
-exception and makeSafe returns an ~runtime_error_location~ exception if
-there is a failure to instantiate.
-
-Once the classes are registered, objects can be instantiated with: 
-
- + std::unique_ptr<BaseA> objectD = UniversalFactory::make<BaseClass>("DerivedClassD");
- + std::unique_ptr<BaseX> object1 = UniversalFactory::make<BaseClass>("DerivedClassY");
-
-#+BEGIN_SRC cpp 
-  class UniversalFactory{
-  private:
-        using FactoryMap = std::map<std::string, UniversalFactory*>;
-        // Force global variable to be initialized, thus it avoid the
-        // inialization order fisaco.
-        static auto getRegister() -> FactoryMap& {
-           static FactoryMap classRegister{};
-           return classRegister;
-        }
-  public:
-      // ========== Instance Methods ========//
-
-      // Destructor
-      virtual
-      ~UniversalFactory() = default;
-
-      // Encapsulates class constructor.
-      // The type void* performs pointer type erasure
-      virtual
-      auto create() const -> void* = 0;
-
-      // Encapsulates destructor 
-      virtual
-      auto destroy(void* object) const -> void = 0;
-
-      virtual
-      auto size() const -> size_t = 0;
-
-      virtual
-      auto typeinfo() const -> const std::type_info& = 0;
-
-      // ========== Static Methods ========//
-
-      /** Register factory object of derived class */
-      static
-      auto registerFactory(const std::string& name, UniversalFactory* factory) -> void {
-           auto& reg = UniversalFactory::getRegister();
-           reg[name] = factory;
-      }
-      /** Show all registered classes printing their name to stdout. */
-      static
-      auto showClasses() -> void {
-          std::cout << " Registered classes. " << "\n";
-          std::cout << " =================== " << "\n";
-          for(const auto& pair: UniversalFactory::getRegister())
-               std::cout << " + " << pair.first
-                         << " ; RTTI name = "
-                         << pair.second->typeinfo().name()
-                         << " ; size (bytes) = "
-                         << pair.second->size()
-                         << "\n";
-      }
-
-      /** Attemp to instantiate a class, if it is not possible, returns nullptr */
-      template<class BaseClass>
-      static
-      auto make(const std::string& name) -> std::unique_ptr<BaseClass> {
-              FactoryMap& reg = UniversalFactory::getRegister();
-              auto it = reg.find(name);
-              if(it == reg.end())
-                      return nullptr;
-              // Avoid core dump if the conversion is not possible.
-              if(it->second->typeinfo() != typeid(BaseClass))
-                      return nullptr;
-              void* ptr = it->second->create();
-              return std::unique_ptr<BaseClass>(reinterpret_cast<BaseClass*>(ptr));
-      }
-
-      /** Attempt to instantiate class, if it is not possible throws an exception. */
-      template<class BaseClass>
-      static
-      auto makeSafe(const std::string& name) -> std::unique_ptr<BaseClass> {
-         // Throw exception for providing better context information and avoid
-         // Core dump due to dangerous reinterpret_cast<>.
-         auto object = UniversalFactory::make<BaseClass>(name);
-         if(object == nullptr)
-            throw RUNTIME_ERROR_LOCATION(
-                 std::string("Cannot create type. Failed to cast void* to: ") + name);
-         return object;
-      }
-  };  // -------- End Of class UniversalFactory() ------//
-
-#+END_SRC
-
-The class FactoryImpl is used for creating static objects (global
-objects) for registering classes in the factory during the program
-initialization. This class also performs type erasure of the
-constructor and destructor by using void* for allowing it to work with
-any type. 
-
-#+BEGIN_SRC cpp 
-  template<typename DerivedClass, typename BaseClass = DerivedClass>
-  class FactoryImpl: UniversalFactory{
-  private:
-       const std::type_info& _tinfo;
-  public:
-       // Register this global object on the Factory register
-       FactoryImpl(const std::string& name)
-               : _tinfo(typeid(BaseClass))
-       {
-           std::cerr << " [TRACE] " << " Registered Class = " << name << "\n";
-           UniversalFactory::registerFactory(name, this);
-       }
-       // Capture class default constructor => constructor type erasure 
-       auto create() const -> void* override {
-               return new DerivedClass;
-       }
-       // Capture destructor => Destructor type erasure 
-       auto destroy(void* object) const -> void override {
-               delete reinterpret_cast<BaseClass*>(object);
-       }	
-       auto typeinfo() const -> const std::type_info& override {
-               return _tinfo;
-       }
-       auto size() const -> size_t override {
-               return sizeof(DerivedClass);
-       }
-  };
-
-#+END_SRC
-
- *Class Registration with static objects.*
-
-Classes can be registered in the factory by creating an static
-instance (static object) of the class FactoryImpl, which registers the
-class or type passed as template parameter, during the object
-initialization. 
-
-
- + The first template parameter is the class to be registered and the
-   second one is its base class. If the class to be registered, doesn't
-   have base class, it can omitted. The constructor argument is the name
-   of the class to be registered as string.
-
- + The anonymous namespace in this example is used for defining
-   internal linkage and making the static objects private or only
-   visible in the current compilation unit or file for avoiding name
-   clashes.
-
- + Note: The registered classes doesn't need to have a common base
-   class, thus it is possible to register any class as the class
-   NonDerived in the code below. 
-
-#+BEGIN_SRC cpp 
-  namespace {
-     
-     auto register_Base       = FactoryImpl<Base, Base>("Base");
-     auto register_DerivedA   = FactoryImpl<DerivedA, Base>("DerivedA");
-     auto register_DerivedB   = FactoryImpl<DerivedB, Base>("DerivedB");
-
-     // Classes without a base class doesn't need the second template paramter 
-     auto register_NonDerived = FactoryImpl<NonDerived>("NonDerived");
-  }
-#+END_SRC
-
-The registration boilerplate can be eliminated by using macros:
-
-#+BEGIN_SRC cpp 
-  // Register a non-polymorphic class -> It means a class without base class 
-  #define REGISTER_CLASS_TO_FACTORY1(aclass) \
-          namespace {  auto register_ ## derived = FactoryImpl<aclass, aclass>( #aclass ); }
-
-  // Register a polymorphic class to the factory.
-  #define REGISTER_CLASS_TO_FACTORY2(derivedClass, baseClass) \
-          namespace {  auto register_ ## derivedClass = FactoryImpl<derivedClass, baseClass>( #derivedClass ); }
-
-  REGISTER_CLASS_TO_FACTORY2(Base, Base);
-  REGISTER_CLASS_TO_FACTORY2(DerivedA, Base);
-  REGISTER_CLASS_TO_FACTORY2(DerivedB, Base);
-  REGISTER_CLASS_TO_FACTORY1(NonDerived);
-#+END_SRC
-
- *Usage example in CERN's ROOT/Cling REPL:*
-
-Load the proof-of-concept file
-
-#+BEGIN_SRC cpp  
-  >> .L factory-universal1.cpp 
-   [TRACE]  Registered Class = Base
-   [TRACE]  Registered Class = DerivedA
-   [TRACE]  Registered Class = DerivedB
-   [TRACE]  Registered Class = NonDerived
-  >> 
-  >> 
-#+END_SRC
-
-Instantiate some classes: 
-
-#+BEGIN_SRC cpp 
-  >> auto base = UniversalFactory::make<Base>("Base")
-  (std::unique_ptr<Base, std::default_delete<Base> > &) @0x7f768c558088
-  >> 
-
-  >> base->getType()
-  (std::string) "Base"
-  >> 
-
-  >> auto derivA = UniversalFactory::make<Base>("DerivedA")
-  (std::unique_ptr<Base, std::default_delete<Base> > &) @0x7f768c5581f8
-
-  >> derivA->showType()
-  Class type = DerivedA
-
-  >> auto derivB = UniversalFactory::make<Base>("DerivedB")
-  (std::unique_ptr<Base, std::default_delete<Base> > &) @0x7f768c558238
-
-  >> derivB->showType()
-  Class type = DerivedB
-  >> 
-
-  for(const auto& cls : {"Base", "DerivedA", "DerivedB"} ){
-      auto obj = UniversalFactory::makeSafe<Base>(cls);
-      std::cout << "Class [" << cls << " ] = " << obj->getType() << " \n";
-  }
-  // Output: 
-  Class [Base ] = Base 
-  Class [DerivedA ] = DerivedA 
-  Class [DerivedB ] = DerivedB 
-  >> 
-
-#+END_SRC
-
-Show all registered classes 
-
-#+BEGIN_SRC cpp  
-  >> UniversalFactory::showClasses()
-   Registered classes. 
-   =================== 
-   + Base ; RTTI name = 4Base ; size (bytes) = 8
-   + DerivedA ; RTTI name = 4Base ; size (bytes) = 8
-   + DerivedB ; RTTI name = 4Base ; size (bytes) = 8
-   + NonDerived ; RTTI name = 10NonDerived ; size (bytes) = 1
-  >> 
-#+END_SRC
-
-Instantiate a non-derived class: 
-
-#+BEGIN_SRC cpp 
-  // Instantiate a non derived class of Base 
-  >> auto ndc = UniversalFactory::make<NonDerived>("NonDerived")
-  (std::unique_ptr<NonDerived, std::default_delete<NonDerived> > &) @0x7f768c558138
-  >> 
-
-  >> ndc->printMessage();
-   ==> I am a non derived class
-  >> 
-#+END_SRC
-
-Try creating a class which is not registered
-
-#+BEGIN_SRC cpp 
-  // Returns a null pointer if there is a failure. 
-  >> UniversalFactory::make<Base>("Error") == nullptr
-  (bool) true
-
-  >> UniversalFactory::make<DerivedA>("Error") == nullptr
-  (bool) true
-  >> 
-
-  // makeSafe throws an exception 
-  >> auto dummy = UniversalFactory::makeSafe<Base>("NonDerived");
-  Error in <TRint::HandleTermInput()>: runtime_error_location caught: 
-  factory-universal1.cpp:123: Error: Cannot create type. Failed to cast void* to: NonDerived
-  >> 
-#+END_SRC
 *** References
 
  *References*
@@ -1840,185 +1521,7 @@ Running:  ([[file:src/design-patterns/composite1.cpp][file:src/design-patterns/c
     [TRACE] Destroy group - id = << groupA
     [TRACE] Destroy group - id = << GroupB
 #+END_SRC
-** Multiple booleans encoded as a single bitmask value 
-
-Note: It is not a design pattern, but a technique for encoding
-multiple booleans or flags inside a single value, passing multiple
-booleans as function parameters or returning multiple booleans as a
-single value.
-
-Example: 
-
- - File:  [[file:src/design-patterns/boolean-bitmask.C][file:src/design-patterns/boolean-bitmask.C]]  (CLING script)
-
-#+BEGIN_SRC cpp 
-  #include <iostream>
-  #include <vector>
-  #include <ostream> // Operator: (<<)
-  #include <string>
-
-  enum class Permissions: unsigned {
-      executable = 0x01,  // decimal = 1 or (1 << 0)
-      writeable  = 0x02,  // decimal = 2 or (1 << 1)
-      readable   = 0x04   // decimal = 4 or (1 << 2)
-  };
-
-  Permissions operator | (Permissions lhs, Permissions rhs){
-      return static_cast<Permissions>(static_cast<unsigned>(lhs) | static_cast<unsigned>(rhs));
-  }
-  bool operator & (Permissions lhs, Permissions rhs){
-      return static_cast<unsigned>(lhs) & static_cast<unsigned>(rhs);
-  }
-  // Make permissions enum printable. 
-  std::ostream& operator<<(std::ostream& os, const Permissions& p){
-      os << std::boolalpha; // Make bool printable as 'true' or 'false' instead of 0 or 1
-      os << "readable = "   << (p & Permissions::readable)   << "; "
-         << "writeable = "  << (p & Permissions::writeable)  << "; "
-         << "executable = " << (p & Permissions::executable);
-      return os;
-  }
-#+END_SRC
-
-Running: 
-
-#+BEGIN_SRC cpp 
-  // Load script 
-  >> .L boolean-bitmask.C 
-
-  >> std::cout << Permissions::readable << std::endl;
-  readable = true; writeable = false; executable = false
-
-  >> std::cout << Permissions::readable << "\n";
-  readable = true; writeable = false; executable = false
-
-  >> std::cout << Permissions::writeable << "\n";
-  readable = false; writeable = true; executable = false
-
-  >> std::cout << Permissions::executable << "\n";
-  readable = false; writeable = false; executable = true
-
-  >> auto p1 = Permissions::executable | Permissions::readable ;
-  >> std::cout << "p1 => " << p1 << "\n";
-  p1 => readable = true; writeable = false; executable = true
-  >> 
-
-  >> auto p2 = Permissions::executable | Permissions::readable | Permissions::writeable ;
-  >> std::cout << "p2 => " << p2 << "\n";
-  p2 => readable = true; writeable = true; executable = true
-  >> 
-
-  >> if(p1 & Permissions::readable) { std::cout << "File is readable" << "\n"; }
-  File is readable
-  >> 
-
-#+END_SRC
-
-Shows all flags or all bits that are set: 
-
-#+BEGIN_SRC cpp 
-  void showPermissions(Permissions p){
-          std::cout << "Is readable?     : " << (p & Permissions::readable)   << '\n';
-          std::cout << "Is writeable?    : " << (p & Permissions::writeable)  << '\n';
-          std::cout << "Is executable?   : " << (p & Permissions::executable) << '\n';
-  }
-
-  >> showPermissions(p1)
-  Is readable?     : true
-  Is writeable?    : false
-  Is executable?   : true
-  >> 
-  >> showPermissions(p2)
-  Is readable?     : true
-  Is writeable?    : true
-  Is executable?   : true
-  >> 
-#+END_SRC
-
-Design 1: Function uses multiple bools creating a file with some
-permissions. 
-
-#+BEGIN_SRC cpp 
-  using FilePerms = std::tuple<bool, bool, bool>;
-
-  // Design 1:
-  FilePerms createFileDD1(
-       std::string name,
-       bool readable,
-       bool writeable,
-       bool executable ){
-       std::cout << std::boolalpha
-                 << "Create file = " << name << "\n"
-                 << " with the following permissions" << "\n"
-                 << "  + readable   = " << readable   << "\n"
-                 << "  + writeable  = " << writeable  << "\n"
-                 << "  + executable = " << executable << "\n"
-                 << "\n";
-       return FilePerms {readable, writeable, executable};	
-  }
-
-  >> auto pd1 = createFileDD1("dataset.txt", true, false, false)
-  Create file = dataset.txt
-   with the following permissions
-    + readable   = true
-    + writeable  = false
-    + executable = false
-
-  >> pd1
-  (std::tuple<bool, bool, bool> &) { true, false, false }
-  >> 
-
-  >> std::cout << "R = " << std::get<0>(pd1) << "\n";
-  R = true
-  >> std::cout << "W = " << std::get<1>(pd1) << "\n";
-  W = false
-  >> std::cout << "X = " << std::get<2>(pd1) << "\n";
-  X = false
-  >> 
-#+END_SRC
-
-Design 2: Use bitmask flags instead of bools. The advantage is more
-readability and less functions parameters. 
-
-#+BEGIN_SRC cpp 
-  // Design 1:
-  Permissions createFileDD2(std::string name, Permissions p){
-       std::cout << std::boolalpha
-                 << "Create file = " << name << "\n"
-                 << " with the following permissions" << "\n"
-                 << "  + readable   = " << (p & Permissions::readable)   << "\n"
-                 << "  + writeable  = " << (p & Permissions::writeable)  << "\n"
-                 << "  + executable = " << (p & Permissions::executable) << "\n"
-                 << "\n";
-       return p;
-  }
-
-  >> auto pd2 = createFileDD2("Sales-report.xls", Permissions::readable | Permissions::writeable)
-  Create file = Sales-report.xls
-   with the following permissions
-    + readable   = true
-    + writeable  = true
-    + executable = false
-
-  (Permissions)  : (unsigned int) 6
-  >> 
-
-  >> createFileDD2("parser.exe", Permissions::readable | Permissions::writeable | Create file = parser.exe
-   with the following permissions
-    + readable   = true
-    + writeable  = true
-    + executable = true
-
-  (Permissions)  : (unsigned int) 7
-  >> 
-
-  >> std::cout << "R = " << (pd2 & Permissions::readable) << "\n";
-  R = true
-  >> std::cout << "W = " << (pd2 & Permissions::writeable) << "\n";
-  W = true
-  >> std::cout << "X = " << (pd2 & Permissions::executable) << "\n";
-  X = false
-#+END_SRC
-
+** Visitor 
 * C++ Specific Design Pattern and Idioms
 ** Interface Class 
 *** Overview  
@@ -3024,3 +2527,503 @@ Example:
 #+END_SRC
 
 
+* Custom Techniques 
+** Multiple booleans encoded as a single bitmask value 
+
+ Note: It is not a design pattern, but a technique for encoding
+ multiple booleans or flags inside a single value, passing multiple
+ booleans as function parameters or returning multiple booleans as a
+ single value.
+
+ Example: 
+
+  - File:  [[file:src/design-patterns/boolean-bitmask.C][file:src/design-patterns/boolean-bitmask.C]]  (CLING script)
+
+ #+BEGIN_SRC cpp 
+   #include <iostream>
+   #include <vector>
+   #include <ostream> // Operator: (<<)
+   #include <string>
+
+   enum class Permissions: unsigned {
+       executable = 0x01,  // decimal = 1 or (1 << 0)
+       writeable  = 0x02,  // decimal = 2 or (1 << 1)
+       readable   = 0x04   // decimal = 4 or (1 << 2)
+   };
+
+   Permissions operator | (Permissions lhs, Permissions rhs){
+       return static_cast<Permissions>(static_cast<unsigned>(lhs) | static_cast<unsigned>(rhs));
+   }
+   bool operator & (Permissions lhs, Permissions rhs){
+       return static_cast<unsigned>(lhs) & static_cast<unsigned>(rhs);
+   }
+   // Make permissions enum printable. 
+   std::ostream& operator<<(std::ostream& os, const Permissions& p){
+       os << std::boolalpha; // Make bool printable as 'true' or 'false' instead of 0 or 1
+       os << "readable = "   << (p & Permissions::readable)   << "; "
+          << "writeable = "  << (p & Permissions::writeable)  << "; "
+          << "executable = " << (p & Permissions::executable);
+       return os;
+   }
+ #+END_SRC
+
+ Running: 
+
+ #+BEGIN_SRC cpp 
+   // Load script 
+   >> .L boolean-bitmask.C 
+
+   >> std::cout << Permissions::readable << std::endl;
+   readable = true; writeable = false; executable = false
+
+   >> std::cout << Permissions::readable << "\n";
+   readable = true; writeable = false; executable = false
+
+   >> std::cout << Permissions::writeable << "\n";
+   readable = false; writeable = true; executable = false
+
+   >> std::cout << Permissions::executable << "\n";
+   readable = false; writeable = false; executable = true
+
+   >> auto p1 = Permissions::executable | Permissions::readable ;
+   >> std::cout << "p1 => " << p1 << "\n";
+   p1 => readable = true; writeable = false; executable = true
+   >> 
+
+   >> auto p2 = Permissions::executable | Permissions::readable | Permissions::writeable ;
+   >> std::cout << "p2 => " << p2 << "\n";
+   p2 => readable = true; writeable = true; executable = true
+   >> 
+
+   >> if(p1 & Permissions::readable) { std::cout << "File is readable" << "\n"; }
+   File is readable
+   >> 
+
+ #+END_SRC
+
+ Shows all flags or all bits that are set: 
+
+ #+BEGIN_SRC cpp 
+   void showPermissions(Permissions p){
+           std::cout << "Is readable?     : " << (p & Permissions::readable)   << '\n';
+           std::cout << "Is writeable?    : " << (p & Permissions::writeable)  << '\n';
+           std::cout << "Is executable?   : " << (p & Permissions::executable) << '\n';
+   }
+
+   >> showPermissions(p1)
+   Is readable?     : true
+   Is writeable?    : false
+   Is executable?   : true
+   >> 
+   >> showPermissions(p2)
+   Is readable?     : true
+   Is writeable?    : true
+   Is executable?   : true
+   >> 
+ #+END_SRC
+
+ Design 1: Function uses multiple bools creating a file with some
+ permissions. 
+
+ #+BEGIN_SRC cpp 
+   using FilePerms = std::tuple<bool, bool, bool>;
+
+   // Design 1:
+   FilePerms createFileDD1(
+        std::string name,
+        bool readable,
+        bool writeable,
+        bool executable ){
+        std::cout << std::boolalpha
+                  << "Create file = " << name << "\n"
+                  << " with the following permissions" << "\n"
+                  << "  + readable   = " << readable   << "\n"
+                  << "  + writeable  = " << writeable  << "\n"
+                  << "  + executable = " << executable << "\n"
+                  << "\n";
+        return FilePerms {readable, writeable, executable};	
+   }
+
+   >> auto pd1 = createFileDD1("dataset.txt", true, false, false)
+   Create file = dataset.txt
+    with the following permissions
+     + readable   = true
+     + writeable  = false
+     + executable = false
+
+   >> pd1
+   (std::tuple<bool, bool, bool> &) { true, false, false }
+   >> 
+
+   >> std::cout << "R = " << std::get<0>(pd1) << "\n";
+   R = true
+   >> std::cout << "W = " << std::get<1>(pd1) << "\n";
+   W = false
+   >> std::cout << "X = " << std::get<2>(pd1) << "\n";
+   X = false
+   >> 
+ #+END_SRC
+
+ Design 2: Use bitmask flags instead of bools. The advantage is more
+ readability and less functions parameters. 
+
+ #+BEGIN_SRC cpp 
+   // Design 1:
+   Permissions createFileDD2(std::string name, Permissions p){
+        std::cout << std::boolalpha
+                  << "Create file = " << name << "\n"
+                  << " with the following permissions" << "\n"
+                  << "  + readable   = " << (p & Permissions::readable)   << "\n"
+                  << "  + writeable  = " << (p & Permissions::writeable)  << "\n"
+                  << "  + executable = " << (p & Permissions::executable) << "\n"
+                  << "\n";
+        return p;
+   }
+
+   >> auto pd2 = createFileDD2("Sales-report.xls", Permissions::readable | Permissions::writeable)
+   Create file = Sales-report.xls
+    with the following permissions
+     + readable   = true
+     + writeable  = true
+     + executable = false
+
+   (Permissions)  : (unsigned int) 6
+   >> 
+
+   >> createFileDD2("parser.exe", Permissions::readable | Permissions::writeable | Create file = parser.exe
+    with the following permissions
+     + readable   = true
+     + writeable  = true
+     + executable = true
+
+   (Permissions)  : (unsigned int) 7
+   >> 
+
+   >> std::cout << "R = " << (pd2 & Permissions::readable) << "\n";
+   R = true
+   >> std::cout << "W = " << (pd2 & Permissions::writeable) << "\n";
+   W = true
+   >> std::cout << "X = " << (pd2 & Permissions::executable) << "\n";
+   X = false
+ #+END_SRC
+
+
+** Universal Polymorphic Factory 
+
+This customized implementation of the polymorphic factory can
+instantiate objects of any type, even if they don't have the same base
+class. Another feature is that the factory class doesn't need to have
+any knowledge about any base class. The trick used were templates;
+void* pointers for type erasure of heap-objects; static objects for
+registering classes in the factory and RTTI - for generating better
+error messages and making the conversion from void* to the particular
+class being instantiated safer.
+
+ + File: [[file:src/design-patterns/factory-universal1.cpp][file:src/design-patterns/factory-universal1.cpp]]
+ + Online Compiler: https://rextester.com/GKEBF89553
+
+The class ~runtime_error_location~ class is used for providing exception
+with better context information with the line and the file the
+exception was generated.
+
+#+BEGIN_SRC cpp 
+  #define RUNTIME_ERROR_LOCATION(message)  \
+          runtime_error_location(__LINE__, __FILE__, message)
+
+  struct runtime_error_location: public std::exception {
+      std::string  message;
+      runtime_error_location(const std::string& text)
+                  : message{text}
+      {
+      }
+      runtime_error_location(
+                  unsigned int line,
+                  const std::string& file,
+                  const std::string& text
+                  )
+          {
+            message = file + ":" + std::to_string(line) + ": " + "Error: " + text;
+          }
+      auto what() const noexcept -> const char* {
+          return message.c_str();
+      }
+  };
+#+END_SRC
+
+The UniversalFactory contains the static factory methods make and makeSafe
+which returns an unique_ptr to an object instantiated on the heap. If
+the factory method make fails it returns a nullptr without throwing an
+exception and makeSafe returns an ~runtime_error_location~ exception if
+there is a failure to instantiate.
+
+Once the classes are registered, objects can be instantiated with: 
+
+ + std::unique_ptr<BaseA> objectD = UniversalFactory::make<BaseClass>("DerivedClassD");
+ + std::unique_ptr<BaseX> object1 = UniversalFactory::make<BaseClass>("DerivedClassY");
+
+#+BEGIN_SRC cpp 
+  class UniversalFactory{
+  private:
+        using FactoryMap = std::map<std::string, UniversalFactory*>;
+        // Force global variable to be initialized, thus it avoid the
+        // inialization order fisaco.
+        static auto getRegister() -> FactoryMap& {
+           static FactoryMap classRegister{};
+           return classRegister;
+        }
+  public:
+      // ========== Instance Methods ========//
+
+      // Destructor
+      virtual
+      ~UniversalFactory() = default;
+
+      // Encapsulates class constructor.
+      // The type void* performs pointer type erasure
+      virtual
+      auto create() const -> void* = 0;
+
+      // Encapsulates destructor 
+      virtual
+      auto destroy(void* object) const -> void = 0;
+
+      virtual
+      auto size() const -> size_t = 0;
+
+      virtual
+      auto typeinfo() const -> const std::type_info& = 0;
+
+      // ========== Static Methods ========//
+
+      /** Register factory object of derived class */
+      static
+      auto registerFactory(const std::string& name, UniversalFactory* factory) -> void {
+           auto& reg = UniversalFactory::getRegister();
+           reg[name] = factory;
+      }
+      /** Show all registered classes printing their name to stdout. */
+      static
+      auto showClasses() -> void {
+          std::cout << " Registered classes. " << "\n";
+          std::cout << " =================== " << "\n";
+          for(const auto& pair: UniversalFactory::getRegister())
+               std::cout << " + " << pair.first
+                         << " ; RTTI name = "
+                         << pair.second->typeinfo().name()
+                         << " ; size (bytes) = "
+                         << pair.second->size()
+                         << "\n";
+      }
+
+      /** Attemp to instantiate a class, if it is not possible, returns nullptr */
+      template<class BaseClass>
+      static
+      auto make(const std::string& name) -> std::unique_ptr<BaseClass> {
+              FactoryMap& reg = UniversalFactory::getRegister();
+              auto it = reg.find(name);
+              if(it == reg.end())
+                      return nullptr;
+              // Avoid core dump if the conversion is not possible.
+              if(it->second->typeinfo() != typeid(BaseClass))
+                      return nullptr;
+              void* ptr = it->second->create();
+              return std::unique_ptr<BaseClass>(reinterpret_cast<BaseClass*>(ptr));
+      }
+
+      /** Attempt to instantiate class, if it is not possible throws an exception. */
+      template<class BaseClass>
+      static
+      auto makeSafe(const std::string& name) -> std::unique_ptr<BaseClass> {
+         // Throw exception for providing better context information and avoid
+         // Core dump due to dangerous reinterpret_cast<>.
+         auto object = UniversalFactory::make<BaseClass>(name);
+         if(object == nullptr)
+            throw RUNTIME_ERROR_LOCATION(
+                 std::string("Cannot create type. Failed to cast void* to: ") + name);
+         return object;
+      }
+  };  // -------- End Of class UniversalFactory() ------//
+
+#+END_SRC
+
+The class FactoryImpl is used for creating static objects (global
+objects) for registering classes in the factory during the program
+initialization. This class also performs type erasure of the
+constructor and destructor by using void* for allowing it to work with
+any type. 
+
+#+BEGIN_SRC cpp 
+  template<typename DerivedClass, typename BaseClass = DerivedClass>
+  class FactoryImpl: UniversalFactory{
+  private:
+       const std::type_info& _tinfo;
+  public:
+       // Register this global object on the Factory register
+       FactoryImpl(const std::string& name)
+               : _tinfo(typeid(BaseClass))
+       {
+           std::cerr << " [TRACE] " << " Registered Class = " << name << "\n";
+           UniversalFactory::registerFactory(name, this);
+       }
+       // Capture class default constructor => constructor type erasure 
+       auto create() const -> void* override {
+               return new DerivedClass;
+       }
+       // Capture destructor => Destructor type erasure 
+       auto destroy(void* object) const -> void override {
+               delete reinterpret_cast<BaseClass*>(object);
+       }	
+       auto typeinfo() const -> const std::type_info& override {
+               return _tinfo;
+       }
+       auto size() const -> size_t override {
+               return sizeof(DerivedClass);
+       }
+  };
+
+#+END_SRC
+
+ *Class Registration with static objects.*
+
+Classes can be registered in the factory by creating an static
+instance (static object) of the class FactoryImpl, which registers the
+class or type passed as template parameter, during the object
+initialization. 
+
+
+ + The first template parameter is the class to be registered and the
+   second one is its base class. If the class to be registered, doesn't
+   have base class, it can omitted. The constructor argument is the name
+   of the class to be registered as string.
+
+ + The anonymous namespace in this example is used for defining
+   internal linkage and making the static objects private or only
+   visible in the current compilation unit or file for avoiding name
+   clashes.
+
+ + Note: The registered classes doesn't need to have a common base
+   class, thus it is possible to register any class as the class
+   NonDerived in the code below. 
+
+#+BEGIN_SRC cpp 
+  namespace {
+     
+     auto register_Base       = FactoryImpl<Base, Base>("Base");
+     auto register_DerivedA   = FactoryImpl<DerivedA, Base>("DerivedA");
+     auto register_DerivedB   = FactoryImpl<DerivedB, Base>("DerivedB");
+
+     // Classes without a base class doesn't need the second template paramter 
+     auto register_NonDerived = FactoryImpl<NonDerived>("NonDerived");
+  }
+#+END_SRC
+
+The registration boilerplate can be eliminated by using macros:
+
+#+BEGIN_SRC cpp 
+  // Register a non-polymorphic class -> It means a class without base class 
+  #define REGISTER_CLASS_TO_FACTORY1(aclass) \
+          namespace {  auto register_ ## derived = FactoryImpl<aclass, aclass>( #aclass ); }
+
+  // Register a polymorphic class to the factory.
+  #define REGISTER_CLASS_TO_FACTORY2(derivedClass, baseClass) \
+          namespace {  auto register_ ## derivedClass = FactoryImpl<derivedClass, baseClass>( #derivedClass ); }
+
+  REGISTER_CLASS_TO_FACTORY2(Base, Base);
+  REGISTER_CLASS_TO_FACTORY2(DerivedA, Base);
+  REGISTER_CLASS_TO_FACTORY2(DerivedB, Base);
+  REGISTER_CLASS_TO_FACTORY1(NonDerived);
+#+END_SRC
+
+ *Usage example in CERN's ROOT/Cling REPL:*
+
+Load the proof-of-concept file
+
+#+BEGIN_SRC cpp  
+  >> .L factory-universal1.cpp 
+   [TRACE]  Registered Class = Base
+   [TRACE]  Registered Class = DerivedA
+   [TRACE]  Registered Class = DerivedB
+   [TRACE]  Registered Class = NonDerived
+  >> 
+  >> 
+#+END_SRC
+
+Instantiate some classes: 
+
+#+BEGIN_SRC cpp 
+  >> auto base = UniversalFactory::make<Base>("Base")
+  (std::unique_ptr<Base, std::default_delete<Base> > &) @0x7f768c558088
+  >> 
+
+  >> base->getType()
+  (std::string) "Base"
+  >> 
+
+  >> auto derivA = UniversalFactory::make<Base>("DerivedA")
+  (std::unique_ptr<Base, std::default_delete<Base> > &) @0x7f768c5581f8
+
+  >> derivA->showType()
+  Class type = DerivedA
+
+  >> auto derivB = UniversalFactory::make<Base>("DerivedB")
+  (std::unique_ptr<Base, std::default_delete<Base> > &) @0x7f768c558238
+
+  >> derivB->showType()
+  Class type = DerivedB
+  >> 
+
+  for(const auto& cls : {"Base", "DerivedA", "DerivedB"} ){
+      auto obj = UniversalFactory::makeSafe<Base>(cls);
+      std::cout << "Class [" << cls << " ] = " << obj->getType() << " \n";
+  }
+  // Output: 
+  Class [Base ] = Base 
+  Class [DerivedA ] = DerivedA 
+  Class [DerivedB ] = DerivedB 
+  >> 
+
+#+END_SRC
+
+Show all registered classes 
+
+#+BEGIN_SRC cpp  
+  >> UniversalFactory::showClasses()
+   Registered classes. 
+   =================== 
+   + Base ; RTTI name = 4Base ; size (bytes) = 8
+   + DerivedA ; RTTI name = 4Base ; size (bytes) = 8
+   + DerivedB ; RTTI name = 4Base ; size (bytes) = 8
+   + NonDerived ; RTTI name = 10NonDerived ; size (bytes) = 1
+  >> 
+#+END_SRC
+
+Instantiate a non-derived class: 
+
+#+BEGIN_SRC cpp 
+  // Instantiate a non derived class of Base 
+  >> auto ndc = UniversalFactory::make<NonDerived>("NonDerived")
+  (std::unique_ptr<NonDerived, std::default_delete<NonDerived> > &) @0x7f768c558138
+  >> 
+
+  >> ndc->printMessage();
+   ==> I am a non derived class
+  >> 
+#+END_SRC
+
+Try creating a class which is not registered
+
+#+BEGIN_SRC cpp 
+  // Returns a null pointer if there is a failure. 
+  >> UniversalFactory::make<Base>("Error") == nullptr
+  (bool) true
+
+  >> UniversalFactory::make<DerivedA>("Error") == nullptr
+  (bool) true
+  >> 
+
+  // makeSafe throws an exception 
+  >> auto dummy = UniversalFactory::makeSafe<Base>("NonDerived");
+  Error in <TRint::HandleTermInput()>: runtime_error_location caught: 
+  factory-universal1.cpp:123: Error: Cannot create type. Failed to cast void* to: NonDerived
+  >> 
+#+END_SRC
