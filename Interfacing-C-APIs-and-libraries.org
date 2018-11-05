@@ -18,588 +18,829 @@
 
  + *GSL* - GNU Scientifc Library 
 
-** Example: Nix / getcwd and chdir 
 
- *getcwd* 
+** Widely Used C Functions 
+*** Overview 
 
- + Brief: Get the current working directory.
+Those functions appear quite often in C code and old C++ codes, thus
+it is important understanding them for accessing or consuming or C
+APIs and also creating C++ wrappers for those libraries.
 
- + Description: "These functions return a null-terminated string
-   containing an absolute pathname that is the current working
-   directory of the calling process.  The pathname is returned as the
-   function result and via the argument buf, if present."
-   + [[http://man7.org/linux/man-pages/man3/getcwd.3.html][(gecwd - Linux Manual)]]
+Header: for C++ - <cstring>, for C - <string.h>
+
+ * "String" (character array) Manipulation 
+   + strcat  - Concatenate strings (const char*)
+   + strcpy  - Copy strings
+   + strcmp  - Compare strings 
+
+ * Memory/buffer manipulation - Header <string.H>
+   + memset    - Fill memory 
+   + memcpy    - Copy memory 
+   + memmove   - Move data from one location to another
+
+*** string manipulation 
+**** strcmp 
+
+ + _strcmp_ 
+   * Compare two C-strings returning 0 if they are equal. 
+
+Signature: 
 
 #+BEGIN_SRC cpp 
-  #include <unistd.h>
-  char *getcwd(char *buf, size_t size);
+  int strcmp(const char *s1, const char *s2);
 #+END_SRC
 
- *chdir* 
-
- + Brief: Change the current working directory.
- + Description: On success returns zero and on failure returns -1 and
-   set the flag *errno*. 
+Example: 
 
 #+BEGIN_SRC cpp 
-  #include <unistd.h>
-  int chdir(const char *path);
-#+END_SRC
+  #include <cstring> // Or in C: #include <string.h>
 
-Using those APIs in C: 
-
-#+BEGIN_SRC cpp 
-  #include <unistd.h>
-
-  >> getcwd(NULL, 0)
-  (char *) "/home/archbox"
-  >>
-
-  >> getcwd(nullptr, 0)
-  (char *) "/home/archbox"
-  >> 
-
-  >> chdir("/var/log")
+  >> strcmp("hello", "hello")
   (int) 0
-  >> getcwd(NULL, 0)
-  (char *) "/var/log"
   >> 
-#+END_SRC
-
-Using those functions with C++ string std::string. 
-
-#+BEGIN_SRC cpp 
-  #include <iostream>
-  #include <string>
-
-  #include <unistd.h>
-
-  >> std::string dirpath = "/etc/";
-
-  // Problem: Pass a std::string where const char* is expected 
-  >> chdir(dirpath)
-  ROOT_prompt_67:1:1: error: no matching function for call to 'chdir'
-  chdir(dirpath)
-  ^~~~~
-  /usr/include/unistd.h:497:12: note: candidate function not viable: no known conversion from 'std::string'
-
-  // Solution: 
-  >> chdir(dirpath.c_str())
+  >> strcmp("hello world", "hello")
+  (int) 32
+  
+  // If strings are equal, the function returns 0.
+  >> strcmp("hello world", "hello world")
   (int) 0
-  >>
 
-  >> dirpath.c_str()
-  (const char *) "/etc/"
+  >> strcmp("hello world", "hello wo")
+  (int) 114
+  >> 
+  >> if(!strcmp("hello world", "hello world")){ std::puts("equal"); }
+  equal
+  >> if(!strcmp("hello wo", "hello world")){ std::puts("equal"); }
+  >>  
+#+END_SRC
+
+**** strcat 
+
+ + _strcat_
+   * Append string src (null terminated character array, terminated at
+     \0) to the dest string.
+   * WARNING: "If dest is not large enough, program behavior is
+     unpredictable; buffer overruns are a favorite avenue for
+     attacking secure programs."
+   * Return: It returns the pointer to the dest array.
+
+Signature: 
+
+#+BEGIN_SRC cpp 
+  char *strcat(char *dest, const char *src);
+#+END_SRC
+
+Example: 
+
+#+BEGIN_SRC cpp 
+  #include <cstring> // In C: #include <string.h>
+
+  >> char str [200] = "Hello world C++ " ;
+  >> str
+  (char [200]) "Hello world C++ \0\0\0\0\0\0\0\0\0..."
+
+  >> strcat(str, " C++11")
+  (char *) "Hello world C++  C++11"
+  >> strcat(str, " C++14")
+  (char *) "Hello world C++  C++11 C++14"
+  >> strcat(str, " C++17")
+  (char *) "Hello world C++  C++11 C++14 C++17"
   >> 
 
-  >> getcwd(nullptr, 0)
-  (char *) "/etc"
+  >> str
+  (char [200]) "Hello world C++  C++11 C++14 C++17\0\0\0\.."
 
-  >> std::string(getcwd(nullptr, 0))
-  (std::string) "/etc"
+  >> 
+  >> std::cout << "str = " << str << "\n";
+  str = Hello world C++  C++11 C++14 C++17
   >> 
 #+END_SRC
 
-C++ Wrapper: 
+**** strcpy
+
+ + _strcpy_
+   * Copies the string pointed by src (null-terminated char array) to
+     the buffer pointed by dest.
+   * WARNING: The strings may not overlap, and the destination string
+     dest must be large enough to receive the copy.  Beware of buffer
+     overruns!  (See BUGS.)
+
+Signature:
 
 #+BEGIN_SRC cpp 
-  auto getCWD() -> std::string {
-       return std::string(getcwd(nullptr, 0));
-  }
+  char *strcpy(char *dest, const char *src);
+#+END_SRC
 
-  auto setCWD(const std::string& path) -> void {
-       int status = ::chdir(path.c_str());
-       if(status < 0)
-           throw std::runtime_error("Failed to change directory.");
-  }
+Example:
 
-  >> setCWD("/tmp")
-  >> getCWD()
-  (std::string) "/tmp"
+#+BEGIN_SRC cpp 
+  #include <cstring> // In C: #include <string.h>
+
+  // Usage example: 
+  char arr[200]; 
+
+  >> char arr[200]; 
+  >> arr
+  (char [200]) "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\..."
+
+  >> strcpy(arr, "Interfacing C APIs and libraries")
+  (char *) "Interfacing C APIs and libraries"
+
+  >> arr
+  (char [200]) "Interfacing C APIs and libraries\0\0\0\0\0..."
+
+  >> std::cout << "arr = " << arr << "\n";
+  arr = Interfacing C APIs and libraries
   >> 
+#+END_SRC
+*** C memory/buffer management functions - memset, memcpy and etc
+**** Overview 
 
-  >> setCWD("/tmp/dummy")
-  Error in <TRint::HandleTermInput()>: std::runtime_error caught: Failed to change directory.
-  >> 
+Note: Those functions are defined in the library <string.h> (for C++ <cstring>) for the C
+programming language.
+
+Buffer/Memory manipulation functions: 
+
+ + memset   - Fill memory 
+ + memcpy   - Copy memory
+ + memmmove - Move data from one location to another.
+
+ *References* 
+
+ + [[https://fresh2refresh.com/c-programming/c-buffer-manipulation-function/][C Buffer manipulation functions]]
+ + QNX [[http://www.qnx.com/developers/docs/7.0.0/#com.qnx.doc.neutrino.lib_ref/topic/m/memcpy.html][- memcpy()]]
+
+**** memset
+
+Initializes buffers with some value. 
+
+Arguments: 
+ + s - Pointer to the buffer that will be initialized
+ + c - Value that will be used to initialize all bytes of the buffer.
+ + n - Number of bytes of the buffer that will be initialized. 
+
+#+BEGIN_SRC cpp 
+  void *memset(void *s, int c, size_t n);
+#+END_SRC
+
+Equivalent to: 
+
+#+BEGIN_SRC cpp 
+  for(int i = 0; i < n; i++){
+      (s + i)* = c;
+  }
+#+END_SRC
+
+Example: 
+
+#+BEGIN_SRC cpp 
+ char buffer[100];
+ memset(buffer, '\0', 100);
+
+ // Initialize an array of 100 integers with 1
+ int arr[100];
+ memset(arr, 1, sizeof(int) * 100);
+#+END_SRC
+
+**** memcpy
+
+Copy bytes from one buffer to another: 
+
+Arguments: 
+ + dst - (destination) - Pointer to destination location where the data will be copied,
+ + src - (source) - Pointer to source location where the data will be copied from.
+ + n   - Number of bytes that will be copied to the destination. 
+
+#+BEGIN_SRC cpp 
+void* memcpy( void* dst,
+              const void* src,
+              size_t n );
+#+END_SRC
+
+This function is equivalent to: 
+
+#+BEGIN_SRC cpp 
+  for(int i = 0; i < n; ++i){
+      (dst + i)* = (src + i)*;
+  }
 #+END_SRC
 
 
-References: 
- + [[http://man7.org/linux/man-pages/man3/getcwd.3.html][getcwd(3) - Linux manual page]]
- + [[https://linux.die.net/man/2/chdir][chdir(2): change working directory - Linux man page]]
-
-** Example: Nix / gethostname (std::string)
-
-Get the computer hostname. This function needs two arguments, an array
-of chars, which is used for returning the hostname, and the size of
-the array. If the array size is not enough for returning the hostname,
-the function returns -1, otherwise it returns 0. The size of
-hostname "string" is limited to ~HOST_NAME_MAX~.
+Example: 
 
 #+BEGIN_SRC cpp 
+char buffer[100];
+memcpy(buffer, "hello world!", 12);
+printf("message = %s\n", buffer);
+#+END_SRC
+
+Example 2: 
+
+ -- [[https://cboard.cprogramming.com/c-programming/148722-when-should-i-use-memcpy.html][when should I use memcpy()?]]
+ 
+#+BEGIN_SRC cpp 
+  /* Packet capture buffer */
+  struct pcbuffer {
+       struct pcap_pkthdr *pkt_header;
+      u_char *pkt_data;
+      int length;    
+  };
+  typedef struct pcbuffer packet_capture;
+  packet_capture packets[PC_BUFFERSIZE];
+ 
+ 
+  struct pcap_pkthdr *pkt_header;              /* I defined it as a pointer */
+  ...
+  pcap_next_ex(phandle, &pkt_header, &pkt_data);
+  ...
+  // we have a pointer, but it doesn't point to a valid object, so malloc space for it
+  packets[in].pkt_header = malloc(sizeof(*(packets[in].pkt_header)));
+  memcpy(packets[in].pkt_header, pkt_header, sizeof(*(packets[in].pkt_header)));
+#+END_SRC
+
+** C++ Wrappers for C libraries or APIs
+*** Example: Nix / getcwd and chdir 
+
+  *getcwd* 
+
+  + Brief: Get the current working directory.
+
+  + Description: "These functions return a null-terminated string
+    containing an absolute pathname that is the current working
+    directory of the calling process.  The pathname is returned as the
+    function result and via the argument buf, if present."
+    + [[http://man7.org/linux/man-pages/man3/getcwd.3.html][(gecwd - Linux Manual)]]
+
+ #+BEGIN_SRC cpp 
    #include <unistd.h>
-   int gethostname(char *name, size_t len);
-#+END_SRC
+   char *getcwd(char *buf, size_t size);
+ #+END_SRC
 
-Example: Using this function in *C* (Root REPL). 
+  *chdir* 
 
-#+BEGIN_SRC cpp 
-  #include <iostream>
-  #include <unistd.h>
-  char hname[HOST_NAME_MAX];
+  + Brief: Change the current working directory.
+  + Description: On success returns zero and on failure returns -1 and
+    set the flag *errno*. 
 
-  >> HOST_NAME_MAX
-  (int) 64
-  >> 
+ #+BEGIN_SRC cpp 
+   #include <unistd.h>
+   int chdir(const char *path);
+ #+END_SRC
 
-  >> hname
-  (char [64]) "\0\0\0\0\0\0\0\0\0\0\0\0\0\...."
+ Using those APIs in C: 
 
-  >> gethostname(hname, HOST_NAME_MAX)
-  (int) 0
-  >> 
+ #+BEGIN_SRC cpp 
+   #include <unistd.h>
 
-  >> hname
-  (char [64]) "localhost.localdomain\0\0\0\..."
+   >> getcwd(NULL, 0)
+   (char *) "/home/archbox"
+   >>
 
-#+END_SRC
+   >> getcwd(nullptr, 0)
+   (char *) "/home/archbox"
+   >> 
 
-Example: Using gethostname with std::string 
+   >> chdir("/var/log")
+   (int) 0
+   >> getcwd(NULL, 0)
+   (char *) "/var/log"
+   >> 
+ #+END_SRC
 
-#+BEGIN_SRC cpp 
-  #include <iostream>
-  #include <unistd.h>
+ Using those functions with C++ string std::string. 
 
-  // Create a string with filled with '\0' null character of size HOST_NAME_MAX
-  >> std::string shname(HOST_NAME_MAX, 0)
-  (std::string &) "\0\0\0\0\0\0\0\0\0\0\0...."
-  >> 
+ #+BEGIN_SRC cpp 
+   #include <iostream>
+   #include <string>
 
-  >> shname.size()
-  (unsigned long) 64
+   #include <unistd.h>
 
+   >> std::string dirpath = "/etc/";
 
-  >> gethostname(&shname[0], shname.size())
-  (int) 0
+   // Problem: Pass a std::string where const char* is expected 
+   >> chdir(dirpath)
+   ROOT_prompt_67:1:1: error: no matching function for call to 'chdir'
+   chdir(dirpath)
+   ^~~~~
+   /usr/include/unistd.h:497:12: note: candidate function not viable: no known conversion from 'std::string'
 
-  >> shname
-  (std::string &) "localhost.localdomain\0\0\0\0\0\0\0\0\..."
-  >> 
+   // Solution: 
+   >> chdir(dirpath.c_str())
+   (int) 0
+   >>
 
-  >> std::cout << "Hostname = " << shname << "\n";
-  Hostname = localhost.localdomain
-  >> 
+   >> dirpath.c_str()
+   (const char *) "/etc/"
+   >> 
 
-  // Remove trailing \0 characters 
-  >> std::string x;
-  >> std::getline(std::stringstream(shname), x, '\0')
-  >> x
-  (std::string &) "localhost.localdomain"
-  >> 
-#+END_SRC
+   >> getcwd(nullptr, 0)
+   (char *) "/etc"
 
-Putting it all together in a C++ wrapper: 
+   >> std::string(getcwd(nullptr, 0))
+   (std::string) "/etc"
+   >> 
+ #+END_SRC
 
-#+BEGIN_SRC cpp 
-    #include <iostream>
-    #include <string>
-    #include <sstream>
-    #include <unistd.h>
+ C++ Wrapper: 
 
-    // C++ Wrapper or C++ interface 
-    std::string getHostname(){
-        std::string shname(HOST_NAME_MAX, 0);
-        int status = gethostname(&shname[0], shname.size());
-        if(status < 0)
-                throw std::runtime_error("Error: failed to retrieve hostname.");
-        std::string out;
-        std::getline(std::stringstream(shname), out, '\0');	
-        return out;
+ #+BEGIN_SRC cpp 
+   auto getCWD() -> std::string {
+        return std::string(getcwd(nullptr, 0));
    }
 
-   >> getHostname()
-   (std::string) "localhost.localdomain"
+   auto setCWD(const std::string& path) -> void {
+        int status = ::chdir(path.c_str());
+        if(status < 0)
+            throw std::runtime_error("Failed to change directory.");
+   }
+
+   >> setCWD("/tmp")
+   >> getCWD()
+   (std::string) "/tmp"
    >> 
-#+END_SRC
 
- *References:*
+   >> setCWD("/tmp/dummy")
+   Error in <TRint::HandleTermInput()>: std::runtime_error caught: Failed to change directory.
+   >> 
+ #+END_SRC
 
- + FreeBSD - [[https://www.freebsd.org/cgi/man.cgi?query=gethostname][gethostname]]
- + [[https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man3/gethostname.3.html][Mac OS X Manual Page For gethostname(3)]]
- + [[https://www.ibm.com/support/knowledgecenter/en/SSB23S_1.1.0.15/gtpc2/cpp_gethostname.html][IBM Knowledge Center - gethostname: Return host name]]
- + [[https://www.gnu.org/software/libc/manual/html_node/Host-Identification.html][Host
-   Identification (The GNU C Library)]]
-** Example: Passing std::vector to a C-array APIs
 
-Many C APIs, such as BLAS and LPACK for linear algebra, provide
-functions like shown in the following code expecting a C array
-(pointer to the first address array[0]) and its size. Some functions
-arguments are used input and other as return value or both. The
-objective is to build a C++ wrapper using STL-vector for interfacing
-those APIs. 
+ References: 
+  + [[http://man7.org/linux/man-pages/man3/getcwd.3.html][getcwd(3) - Linux manual page]]
+  + [[https://linux.die.net/man/2/chdir][chdir(2): change working directory - Linux man page]]
 
- + C-APIs with C-arrays. 
+*** Example: Nix / gethostname (std::string)
 
-#+BEGIN_SRC cpp 
-  double average(size_t size, double* const xs ){
-       double sum = 0.0;
-       for(size_t i = 0; i < size; i++)
-               sum += xs[i];
-       return sum / size;
-  }
+ Get the computer hostname. This function needs two arguments, an array
+ of chars, which is used for returning the hostname, and the size of
+ the array. If the array size is not enough for returning the hostname,
+ the function returns -1, otherwise it returns 0. The size of
+ hostname "string" is limited to ~HOST_NAME_MAX~.
 
-  // xs[i] <- x[i] + a * ys[i]
-  void arraySum(size_t size, double a, double *xs,  double* const ys){
-       for(size_t i = 0; i < size; i++)
-           xs[i] = xs[i] + a * ys[i];
-  }
-#+END_SRC
+ #+BEGIN_SRC cpp 
+    #include <unistd.h>
+    int gethostname(char *name, size_t len);
+ #+END_SRC
 
-Testing: 
+ Example: Using this function in *C* (Root REPL). 
 
-#+BEGIN_SRC cpp 
-  >> double arr [] = {1.0, 2.0, 3.0, 4.0, 5.0};
-  >> 
-  >> average(5, arr)
-  (double) 3.0000000
-  >> 
+ #+BEGIN_SRC cpp 
+   #include <iostream>
+   #include <unistd.h>
+   char hname[HOST_NAME_MAX];
 
-  >> double xs [] = {1.0, 3.0, 4.0, 5.0};
-  >> double ys [] = {3.0, 5.0, 6.0, 3.4};
-  >> 
-  // =====> Before <<<=========
-  >> xs
-  (double [4]) { 1.0000000, 3.0000000, 4.0000000, 5.0000000 }
-  >> ys
-  (double [4]) { 3.0000000, 5.0000000, 6.0000000, 3.4000000 }
-  >> 
+   >> HOST_NAME_MAX
+   (int) 64
+   >> 
+
+   >> hname
+   (char [64]) "\0\0\0\0\0\0\0\0\0\0\0\0\0\...."
+
+   >> gethostname(hname, HOST_NAME_MAX)
+   (int) 0
+   >> 
+
+   >> hname
+   (char [64]) "localhost.localdomain\0\0\0\..."
+
+ #+END_SRC
+
+ Example: Using gethostname with std::string 
+
+ #+BEGIN_SRC cpp 
+   #include <iostream>
+   #include <unistd.h>
+
+   // Create a string with filled with '\0' null character of size HOST_NAME_MAX
+   >> std::string shname(HOST_NAME_MAX, 0)
+   (std::string &) "\0\0\0\0\0\0\0\0\0\0\0...."
+   >> 
+
+   >> shname.size()
+   (unsigned long) 64
+
+
+   >> gethostname(&shname[0], shname.size())
+   (int) 0
+
+   >> shname
+   (std::string &) "localhost.localdomain\0\0\0\0\0\0\0\0\..."
+   >> 
+
+   >> std::cout << "Hostname = " << shname << "\n";
+   Hostname = localhost.localdomain
+   >> 
+
+   // Remove trailing \0 characters 
+   >> std::string x;
+   >> std::getline(std::stringstream(shname), x, '\0')
+   >> x
+   (std::string &) "localhost.localdomain"
+   >> 
+ #+END_SRC
+
+ Putting it all together in a C++ wrapper: 
+
+ #+BEGIN_SRC cpp 
+     #include <iostream>
+     #include <string>
+     #include <sstream>
+     #include <unistd.h>
+
+     // C++ Wrapper or C++ interface 
+     std::string getHostname(){
+         std::string shname(HOST_NAME_MAX, 0);
+         int status = gethostname(&shname[0], shname.size());
+         if(status < 0)
+                 throw std::runtime_error("Error: failed to retrieve hostname.");
+         std::string out;
+         std::getline(std::stringstream(shname), out, '\0');	
+         return out;
+    }
+
+    >> getHostname()
+    (std::string) "localhost.localdomain"
+    >> 
+ #+END_SRC
+
+  *References:*
+
+  + FreeBSD - [[https://www.freebsd.org/cgi/man.cgi?query=gethostname][gethostname]]
+  + [[https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man3/gethostname.3.html][Mac OS X Manual Page For gethostname(3)]]
+  + [[https://www.ibm.com/support/knowledgecenter/en/SSB23S_1.1.0.15/gtpc2/cpp_gethostname.html][IBM Knowledge Center - gethostname: Return host name]]
+  + [[https://www.gnu.org/software/libc/manual/html_node/Host-Identification.html][Host
+    Identification (The GNU C Library)]]
+*** Example: Passing std::vector to a C-array APIs
+
+ Many C APIs, such as BLAS and LPACK for linear algebra, provide
+ functions like shown in the following code expecting a C array
+ (pointer to the first address array[0]) and its size. Some functions
+ arguments are used input and other as return value or both. The
+ objective is to build a C++ wrapper using STL-vector for interfacing
+ those APIs. 
+
+  + C-APIs with C-arrays. 
+
+ #+BEGIN_SRC cpp 
+   double average(size_t size, double* const xs ){
+        double sum = 0.0;
+        for(size_t i = 0; i < size; i++)
+                sum += xs[i];
+        return sum / size;
+   }
+
+   // xs[i] <- x[i] + a * ys[i]
+   void arraySum(size_t size, double a, double *xs,  double* const ys){
+        for(size_t i = 0; i < size; i++)
+            xs[i] = xs[i] + a * ys[i];
+   }
+ #+END_SRC
+
+ Testing: 
+
+ #+BEGIN_SRC cpp 
+   >> double arr [] = {1.0, 2.0, 3.0, 4.0, 5.0};
+   >> 
+   >> average(5, arr)
+   (double) 3.0000000
+   >> 
+
+   >> double xs [] = {1.0, 3.0, 4.0, 5.0};
+   >> double ys [] = {3.0, 5.0, 6.0, 3.4};
+   >> 
+   // =====> Before <<<=========
+   >> xs
+   (double [4]) { 1.0000000, 3.0000000, 4.0000000, 5.0000000 }
+   >> ys
+   (double [4]) { 3.0000000, 5.0000000, 6.0000000, 3.4000000 }
+   >> 
  
-  //======> After <<=========
-  >> arraySum(4, 2.0, xs, ys)
-  >> xs
-  (double [4]) { 7.0000000, 13.000000, 16.000000, 11.800000 }
-  >> ys
-  (double [4]) { 3.0000000, 5.0000000, 6.0000000, 3.4000000 }
-#+END_SRC
+   //======> After <<=========
+   >> arraySum(4, 2.0, xs, ys)
+   >> xs
+   (double [4]) { 7.0000000, 13.000000, 16.000000, 11.800000 }
+   >> ys
+   (double [4]) { 3.0000000, 5.0000000, 6.0000000, 3.4000000 }
+ #+END_SRC
 
-C++ stl vectors with C-array APIs 
+ C++ stl vectors with C-array APIs 
 
-#+BEGIN_SRC cpp 
-  std::vector<double> xsv = {1.0, 3.0, 4.0, 5.0};
-  std::vector<double> ysv = {3.0, 5.0, 6.0, 3.4};
-  >> 
+ #+BEGIN_SRC cpp 
+   std::vector<double> xsv = {1.0, 3.0, 4.0, 5.0};
+   std::vector<double> ysv = {3.0, 5.0, 6.0, 3.4};
+   >> 
 
-  >> average(xsv.size(), xsv.data())
-  (double) 3.2500000
-  >> 
+   >> average(xsv.size(), xsv.data())
+   (double) 3.2500000
+   >> 
 
-  >> arraySum(xsv.size(), 2.0, xsv.data(), ysv.data())
-  >> 
-  >> xsv
-  (std::vector<double> &) { 7.0000000, 13.000000, 16.000000, 11.800000 }
-  >> ysv
-  (std::vector<double> &) { 3.0000000, 5.0000000, 6.0000000, 3.4000000 }
-  >> 
-#+END_SRC
+   >> arraySum(xsv.size(), 2.0, xsv.data(), ysv.data())
+   >> 
+   >> xsv
+   (std::vector<double> &) { 7.0000000, 13.000000, 16.000000, 11.800000 }
+   >> ysv
+   (std::vector<double> &) { 3.0000000, 5.0000000, 6.0000000, 3.4000000 }
+   >> 
+ #+END_SRC
 
-C++ Wrapper: 
+ C++ Wrapper: 
 
-#+BEGIN_SRC cpp 
-   namespace CPPWrapper{
-      auto average(const std::vector<double>& xs) -> double {
-          return ::average(xs.size(), const_cast<std::vector<double>&>(xs).data());
-      }
-      auto linearComb(double a,
-                      const std::vector<double>& xs,
-                      const std::vector<double>& ys) -> std::vector<double> {
-         auto xscopy = xs;
-         auto& ysref  = const_cast<std::vector<double>&>(ys); 
-         ::arraySum(xs.size(), a, xscopy.data(), ysref.data());
-         return xscopy;
-      }
+ #+BEGIN_SRC cpp 
+    namespace CPPWrapper{
+       auto average(const std::vector<double>& xs) -> double {
+           return ::average(xs.size(), const_cast<std::vector<double>&>(xs).data());
+       }
+       auto linearComb(double a,
+                       const std::vector<double>& xs,
+                       const std::vector<double>& ys) -> std::vector<double> {
+          auto xscopy = xs;
+          auto& ysref  = const_cast<std::vector<double>&>(ys); 
+          ::arraySum(xs.size(), a, xscopy.data(), ysref.data());
+          return xscopy;
+       }
+    };
+ #+END_SRC
+
+ Testing wrapper: 
+
+ #+BEGIN_SRC cpp 
+   std::vector<double> xsv = {1.0, 3.0, 4.0, 5.0};
+   std::vector<double> ysv = {3.0, 5.0, 6.0, 3.4};
+
+   >> CPPWrapper::average(xsv)
+   (double) 3.2500000
+   >> 
+
+   >> CPPWrapper::linearComb(2.0, xsv, ysv)
+   (std::vector<double>) { 7.0000000, 13.000000, 16.000000, 11.800000 }
+   >> 
+
+   >> CPPWrapper::linearComb(3.0, xsv, ysv)
+   (std::vector<double>) { 10.000000, 18.000000, 22.000000, 15.200000 }
+   >> 
+
+   // Check whether vectors xsv and ysv were modified. 
+   >> xsv
+   (std::vector<double> &) { 1.0000000, 3.0000000, 4.0000000, 5.0000000 }
+   >> ysv
+   (std::vector<double> &) { 3.0000000, 5.0000000, 6.0000000, 3.4000000 }
+   >> 
+ #+END_SRC
+
+*** Example: GSL / C++ Class Wrapper to an C-API in OOP style or with opaque pointers. 
+
+ This example shows how to build a C++ wrapper for C-APIs written in
+ object-oriented C style. It means, C-APIs which emulates OOP concepts
+ by using functions which encode class methods and a pointer pointer
+ for emulating an object. In this style, the pointer to the data
+ representation is passed around the functions emulating class methods.
+
+ This style can also use opaque pointers for full encapsulation and
+ data hiding. Opaque pointers to incomplete types where the data
+ representation struct is not exposed to the client code. Many old
+ C-libraries uses this style, including Windows Win32 API. 
+
+ In example case, it will be used the [[https://www.gnu.org/software/gsl/manual/html_node/Vectors.html#Vectors][vector "class"]] from GNU
+ Scientific library, but this approach can be used in other similar
+ scenarios. 
+
+ See more at:
+   + [[https://en.wikipedia.org/wiki/Opaque_pointer][Opaque pointer - Wikipedia]]
+   + [[https://en.wikipedia.org/wiki/Handle_(computing)][Handle (computing) - Wikipedia]]
+   + [[https://www.codementor.io/michaelsafyan/object-oriented-programming-in-c-du1081gw2][Object-Oriented Programming (OOP) in C | Codementor]]
+   + [[https://dmitryfrank.com/articles/oop_in_c][Object-oriented techniques in C - Dmitry Frank]]
+   + [[https://nullprogram.com/blog/2014/10/21/][C Object Oriented Programming « null program]]
+
+  *GSL C-Vector API*
+
+ Basic Functions: 
+
+ #+BEGIN_SRC cpp 
+   // Constructor: new gsl_vector(10)
+   // Allocate vector -> Similar to a constructor 
+   gsl_vector* gsl_vector_alloc (size_t n)
+
+   // Destructor: ~gsl_vector(){}
+   // Deallocate vector -> Similar to a destructor 
+   void        gsl_vector_free (gsl_vector* v);
+
+   // Accessor method => double x = vector.get(index)
+   // Get vector element 
+   double      gsl_vector_get (const gsl_vector * v, const size_t i)
+
+   // Mutator mehtod => vector.set(10, 2.34);
+   // Set vector element
+   void        gsl_vector_set (gsl_vector* v, const size_t i, double x)
+
+   // Mutator method => vector.setall(1.25)
+   // This function sets all the elements of the vector v to the value x.
+   void        gsl_vector_set_all (gsl_vector* v, double x)
+   // This function sets all the elements of the vector v to zero.
+   void        gsl_vector_set_zero (gsl_vector* v)
+ #+END_SRC
+
+ Vector Operations: 
+
+  + [[https://www.gnu.org/software/gsl/manual/html_node/Vector-operations.html#Vector-operations][GNU Scientific Library – Reference Manual: Vector operations]]
+
+ #+BEGIN_SRC cpp
+   // a <- a + b 
+   int gsl_vector_add (gsl_vector * a, const gsl_vector * b)
+   // a <- a - b
+   int gsl_vector_sub (gsl_vector * a, const gsl_vector * b)
+   // a <- a * b
+   int gsl_vector_mul (gsl_vector * a, const gsl_vector * b)
+   // a[i] <- a[i] * SCALE
+   int gsl_vector_scale (gsl_vector * a, const double x)
+   // a[i] <- a[i] + CONSTANT 
+   int gsl_vector_add_constant (gsl_vector * a, const double x)
+ #+END_SRC
+
+  *C++ Wrapper* 
+
+  + Class GSLVector - encapsulates the GNU Scientific library vector
+    "object" which is written in *object-oriented C style*. In this
+    style, methods are encoded as C-functions and the object is encoded
+    as pointer which is passed as function argument. Despite the style
+    this GLS API is written, it still not convenient for using in
+    C++. This example shows how to encapsulate an API like this in a
+    C++ class.
+
+ Complete file: [[file:src/gsl-vector-wrapper.cpp][file:src/gsl-vector-wrapper.cpp]]
+
+ #+BEGIN_SRC cpp 
+   class GSLVector{
+   private:
+       gsl_vector* m_hnd;
+       int m_size;
+   public:
+       GSLVector(int m_size) {
+           this->m_size = m_size;
+           this->m_hnd = gsl_vector_alloc(m_size);
+       }
+       // Overloaded constructor
+       GSLVector(int m_size, double x) {        
+           this->m_size = m_size;
+           this->m_hnd = gsl_vector_alloc(m_size);
+           gsl_vector_set_all(m_hnd, x);
+       }
+       // Copy constructor 
+       GSLVector(const GSLVector& src){
+           m_size = src.m_size;
+           m_hnd = gsl_vector_alloc(src.m_size);
+           gsl_vector_memcpy(m_hnd, src.m_hnd);
+       }
+           // Copy assignment operator
+       GSLVector& operator= (const GSLVector& src){
+           std::cerr << " [TRACE] Copy assignment operator." << "\n";
+           if(m_size != src.m_size){
+              gsl_vector_free(m_hnd);
+              m_hnd = gsl_vector_alloc(src.m_size);
+            }        
+           gsl_vector_memcpy(m_hnd, src.m_hnd);
+           return *this;
+       }	
+       // Destructor 
+       ~GSLVector(){
+           if(m_hnd != nullptr)
+              gsl_vector_free(m_hnd);
+       }
+       size_t size() const { return m_size; }
+
+       gsl_vector* data(){
+           return this->m_hnd;
+       }
+       struct ElementProxy{
+            GSLVector* ptr;
+            size_t     index;
+            ElementProxy(GSLVector* ptr, size_t index): ptr(ptr), index(index){}
+            ElementProxy& operator=(double x){
+                gsl_vector_set(ptr->data(), index, x);
+                return *this;
+            }
+            double get() const {
+                 return gsl_vector_get(ptr->data(), index);
+            }
+       };
+
+       ElementProxy operator[](size_t index){
+          return ElementProxy(this, index);
+          // return gsl_vector_get(m_hnd, index);
+       }
+       // double operator[](int index){
+       //     return gsl_vector_get(m_hnd, index);
+       // }	
+       void set(int index, double x){
+           gsl_vector_set(m_hnd, index, x);
+       }
+       double max() const {
+           return gsl_vector_max(m_hnd);        
+       }
+       double min() const {
+           return gsl_vector_min(m_hnd);
+       }
+       GSLVector operator + (const GSLVector& va){
+           // Invoke copy constructor 
+           GSLVector vec2 = *this;
+           gsl_vector_add(vec2.m_hnd, va.m_hnd);
+           return vec2;
+       }
+       GSLVector operator * (double scale){
+           // Invoke copy constructor 
+           GSLVector vec2 = *this;
+           gsl_vector_scale(vec2.m_hnd, scale);
+           return vec2;
+       }
+       friend std::ostream& operator<<(std::ostream& os, const GSLVector& vec){
+           os << "[" << vec.m_size << "](";
+           for(int i = 0; i < vec.m_size; i++){
+               os << std::setprecision(4) << std::fixed << " " << gsl_vector_get(vec.m_hnd, i);
+           }
+           os << ") ";
+           return os;
+       }
    };
-#+END_SRC
+ #+END_SRC
 
-Testing wrapper: 
+ Loading in CERN's ROOT REPL:
 
-#+BEGIN_SRC cpp 
-  std::vector<double> xsv = {1.0, 3.0, 4.0, 5.0};
-  std::vector<double> ysv = {3.0, 5.0, 6.0, 3.4};
+ #+BEGIN_SRC cpp 
+   >> .L gsl-vector-wrapper.cpp 
+   >> GSLVector v(5);
+   >> 
+   >> v.size()
+   (unsigned long) 5
+   >> 
+   >> std::cout << "v = " << v << "\n";
+   v = [5]( 0.0000 0.0000 0.0000 0.0000 0.0000) 
+   >> 
 
-  >> CPPWrapper::average(xsv)
-  (double) 3.2500000
-  >> 
+   >> v.set(0, 3.0); v.set(1, 4.5); v.set(2, 3.25);
+   >> std::cout << "v = " << v << "\n";
+   v = [5]( 3.0000 4.5000 3.2500 0.0000 0.0000) 
+   >> 
 
-  >> CPPWrapper::linearComb(2.0, xsv, ysv)
-  (std::vector<double>) { 7.0000000, 13.000000, 16.000000, 11.800000 }
-  >> 
+   >> std::cout << "v * 2.0 = " << v * 2.0 << "\n";
+   v * 2.0 = [5]( 6.0000 9.0000 6.5000 0.0000 0.0000) 
+   >> 
 
-  >> CPPWrapper::linearComb(3.0, xsv, ysv)
-  (std::vector<double>) { 10.000000, 18.000000, 22.000000, 15.200000 }
-  >> 
+   >> auto a =  v * 2.0;
+   >> std::cout << "a = " << a << "\n";
+   a = [5]( 6.0000 9.0000 6.5000 0.0000 0.0000) 
+   >> 
+   >> std::cout << "v = " << v << "\n";
+   v = [5]( 3.0000 4.5000 3.2500 0.0000 0.0000) 
+   >> 
 
-  // Check whether vectors xsv and ysv were modified. 
-  >> xsv
-  (std::vector<double> &) { 1.0000000, 3.0000000, 4.0000000, 5.0000000 }
-  >> ysv
-  (std::vector<double> &) { 3.0000000, 5.0000000, 6.0000000, 3.4000000 }
-  >> 
-#+END_SRC
+   >> v.max()
+   (double) 4.5000000
+   >> v.min()
+   (double) 2.3715151e-322
+   >>   
+ #+END_SRC
 
-** Example: GSL / C++ Class Wrapper to an C-API in OOP style or with opaque pointers. 
+ Main function: 
 
-This example shows how to build a C++ wrapper for C-APIs written in
-object-oriented C style. It means, C-APIs which emulates OOP concepts
-by using functions which encode class methods and a pointer pointer
-for emulating an object. In this style, the pointer to the data
-representation is passed around the functions emulating class methods.
+ #+BEGIN_SRC cpp 
+     GSLVector vec1(5, 2.45);
+     vec1.set(0, -3.45);
 
-This style can also use opaque pointers for full encapsulation and
-data hiding. Opaque pointers to incomplete types where the data
-representation struct is not exposed to the client code. Many old
-C-libraries uses this style, including Windows Win32 API. 
+     std::cout << std::boolalpha;
+     std::cout << "vec1 = " << vec1 << "\n";
+     // test copy constructor
+     std::puts("Create vec2 - before invoke copy constructor");
+     GSLVector vec2 = vec1;
+     std::cout << "vec1 = " << vec2 << "\n";
+     std::cout << "&vec2 == &vec1: " << (&vec1 == &vec2) << "\n";
+     assert(&vec2 != &vec1);
+     vec2.set(0, 10.0);
+     vec2.set(1, 25.0);
+     vec2[3] = 2.30;
+     std::cout << "vec2 = " << vec2 << "\n";
 
-In example case, it will be used the [[https://www.gnu.org/software/gsl/manual/html_node/Vectors.html#Vectors][vector "class"]] from GNU
-Scientific library, but this approach can be used in other similar
-scenarios. 
+     GSLVector vec3 = vec1 + vec2;
+     std::cout << "vec3 = " << vec3 << "\n";
+     std::cout << "vec1 * 3 + vec2 * 2.5 = " << vec1 * 1.5 + vec2 * 2.5 << "\n";
 
-See more at:
-  + [[https://en.wikipedia.org/wiki/Opaque_pointer][Opaque pointer - Wikipedia]]
-  + [[https://en.wikipedia.org/wiki/Handle_(computing)][Handle (computing) - Wikipedia]]
-  + [[https://www.codementor.io/michaelsafyan/object-oriented-programming-in-c-du1081gw2][Object-Oriented Programming (OOP) in C | Codementor]]
-  + [[https://dmitryfrank.com/articles/oop_in_c][Object-oriented techniques in C - Dmitry Frank]]
-  + [[https://nullprogram.com/blog/2014/10/21/][C Object Oriented Programming « null program]]
+ #+END_SRC
 
- *GSL C-Vector API*
+ Compilation Output: 
 
-Basic Functions: 
+ #+BEGIN_SRC cpp 
+   $ clang++ gsl-vector-wrapper.cpp -std=c++11 -Wall -Wextra -g -lgsl -lgslcblas -o out.bin 
+   $ ./out.bin
 
-#+BEGIN_SRC cpp 
-  // Constructor: new gsl_vector(10)
-  // Allocate vector -> Similar to a constructor 
-  gsl_vector* gsl_vector_alloc (size_t n)
-
-  // Destructor: ~gsl_vector(){}
-  // Deallocate vector -> Similar to a destructor 
-  void        gsl_vector_free (gsl_vector* v);
-
-  // Accessor method => double x = vector.get(index)
-  // Get vector element 
-  double      gsl_vector_get (const gsl_vector * v, const size_t i)
-
-  // Mutator mehtod => vector.set(10, 2.34);
-  // Set vector element
-  void        gsl_vector_set (gsl_vector* v, const size_t i, double x)
-
-  // Mutator method => vector.setall(1.25)
-  // This function sets all the elements of the vector v to the value x.
-  void        gsl_vector_set_all (gsl_vector* v, double x)
-  // This function sets all the elements of the vector v to zero.
-  void        gsl_vector_set_zero (gsl_vector* v)
-#+END_SRC
-
-Vector Operations: 
-
- + [[https://www.gnu.org/software/gsl/manual/html_node/Vector-operations.html#Vector-operations][GNU Scientific Library – Reference Manual: Vector operations]]
-
-#+BEGIN_SRC cpp
-  // a <- a + b 
-  int gsl_vector_add (gsl_vector * a, const gsl_vector * b)
-  // a <- a - b
-  int gsl_vector_sub (gsl_vector * a, const gsl_vector * b)
-  // a <- a * b
-  int gsl_vector_mul (gsl_vector * a, const gsl_vector * b)
-  // a[i] <- a[i] * SCALE
-  int gsl_vector_scale (gsl_vector * a, const double x)
-  // a[i] <- a[i] + CONSTANT 
-  int gsl_vector_add_constant (gsl_vector * a, const double x)
-#+END_SRC
-
- *C++ Wrapper* 
-
- + Class GSLVector - encapsulates the GNU Scientific library vector
-   "object" which is written in *object-oriented C style*. In this
-   style, methods are encoded as C-functions and the object is encoded
-   as pointer which is passed as function argument. Despite the style
-   this GLS API is written, it still not convenient for using in
-   C++. This example shows how to encapsulate an API like this in a
-   C++ class.
-
-Complete file: [[file:src/gsl-vector-wrapper.cpp][file:src/gsl-vector-wrapper.cpp]]
-
-#+BEGIN_SRC cpp 
-  class GSLVector{
-  private:
-      gsl_vector* m_hnd;
-      int m_size;
-  public:
-      GSLVector(int m_size) {
-          this->m_size = m_size;
-          this->m_hnd = gsl_vector_alloc(m_size);
-      }
-      // Overloaded constructor
-      GSLVector(int m_size, double x) {        
-          this->m_size = m_size;
-          this->m_hnd = gsl_vector_alloc(m_size);
-          gsl_vector_set_all(m_hnd, x);
-      }
-      // Copy constructor 
-      GSLVector(const GSLVector& src){
-          m_size = src.m_size;
-          m_hnd = gsl_vector_alloc(src.m_size);
-          gsl_vector_memcpy(m_hnd, src.m_hnd);
-      }
-          // Copy assignment operator
-      GSLVector& operator= (const GSLVector& src){
-          std::cerr << " [TRACE] Copy assignment operator." << "\n";
-          if(m_size != src.m_size){
-             gsl_vector_free(m_hnd);
-             m_hnd = gsl_vector_alloc(src.m_size);
-           }        
-          gsl_vector_memcpy(m_hnd, src.m_hnd);
-          return *this;
-      }	
-      // Destructor 
-      ~GSLVector(){
-          if(m_hnd != nullptr)
-             gsl_vector_free(m_hnd);
-      }
-      size_t size() const { return m_size; }
-
-      gsl_vector* data(){
-          return this->m_hnd;
-      }
-      struct ElementProxy{
-           GSLVector* ptr;
-           size_t     index;
-           ElementProxy(GSLVector* ptr, size_t index): ptr(ptr), index(index){}
-           ElementProxy& operator=(double x){
-               gsl_vector_set(ptr->data(), index, x);
-               return *this;
-           }
-           double get() const {
-                return gsl_vector_get(ptr->data(), index);
-           }
-      };
-
-      ElementProxy operator[](size_t index){
-         return ElementProxy(this, index);
-         // return gsl_vector_get(m_hnd, index);
-      }
-      // double operator[](int index){
-      //     return gsl_vector_get(m_hnd, index);
-      // }	
-      void set(int index, double x){
-          gsl_vector_set(m_hnd, index, x);
-      }
-      double max() const {
-          return gsl_vector_max(m_hnd);        
-      }
-      double min() const {
-          return gsl_vector_min(m_hnd);
-      }
-      GSLVector operator + (const GSLVector& va){
-          // Invoke copy constructor 
-          GSLVector vec2 = *this;
-          gsl_vector_add(vec2.m_hnd, va.m_hnd);
-          return vec2;
-      }
-      GSLVector operator * (double scale){
-          // Invoke copy constructor 
-          GSLVector vec2 = *this;
-          gsl_vector_scale(vec2.m_hnd, scale);
-          return vec2;
-      }
-      friend std::ostream& operator<<(std::ostream& os, const GSLVector& vec){
-          os << "[" << vec.m_size << "](";
-          for(int i = 0; i < vec.m_size; i++){
-              os << std::setprecision(4) << std::fixed << " " << gsl_vector_get(vec.m_hnd, i);
-          }
-          os << ") ";
-          return os;
-      }
-  };
-#+END_SRC
-
-Loading in CERN's ROOT REPL:
-
-#+BEGIN_SRC cpp 
-  >> .L gsl-vector-wrapper.cpp 
-  >> GSLVector v(5);
-  >> 
-  >> v.size()
-  (unsigned long) 5
-  >> 
-  >> std::cout << "v = " << v << "\n";
-  v = [5]( 0.0000 0.0000 0.0000 0.0000 0.0000) 
-  >> 
-
-  >> v.set(0, 3.0); v.set(1, 4.5); v.set(2, 3.25);
-  >> std::cout << "v = " << v << "\n";
-  v = [5]( 3.0000 4.5000 3.2500 0.0000 0.0000) 
-  >> 
-
-  >> std::cout << "v * 2.0 = " << v * 2.0 << "\n";
-  v * 2.0 = [5]( 6.0000 9.0000 6.5000 0.0000 0.0000) 
-  >> 
-
-  >> auto a =  v * 2.0;
-  >> std::cout << "a = " << a << "\n";
-  a = [5]( 6.0000 9.0000 6.5000 0.0000 0.0000) 
-  >> 
-  >> std::cout << "v = " << v << "\n";
-  v = [5]( 3.0000 4.5000 3.2500 0.0000 0.0000) 
-  >> 
-
-  >> v.max()
-  (double) 4.5000000
-  >> v.min()
-  (double) 2.3715151e-322
-  >>   
-#+END_SRC
-
-Main function: 
-
-#+BEGIN_SRC cpp 
-    GSLVector vec1(5, 2.45);
-    vec1.set(0, -3.45);
-
-    std::cout << std::boolalpha;
-    std::cout << "vec1 = " << vec1 << "\n";
-    // test copy constructor
-    std::puts("Create vec2 - before invoke copy constructor");
-    GSLVector vec2 = vec1;
-    std::cout << "vec1 = " << vec2 << "\n";
-    std::cout << "&vec2 == &vec1: " << (&vec1 == &vec2) << "\n";
-    assert(&vec2 != &vec1);
-    vec2.set(0, 10.0);
-    vec2.set(1, 25.0);
-    vec2[3] = 2.30;
-    std::cout << "vec2 = " << vec2 << "\n";
-
-    GSLVector vec3 = vec1 + vec2;
-    std::cout << "vec3 = " << vec3 << "\n";
-    std::cout << "vec1 * 3 + vec2 * 2.5 = " << vec1 * 1.5 + vec2 * 2.5 << "\n";
-
-#+END_SRC
-
-Compilation Output: 
-
-#+BEGIN_SRC cpp 
-  $ clang++ gsl-vector-wrapper.cpp -std=c++11 -Wall -Wextra -g -lgsl -lgslcblas -o out.bin 
-  $ ./out.bin
-
-  vec1 = [5]( -3.4500 2.4500 2.4500 2.4500 2.4500) 
-  Create vec2 - before invoke copy constructor
-  vec1 = [5]( -3.4500 2.4500 2.4500 2.4500 2.4500) 
-  &vec2 == &vec1: false
-  vec2 = [5]( 10.0000 25.0000 2.4500 2.3000 2.4500) 
-  vec3 = [5]( 6.5500 27.4500 4.9000 4.7500 4.9000) 
-  vec1 * 3 + vec2 * 2.5 = [5]( 19.8250 66.1750 9.8000 9.4250 9.8000) 
-#+END_SRC
+   vec1 = [5]( -3.4500 2.4500 2.4500 2.4500 2.4500) 
+   Create vec2 - before invoke copy constructor
+   vec1 = [5]( -3.4500 2.4500 2.4500 2.4500 2.4500) 
+   &vec2 == &vec1: false
+   vec2 = [5]( 10.0000 25.0000 2.4500 2.3000 2.4500) 
+   vec3 = [5]( 6.5500 27.4500 4.9000 4.7500 4.9000) 
+   vec1 * 3 + vec2 * 2.5 = [5]( 19.8250 66.1750 9.8000 9.4250 9.8000) 
+ #+END_SRC
 
 
-References: 
- + [[https://www.gnu.org/software/gsl/manual/html_node/Vector-allocation.html#Vector-allocation][GNU Scientific Library – Reference Manual: Vector allocation]]
- + [[https://www.gnu.org/software/gsl/manual/html_node/Initializing-vector-elements.html#Initializing-vector-elements][GNU Scientific Library – Reference Manual: Initializing vector elements]]
- + [[https://www.gnu.org/software/gsl/manual/html_node/Vector-operations.html#Vector-operations][GNU Scientific Library – Reference Manual: Vector operations]]
+ References: 
+  + [[https://www.gnu.org/software/gsl/manual/html_node/Vector-allocation.html#Vector-allocation][GNU Scientific Library – Reference Manual: Vector allocation]]
+  + [[https://www.gnu.org/software/gsl/manual/html_node/Initializing-vector-elements.html#Initializing-vector-elements][GNU Scientific Library – Reference Manual: Initializing vector elements]]
+  + [[https://www.gnu.org/software/gsl/manual/html_node/Vector-operations.html#Vector-operations][GNU Scientific Library – Reference Manual: Vector operations]]
