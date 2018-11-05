@@ -1522,6 +1522,7 @@ Running:  ([[file:src/design-patterns/composite1.cpp][file:src/design-patterns/c
     [TRACE] Destroy group - id = << GroupB
 #+END_SRC
 ** Visitor 
+*** Overview 
 
 The visitor design pattern is a behavioral design pattern which allows
 to add new operations to a class hierarchy without modifying classes
@@ -1541,6 +1542,13 @@ Features:
    modifying them or adding new virtual methods.
  + Decouple data structure and algorithms.
  + Decouple two class hierarchies.
+ + The code to perform the operation is centralized in the visitor
+   object. If the operation were implemented as methods, the code
+   would be scattered through all derived classes.
+
+Drawbacks: 
+ + The class hierarchy must be stable as adding a new derived class
+   requires modifying all visitors implementations.
 
 Application Domains: 
 
@@ -1582,6 +1590,338 @@ Alternatives to Visitor Design Pattern:
  + Pattern Matching + Algebraic Data Types or Classes.
    + Possible in functinal laguages such as F# (F Sharp), Scala,
      Haskell and so on.
+
+Parts:
+
+   + Interface: _Element_ 
+     + The element is an element of the class hirarchy which contains
+       the method _.accept(Visitor v)_ which takes a visitor as
+       argument.
+     + Method: _.accept(Visitor v)_ => Takes a visitor (operation) as
+       argument. 
+
+   + Interface: _Visitor_ - 
+     + Perform the operations the class hierarchy. Every operation is
+       an implementation of the visitor interface.
+     + Methods: The visitor interface requires a method visit for
+       derived class of the interface Element. Note: Element1,
+       Element2 and Element3 are derived classes of interface Element. 
+       + _.visit(Element1 e)_  => Specific version of the operation for class Element1.
+       + _.visit(Element2 e1)_ => Specific version of the operation for Element2.
+       + _.visit(Element3 e)_  => ... 
+
+   + ConcreteElement -> Implementation of interface Element.
+
+   + ConcreteVisitor -> Operation for the class hierarchy.
+
+Papers: 
+
+  + *Open Pattern Matching for C++*
+    + <http://www.stroustrup.com/OpenPatternMatching.pdf>
+
+  + *Design and evaluation of C++ open multi-methods*
+     <https://parasol.tamu.edu/~yuriys/papers/OMM10.pdf>
+    + Note: Shows many use cases for double-dispatch and 
+
+  + *XVF: C++ Introspection by Extensible Visitation*
+    + <http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.578.2090&rep=rep1&type=pdf>
+
+  + *Design Patterns for Dealing with Dual Inheritance Hierarchies in C++*
+    + <https://pdfs.semanticscholar.org/f403/361d9ef3dac96463787b852b605a918bc4fe.pdf>
+
+  + *Generic Visitors in C++*
+    + <https://www.lrde.epita.fr/dload/20030528-Seminar/tisser_n0503_visitors.pdf>
+
+  + *Acyclic Visitor*
+    + <https://condor.depaul.edu/dmumaugh/OOT/Design-Principles/acv.pdf>
+
+  + *Using Template Metaprogramming to Enhance Reuse in Visitor-based Model Interpreters*
+    + <http://www.dre.vanderbilt.edu/~gokhale/WWW/papers/ECBS12_Templates.pdf>
+
+Other implementation examples: 
+
+ + [[https://eli.thegreenplace.net/2016/a-polyglots-guide-to-multiple-dispatch/][A polyglot's guide to multiple dispatch - Eli Bendersky's website]]
+
+ + [[http://www.sourcetricks.com/2011/06/visitor-pattern.html#.W-CKfh6YW00][Visitor Pattern ~ Programming Tutorials by SourceTricks]]
+
+ + [[https://codereview.stackexchange.com/questions/153786/modular-visitor-pattern][c++ - Modular Visitor Pattern - Code Review Stack Exchange]]
+
+ + [[https://www.codeproject.com/Articles/588882/TheplusVisitorplusPatternplusExplained][The Visitor Pattern Explained - CodeProject]]
+
+ + [[https://foonathan.net/blog/2017/12/21/visitors.html][foonathan::blog() - Implementation Challenge: Revisiting the visitor pattern]]
+
+ + [[http://alblue.bandlem.com/2009/07/why-i-don-like-visitor-pattern.html][Why I don't like the visitor pattern - AlBlue’s Blog]]
+
+ + [[https://accu.org/index.php/articles/2021][ACCU - Defining Visitors Inline in Modern C++]]
+
+ + [[http://softwareengisneering.blogspot.com/2009/03/c-visitors-basic-implementation.html][Software EngiSneering: C++ Visitors: Basic Implementation]]
+
+ + [[http://blog.aaronballman.com/2011/11/visitor/][The Amazing Visitor Pattern | Ruminations]]
+
+Visitor with C++17 - std::variant 
+
+ + [[https://www.boost.org/doc/libs/1_68_0/doc/html/variant.html][Chapter 45. Boost.Variant - 1.68.0]] (Boost Variant Documentation)
+
+ + [[https://www.heise.de/developer/artikel/C-17-hat-einen-Visitor-3700274.html][C++17
+   hat einen Visitor | heise Developer]] (In German)
+*** Example: Basic Visitor 
+
+File: [[file:src/design-patterns/visitor1.cpp][file:src/design-patterns/visitor1.cpp]]
+
+
+ + _IVisitor interace_ - The visitor interface encapsulates the
+   operation performed on the class hierarchy. It should define a
+   specific version operation (method visit) for each derived class.
+
+#+BEGIN_SRC cpp
+  // Forward reference
+  class Circle;
+  class Square;
+  class Blob;
+
+  class IVisitor{
+  public:
+      virtual ~IVisitor() = default;
+      virtual void visit(Circle& sh) = 0;
+      virtual void visit(Square& sh) = 0;
+      virtual void visit(Blob& sh) = 0;
+  };
+#+END_SRC
+
+Class hierarchy: 
+
+ + Interface IShape.
+ 
+#+BEGIN_SRC cpp 
+  // Shape interface - The base class must define the method accept
+  class IShape{
+  public:
+      virtual ~IShape() = default;	
+      virtual void accept(IVisitor& v) = 0;
+  };
+#+END_SRC
+
+ + Implementations of the interface class IShape. 
+
+#+BEGIN_SRC cpp 
+  class Circle: public IShape{
+  public:
+       double radius;
+       Circle(double radius): radius(radius) { }
+       void accept(IVisitor& v) override {
+               v.visit(*this);
+       }
+  };
+
+  class Square: public IShape{
+  public:
+      double side;
+      Square(double side): side(side) { }
+      void accept(IVisitor& v) override {
+          v.visit(*this);
+      }
+  };
+
+  class Blob: public IShape{
+  public:
+      Blob(){}
+      void accept(IVisitor& v) override {
+          v.visit(*this);
+      }
+  };
+#+END_SRC
+ 
+ + PrintNameVisitor - Visitor Interface Implementation - This visitor
+   encapsulates an operation which prints the name of each object in
+   the class hierarchy.
+
+#+BEGIN_SRC cpp 
+  // Operation which prints name of the class hierarchy
+  class PrintNameVisitor: public IVisitor{
+  public:
+      void visit(Circle& sh) override
+      {
+        std::cout << " => Shape is a circle of radius = "
+                  << sh.radius
+                  << "\n";
+      }
+      void visit(Square& sh) override
+      {
+         std::cout << " => Shape is a square of side = "
+                   << sh.side
+                   << "\n";		
+      }
+      void visit(Blob& ) override
+      {
+         std::cout << " => Shape is a blob with an undefined shape"
+                   << "\n";
+      }
+  };
+#+END_SRC
+ 
+
+ + ComputeAreaVisitor - This stateful visitor encapsulate an operation
+   which computes the area of each element.
+
+#+BEGIN_SRC cpp 
+  class ComputeAreaVisitor: public IVisitor{
+  private:
+      double _area = 0.0;
+  public:
+      ComputeAreaVisitor() = default;
+      double getArea(){
+        return _area;
+      }
+      void visit(Circle& sh) override
+      {
+         // CircleArea =  PI * radius^2
+         _area = 3.1415 * sh.radius * sh.radius;
+      }
+      void visit(Square& sh) override
+      {
+         _area = sh.side * sh.side;
+      }
+      void visit(Blob& ) override
+      {
+         _area = 100.0;
+      }
+  };
+#+END_SRC
+
+ + FunctionAdapater - Turns lambda function into a visitor object
+   reducing the code boilerplate.
+
+#+BEGIN_SRC cpp 
+  // Lambda function are used for adding new behavior to the object.
+  template<class Result>
+  class FunctionAdapter: public IVisitor{
+      template<typename T> using Func = std::function<Result (T& sh)>;
+      Result       _res;
+      Func<Circle> _fn_circle;
+      Func<Square> _fn_square;
+      Func<Blob>   _fn_blob;
+  public:
+      Result get(){
+              return _res;
+      }
+      FunctionAdapter(Func<Circle> fnCircle, Func<Square> fnSquare, Func<Blob> fnBlob)
+         : _res{}
+         , _fn_circle{fnCircle}
+         , _fn_square{fnSquare}
+         , _fn_blob{fnBlob}
+      {		
+      }		
+      void visit(Circle& sh) override { _res = _fn_circle(sh); }
+      void visit(Square& sh) override { _res = _fn_square(sh);}
+      void visit(Blob& sh)   override { _res = _fn_blob(sh); }
+  };
+#+END_SRC
+
+
+ + Compiling and Running:
+
+#+BEGIN_SRC sh 
+  $ clang++ visitor1.cpp -o visitor1.bin -g -std=c++14 -Wall -Wextra && ./visitor1.bin
+#+END_SRC
+
+ + Experiment 1: 
+
+#+BEGIN_SRC cpp 
+  // Sample shapes 
+  auto s1 = Circle(3.0);
+  auto s2 = Square(4.0);
+  auto s3 = Blob();
+
+  std::cout << "===> Experiment 1: PrintNameVisitor " << "\n";
+  auto visitor1 = PrintNameVisitor();
+  s1.accept(visitor1);
+  s2.accept(visitor1);
+  s3.accept(visitor1);	
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC txt 
+  ===> Experiment 1: PrintNameVisitor 
+   => Shape is a circle of radius = 3
+   => Shape is a square of side = 4
+   => Shape is a blob with an undefined shape
+
+#+END_SRC
+
+ + Experiment 2: 
+
+#+BEGIN_SRC cpp 
+    std::cout << "===> Experiment 2: ComputeAreaVisitor " << "\n";
+    auto visitor2 = ComputeAreaVisitor();
+    s1.accept(visitor2);
+    std::cout << "Area of shape 1 = " << visitor2.getArea() << "\n";
+    s2.accept(visitor2);
+    std::cout << "Area of shape 2 = " << visitor2.getArea() << "\n";
+    s3.accept(visitor2);
+    std::cout << "Area of shape 3 = " << visitor2.getArea() << "\n";
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC txt 
+  ===> Experiment 2: ComputeAreaVisitor 
+  Area of shape 1 = 28.2735
+  Area of shape 2 = 16
+  Area of shape 3 = 100
+#+END_SRC
+
+ + Experiment 3:
+
+#+BEGIN_SRC cpp 
+  auto visitor3 = FunctionAdapter<std::string>{
+      [](Circle& ){ return "circle"; },
+      [](Square& ){ return "square"; },
+      [](Blob&   ){ return "blob";   },
+   };
+  s1.accept(visitor3);
+  std::cout << "Type of shape 1 = " << visitor3.get() << "\n";
+  s2.accept(visitor3);
+  std::cout << "Type of shape 2 = " << visitor3.get() << "\n";
+  s3.accept(visitor3);
+  std::cout << "Type of shape 3 = " << visitor3.get() << "\n";
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC txt 
+  ===> Experiment 3: FunctionAdapter 
+  Type of shape 1 = circle
+  Type of shape 2 = square
+  Type of shape 3 = blob
+#+END_SRC
+
+ + Experiment 4: 
+
+#+BEGIN_SRC cpp 
+    std::cout << "===> Experiment 4: FunctionAdapter " << "\n";
+    // Creates operation to compute shape perimiter
+    auto visitor4 = FunctionAdapter<double>{
+            [](Circle& s){ return 2 * 3.1415 * s.radius * s.radius ; },
+            [](Square& s){ return 4.0 * s.side; },
+            [](Blob&    ){ return -100.0;   },
+     };	
+    s1.accept(visitor4);
+    std::cout << "Perimiter of shape 1 = " << visitor4.get() << "\n";
+    s2.accept(visitor4);
+    std::cout << "Perimiter of shape 2 = " << visitor4.get() << "\n";
+    s3.accept(visitor4);
+    std::cout << "Perimiter of shape 3 = " << visitor4.get() << "\n";
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC txt 
+  ===> Experiment 4: FunctionAdapter 
+  Perimiter of shape 1 = 56.547
+  Perimiter of shape 2 = 16
+  Perimiter of shape 3 = -100
+#+END_SRC
 
 * C++ Specific Design Pattern and Idioms
 ** Interface Class 
