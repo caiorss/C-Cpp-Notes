@@ -4292,7 +4292,7 @@ Some lambda functions:
                 }
 #+END_SRC
 
-*** Basic Example 
+*** Basic Examples 
 
 *Proof-of-concept code* 
 
@@ -4557,7 +4557,66 @@ Complete program output ([[file:src/lambdaFun.cpp][file:src/lambdaFun.cpp]]) :
  - *Creating Recursive Lambdas ... and returning them too!* -
    <http://cpptruths.blogspot.com.br/2013/10/creating-recursive-lambdas-and.html> 
 
-*** std::bind 
+*** Self-executable lambda for complex initialization 
+
+Self-executable lambdas functions can also be used for performing
+complex local or global static variables initialization.
+
+Example: 
+
+ - Online compiler: https://rextester.com/RIGN6626
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+  #include <map>
+
+  int getDayOfWeekNum2(const std::string& weekDay){
+      // Type alias / synonym 
+      using WeekDayTable = std::map<std::string, int>;
+      static WeekDayTable week_table =
+               [](){ // Lambda function
+                  std::cerr << " [LOG] Initializing month table" << "\n";
+                  WeekDayTable tbl;
+                  tbl["Sun"] = 1;
+                  tbl["Mon"] = 2;
+                  tbl["Tue"] = 3;
+                  tbl["Wed"] = 4;
+                  tbl["Thu"] = 5;
+                  tbl["Fri"] = 6;
+                  tbl["Sat"] = 7;
+                  std::cerr << " [LOG] Month table initialization end. OK." << "\n";
+                  return tbl;
+          }();
+      if(week_table.find(weekDay) != week_table.end())
+         return week_table[weekDay];	
+      return -1;
+  }
+  int main(){
+      std::cout << "getDayOfWeekNum2(Mon)   = " << getDayOfWeekNum2("Mon")   << "\n";
+      std::cout << "getDayOfWeekNum2(Tue)   = " << getDayOfWeekNum2("Tue")   << "\n";
+      std::cout << "getDayOfWeekNum2(Sat)   = " << getDayOfWeekNum2("Sat")   << "\n";
+      std::cout << "getDayOfWeekNum2(ERROR) = " << getDayOfWeekNum2("ERROR") << "\n";
+      return 0;
+  };
+#+END_SRC
+
+Output stderr (Program logging)
+
+#+BEGIN_SRC txt 
+ [LOG] Initializing month table
+ [LOG] Month table initialization end. OK.
+#+END_SRC
+
+Output stdout (Program output) 
+
+#+BEGIN_SRC txt 
+  getDayOfWeekNum2(Mon)   = 2
+  getDayOfWeekNum2(Tue)   = 3
+  getDayOfWeekNum2(Sat)   = 7
+  getDayOfWeekNum2(ERROR) = -1
+#+END_SRC
+*** Universal function adapter - std::bind 
 **** Overview
 
 The operator std::bind can simplify help simplifying turning ordinary
