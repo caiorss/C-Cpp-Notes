@@ -3293,609 +3293,6 @@ Example: CERN's root shell.
    (bool) true
    >> 
 #+END_SRC
-** Type Casting / Type Conversion
-*** Overview  
-
-In addition to the old C-style castiung, C++ supports new casting
-operators which are more type-safe and make the program's intent
-explicit, thus enhancing the readability and maintanability. 
-
- *C-style Casting*
-
- + (NEW-TYPE) <EXPRESSION>
- + Note: should be avoided.
- + Example:
-   + char x = (char) 65;
-
- *C++ Sytle-Casting*
-
-  - ~static_cast<TYPE>(EXPR)~
-    * Use-case: implicity type conversion of related types, conversion
-      of base class to derived class, void* pointer to othe pointer
-      (except function pointer.). static_cast is the most used C++
-      casting operator.
-    * When happens: this casting is performed at compile-time.
-    * Can:
-      * Convert between related types such as char to int, int to
-        double,
-      * Convert from and to void* pointer to other pointers: void* to
-        double*, double* to void* and so on. 
-      * Convert base class to derived class (downcasting).
-    * Cannot:
-      * Convert between unrelated types such as _unsigned long_ to _double*_.
-      * Convert between pointers of unrelated types, for instance int*
-        to double* or unsigned long to double*.
-
-  - ~reinterpret_cast<TYPE>(EXPR);~
-    * Use-cases: This is a dangerous low level casting used for
-      converting unrelated types. WARNING: failed conversion can
-      result in segmentation fault, core dump and subtle crashing use
-      with care. 
-      * Converting pointers of unrelated types such as double* to int*
-      * Convert void* to function pointer.
-        * Loading C-functions from shared libraries (.DLL files on
-          Windows or .SO on U-nix, Linux, BSD, OSX ...)
-        * Implement type erasure of function-pointers for reflection
-          libraries.
-      * Access hardware registers of Embedded Systems (_memory mapped_
-        _IO_). Many embedded systems such as microcontrollers have
-        memory mapped-IO which are hardware devices like Analog to
-        Digital Convertes, digital Input/Output ports bound to
-        specific memory addresses assigned by the manufacturer. By
-        writing to those memory locations, it is possible to
-        configure, control and read data from hardware
-        devices. ~reinterpret_cast~ can be used for converting the
-        numerical address given in usigned hexadecimal to some pointer
-        of type int*, char*, double* and so on. 
-
-  - ~dynamic_cast<TYPE>(EXPR);~
-    * Use cases: Casting for polymorphic types, class hierachies for
-      identifying at runtime instances of derived classes. This is
-      part of the C++ RTTI - Runtime Type Identification. 
-    * When happens: this casting is performed at run-time.
-
-  - ~const_cast<TYPE>(EXPR);~
-    - Use-case: Create non-const reference to const variable, so it
-      can bypass the const constraint. 
-
-*** Example: Old C-Style Casting: 
-
-#+BEGIN_SRC cpp 
-  >> int k = 10;
-  >> int z = 7;
-
-  >> (float) k
-  (float) 10.0000f
-
-  >> float(k) / z
-  (float) 1.42857f
-  >> 
-
-  >> int m = 65
-  (int) 65
- 
-  >> (char) m
-  (char) 'A'
-  >> 
-
-  >> (char) (m+1)
-  (char) 'B'
-  >> (char) (m+2)
-  (char) 'C'
-  >> (char) (m+3)
-  (char) 'D'
-  >> (char) (m+5)
-  (char) 'F'
-  >> 
-#+END_SRC
-
-*** Example: Static Casting 
-
- - *Implicit conversion:*
-
-#+BEGIN_SRC cpp 
-  >> int k = 10;
-  >> int z = 7;
-
-  >> k / z
-  (int) 1
-
-  >> static_cast<double>(k) / z
-  (double) 1.4285714
-
-  >> static_cast<float>(k) / z
-  (float) 1.42857f
-  >> 
-
-  >> int m = 65;
-  >> char ch;
-  >> ch = m
-  (char) 'A'
-  >> 
-  // Implicit conversion 
-  >> ch = static_cast<char>(m)
-  (char) 'A'
-  >> ch = static_cast<char>(m + 1)
-  (char) 'B'
-  >> ch = static_cast<char>(m + 2)
-  (char) 'C'
-  >> ch = static_cast<char>(m + 3)
-  (char) 'D'
-  >> 
-#+END_SRC
-
- - *Pointer conversion:*
-
-Conversion between pointer of unrelated types is not possible with
-static casting. 
-
-#+BEGIN_SRC cpp 
-
-  >> double x = 10.2;
-  >> int k = 10;
-  >> x
- 
-  >> static_cast<int*>(&x)
-  ROOT_prompt_5:1:1: error: static_cast from 'double *' to 'int *' is not allowed
-  static_cast<int*>(&x)
-  ^~~~~~~~~~~~~~~~~~~~~
-  >> 
-
-
-#+END_SRC
-
-Conversion to and from void pointer to other pointer types (except
-function pointer) is possible: 
-
-#+BEGIN_SRC cpp 
-  >> double x = 10.2;
-  >> int k = 10;
-
-  >> static_cast<void*>(&x)
-  (void *) 0x7f639f3ca010
-  >> 
-  >> void* ptrErased = static_cast<void*>(&x)
-  (void *) 0x7f639f3ca010
-  >> 
-  >> static_cast<double*>(ptrErased)
-  (double *) 0x7f639f3ca010
-  >> *static_cast<double*>(ptrErased)
-  (double) 10.200000
-  >> 
-
-  >> ptrErased = &k
-  (void *) 0x7f639f3ca018
-  >> static_cast<double*>(ptrErased)
-  (double *) 0x7f639f3ca018
-
-  // However, it may fail without any notice. 
-  >> *static_cast<double*>(ptrErased)
-  (double) 4.9406565e-323
-  >> 
-
-  >> static_cast<int*>(ptrErased)
-  (int *) 0x7f639f3ca018
-  >> *static_cast<int*>(ptrErased)
-  (int) 10
-  >> 
-
-#+END_SRC
-
-Conversion from number (numeric value of address) to to pointer is not
-possible with static casting.
-
-#+BEGIN_SRC cpp 
-  >> &x
-  (double *) 0x7f639f3ca010
-  >> 
-  >> double* ptrX = static_cast<double*>(0x7f639f3ca010)
-  ROOT_prompt_18:1:16: error: cannot cast from type 'long' to pointer type 'double *'
-  double* ptrX = static_cast<double*>(0x7f639f3ca010)
-                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  >> double* ptrX = static_cast<double*>(0x7f639f3ca010UL)
-  ROOT_prompt_19:1:16: error: cannot cast from type 'unsigned long' to pointer type 'double *'
-  double* ptrX = static_cast<double*>(0x7f639f3ca010UL)
-                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  >> 
-#+END_SRC
-
- - *Conversion between polymorphic types* / Classes from a given
-   hierarchy.
-
-#+BEGIN_SRC cpp 
-  using cstring = const char*;
-
-  class Base {
-  public:
-          Base() = default;
-          virtual ~Base() = default;
-          virtual cstring getID() const {
-                  return "Base";
-          }
-  };
-
-  class DerivedA: public Base{
-  public:
-           cstring getID() const override {
-                  return "DerivedA";
-          }
-          void showA(){
-                  std::cout << "Exclusive method of class A." << "\n";
-          }
-  };
-
-  class DerivedB: public Base{
-  public:
-          cstring getID() const override {
-                  return "DerivedB";
-          }
-          double method(double x){
-                  return 3 * x;
-          }
-          void showB(){
-                  std::cout << "Exclusive method of class B." << "\n";
-          }
-  };
-
-  Base     b;
-  DerivedA da;
-  DerivedB db;
-
-  Base* ptr = nullptr;
-
-  >> ptr = &b
-  (Base *) 0x7fd81941b010
-  >> ptr->getID()
-  (cstring) "Base"
-  >> 
-
-  >> ptr = &da;
-  >> ptr->getID()
-  (cstring) "DerivedA"
-
-  >> ptr = &db;
-  >> ptr->getID()
-  (cstring) "DerivedB"
-  >> 
-
-  // Downcast/Convert at compile-time pointer from the base class
-  // to derived class
-  //-------------------------------------------------
-  // Try access exclusive method:
-  >> ptr = &da;
-  >> ptr->showA()
-  ROOT_prompt_42:1:6: error: no member named 'showA' in 'Base'
-  ptr->showA()
-  ~~~  ^
-
-  >> static_cast<DerivedA*>(ptr)->getID()
-  (cstring) "DerivedA"
-
-  >> static_cast<DerivedA*>(ptr)->showA()
-  Exclusive method of class A.
-  >> 
-
-  // Note: Can result in undefined behavior!
-  >> static_cast<DerivedB*>(ptr)->showB()
-  Exclusive method of class B.
-
-  >> 
-  >> ptr = &db;
-  >> static_cast<DerivedB*>(ptr)->getID()
-  (cstring) "DerivedB"
-  >> static_cast<DerivedB*>(ptr)->showB()
-  Exclusive method of class B.
-  >> static_cast<DerivedB*>(ptr)->method(3.0)
-  (double) 9.0000000
-  >> 
-#+END_SRC
- 
-
- - *Conversio from/to void* to function pointer is not possible. 
-
-#+BEGIN_SRC cpp 
-  >> double someFunction(int x, int y){ return 3.0 * x + y; }
-
-  >> someFunction(3, 5)
-  (double) 14.000000
-
-  >> void* ptrErasure = nullptr;
-
-  >> ptrErasure = static_cast<void*>(someFunction)
-  ROOT_prompt_26:1:14: error: static_cast from 'double (*)(int, int)' to 'void *' is not allowed
-  ptrErasure = static_cast<void*>(someFunction)
-               ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-  // However, it is possible with the old C-style casting. 
-  >> ptrErasure = (void*) &someFunction
-  (void *) 0x7f639f3730a0
-
-  // Or: 
-  >> ptrErasure = (void*) someFunction
-  (void *) 0x7f639f3730a0
-  >> 
-
-  // But, it works with C-style casting.
-  >> auto fnPointer2 = (double (*)(int, int)) ptrErasure
-  (double (*)(int, int)) Function @0x7f639f3730a0
-  >> 
-  >> fnPointer2(3, 4)
-  (double) 13.000000
-  >> fnPointer2(5, 4)
-  (double) 19.000000
-
-#+END_SRC
-
-*** Example: Reinterpret Cast 
-
- + Casting function/pointer from and to void*
-   - Note: this is useful for type erasure and reflection and loading
-     functions/symbols from shared libraries at runtime.
-
-#+BEGIN_SRC cpp 
-  double someFunction(int x, int y){ return 3.0 * x + y; }
-  double mfun1(double x){ return x * x + 10 * x - 25; }
-
-  void* ptrErasure = nullptr;
-
-  // Testing function some function:
-  >> ptrErasure = reinterpret_cast<void*>(&someFunction)
-  (void *) 0x7fe3b065a080
-
-  >> auto fnPtr1 = reinterpret_cast<double (*) (int, int)>(ptrErasure)
-  (double (*)(int, int)) Function @0x7fe3b065a080
-	
-  >> fnPtr1(3, 5)
-  (double) 14.000000
-  >> fnPtr1(5, 5)
-  (double) 20.000000
-  >> 
-  >> reinterpret_cast<double (*) (int, int)>(ptrErasure)(3, 5)
-  (double) 14.000000
-  >> reinterpret_cast<double (*) (int, int)>(ptrErasure)(4, 5)
-  (double) 17.000000
-  >> 
-
-  // Testing with mfun
-  // --> C-style casting 	
-  >> ptrErasure = (void*) mfun1
-  (void *) 0x7f94856da090
-  >> ptrErasure = (void*) &mfun1
-  (void *) 0x7f94856da090
-  >> 
-
-  // Failed 	
-  >> ptrErasure = static_cast<void*>(&mfun1)
-  ROOT_prompt_7:1:14: error: static_cast from 'double (*)(double)' to 'void *' is not allowed
-  ptrErasure = static_cast<void*>(&mfun1)
-
-  >> auto fnPtr2 = reinterpret_cast<double (*) (double)>(mfun1)
-  (double (*)(double)) Function @0x7f94856da090
-
-  >> fnPtr2(4)
-  (double) 31.000000
-  >> fnPtr2(5)
-  (double) 50.000000
-  >> 
-
-  // It is really dangerous as it can cast anything to anything!
-  // and the compiler cannot help.	
-  >> reinterpret_cast<double (*) (double)>(4)(5)
-  // *** Break *** segmentation violation
-
-#+END_SRC
-
- + Cast address/pointer to int and print it in hexadecimal format.
-
-#+BEGIN_SRC cpp 
-  >> 
-  >> double x;
-  >> &x
-  (double *) 0x7fd510b760a0
-  >> 
-  >> std::cout << std::hex << "0x" << reinterpret_cast<std::uintptr_t>(&x) << std::dec << "\n";
-  0x7fd510b760a0
-
-  void printAddress(void* ptr){
-          std::cout << "Address of variable is = " 
-                            << std::hex << "0x" << reinterpret_cast<std::uintptr_t>(ptr)
-                            << std::dec 
-                            << "\n";
-  }
-
-
-  >> std::string s
-  (std::string &) ""
-  >> &s
-  (std::string *) 0x7fd510b760b0
-  >> 
-  >> double m
-  (double) 0.0000000
-  >> 
-  >> printAddress(&s)
-  Address of variable is = 0x7fd510b760b0
-  >> printAddress(&m)
-  Address of variable is = 0x7fd510b760d0
-
-
-
-#+END_SRC
-
- + Casting memory locations to pointer.
-   + Note: It doesn't have applicability in most cases, but it can be
-     useful for accessing memory mapped IO.
-
-#+BEGIN_SRC cpp 
-  >> double x = 10.0
-  (double) 10.000000
-  >> unsigned long n = 300
-  (unsigned long) 300
-  >> 
-
-  >> &x
-  (double *) 0x7f3fd32e9010
-  >> &n
-  (unsigned long *) 0x7f3fd32e9018
-  >> 
-
-  // =========== Variable x =================
-
-  // Failure! Doesn't compile
-  >> static_cast<double*>(0x7f3fd32e9010)
-  ROOT_prompt_4:1:1: error: cannot cast from type 'long' to pointer type 'double *'
-  static_cast<double*>(0x7f3fd32e9010)
-  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  >> 
-  >> reinterpret_cast<double*>(0x7f3fd32e9010)
-  (double *) 0x7f3fd32e9010
-  >> *reinterpret_cast<double*>(0x7f3fd32e9010)
-  (double) 10.000000
-  >> *reinterpret_cast<double*>(0x7f3fd32e9010) = 100.0
-  (double) 100.00000
-  >> x
-  (double) 100.00000
-  >> 
-
-  // =========== Variable n =================
-  >> reinterpret_cast<int*>(0x7f3fd32e9018)
-  (int *) 0x7f3fd32e9018
-  >> *reinterpret_cast<int*>(0x7f3fd32e9018)
-  (int) 300
-  >> *reinterpret_cast<int*>(0x7f3fd32e9018) = 100
-  (int) 100
-  >> int& z = *reinterpret_cast<int*>(0x7f3fd32e9018)
-  (int) 100
-  >> z  = 500
-  (int) 500
-  >> n
-  (unsigned long) 500
-  >> n = 600
-  (unsigned long) 600
-  >> z
-  (int) 600
-  >> 
-#+END_SRC
-
- + Load Symbols from a DLL / Shared Object
-   + Note: Windows uses the Win32 API-Calls LoadLibrary, LoadLibraryA,
-     GetProcAddress and so on. 
-
-#+BEGIN_SRC cpp 
-  #include <dlfcn.h>
-
-  // GNU Scientific Library - Linear Algebra CBLAS 
-  auto dllPath = "/usr/lib64/libgslcblas.so";
-
-  >> void* libHandle = dlopen(dllPath, RTLD_LAZY)
-  (void *) 0x1be2de0
-  >> 
-
-  >> void* sym = dlsym(libHandle, "cblas_daxpy")
-  (void *) 0x7f3fb97d2010
-
-  >> sym == nullptr
-  (bool) false
-  >> 
-
-  >> auto cblas_daxpy = reinterpret_cast<void (*) (int, double, const double*, int, double*, int)>(sym)
-  (void (*)(int, double, const double *, int, double *, int)) Function @0x7f3fb97d2010
-  >> 
-
-  // Or 
-  using cblas_daxpy_type = void (int, double, const double*, int, double*, int);
-
-  >> auto xs = std::vector<double>{ 3.0, 5.0, 6.0, 10.0, 8.0};
-  >> auto ys = std::vector<double>{ 2.0, 2.0, 2.0,  2.0, 2.0};
-  >> 
-
-  >> cblas_daxpy(xs.size(), 4.0, &xs[0], 1, &ys[0], 1)
-  >> xs
-  (std::vector<double, std::allocator<double> > &) 
-  { 3.0000000, 5.0000000, 6.0000000, 10.000000, 8.0000000 }
-
-  >> ys
-  (std::vector<double, std::allocator<double> > &) 
-  { 14.000000, 22.000000, 26.000000, 42.000000, 34.000000 }
-  >> 
-
-  // Close the library handle (Better use SMART POINTERS!!!!)
-  >> dlclose(libHandle)
-  (int) 0
-  >> 
-#+END_SRC
-
-*** Example: Const cast 
-
-Const cast is used for removing the const qualifier/modifier from const
-reference or const pointer in order to modify the referenced memory
-location. 
-
-  + Note: The const cast cannot be used for removing the const
-    qualifierfrom const variables. In this case the casting behavior
-    is undefined.
-  + Documentation: [[https://en.cppreference.com/w/cpp/language/const_cast][const_cast conversion - cppreference.com]]
-
-#+BEGIN_SRC cpp 
-  >> double x = 10.0;
-  >> const double& xref = x;
-  >> xref
-  (const double) 10.000000
-  >> 
-  >> xref = 20.0
-  ROOT_prompt_3:1:6: error: cannot assign to variable 'xref' with const-qualified type 'const double &'
-  xref = 20.0
-  ~~~~ ^
-  ROOT_prompt_1:1:15: note: variable 'xref' declared const here
-  const double& xref = x;
-  ~~~~~~~~~~~~~~^~~~~~~~
-  >> 
-  // Remove the const qualifier of xref 
-  >> const_cast<double&>(xref) = 25.0
-  (double) 25.000000
-  >> x
-  (double) 25.000000
-  >> xref
-  (const double) 25.000000
-  >> 
-
-  // Creating a non-const reference from a const reference.
-  >> double& usualRef = const_cast<double&>(xref) 
-  (double) 25.000000
-  >> usualRef = 16.0
-  (double) 16.000000
-  >> x
-  (double) 16.000000
-  >> xref
-  (const double) 16.000000
-  >> 
-#+END_SRC
-
-*** References and further reading
-
- - Cambridge University - *Casting in C++ (intermediate level)* -
-   <http://www-h.eng.cam.ac.uk/help/tpl/languages/C++/casting.html> 
-
- - *4.4a — Explicit type conversion (casting)* -
-   <http://www.learncpp.com/cpp-tutorial/4-4a-explicit-type-conversion-casting/> 
-
- - https://anteru.net/blog/2007/12/18/200/index.html
-
- - *Casting operators in C++ | Set 1 (const_cast)* -
-   <http://www.geeksforgeeks.org/casting-operators-in-c-set-1-const_cast/>
-
- - *Casting – what could possibly go wrong?* -
-   <https://blog.feabhas.com/2013/09/casting-what-could-possibly-go-wrong/>
-
- - *C++ Casting, or: "Oh No, They Broke Malloc!* -
-   <https://embeddedartistry.com/blog/2017/2/28/c-casting-or-oh-no-we-broke-malloc> 
-
- - *When should static_cast, dynamic_cast, const_cast and
-   reinterpret_cast be used?* - <https://stackoverflow.com/questions/332030/when-should-static-cast-dynamic-cast-const-cast-and-reinterpret-cast-be-used>
-
- - http://cppblogs.blogspot.com.br/2013/08/c-style-casts.html
-
- - *Type-Conversion operators* -
-   <http://www.bogotobogo.com/cplusplus/typecast.php>
 ** Functor Function-Object and higher order functions 
 
 Functor is any object which behaves like a function and callable like
@@ -7022,6 +6419,609 @@ References:
 
  + How to correctly use std::reference_wrappers -
    <https://stackoverflow.com/questions/18127469/how-to-correctly-use-stdreference-wrappers>
+** Type Casting / Type Conversion
+*** Overview  
+
+In addition to the old C-style castiung, C++ supports new casting
+operators which are more type-safe and make the program's intent
+explicit, thus enhancing the readability and maintanability. 
+
+ *C-style Casting*
+
+ + (NEW-TYPE) <EXPRESSION>
+ + Note: should be avoided.
+ + Example:
+   + char x = (char) 65;
+
+ *C++ Sytle-Casting*
+
+  - ~static_cast<TYPE>(EXPR)~
+    * Use-case: implicity type conversion of related types, conversion
+      of base class to derived class, void* pointer to othe pointer
+      (except function pointer.). static_cast is the most used C++
+      casting operator.
+    * When happens: this casting is performed at compile-time.
+    * Can:
+      * Convert between related types such as char to int, int to
+        double,
+      * Convert from and to void* pointer to other pointers: void* to
+        double*, double* to void* and so on. 
+      * Convert base class to derived class (downcasting).
+    * Cannot:
+      * Convert between unrelated types such as _unsigned long_ to _double*_.
+      * Convert between pointers of unrelated types, for instance int*
+        to double* or unsigned long to double*.
+
+  - ~reinterpret_cast<TYPE>(EXPR);~
+    * Use-cases: This is a dangerous low level casting used for
+      converting unrelated types. WARNING: failed conversion can
+      result in segmentation fault, core dump and subtle crashing use
+      with care. 
+      * Converting pointers of unrelated types such as double* to int*
+      * Convert void* to function pointer.
+        * Loading C-functions from shared libraries (.DLL files on
+          Windows or .SO on U-nix, Linux, BSD, OSX ...)
+        * Implement type erasure of function-pointers for reflection
+          libraries.
+      * Access hardware registers of Embedded Systems (_memory mapped_
+        _IO_). Many embedded systems such as microcontrollers have
+        memory mapped-IO which are hardware devices like Analog to
+        Digital Convertes, digital Input/Output ports bound to
+        specific memory addresses assigned by the manufacturer. By
+        writing to those memory locations, it is possible to
+        configure, control and read data from hardware
+        devices. ~reinterpret_cast~ can be used for converting the
+        numerical address given in usigned hexadecimal to some pointer
+        of type int*, char*, double* and so on. 
+
+  - ~dynamic_cast<TYPE>(EXPR);~
+    * Use cases: Casting for polymorphic types, class hierachies for
+      identifying at runtime instances of derived classes. This is
+      part of the C++ RTTI - Runtime Type Identification. 
+    * When happens: this casting is performed at run-time.
+
+  - ~const_cast<TYPE>(EXPR);~
+    - Use-case: Create non-const reference to const variable, so it
+      can bypass the const constraint. 
+
+*** Example: Old C-Style Casting: 
+
+#+BEGIN_SRC cpp 
+  >> int k = 10;
+  >> int z = 7;
+
+  >> (float) k
+  (float) 10.0000f
+
+  >> float(k) / z
+  (float) 1.42857f
+  >> 
+
+  >> int m = 65
+  (int) 65
+ 
+  >> (char) m
+  (char) 'A'
+  >> 
+
+  >> (char) (m+1)
+  (char) 'B'
+  >> (char) (m+2)
+  (char) 'C'
+  >> (char) (m+3)
+  (char) 'D'
+  >> (char) (m+5)
+  (char) 'F'
+  >> 
+#+END_SRC
+
+*** Example: Static Casting 
+
+ - *Implicit conversion:*
+
+#+BEGIN_SRC cpp 
+  >> int k = 10;
+  >> int z = 7;
+
+  >> k / z
+  (int) 1
+
+  >> static_cast<double>(k) / z
+  (double) 1.4285714
+
+  >> static_cast<float>(k) / z
+  (float) 1.42857f
+  >> 
+
+  >> int m = 65;
+  >> char ch;
+  >> ch = m
+  (char) 'A'
+  >> 
+  // Implicit conversion 
+  >> ch = static_cast<char>(m)
+  (char) 'A'
+  >> ch = static_cast<char>(m + 1)
+  (char) 'B'
+  >> ch = static_cast<char>(m + 2)
+  (char) 'C'
+  >> ch = static_cast<char>(m + 3)
+  (char) 'D'
+  >> 
+#+END_SRC
+
+ - *Pointer conversion:*
+
+Conversion between pointer of unrelated types is not possible with
+static casting. 
+
+#+BEGIN_SRC cpp 
+
+  >> double x = 10.2;
+  >> int k = 10;
+  >> x
+ 
+  >> static_cast<int*>(&x)
+  ROOT_prompt_5:1:1: error: static_cast from 'double *' to 'int *' is not allowed
+  static_cast<int*>(&x)
+  ^~~~~~~~~~~~~~~~~~~~~
+  >> 
+
+
+#+END_SRC
+
+Conversion to and from void pointer to other pointer types (except
+function pointer) is possible: 
+
+#+BEGIN_SRC cpp 
+  >> double x = 10.2;
+  >> int k = 10;
+
+  >> static_cast<void*>(&x)
+  (void *) 0x7f639f3ca010
+  >> 
+  >> void* ptrErased = static_cast<void*>(&x)
+  (void *) 0x7f639f3ca010
+  >> 
+  >> static_cast<double*>(ptrErased)
+  (double *) 0x7f639f3ca010
+  >> *static_cast<double*>(ptrErased)
+  (double) 10.200000
+  >> 
+
+  >> ptrErased = &k
+  (void *) 0x7f639f3ca018
+  >> static_cast<double*>(ptrErased)
+  (double *) 0x7f639f3ca018
+
+  // However, it may fail without any notice. 
+  >> *static_cast<double*>(ptrErased)
+  (double) 4.9406565e-323
+  >> 
+
+  >> static_cast<int*>(ptrErased)
+  (int *) 0x7f639f3ca018
+  >> *static_cast<int*>(ptrErased)
+  (int) 10
+  >> 
+
+#+END_SRC
+
+Conversion from number (numeric value of address) to to pointer is not
+possible with static casting.
+
+#+BEGIN_SRC cpp 
+  >> &x
+  (double *) 0x7f639f3ca010
+  >> 
+  >> double* ptrX = static_cast<double*>(0x7f639f3ca010)
+  ROOT_prompt_18:1:16: error: cannot cast from type 'long' to pointer type 'double *'
+  double* ptrX = static_cast<double*>(0x7f639f3ca010)
+                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  >> double* ptrX = static_cast<double*>(0x7f639f3ca010UL)
+  ROOT_prompt_19:1:16: error: cannot cast from type 'unsigned long' to pointer type 'double *'
+  double* ptrX = static_cast<double*>(0x7f639f3ca010UL)
+                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  >> 
+#+END_SRC
+
+ - *Conversion between polymorphic types* / Classes from a given
+   hierarchy.
+
+#+BEGIN_SRC cpp 
+  using cstring = const char*;
+
+  class Base {
+  public:
+          Base() = default;
+          virtual ~Base() = default;
+          virtual cstring getID() const {
+                  return "Base";
+          }
+  };
+
+  class DerivedA: public Base{
+  public:
+           cstring getID() const override {
+                  return "DerivedA";
+          }
+          void showA(){
+                  std::cout << "Exclusive method of class A." << "\n";
+          }
+  };
+
+  class DerivedB: public Base{
+  public:
+          cstring getID() const override {
+                  return "DerivedB";
+          }
+          double method(double x){
+                  return 3 * x;
+          }
+          void showB(){
+                  std::cout << "Exclusive method of class B." << "\n";
+          }
+  };
+
+  Base     b;
+  DerivedA da;
+  DerivedB db;
+
+  Base* ptr = nullptr;
+
+  >> ptr = &b
+  (Base *) 0x7fd81941b010
+  >> ptr->getID()
+  (cstring) "Base"
+  >> 
+
+  >> ptr = &da;
+  >> ptr->getID()
+  (cstring) "DerivedA"
+
+  >> ptr = &db;
+  >> ptr->getID()
+  (cstring) "DerivedB"
+  >> 
+
+  // Downcast/Convert at compile-time pointer from the base class
+  // to derived class
+  //-------------------------------------------------
+  // Try access exclusive method:
+  >> ptr = &da;
+  >> ptr->showA()
+  ROOT_prompt_42:1:6: error: no member named 'showA' in 'Base'
+  ptr->showA()
+  ~~~  ^
+
+  >> static_cast<DerivedA*>(ptr)->getID()
+  (cstring) "DerivedA"
+
+  >> static_cast<DerivedA*>(ptr)->showA()
+  Exclusive method of class A.
+  >> 
+
+  // Note: Can result in undefined behavior!
+  >> static_cast<DerivedB*>(ptr)->showB()
+  Exclusive method of class B.
+
+  >> 
+  >> ptr = &db;
+  >> static_cast<DerivedB*>(ptr)->getID()
+  (cstring) "DerivedB"
+  >> static_cast<DerivedB*>(ptr)->showB()
+  Exclusive method of class B.
+  >> static_cast<DerivedB*>(ptr)->method(3.0)
+  (double) 9.0000000
+  >> 
+#+END_SRC
+ 
+
+ - *Conversio from/to void* to function pointer is not possible. 
+
+#+BEGIN_SRC cpp 
+  >> double someFunction(int x, int y){ return 3.0 * x + y; }
+
+  >> someFunction(3, 5)
+  (double) 14.000000
+
+  >> void* ptrErasure = nullptr;
+
+  >> ptrErasure = static_cast<void*>(someFunction)
+  ROOT_prompt_26:1:14: error: static_cast from 'double (*)(int, int)' to 'void *' is not allowed
+  ptrErasure = static_cast<void*>(someFunction)
+               ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+  // However, it is possible with the old C-style casting. 
+  >> ptrErasure = (void*) &someFunction
+  (void *) 0x7f639f3730a0
+
+  // Or: 
+  >> ptrErasure = (void*) someFunction
+  (void *) 0x7f639f3730a0
+  >> 
+
+  // But, it works with C-style casting.
+  >> auto fnPointer2 = (double (*)(int, int)) ptrErasure
+  (double (*)(int, int)) Function @0x7f639f3730a0
+  >> 
+  >> fnPointer2(3, 4)
+  (double) 13.000000
+  >> fnPointer2(5, 4)
+  (double) 19.000000
+
+#+END_SRC
+
+*** Example: Reinterpret Cast 
+
+ + Casting function/pointer from and to void*
+   - Note: this is useful for type erasure and reflection and loading
+     functions/symbols from shared libraries at runtime.
+
+#+BEGIN_SRC cpp 
+  double someFunction(int x, int y){ return 3.0 * x + y; }
+  double mfun1(double x){ return x * x + 10 * x - 25; }
+
+  void* ptrErasure = nullptr;
+
+  // Testing function some function:
+  >> ptrErasure = reinterpret_cast<void*>(&someFunction)
+  (void *) 0x7fe3b065a080
+
+  >> auto fnPtr1 = reinterpret_cast<double (*) (int, int)>(ptrErasure)
+  (double (*)(int, int)) Function @0x7fe3b065a080
+	
+  >> fnPtr1(3, 5)
+  (double) 14.000000
+  >> fnPtr1(5, 5)
+  (double) 20.000000
+  >> 
+  >> reinterpret_cast<double (*) (int, int)>(ptrErasure)(3, 5)
+  (double) 14.000000
+  >> reinterpret_cast<double (*) (int, int)>(ptrErasure)(4, 5)
+  (double) 17.000000
+  >> 
+
+  // Testing with mfun
+  // --> C-style casting 	
+  >> ptrErasure = (void*) mfun1
+  (void *) 0x7f94856da090
+  >> ptrErasure = (void*) &mfun1
+  (void *) 0x7f94856da090
+  >> 
+
+  // Failed 	
+  >> ptrErasure = static_cast<void*>(&mfun1)
+  ROOT_prompt_7:1:14: error: static_cast from 'double (*)(double)' to 'void *' is not allowed
+  ptrErasure = static_cast<void*>(&mfun1)
+
+  >> auto fnPtr2 = reinterpret_cast<double (*) (double)>(mfun1)
+  (double (*)(double)) Function @0x7f94856da090
+
+  >> fnPtr2(4)
+  (double) 31.000000
+  >> fnPtr2(5)
+  (double) 50.000000
+  >> 
+
+  // It is really dangerous as it can cast anything to anything!
+  // and the compiler cannot help.	
+  >> reinterpret_cast<double (*) (double)>(4)(5)
+  // *** Break *** segmentation violation
+
+#+END_SRC
+
+ + Cast address/pointer to int and print it in hexadecimal format.
+
+#+BEGIN_SRC cpp 
+  >> 
+  >> double x;
+  >> &x
+  (double *) 0x7fd510b760a0
+  >> 
+  >> std::cout << std::hex << "0x" << reinterpret_cast<std::uintptr_t>(&x) << std::dec << "\n";
+  0x7fd510b760a0
+
+  void printAddress(void* ptr){
+          std::cout << "Address of variable is = " 
+                            << std::hex << "0x" << reinterpret_cast<std::uintptr_t>(ptr)
+                            << std::dec 
+                            << "\n";
+  }
+
+
+  >> std::string s
+  (std::string &) ""
+  >> &s
+  (std::string *) 0x7fd510b760b0
+  >> 
+  >> double m
+  (double) 0.0000000
+  >> 
+  >> printAddress(&s)
+  Address of variable is = 0x7fd510b760b0
+  >> printAddress(&m)
+  Address of variable is = 0x7fd510b760d0
+
+
+
+#+END_SRC
+
+ + Casting memory locations to pointer.
+   + Note: It doesn't have applicability in most cases, but it can be
+     useful for accessing memory mapped IO.
+
+#+BEGIN_SRC cpp 
+  >> double x = 10.0
+  (double) 10.000000
+  >> unsigned long n = 300
+  (unsigned long) 300
+  >> 
+
+  >> &x
+  (double *) 0x7f3fd32e9010
+  >> &n
+  (unsigned long *) 0x7f3fd32e9018
+  >> 
+
+  // =========== Variable x =================
+
+  // Failure! Doesn't compile
+  >> static_cast<double*>(0x7f3fd32e9010)
+  ROOT_prompt_4:1:1: error: cannot cast from type 'long' to pointer type 'double *'
+  static_cast<double*>(0x7f3fd32e9010)
+  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  >> 
+  >> reinterpret_cast<double*>(0x7f3fd32e9010)
+  (double *) 0x7f3fd32e9010
+  >> *reinterpret_cast<double*>(0x7f3fd32e9010)
+  (double) 10.000000
+  >> *reinterpret_cast<double*>(0x7f3fd32e9010) = 100.0
+  (double) 100.00000
+  >> x
+  (double) 100.00000
+  >> 
+
+  // =========== Variable n =================
+  >> reinterpret_cast<int*>(0x7f3fd32e9018)
+  (int *) 0x7f3fd32e9018
+  >> *reinterpret_cast<int*>(0x7f3fd32e9018)
+  (int) 300
+  >> *reinterpret_cast<int*>(0x7f3fd32e9018) = 100
+  (int) 100
+  >> int& z = *reinterpret_cast<int*>(0x7f3fd32e9018)
+  (int) 100
+  >> z  = 500
+  (int) 500
+  >> n
+  (unsigned long) 500
+  >> n = 600
+  (unsigned long) 600
+  >> z
+  (int) 600
+  >> 
+#+END_SRC
+
+ + Load Symbols from a DLL / Shared Object
+   + Note: Windows uses the Win32 API-Calls LoadLibrary, LoadLibraryA,
+     GetProcAddress and so on. 
+
+#+BEGIN_SRC cpp 
+  #include <dlfcn.h>
+
+  // GNU Scientific Library - Linear Algebra CBLAS 
+  auto dllPath = "/usr/lib64/libgslcblas.so";
+
+  >> void* libHandle = dlopen(dllPath, RTLD_LAZY)
+  (void *) 0x1be2de0
+  >> 
+
+  >> void* sym = dlsym(libHandle, "cblas_daxpy")
+  (void *) 0x7f3fb97d2010
+
+  >> sym == nullptr
+  (bool) false
+  >> 
+
+  >> auto cblas_daxpy = reinterpret_cast<void (*) (int, double, const double*, int, double*, int)>(sym)
+  (void (*)(int, double, const double *, int, double *, int)) Function @0x7f3fb97d2010
+  >> 
+
+  // Or 
+  using cblas_daxpy_type = void (int, double, const double*, int, double*, int);
+
+  >> auto xs = std::vector<double>{ 3.0, 5.0, 6.0, 10.0, 8.0};
+  >> auto ys = std::vector<double>{ 2.0, 2.0, 2.0,  2.0, 2.0};
+  >> 
+
+  >> cblas_daxpy(xs.size(), 4.0, &xs[0], 1, &ys[0], 1)
+  >> xs
+  (std::vector<double, std::allocator<double> > &) 
+  { 3.0000000, 5.0000000, 6.0000000, 10.000000, 8.0000000 }
+
+  >> ys
+  (std::vector<double, std::allocator<double> > &) 
+  { 14.000000, 22.000000, 26.000000, 42.000000, 34.000000 }
+  >> 
+
+  // Close the library handle (Better use SMART POINTERS!!!!)
+  >> dlclose(libHandle)
+  (int) 0
+  >> 
+#+END_SRC
+
+*** Example: Const cast 
+
+Const cast is used for removing the const qualifier/modifier from const
+reference or const pointer in order to modify the referenced memory
+location. 
+
+  + Note: The const cast cannot be used for removing the const
+    qualifierfrom const variables. In this case the casting behavior
+    is undefined.
+  + Documentation: [[https://en.cppreference.com/w/cpp/language/const_cast][const_cast conversion - cppreference.com]]
+
+#+BEGIN_SRC cpp 
+  >> double x = 10.0;
+  >> const double& xref = x;
+  >> xref
+  (const double) 10.000000
+  >> 
+  >> xref = 20.0
+  ROOT_prompt_3:1:6: error: cannot assign to variable 'xref' with const-qualified type 'const double &'
+  xref = 20.0
+  ~~~~ ^
+  ROOT_prompt_1:1:15: note: variable 'xref' declared const here
+  const double& xref = x;
+  ~~~~~~~~~~~~~~^~~~~~~~
+  >> 
+  // Remove the const qualifier of xref 
+  >> const_cast<double&>(xref) = 25.0
+  (double) 25.000000
+  >> x
+  (double) 25.000000
+  >> xref
+  (const double) 25.000000
+  >> 
+
+  // Creating a non-const reference from a const reference.
+  >> double& usualRef = const_cast<double&>(xref) 
+  (double) 25.000000
+  >> usualRef = 16.0
+  (double) 16.000000
+  >> x
+  (double) 16.000000
+  >> xref
+  (const double) 16.000000
+  >> 
+#+END_SRC
+
+*** References and further reading
+
+ - Cambridge University - *Casting in C++ (intermediate level)* -
+   <http://www-h.eng.cam.ac.uk/help/tpl/languages/C++/casting.html> 
+
+ - *4.4a — Explicit type conversion (casting)* -
+   <http://www.learncpp.com/cpp-tutorial/4-4a-explicit-type-conversion-casting/> 
+
+ - https://anteru.net/blog/2007/12/18/200/index.html
+
+ - *Casting operators in C++ | Set 1 (const_cast)* -
+   <http://www.geeksforgeeks.org/casting-operators-in-c-set-1-const_cast/>
+
+ - *Casting – what could possibly go wrong?* -
+   <https://blog.feabhas.com/2013/09/casting-what-could-possibly-go-wrong/>
+
+ - *C++ Casting, or: "Oh No, They Broke Malloc!* -
+   <https://embeddedartistry.com/blog/2017/2/28/c-casting-or-oh-no-we-broke-malloc> 
+
+ - *When should static_cast, dynamic_cast, const_cast and
+   reinterpret_cast be used?* - <https://stackoverflow.com/questions/332030/when-should-static-cast-dynamic-cast-const-cast-and-reinterpret-cast-be-used>
+
+ - http://cppblogs.blogspot.com.br/2013/08/c-style-casts.html
+
+ - *Type-Conversion operators* -
+   <http://www.bogotobogo.com/cplusplus/typecast.php>
 ** TODO OOP RTTI - Runtime Type Identification 
 *** Overview 
 
