@@ -1937,7 +1937,161 @@ Output:
   Perimeter of shape 3 = -100
 #+END_SRC
 
-*** Example: Gneric Acyclic Visitor 
+*** Example: Generic Acyclic Visitor 
+
+File:
+ + [[file:src/design-patterns/visitor2.cpp][file:src/design-patterns/visitor2.cpp]]
+
+Online Compiler: 
+ + https://rextester.com/JGOF16781
+
+Description: Simple generic acyclic implementation of visitor pattern
+in C++11. Note: acyclic means that it doesn't have cyclic
+dependencies. 
+
+Template class visitable used the CRTP (Curious Recurring Template
+Pattern) for making derived classes visitable without virtual
+methods. 
+
+#+BEGIN_SRC cpp 
+  template<typename Implementation>
+  class  Visitable{
+  public:
+     /** Accept any visitor class which implements
+       ,* the method:
+       ,* void Visitor::visit(Implementation& impl);
+       ,*********************************************/
+      template<typename Visitor>
+      void accept(Visitor&& v) {
+         v.visit(static_cast<Implementation&>(*this));
+      }
+  };
+#+END_SRC
+
+Visitable class hierarchy: 
+
+#+BEGIN_SRC cpp 
+  // Shape interface - The base class must define the method accept
+  class IShape{
+  public:
+      virtual ~IShape() = default;
+  };
+
+  // ============ Concrete shapes ======= //
+
+  class Circle: public IShape, public Visitable<Circle>{
+  public:
+      double radius;
+      Circle(double radius): radius(radius) { }
+  };
+
+  class Square: public IShape, public Visitable<Square>{
+  public:
+      double side;
+      Square(double side): side(side) { }
+  };
+
+  class Blob: public IShape, public Visitable<Blob>{
+  public:
+      Blob(){}
+  };
+#+END_SRC
+
+The following template class turns a list of lambda function
+parameters into a visitor object. 
+
+#+BEGIN_SRC cpp 
+  template<class Result>
+  class FunctionAdapter{	
+      // Lambda function are used for adding new behavior to the object.
+       template<typename T> using Func = std::function<Result (T& sh)>;
+       Result       _res;
+       Func<Circle> _fn_circle;
+       Func<Square> _fn_square;
+       Func<Blob>   _fn_blob;
+  public:
+       Result get(){ return _res; }
+       FunctionAdapter(Func<Circle> fnCircle, Func<Square> fnSquare, Func<Blob> fnBlob)
+               : _res{}
+               , _fn_circle{fnCircle}
+               , _fn_square{fnSquare}
+               , _fn_blob{fnBlob}
+       {
+       }
+       void visit(Circle& sh)  { _res = _fn_circle(sh); }
+       void visit(Square& sh)  { _res = _fn_square(sh);}
+       void visit(Blob& sh)    { _res = _fn_blob(sh); }
+
+       template<class Visitable>
+       Result operator()(Visitable& visitable){
+               this->visit(visitable);
+               return this->get();
+       }
+  };
+#+END_SRC
+
+Some visitors implementation: 
+
+#+BEGIN_SRC cpp 
+  auto visitorGetName = FunctionAdapter<std::string>{
+       [](Circle& ){ return "circle"; },
+       [](Square& ){ return "square"; },
+       [](Blob&   ){ return "blob";   },
+  };
+
+  // Creates operation to compute shape perimeter
+  auto visitorGetArea = FunctionAdapter<double>{
+       [](Circle& s){ return 2 * 3.1415 * s.radius * s.radius ; },
+       [](Square& s){ return 4.0 * s.side; },
+       [](Blob&    ){ return -100.0;   },
+  };
+#+END_SRC
+
+Running in REPL: 
+
+#+BEGIN_SRC cpp 
+  >> .L visitor2.cpp
+
+  >> auto s1 = Circle(3.0);
+  >> auto s2 = Square(4.0);
+  >> auto s3 = Blob();
+
+  >> s1.accept(visitorGetName)
+  >> visitorGetName.get()
+  "circle"
+
+  >> s2.accept(visitorGetName)
+  >> visitorGetName.get()
+  "square"
+
+  >> visitorGetName(s1)
+  "circle"
+
+  >> visitorGetName(s2)
+  "square"
+
+  >> visitorGetArea(s1)
+  (double) 56.547000
+
+  >> s1.accept(visitorGetArea)
+  >> visitorGetArea.get()
+  (double) 56.547000
+
+  >> visitorGetArea(s2)
+  (double) 16.000000
+
+  >> s2.accept(visitorGetArea)
+  >> visitorGetArea.get()
+  (double) 16.000000
+
+  >> visitorGetArea(s2)
+  (double) 16.000000
+
+  >> visitorGetArea(s3)
+  (double) -100.00000
+  >> 
+#+END_SRC
+
 * C++ Specific Design Pattern and Idioms
 ** Interface Class 
 *** Overview  
