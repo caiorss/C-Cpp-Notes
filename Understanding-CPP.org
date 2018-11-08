@@ -4208,418 +4208,6 @@ Running:
 
 
 #+END_SRC
-** TODO Memory Allocation - Stack X Heap 
-*** Stack Allocation - Automatic Variables 
-**** Overview 
-
-In C++, variables, objects or arrays defined inside functions are
-allocated on the stack by default. The memory allocated is
-automatically released when they go out scope, thus there is no need
-to worry about allocation in this case. 
-
-Stack allocation features: 
-
- + Variables allocated on the stack are also called _automatic variables_.
-
- + The array size cannot be changed at runtime and it cannot grow or
-   shrink. Therefore, it is not possible to allocate an array in this way:
-   + _int n = 10; double array[n]_; 
-
- + _The stack has limited size_, the Linux Kernel has an 8 kbytes stack,
-   as a result, large objects cannot be allocated in the stack. So, if
-   one tries to allocate an array: _int array[1000000000]_, it will case
-   segmentation fault.
-
-   + TL;DR: Large objects should be allocated on the heap or dynamic
-     memory.
-
- + Primitive type variable, objects and arrays are automatically
-   released (aka deleted) when they go out of scope. In the case of
-   objects, their dectructors methods or member functions are always
-   called.
-**** Example: Stack-allocated arrays
-
-Try to define/allocate a variable-size array. 
-
-#+BEGIN_SRC cpp
-  >> int k = 4;
-
-  // Error: It is impossible to allocate variable-size array on stack or
-  // static memory (as global variable).
-  >> double arr_flt[k];
-  ROOT_prompt_38:1:8: error: variable length array 
-  declaration not allowed at file scope
-
-#+END_SRC
-
-Defining an stack-allocated array with size set by const variable. In
-C++, it is preferable to use const variable instead of preprocessor
-macros for defining consts.
-
-#+BEGIN_SRC cpp 
-  // DO NOT: #define arra_size 3 
-  >> const size_t arr_size = 3;
-  >> double arr_flt[arr_size]
-  (double [3]) { 0.0000000, 0.0000000, 0.0000000 }
-  >> 
-#+END_SRC
-
-
-Defining an stack-allocated array, assuming that all statements are
-executed inside a function.
-
-#+BEGIN_SRC cpp 
-  // Define array 
-  >> int arr1[5];
-
-  >> arr1
-  (int [5]) { 0, 0, 0, 0, 0 }
-  >> 
-
-  // Set elements 
-  >> arr1[0] = 10, arr1[1] = 5; arr1[2] = 6, arr1[3] = 9, arr1[4] = 15;
-  >> 
-
-  >> arr1
-  (int [5]) { 10, 5, 6, 9, 15 }
-  >> 
-
-  // Query elements 
-  >> arr1[0]
-  (int) 10
-  >> arr1[2]
-  (int) 6
-  >> arr1[3]
-  (int) 9
-  >> 
-#+END_SRC
-
-Loop over array: 
-
-#+BEGIN_SRC cpp 
-  >> for(int i = 0; i < 5; i++){ std::cout << " " << arr1[i] << "\n"; }
-   10
-   5
-   6
-   9
-   15
-  >> 
-#+END_SRC
-
-Array as a pointer: 
-
- - The array _arr1_ is actually a pointer to its first element. This
-   array is a memory block of five consecutive allocated integers with
-   the same size. 
-
-#+BEGIN_SRC cpp 
-  // The array is actually a pointer to array[0] or the 0-th 
-  // first element of memory block.
-  //-------------------------------------------------
-  >> *arr1
-  (int) 10
-  // Second memory block 
-  >> *(arr1 + 1)
-  (int) 5
-  // Third memory block 
-  >> *(arr1 + 2)
-  (int) 6
-  >> *(arr1 + 3)
-  (int) 9
-  >> *(arr1 + 4)
-  (int) 15
-  >>
-
-  >> *(&arr1[0] + 0)
-  (int) 10
-  >> *(&arr1[0] + 1)
-  (int) 5
-  >> *(&arr1[0] + 2)
-  (int) 6
-  >> *(&arr1[0] + 3)
-  (int) 9
-  >> *(&arr1[0] + 4)
-  (int) 15
-  >> 
-#+END_SRC
-
-Many ways to manipulate the third element (index 2):
-
-#+BEGIN_SRC cpp 
-  >> *(&arr1[0] + 2)
-  (int) 6
-  >> *(&arr1[0] + 2) = 25
-  (int) 25
-  >> *(&arr1[0] + 2)
-  (int) 25
-  >> arr1[2]
-  (int) 25
-  >> 
-#+END_SRC
-
-Passing arrays to functions: 
-
- + An array (C-arrays) is not aware of its size, thus this parameter
-   must be passed to functions alongside the array or pointer to
-   first element.
-
-#+BEGIN_SRC cpp 
-  void printArray(size_t size, int xs []){
-    for(size_t i = 0; i < size; i++)
-      std::cout << " => xs[" << i << "] = " << xs[i] << "\n";
-  }
-
-  void printArray2(size_t size, int* xs){
-    for(size_t i = 0; i < size; i++)
-      std::cout << " => xs[" << i << "] = " << xs[i] << "\n";
-  }
-
-  void printArray3(size_t size, int* xs){
-    for(size_t i = 0; i < size; i++)
-      std::cout << " => xs[" << i << "] = " << *(xs + i) << "\n";
-  }
-
-  >> printArray(5, arr1)
-   => xs[0] = 10
-   => xs[1] = 5
-   => xs[2] = 25
-   => xs[3] = 9
-   => xs[4] = 15
-  >> 
-
-  >> printArray2(5, arr1)
-   => xs[0] = 10
-   => xs[1] = 5
-   => xs[2] = 25
-   => xs[3] = 9
-   => xs[4] = 15
-
-  >> printArray2(3, arr1)
-   => xs[0] = 10
-   => xs[1] = 5
-   => xs[2] = 25
-  >> 
-
-#+END_SRC
-**** Example: Stack-allocated objects
-     
- Example: *Stack-allocated object.*
-
-#+BEGIN_SRC cpp 
-  #include <iostream>
-  #include <string>
-
-  class SomeClass{
-     // Internal state 
-     std::string _id; 
-  public:
-     // Default constructor is created by the compiler
-     // if not defined. 
-     SomeClass()
-       : _id("unnamed") {}
-
-     SomeClass(const std::string& id)
-        : _id(id) 
-     {
-        std::cout << "[LOG] Object created = <" << _id << "> \n"; 
-     }
-     std::string getID(){ 
-        return _id;  
-     }
-     void setID(const std::string& id){ 
-        _id = id;  
-     }
-     // Copy-constructor is created by default by the compiler,
-     SomeClass(const SomeClass& rhs){
-       std::cout << "[LOG] Copy-constructo Object copyed = <" << rhs._id << ">\n";
-       this->_id = rhs._id;
-     }
-     // Copy-assignment operator -
-     SomeClass& operator=(const SomeClass& rhs){
-       std::cout << "[LOG] Copy-assign operator Object copyed = <" << rhs._id << ">\n";
-       this->_id = rhs._id;
-       return *this;
-     }
- 
-     // Destructor - is always generated by compiler
-     // if not specified. 
-     ~SomeClass()
-     {
-        std::cout << "[LOG] I was deleted <" << _id << "> " << "\n";
-     }
-  };
-#+END_SRC
- 
- *Object - Allocated on stack or static memory*
-
-Any object allocated on the stack (locally on the function) such as
-the variable cls is automatically deleted when it goes out of scope. 
-
-#+BEGIN_SRC cpp
-  // Return reference.
-  SomeClass& Function(){  
-     SomeClass cls("object-1");
-     std::cout << "Object id = " << cls.getID() << "\n";
-     return cls;
-  }
-#+END_SRC
-
-Testing: 
-
-#+BEGIN_SRC cpp
-  >> SomeClass& clsref = Function()
-
-  [LOG] Object created = <object-1> 
-  Object id = object-1
-  [LOG] I was deleted <object-1> 
-  (SomeClass &) @0x7ffcbbe2eed0
-
-  // DO NOT DO IT! Reference to deleted object
-  >> clsref.getID()
-
-   *** Break *** segmentation violation
-#+END_SRC
-
- *Stack-allocated array of objects*
-
- + An array of objects is always intialized with default-constructor
- 
-#+BEGIN_SRC cpp 
-  >> SomeClass arr1[3];
-  [LOG] Copy-constructo Object copyed = <unnamed>
-  [LOG] Copy-constructo Object copyed = <unnamed>
-  [LOG] Copy-constructo Object copyed = <unnamed>
-  >> 
-
->> arr[0].getID()
-(std::string) "unnamed"
->> arr[1].getID()
-(std::string) "unnamed"
->> arr[2].getID()
-(std::string) "unnamed"
->> 
->> 
-
-#+END_SRC
-
- + Intialized array 
-
-#+BEGIN_SRC cpp 
-  // Intialized array 
-  >> SomeClass arr2[3] = { SomeClass("obj1"), SomeClass("obj2"), SomeClass("obj3")};
-  [LOG] Object created = <obj1> 
-  [LOG] Object created = <obj2> 
-  [LOG] Object created = <obj3> 
-  [LOG] Copy-constructo Object copyed = <obj1>
-  [LOG] Copy-constructo Object copyed = <obj2>
-  [LOG] Copy-constructo Object copyed = <obj3>
-
-  >> arr2[0].getID()
-  (std::string) "obj1"
-  >> arr2[1].getID()
-  (std::string) "obj2"
-  >> arr2[2].getID()
-  (std::string) "obj3"
-  >> 
-
-  // Uniform initialization 
-  >> SomeClass arr3[3] = { {"objA"}, {"objB"}, {"objC"}};
-  >> SomeClass arr3[3] = { {"objA"}, {"objB"}, {"objC"}};
-  [LOG] Object created = <objA> 
-  [LOG] Object created = <objB> 
-  [LOG] Object created = <objC> 
-  [LOG] Copy-constructo Object copyed = <objA>
-  [LOG] Copy-constructo Object copyed = <objB>
-  [LOG] Copy-constructo Object copyed = <objC>
-  >> 
-#+END_SRC
-
- + Manipulating objects in array:
-
-#+BEGIN_SRC cpp 
-  >> arr1[0].setID("O1"), arr1[1].setID("O2"), arr1[2].setID("O3");
-  >> arr1[0].getID()
-  (std::string) "O1"
-  >> arr1[1].getID()
-  (std::string) "O2"
-  >> arr1[2].getID()
-  (std::string) "O3"
-  >>
-#+END_SRC
-
- + Loop over array elements:
-
-#+BEGIN_SRC cpp 
-  void showArray(size_t n, SomeClass xs []){
-    for(int i = 0; i < n; i++)
-      std::cout << "obj[" << i << "] = " << xs[i].getID() << ", ";
-    std::cout << "\n";
-    std::cout.flush();
-  }
-
-  >> showArray(3, arr1)
-  obj[0] = O1, obj[1] = O2, obj[2] = O3, 
-
-  >> showArray(3, arr2)
-  obj[0] = obj1, obj[1] = obj2, obj[2] = obj3, 
-
-  >> showArray(3, arr3)
-  obj[0] = objA, obj[1] = objB, obj[2] = objC, 
-  >> 
-#+END_SRC
-
- + Assign array elements:
-
-#+BEGIN_SRC cpp 
-  >> showArray(3, arr2)
-  obj[0] = obj1, obj[1] = obj2, obj[2] = obj3, 
-  >> 
-
-  >> arr2[0] = SomeClass("1st-object");
-  [LOG] Object created = <1st-object> 
-  [LOG] Copy-assign operator Object copyed = <1st-object>
-  [LOG] I was deleted <1st-object> 
-
-  >> arr2[0].getID()
-  (std::string) "1st-object"
-
-  >> arr2[1] =  {"2nd-element"}; // Uniform initialization
-  [LOG] Object created = <2nd-element> 
-  [LOG] Copy-assign operator Object copyed = <2nd-element>
-  [LOG] I was deleted <2nd-element> 
-
-  >> arr2[1].getID()
-  (std::string) "2nd-element"
-  >> 
-
-  >> showArray(3, arr2)
-  obj[0] = 1st-object, obj[1] = 2nd-element, obj[2] = obj3, 
-#+END_SRC
-
- + Defining an array inside a function: 
-
-#+BEGIN_SRC cpp 
-  void exampleFunction(){
-    const size_t n = 4;
-    // Deleted when out of scope.
-    SomeClass xss [n] = {{"C++98"}, {"C++11"}, {"C++17"}, {"C++20"}} ;
-    showArray(n, xss);
-  }
-
-  >> exampleFunction()
-  [LOG] Object created = <C++98> 
-  [LOG] Object created = <C++11> 
-  [LOG] Object created = <C++17> 
-  [LOG] Object created = <C++20> 
-  obj[0] = C++98, obj[1] = C++11, obj[2] = C++17, obj[3] = C++20, 
-  [LOG] I was deleted <C++20> 
-  [LOG] I was deleted <C++17> 
-  [LOG] I was deleted <C++11> 
-  [LOG] I was deleted <C++98> 
-#+END_SRC
-
-*** Heap Allocation 
-
 ** OOP Simple Class
 
  - File: [[file:src/cppClasses1.cpp][file:src/cppClasses1.cpp]]
@@ -5256,6 +4844,601 @@ reference or create a reference to the object.
     Semantics) - <https://medium.com/@gaussnoise/my-precious-compile-time-bool-long-introduction-to-move-semantics-c9ee73c370c7>
 
   + 
+** TODO Memory Allocation - Stack X Heap 
+*** Program/Process memory 
+
+The memory of a process or running program (compile object-code) can
+be divided into the _segments_:
+
+ + *Code* (text segment):
+   + Contains the program compiled as object-code. Generally, this
+     segment is read-only.
+
+ + *Bss*:
+   + Contains non-initialized global variables. 
+
+ + *Data*:
+   + Contains intialized global variables.
+
+ + *Stack* (aka Call-stack) or stack memory 
+   + Contains function arguments and current function's _local variables_.
+   + In C++, variables, objects and arrays are allocated on the stack
+     by default.
+   + Variables: allocated at compile-time.
+   + Stack-allocated variables are also called automatic variables.     
+   + Limit: Stack is limited, on Linux Kernel 8 kb (kbytes). Large
+     objects should not be allocated on the stack.
+   + Memory management: Variables are automatically deleted when out
+     of scope.
+
+ + *Heap* (dynamic memory or free-store)
+   + Dynamically allocated variables or objects (variables allocated
+     with C++ new operator or C-malloc) are instatiated on the heap.
+   + Example - heap-allocated array: _int* ptr = new int [10]_;
+   + Variables: allocated at runtime.
+   + Limit: The limit is the RAM memory or the virtual memory. 
+   + Memory management: Manual (C++ is not garbage collected), for
+     every statement with _new_ operator, there must be a matching
+     delete operator releasing the allocated memory in order to avoid
+     memory leak.
+   + Only accessible through pointers.
+
+*** stack Allocation - Automatic Variables 
+**** Overview 
+
+In C++, variables, objects or arrays defined inside functions are
+allocated on the stack by default. The memory allocated is
+automatically released when they go out scope, thus there is no need
+to worry about allocation in this case. 
+
+Stack allocation features: 
+
+ + Variables allocated on the stack are also called _automatic variables_.
+
+ + The array size cannot be changed at runtime and it cannot grow or
+   shrink. Therefore, it is not possible to allocate an array in this way:
+   + _int n = 10; double array[n]_; 
+
+ + _The stack has limited size_, the Linux Kernel has an 8 kbytes stack,
+   as a result, large objects cannot be allocated in the stack. So, if
+   one tries to allocate an array: _int array[1000000000]_, it will case
+   segmentation fault.
+
+   + TL;DR: Large objects should be allocated on the heap or dynamic
+     memory.
+
+ + Primitive type variable, objects and arrays are automatically
+   released (aka deleted) when they go out of scope. In the case of
+   objects, their dectructors methods or member functions are always
+   called.
+**** Example: Stack-allocated arrays
+
+Try to define/allocate a variable-size array. 
+
+#+BEGIN_SRC cpp
+  >> int k = 4;
+
+  // Error: It is impossible to allocate variable-size array on stack or
+  // static memory (as global variable).
+  >> double arr_flt[k];
+  ROOT_prompt_38:1:8: error: variable length array 
+  declaration not allowed at file scope
+
+#+END_SRC
+
+Defining an stack-allocated array with size set by const variable. In
+C++, it is preferable to use const variable instead of preprocessor
+macros for defining consts.
+
+#+BEGIN_SRC cpp 
+  // DO NOT: #define arra_size 3 
+  >> const size_t arr_size = 3;
+  >> double arr_flt[arr_size]
+  (double [3]) { 0.0000000, 0.0000000, 0.0000000 }
+  >> 
+#+END_SRC
+
+
+Defining an stack-allocated array, assuming that all statements are
+executed inside a function.
+
+#+BEGIN_SRC cpp 
+  // Define array 
+  >> int arr1[5];
+
+  >> arr1
+  (int [5]) { 0, 0, 0, 0, 0 }
+  >> 
+
+  // Set elements 
+  >> arr1[0] = 10, arr1[1] = 5; arr1[2] = 6, arr1[3] = 9, arr1[4] = 15;
+  >> 
+
+  >> arr1
+  (int [5]) { 10, 5, 6, 9, 15 }
+  >> 
+
+  // Query elements 
+  >> arr1[0]
+  (int) 10
+  >> arr1[2]
+  (int) 6
+  >> arr1[3]
+  (int) 9
+  >> 
+#+END_SRC
+
+Loop over array: 
+
+#+BEGIN_SRC cpp 
+  >> for(int i = 0; i < 5; i++){ std::cout << " " << arr1[i] << "\n"; }
+   10
+   5
+   6
+   9
+   15
+  >> 
+#+END_SRC
+
+Array as a pointer: 
+
+ - The array _arr1_ is actually a pointer to its first element. This
+   array is a memory block of five consecutive allocated integers with
+   the same size. 
+
+#+BEGIN_SRC cpp 
+  // The array is actually a pointer to array[0] or the 0-th 
+  // first element of memory block.
+  //-------------------------------------------------
+  >> *arr1
+  (int) 10
+  // Second memory block 
+  >> *(arr1 + 1)
+  (int) 5
+  // Third memory block 
+  >> *(arr1 + 2)
+  (int) 6
+  >> *(arr1 + 3)
+  (int) 9
+  >> *(arr1 + 4)
+  (int) 15
+  >>
+
+  >> *(&arr1[0] + 0)
+  (int) 10
+  >> *(&arr1[0] + 1)
+  (int) 5
+  >> *(&arr1[0] + 2)
+  (int) 6
+  >> *(&arr1[0] + 3)
+  (int) 9
+  >> *(&arr1[0] + 4)
+  (int) 15
+  >> 
+#+END_SRC
+
+Many ways to manipulate the third element (index 2):
+
+#+BEGIN_SRC cpp 
+  >> *(&arr1[0] + 2)
+  (int) 6
+  >> *(&arr1[0] + 2) = 25
+  (int) 25
+  >> *(&arr1[0] + 2)
+  (int) 25
+  >> arr1[2]
+  (int) 25
+  >> 
+#+END_SRC
+
+Passing arrays to functions: 
+
+ + An array (C-arrays) is not aware of its size, thus this parameter
+   must be passed to functions alongside the array or pointer to
+   first element.
+
+#+BEGIN_SRC cpp 
+  void printArray(size_t size, int xs []){
+    for(size_t i = 0; i < size; i++)
+      std::cout << " => xs[" << i << "] = " << xs[i] << "\n";
+  }
+
+  void printArray2(size_t size, int* xs){
+    for(size_t i = 0; i < size; i++)
+      std::cout << " => xs[" << i << "] = " << xs[i] << "\n";
+  }
+
+  void printArray3(size_t size, int* xs){
+    for(size_t i = 0; i < size; i++)
+      std::cout << " => xs[" << i << "] = " << *(xs + i) << "\n";
+  }
+
+  >> printArray(5, arr1)
+   => xs[0] = 10
+   => xs[1] = 5
+   => xs[2] = 25
+   => xs[3] = 9
+   => xs[4] = 15
+  >> 
+
+  >> printArray2(5, arr1)
+   => xs[0] = 10
+   => xs[1] = 5
+   => xs[2] = 25
+   => xs[3] = 9
+   => xs[4] = 15
+
+  >> printArray2(3, arr1)
+   => xs[0] = 10
+   => xs[1] = 5
+   => xs[2] = 25
+  >> 
+
+#+END_SRC
+**** Example: Stack-allocated objects
+     
+ Example: *Stack-allocated object.*
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+
+  class SomeClass{
+     // Internal state 
+     std::string _id; 
+  public:
+     // Default constructor is created by the compiler
+     // if not defined. 
+     SomeClass()
+       : _id("unnamed") {}
+
+     SomeClass(const std::string& id)
+        : _id(id) 
+     {
+        std::cout << "[LOG] Object created = <" << _id << "> \n"; 
+     }
+     std::string getID(){ 
+        return _id;  
+     }
+     void setID(const std::string& id){ 
+        _id = id;  
+     }
+     // Copy-constructor is created by default by the compiler,
+     SomeClass(const SomeClass& rhs){
+       std::cout << "[LOG] Copy-constructo Object copyed = <" << rhs._id << ">\n";
+       this->_id = rhs._id;
+     }
+     // Copy-assignment operator -
+     SomeClass& operator=(const SomeClass& rhs){
+       std::cout << "[LOG] Copy-assign operator Object copyed = <" << rhs._id << ">\n";
+       this->_id = rhs._id;
+       return *this;
+     }
+ 
+     // Destructor - is always generated by compiler
+     // if not specified. 
+     ~SomeClass()
+     {
+        std::cout << "[LOG] I was deleted <" << _id << "> " << "\n";
+     }
+  };
+#+END_SRC
+ 
+ *Object - Allocated on stack or static memory*
+
+Any object allocated on the stack (locally on the function) such as
+the variable cls is automatically deleted when it goes out of scope. 
+
+#+BEGIN_SRC cpp
+  // Return reference.
+  SomeClass& Function(){  
+     SomeClass cls("object-1");
+     std::cout << "Object id = " << cls.getID() << "\n";
+     return cls;
+  }
+#+END_SRC
+
+Testing: 
+
+#+BEGIN_SRC cpp
+  >> SomeClass& clsref = Function()
+
+  [LOG] Object created = <object-1> 
+  Object id = object-1
+  [LOG] I was deleted <object-1> 
+  (SomeClass &) @0x7ffcbbe2eed0
+
+  // DO NOT DO IT! Reference to deleted object
+  >> clsref.getID()
+
+   *** Break *** segmentation violation
+#+END_SRC
+
+ *Stack-allocated array of objects*
+
+ + An array of objects is always intialized with default-constructor
+ 
+#+BEGIN_SRC cpp 
+  >> SomeClass arr1[3];
+  [LOG] Copy-constructo Object copyed = <unnamed>
+  [LOG] Copy-constructo Object copyed = <unnamed>
+  [LOG] Copy-constructo Object copyed = <unnamed>
+  >> 
+
+>> arr[0].getID()
+(std::string) "unnamed"
+>> arr[1].getID()
+(std::string) "unnamed"
+>> arr[2].getID()
+(std::string) "unnamed"
+>> 
+>> 
+
+#+END_SRC
+
+ + Intialized array 
+
+#+BEGIN_SRC cpp 
+  // Intialized array 
+  >> SomeClass arr2[3] = { SomeClass("obj1"), SomeClass("obj2"), SomeClass("obj3")};
+  [LOG] Object created = <obj1> 
+  [LOG] Object created = <obj2> 
+  [LOG] Object created = <obj3> 
+  [LOG] Copy-constructo Object copyed = <obj1>
+  [LOG] Copy-constructo Object copyed = <obj2>
+  [LOG] Copy-constructo Object copyed = <obj3>
+
+  >> arr2[0].getID()
+  (std::string) "obj1"
+  >> arr2[1].getID()
+  (std::string) "obj2"
+  >> arr2[2].getID()
+  (std::string) "obj3"
+  >> 
+
+  // Uniform initialization 
+  >> SomeClass arr3[3] = { {"objA"}, {"objB"}, {"objC"}};
+  >> SomeClass arr3[3] = { {"objA"}, {"objB"}, {"objC"}};
+  [LOG] Object created = <objA> 
+  [LOG] Object created = <objB> 
+  [LOG] Object created = <objC> 
+  [LOG] Copy-constructo Object copyed = <objA>
+  [LOG] Copy-constructo Object copyed = <objB>
+  [LOG] Copy-constructo Object copyed = <objC>
+  >> 
+#+END_SRC
+
+ + Manipulating objects in array:
+
+#+BEGIN_SRC cpp 
+  >> arr1[0].setID("O1"), arr1[1].setID("O2"), arr1[2].setID("O3");
+  >> arr1[0].getID()
+  (std::string) "O1"
+  >> arr1[1].getID()
+  (std::string) "O2"
+  >> arr1[2].getID()
+  (std::string) "O3"
+  >>
+#+END_SRC
+
+ + Loop over array elements:
+
+#+BEGIN_SRC cpp 
+  void showArray(size_t n, SomeClass xs []){
+    for(int i = 0; i < n; i++)
+      std::cout << "obj[" << i << "] = " << xs[i].getID() << ", ";
+    std::cout << "\n";
+    std::cout.flush();
+  }
+
+  >> showArray(3, arr1)
+  obj[0] = O1, obj[1] = O2, obj[2] = O3, 
+
+  >> showArray(3, arr2)
+  obj[0] = obj1, obj[1] = obj2, obj[2] = obj3, 
+
+  >> showArray(3, arr3)
+  obj[0] = objA, obj[1] = objB, obj[2] = objC, 
+  >> 
+#+END_SRC
+
+ + Assign array elements:
+
+#+BEGIN_SRC cpp 
+  >> showArray(3, arr2)
+  obj[0] = obj1, obj[1] = obj2, obj[2] = obj3, 
+  >> 
+
+  >> arr2[0] = SomeClass("1st-object");
+  [LOG] Object created = <1st-object> 
+  [LOG] Copy-assign operator Object copyed = <1st-object>
+  [LOG] I was deleted <1st-object> 
+
+  >> arr2[0].getID()
+  (std::string) "1st-object"
+
+  >> arr2[1] =  {"2nd-element"}; // Uniform initialization
+  [LOG] Object created = <2nd-element> 
+  [LOG] Copy-assign operator Object copyed = <2nd-element>
+  [LOG] I was deleted <2nd-element> 
+
+  >> arr2[1].getID()
+  (std::string) "2nd-element"
+  >> 
+
+  >> showArray(3, arr2)
+  obj[0] = 1st-object, obj[1] = 2nd-element, obj[2] = obj3, 
+#+END_SRC
+
+ + Defining an array inside a function: 
+
+#+BEGIN_SRC cpp 
+  void exampleFunction(){
+    const size_t n = 4;
+    // Deleted when out of scope.
+    SomeClass xss [n] = {{"C++98"}, {"C++11"}, {"C++17"}, {"C++20"}} ;
+    showArray(n, xss);
+  }
+
+  >> exampleFunction()
+  [LOG] Object created = <C++98> 
+  [LOG] Object created = <C++11> 
+  [LOG] Object created = <C++17> 
+  [LOG] Object created = <C++20> 
+  obj[0] = C++98, obj[1] = C++11, obj[2] = C++17, obj[3] = C++20, 
+  [LOG] I was deleted <C++20> 
+  [LOG] I was deleted <C++17> 
+  [LOG] I was deleted <C++11> 
+  [LOG] I was deleted <C++98> 
+#+END_SRC
+
+*** Dynamic/Heap Allocation 
+**** Overview 
+
+ *When dynamic allocation is needed*
+
+Situation where dynamic allocation is needed: 
+
+ + The number of elements to be allocated is not known in advance.
+ + The array or data structure needs to allocate more memory on
+   demand. 
+ + Return an instance of a polymorphic class from a function. (Factory
+   function.)
+ + Type erasure: any object allocated on the heap can have its pointer
+   casted to void* and then casted back to the object type. 
+
+Note: 
+
+ + Using new and delete with raw pointers is error prone and not
+   safe. In C++ >= C++11, it is safer and better to use RAII technique
+   through the usage of smart pointers.
+   + SUMMARY: Use std::unique_ptr or std::shared_ptr instead of new
+     and delete.
+
+ + Dynamic allocation of arrays is often not needed as STL containers
+   already encapsulates the heap allocation and automatically
+   allocate new memory when a new element is added.
+   + SUMMARY: Use std::vector, std::array, std::deque instead of
+     dynamically allocated arrays. 
+
+ *Operators new and delete for a single element*
+
+The following code shows the general usage of the operator new.
+
+Allocation with exception: 
+
+ + Note: The operator _new_ always throws an exception bad_alloc if the
+   allocation fails. 
+
+#+BEGIN_SRC cpp 
+ try{
+  Type* object_pointer1 = new Type;
+  //  Intialized with constructor arguments
+  Type* object_pointer2 = new Type(arg0, arg1, arg2 ...);
+  } catch(const std::bad_alloc& ex){
+     std::cerr << "Error: failed to allocate memory." << "\n";
+     std::cerr << "Error = " << ex.what() << "\n";
+     exit(1);
+  }
+#+END_SRC
+
+Allocation without exception:
+
+ + When the allocation fails, the operator returns a null pointer. 
+
+#+BEGIN_SRC cpp 
+  Type* object_pointer1 = new (nothrow) Type;
+  //  Intialized with constructor arguments
+  Type* object_pointer2 = new (nothrow) Type(arg0, arg1, arg2 ...);
+  if(!object_pointer1){
+     std::cerr << "Error: failed to allocate memory for obj1." << "\n";
+     exit(1);
+  }
+  if(object_pointer1 == nullptr){
+     std::cerr << "Error: failed to allocate memory for obj1." << "\n";
+     exit(1);
+  }
+#+END_SRC
+
+Deallocation: 
+
+ - After the heap-allocated object is no longer needed, it is
+   necessary to release the allocated memory by using the delete
+   operator.
+
+#+BEGIN_SRC cpp
+  delete object_pointer1;
+  // A good practice is to set the pointer to null
+  // after the object is released.
+  object_pointer1 = nullptr;
+
+  // Deleting a null pointer is always safe and does nothing.  
+  delete object_pointer1;
+#+END_SRC
+
+
+ *Operators new and delete for array allocation*
+
+An array of elements of type Type can be allocated on the heap with:
+
+Allocation with exception: 
+
+#+BEGIN_SRC cpp 
+  const size_t SIZE = 10;
+  try {
+     Type* array_pointer = new Type [SIZE];
+  } catch(const std::bad_alloc& ex) {
+     std::cerr << "Error: failed to allocate memory." << "\n";
+     std::cerr << "Error = " << ex.what() << "\n";
+  }
+#+END_SRC
+
+Allocation without exception: 
+
+#+BEGIN_SRC cpp 
+  const size_t SIZE = 10;
+  Type* array_pointer = new (nothrow) Type [SIZE];
+  if(!array_pointer){
+    std::cerr << "Error: failed to allocate memory." << "\n";
+    exit(1);
+  }
+  // Or more explicitly
+  if(array_pointer == nullptr){
+    std::cerr << "Error: failed to allocate memory." << "\n";
+    exit(1);
+  }
+#+END_SRC
+
+Deallocation: 
+
+#+BEGIN_SRC cpp 
+  delete [] array_pointer;
+#+END_SRC
+
+
+
+*** References and further reading 
+
+General: 
+
+ + [[https://www.gribblelab.org/CBootCamp/7_Memory_Stack_vs_Heap.html][7. Memory : Stack vs Heap]]
+
+ + [[http://www.yolinux.com/TUTORIALS/Cpp-DynamicMemory.html][C / C++ and Dynamic memory allocation]]
+
+ + [[http://www.modernescpp.com/index.php/strategies-for-the-allocation-of-memory][Strategies for the Allocation of Memory - ModernesCpp.com]]
+
+ + [[https://www.design-reuse.com/articles/25090/dynamic-memory-allocation-fragmentation-c.html][Dynamic Memory Allocation and Fragmentation in C and C++]]
+
+ + [[https://www.learncpp.com/cpp-tutorial/79-the-stack-and-the-heap/][7.9 — The stack and the heap | Learn C++]] 
+
+C++ Idioms related to Heap-Allocation: 
+
+ + [[https://en.wikibooks.org/wiki/More_C%2B%2B_Idioms/Requiring_or_Prohibiting_Heap-based_Objects][More C++ Idioms/Requiring or Prohibiting Heap-based Objects - Wikibooks, open books for an open world]]
+
+Debugging: 
+ 
+ + [[https://www.eventhelix.com/RealtimeMantra/Basics/debugging_software_crashes_2.htm#.W-RbqB6YW00][Debugging Software Crashes in C and C++ - II]]
+
 ** OOP Object Lifecycle 
    :PROPERTIES:
    :ID:       69b48bc0-1b18-4997-b954-3da566a3508a
