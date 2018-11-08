@@ -5321,6 +5321,16 @@ Note:
    + SUMMARY: Use std::vector, std::array, std::deque instead of
      dynamically allocated arrays. 
 
+Potential pitfalls: 
+
+ + Dangling pointer
+ + Null-pointer access
+ + Wild pointers
+ + Heap corruption
+ + Ownership Semantics 
+ + Non deterministic allocation on embedded systems or real time
+   systems. 
+
  *Operators new and delete for a single element*
 
 The following code shows the general usage of the operator new.
@@ -5415,7 +5425,108 @@ Deallocation:
   delete [] array_pointer;
 #+END_SRC
 
+**** Basic Example
 
+Allocation of single value on the heap: 
+
+#+BEGIN_SRC cpp 
+  >> double* ptr = new (nothrow) double;
+
+  >> if(ptr != nullptr) std::cout << "OK, proceed" << "\n";
+  OK, proceed
+  >> 
+
+  >> *ptr = 100.0;
+
+  >> *ptr
+  (double) 100.00000
+  >> 3.0 * *ptr
+  (double) 300.00000
+  >> 
+
+  // Always delete the pointer when the 
+  // allocated object is no longer needed.
+  >> delete ptr;
+
+  // Always set the pointer to null 
+  >> ptr = nullptr;
+
+  // Deleting a null pointer is safe and does nothing.
+  >> delete ptr;
+#+END_SRC
+
+Array allocation on the heap: 
+
+ + Allocate array. 
+
+#+BEGIN_SRC cpp 
+size_t n = 6;
+
+// Array of size 6
+int* arr = new (nothrow) int [n];
+
+>> arr
+(int *) 0x216cbf0
+
+// Not initialized, can have any value. 
+>> arr[0]
+(int) 36003472
+>> arr[1]
+(int) 0
+>> arr[2]
+(int) 1864399218
+>> 
+#+END_SRC
+
+ + Set array elements: 
+
+#+BEGIN_SRC cpp 
+>> arr[0] = 10;
+>> arr[0] = 0, arr[1] = 15, arr[2] = 20, arr[3] = 90;
+>> arr[4] = 4, arr[5] = 3;
+
+>> arr[0]
+(int) 0
+>> arr[3]
+(int) 90
+>> arr[5]
+(int) 3
+>> 
+
+#+END_SRC
+
+ + Access array elements with pointer offset.
+
+#+BEGIN_SRC cpp 
+  // Access with pointer + offset 
+  >> *(arr + 0)
+  (int) 0
+  >> *(arr + 1)
+  (int) 15
+  >> *(arr + 2)
+  (int) 20
+  >> *(arr + 3)
+  (int) 90
+  >> *(arr + 4)
+  (int) 4
+  >> *(arr + 5)
+  (int) 3
+  >> 
+
+  >> *(arr + 3) = 100;
+  >> arr[3]
+  (int) 100
+  >> 
+#+END_SRC
+
+ + Delete heap-allocated array.
+
+#+BEGIN_SRC cpp 
+  >> delete [] arr;
+
+  // Avoid dangling pointer
+  >> arr = nullptr;
+#+END_SRC
 
 *** References and further reading 
 
@@ -5429,7 +5540,25 @@ General:
 
  + [[https://www.design-reuse.com/articles/25090/dynamic-memory-allocation-fragmentation-c.html][Dynamic Memory Allocation and Fragmentation in C and C++]]
 
- + [[https://www.learncpp.com/cpp-tutorial/79-the-stack-and-the-heap/][7.9 — The stack and the heap | Learn C++]] 
+ + [[https://www.learncpp.com/cpp-tutorial/79-the-stack-and-the-heap/][7.9 — The stack and the heap | Learn C++]]
+
+ + *CS 414: Operating Systems Fall 2005 - Operating Systems*
+   + http://www.cs.virginia.edu/~son/cs414.f05/lec11.slides.pdf
+
+ + *Thinking in C++, 2nd ed. Volume 1*
+   + http://www.cs.ust.hk/~dekai/library/ECKEL_Bruce/TICPP-2nd-ed-Vol-one/TICPP-2nd-ed-Vol-one-html/Chapter13.html
+
+ + *Dynamic Memory Allocation and Deallocation*
+   + http://www.umsl.edu/~lawtonb/224/dynamic0.html
+
+ + *Dynamic Memory in Real Time Systems - a solution?*
+   + https://blogs.mentor.com/colinwalls/blog/2014/05/06/dynamic-memory-in-real-time-systems-a-solution/
+
+ + *Dynamic Memory Allocation in Critical Embedded Systems*
+   + https://critical.eschertech.com/2010/07/30/dynamic-memory-allocation-in-critical-embedded-systems/
+
+ + *Favorite Tools: C++11 std::array*
+   + https://www.embeddedrelated.com/showarticle/1031.php
 
 C++ Idioms related to Heap-Allocation: 
 
