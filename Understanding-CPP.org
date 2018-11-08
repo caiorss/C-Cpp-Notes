@@ -4210,6 +4210,7 @@ Running:
 #+END_SRC
 ** TODO Memory Allocation - Stack X Heap 
 *** Stack Allocation - Automatic Variables 
+**** Overview 
 
 In C++, variables, objects or arrays defined inside functions are
 allocated on the stack by default. The memory allocated is
@@ -4236,7 +4237,171 @@ Stack allocation features:
    released (aka deleted) when they go out of scope. In the case of
    objects, their dectructors methods or member functions are always
    called.
+**** Example: Stack-allocated arrays
 
+Try to define/allocate a variable-size array. 
+
+#+BEGIN_SRC cpp
+  >> int k = 4;
+
+  // Error: It is impossible to allocate variable-size array on stack or
+  // static memory (as global variable).
+  >> double arr_flt[k];
+  ROOT_prompt_38:1:8: error: variable length array 
+  declaration not allowed at file scope
+
+#+END_SRC
+
+Defining an stack-allocated array with size set by const variable. In
+C++, it is preferable to use const variable instead of preprocessor
+macros for defining consts.
+
+#+BEGIN_SRC cpp 
+  // DO NOT: #define arra_size 3 
+  >> const size_t arr_size = 3;
+  >> double arr_flt[arr_size]
+  (double [3]) { 0.0000000, 0.0000000, 0.0000000 }
+  >> 
+#+END_SRC
+
+
+Defining an stack-allocated array, assuming that all statements are
+executed inside a function.
+
+#+BEGIN_SRC cpp 
+  // Define array 
+  >> int arr1[5];
+
+  >> arr1
+  (int [5]) { 0, 0, 0, 0, 0 }
+  >> 
+
+  // Set elements 
+  >> arr1[0] = 10, arr1[1] = 5; arr1[2] = 6, arr1[3] = 9, arr1[4] = 15;
+  >> 
+
+  >> arr1
+  (int [5]) { 10, 5, 6, 9, 15 }
+  >> 
+
+  // Query elements 
+  >> arr1[0]
+  (int) 10
+  >> arr1[2]
+  (int) 6
+  >> arr1[3]
+  (int) 9
+  >> 
+#+END_SRC
+
+Loop over array: 
+
+#+BEGIN_SRC cpp 
+  >> for(int i = 0; i < 5; i++){ std::cout << " " << arr1[i] << "\n"; }
+   10
+   5
+   6
+   9
+   15
+  >> 
+#+END_SRC
+
+Array as a pointer: 
+
+ - The array _arr1_ is actually a pointer to its first element. This
+   array is a memory block of five consecutive allocated integers with
+   the same size. 
+
+#+BEGIN_SRC cpp 
+  // The array is actually a pointer to array[0] or the 0-th 
+  // first element of memory block.
+  //-------------------------------------------------
+  >> *arr1
+  (int) 10
+  // Second memory block 
+  >> *(arr1 + 1)
+  (int) 5
+  // Third memory block 
+  >> *(arr1 + 2)
+  (int) 6
+  >> *(arr1 + 3)
+  (int) 9
+  >> *(arr1 + 4)
+  (int) 15
+  >>
+
+  >> *(&arr1[0] + 0)
+  (int) 10
+  >> *(&arr1[0] + 1)
+  (int) 5
+  >> *(&arr1[0] + 2)
+  (int) 6
+  >> *(&arr1[0] + 3)
+  (int) 9
+  >> *(&arr1[0] + 4)
+  (int) 15
+  >> 
+#+END_SRC
+
+Many ways to manipulate the third element (index 2):
+
+#+BEGIN_SRC cpp 
+  >> *(&arr1[0] + 2)
+  (int) 6
+  >> *(&arr1[0] + 2) = 25
+  (int) 25
+  >> *(&arr1[0] + 2)
+  (int) 25
+  >> arr1[2]
+  (int) 25
+  >> 
+#+END_SRC
+
+Passing arrays to functions: 
+
+ + An array (C-arrays) is not aware of its size, thus this parameter
+   must be passed to functions alongside the array or pointer to
+   first element.
+
+#+BEGIN_SRC cpp 
+  void printArray(size_t size, int xs []){
+    for(size_t i = 0; i < size; i++)
+      std::cout << " => xs[" << i << "] = " << xs[i] << "\n";
+  }
+
+  void printArray2(size_t size, int* xs){
+    for(size_t i = 0; i < size; i++)
+      std::cout << " => xs[" << i << "] = " << xs[i] << "\n";
+  }
+
+  void printArray3(size_t size, int* xs){
+    for(size_t i = 0; i < size; i++)
+      std::cout << " => xs[" << i << "] = " << *(xs + i) << "\n";
+  }
+
+  >> printArray(5, arr1)
+   => xs[0] = 10
+   => xs[1] = 5
+   => xs[2] = 25
+   => xs[3] = 9
+   => xs[4] = 15
+  >> 
+
+  >> printArray2(5, arr1)
+   => xs[0] = 10
+   => xs[1] = 5
+   => xs[2] = 25
+   => xs[3] = 9
+   => xs[4] = 15
+
+  >> printArray2(3, arr1)
+   => xs[0] = 10
+   => xs[1] = 5
+   => xs[2] = 25
+  >> 
+
+#+END_SRC
+**** Example: Stack-allocated objects
 
  Example: *Stack-allocated object.*
 
@@ -4301,6 +4466,7 @@ Testing:
 #+END_SRC
 
 *** Heap Allocation 
+
 ** OOP Simple Class
 
  - File: [[file:src/cppClasses1.cpp][file:src/cppClasses1.cpp]]
