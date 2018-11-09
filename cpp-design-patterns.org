@@ -1953,22 +1953,8 @@ Template class visitable used the CRTP (Curious Recurring Template
 Pattern) for making derived classes visitable without virtual
 methods. 
 
-#+BEGIN_SRC cpp 
-  template<typename Implementation>
-  class  Visitable{
-  public:
-     /** Accept any visitor class which implements
-       ,* the method:
-       ,* void Visitor::visit(Implementation& impl);
-       ,*********************************************/
-      template<typename Visitor>
-      void accept(Visitor&& v) {
-         v.visit(static_cast<Implementation&>(*this));
-      }
-  };
-#+END_SRC
 
-Visitable class hierarchy: 
+Shape interface class: 
 
 #+BEGIN_SRC cpp 
   // Shape interface - The base class must define the method accept
@@ -1976,26 +1962,47 @@ Visitable class hierarchy:
   public:
       virtual ~IShape() = default;
   };
+#+END_SRC
 
-  // ============ Concrete shapes ======= //
+Visitable CRTP Template class 
 
-  class Circle: public IShape, public Visitable<Circle>{
+#+BEGIN_SRC cpp 
+  template<typename Implementation>
+  class VisitableShape: public IShape{
+  public:
+      /** Accept any visitor class which implements
+        ,* the method:
+        ,* void Visitor::visit(Implementation& impl);
+        ,*********************************************/
+        template<typename Visitor>
+        void accept(Visitor&& v) {
+           v.visit(static_cast<Implementation&>(*this));
+        }
+  };
+
+#+END_SRC
+
+Visitable class hierarchy: 
+
+#+BEGIN_SRC cpp 
+  class Circle: public VisitableShape<Circle> {
   public:
       double radius;
       Circle(double radius): radius(radius) { }
   };
 
-  class Square: public IShape, public Visitable<Square>{
+  class Square: public VisitableShape<Square> {
   public:
       double side;
       Square(double side): side(side) { }
   };
 
-  class Blob: public IShape, public Visitable<Blob>{
+  class Blob: public VisitableShape<Blob> {
   public:
       Blob(){}
   };
 #+END_SRC
+
 
 The following template class turns a list of lambda function
 parameters into a visitor object. 
