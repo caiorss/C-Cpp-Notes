@@ -8,11 +8,19 @@
 #include <memory>
 #include <functional>
 
+// Shape interface - The base class must define the method accept
+class IShape{
+public:
+	virtual ~IShape() = default;
+};
+
+// ============ Concrete shapes ======= //
+
 // Generic Visitor with CRTP (Curious Recurring Template)
 // REMINDER: Template classes must always be
 //           in header files (*.h or *.hpp)
 template<typename Implementation>
-class  Visitable{
+class VisitableShape: public IShape{
 public:
 	/** Accept any visitor class which implements
 	  * the method:
@@ -24,27 +32,20 @@ public:
 	}
 };
 
-// Shape interface - The base class must define the method accept
-class IShape{
-public:
-	virtual ~IShape() = default;
-};
 
-// ============ Concrete shapes ======= //
-
-class Circle: public IShape, public Visitable<Circle>{
+class Circle: public VisitableShape<Circle> {
 public:
 	double radius;
 	Circle(double radius): radius(radius) { }
 };
 
-class Square: public IShape, public Visitable<Square>{
+class Square: public VisitableShape<Square> {
 public:
 	double side;
 	Square(double side): side(side) { }
 };
 
-class Blob: public IShape, public Visitable<Blob>{
+class Blob: public VisitableShape<Blob> {
 public:
 	Blob(){}
 };
