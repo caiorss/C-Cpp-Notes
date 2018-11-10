@@ -5745,6 +5745,107 @@ Delete object:
   >> 
 #+END_SRC
 
+*** Limits of stack and heap allocation 
+
+This small program aims to test the limits of stack and heap
+allocation by allowing the user to set the size of a float point array
+and whether its allocation will happen on stack or heap using
+pre-processor directives. 
+
+File: [[file:src/stack-allocation-test.cpp][file:src/stack-allocation-test.cpp]]
+
+#+BEGIN_SRC cpp
+  // File:   stack-allocation-test 
+  // Brief:  Test limits of stack or heap allocation. 
+  // Author: Caio Rodrigues
+  //------------------------------------------------------
+  #include <iostream>
+  #include <string> 
+
+  #ifndef ARRAY_SIZE
+     #define ARRAY_SIZE 8000
+  #endif 
+
+  int main(){
+      size_t sizeKB = static_cast<size_t>(ARRAY_SIZE) * sizeof(double) / 1024;
+      std::cout << " [LOG] Number of elements = " << ARRAY_SIZE << "\n";
+      std::cout << " [LOG] Array size in Kbytes = " << sizeKB << "\n";
+      #if !defined HEAP || HEAP == 0
+         // ===> Stack allocation 
+         std::cout << " [LOG] Stack allocation." << "\n";
+         double array [ARRAY_SIZE];
+      #else
+         // ===> Heap allocation 
+         std::cout << " [LOG] Heap (dynamic memory) allocation." << "\n";
+         // Note: It throws std::bad_alloc exception. 
+         double* array = new double [ARRAY_SIZE];	  	  
+         delete [] array;
+      #endif
+         std::cout << " [LOG] Program ended gracefully OK." << "\n";
+      return 0;
+  }
+#+END_SRC
+
+ *Testing stack-allocation limit:*
+
+ + Note: Tested on Linux-64 bits - Kernel 4.16.3
+
+ + Result: Core dump due to stack overflow happens when the array size is
+   10,000,000, 10 million doubles or 7812 kb (kbytes) or 7.6 Mb
+   (Megabytes). 
+
+#+BEGIN_SRC sh 
+  $ clang++ stack-allocation-test.cpp -o out.bin -DHEAP=false -DARRAY_SIZE=100 && ./out.bin
+   [LOG] Number of elements = 100
+   [LOG] Array size in Kbytes = 0
+   [LOG] Stack allocation.
+   [LOG] Program ended gracefully OK.
+
+  $ clang++ stack-allocation-test.cpp -o out.bin -DHEAP=false -DARRAY_SIZE=1000000 && ./out.bin
+   [LOG] Number of elements = 1000000
+   [LOG] Array size in Kbytes = 7812
+   [LOG] Stack allocation.
+   [LOG] Program ended gracefully OK.
+
+  $ clang++ stack-allocation-test.cpp -o out.bin -DHEAP=false -DARRAY_SIZE=10000000 && ./out.bin
+  Segmentation fault (core dumped)
+
+  $ ./out.bin
+  Segmentation fault (core dumped)
+#+END_SRC
+
+ *Testing heap (dynamic memory) allocation limit:*
+
+ + Note: Tested on Linux-64 bits - Kernel 4.16.3
+
+ + Result: bad_alloc exception happens when the array size is 10
+   billions or 78125000 kb (= 76293 Mb or 74 GB. The limit of the heap
+   allocation is the size of the virtual memory or RAM memory.  
+
+#+BEGIN_SRC sh 
+  # 10 millions
+  $ clang++ stack-allocation-test.cpp -o out.bin -DHEAP=true -DARRAY_SIZE=10000000 && ./out.bin
+   [LOG] Number of elements = 10000000
+   [LOG] Array size in Kbytes = 78125
+   [LOG] Heap (dynamic memory) allocation.
+   [LOG] Program ended gracefully OK.
+
+  # 100 millions 
+  $ clang++ stack-allocation-test.cpp -o out.bin -DHEAP=true -DARRAY_SIZE=100000000 && ./out.bin
+   [LOG] Number of elements = 100000000
+   [LOG] Array size in Kbytes = 781250
+   [LOG] Heap (dynamic memory) allocation.
+   [LOG] Program ended gracefully OK.
+
+  # 10 billions
+  $ clang++ stack-allocation-test.cpp -o out.bin -DHEAP=true -DARRAY_SIZE=10000000000 && ./out.bin
+   [LOG] Number of elements = 10000000000
+   [LOG] Array size in Kbytes = 78125000
+   [LOG] Heap (dynamic memory) allocation.
+  terminate called after throwing an instance of 'std::bad_alloc'
+    what():  std::bad_alloc
+  Aborted (core dumped)
+#+END_SRC
 *** References and further reading 
 
 General: 
