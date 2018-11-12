@@ -3017,6 +3017,7 @@ Videos:
 
  + 
 ** Virtual Copy Constructor Idiom 
+*** Overview 
 
 The virtual copy constructor idiom is a workround for allowing a
 client to clone or performing deep copy at runtime of C++ instances
@@ -3025,9 +3026,9 @@ those of those instances. In other words, this idioms makes possible
 to a client to clone instances of derived classes given as pointers to
 base class (the type of pointers is Base*).
 
-File: [[file:src/design-patterns/virtual-constructor1.cpp][file:src/design-patterns/virtual-constructor1.cpp]]
+*** Example: Simple Virtual Copy Constructor 
 
- *Example:*
+File: [[file:src/design-patterns/virtual-constructor1.cpp][file:src/design-patterns/virtual-constructor1.cpp]]
 
 Note: This example can be improved using smart pointers.
 
@@ -3207,7 +3208,111 @@ Codes using "virtual copy constructor":
 
  + [[https://people.math.ethz.ch/~concepts/doxygen/html/classconcepts_1_1FrmE__TangentialVector.html#a9da3ec4c6f5b2b0d8f3eff38602c624b][Home – Concepts | Numerical C++ Library Concepts | ETH Zurich]]
 
- + [[http://www.java2s.com/Tutorial/Cpp/0180__Class/Virtualcopyconstructor.htm][Virtual copy constructor : constructor « Class « C++ Tutorial]]
+ + [[http://www.java2s.com/Tutorial/Cpp/0180__Class/Virtualcopyconstructor.htm][Virtual
+   copy constructor : constructor « Class « C++ Tutorial]]
+*** Examṕle: Virtual Copy Constructor with CRTP 
+
+This alternative implementation uses CRTP (Curious Recurring Template)
+for eliminating the boilerplate code and smart pointers.
+
+File: [[file:src/design-patterns/virtual-constructor2.cpp][file:src/design-patterns/virtual-constructor2.cpp]]
+
+ + IBase interface class:
+
+#+BEGIN_SRC cpp 
+  class IBase{
+  public:
+     // Destructor always virtual to avoid memory leak,
+     virtual ~IBase() = default;	
+     // "virtual copy constructor"
+     virtual auto clone() const -> std::unique_ptr<IBase> = 0;
+     // "virtual default constructor"
+     virtual auto create() const        -> std::unique_ptr<IBase> = 0;	
+     virtual auto getID() const         -> std::string  = 0;
+     virtual auto setID(std::string id) -> void	      = 0;
+     virtual auto show() const          -> void	      = 0;
+  };
+#+END_SRC
+
+ + CRTP base class:
+
+#+BEGIN_SRC cpp 
+  /** Remember: Template always in header files. */
+  template<typename Base, typename Derived>
+  class Copyable: public Base{
+  private:
+       inline auto self() const -> const Derived& {
+          return *static_cast<const Derived* const>(this);
+       }
+  public:
+      virtual ~Copyable() = default;
+      auto clone() const -> std::unique_ptr<Base> {
+         // Invoke copy constructor 
+         return std::make_unique<Derived>(this->self());
+      }
+      auto create() const -> std::unique_ptr<Base> {
+         // Invoke default constructor 
+         return std::make_unique<Derived>();
+      }
+  };
+
+#+END_SRC
+
+ + Class DerivedA. The class DerivedB is similar to this one. 
+
+#+BEGIN_SRC cpp 
+  class DerivedA: public Copyable<IBase, DerivedA>{
+  private: 
+       std::string _id;
+  public:
+       DerivedA()
+         : _id("unnamed-A"){ }
+       DerivedA(std::string id)
+         : _id{std::move(id)}{  }
+       auto getID() const -> std::string {
+          return _id;
+       }
+       auto setID(std::string id) -> void {
+          _id = id;
+       }   
+       auto show() const -> void  {
+          std::cout << " => Class DerivedA - id = " << _id << "\n";
+       }
+  };
+#+END_SRC
+
+Testign in ROOT REPL: 
+
+#+BEGIN_SRC cpp 
+  >> .L virtual-constructor2.cpp
+
+  >> DerivedA da("objA");
+  >> DerivedB db("objB");
+  >> 
+  >> IBase* ptr = &da;
+
+  >> ptr->getID()
+  (std::string) "objA"
+
+  >> ptr->show()
+   => Class DerivedA - id = objA
+  >>
+
+  >> auto clone1 = ptr->clone()
+  (std::unique_ptr<IBase, std::default_delete<IBase> > &) @0x7fdf62fa5068
+  >> 
+
+  >> clone1->setID("objA-clone");
+
+  >> clone1->getID()
+  (std::string) "objA-clone"
+  >> 
+
+  >> ptr->getID()
+  (std::string) "objA"
+  >> 
+
+#+END_SRC
 ** Cross platform code with conditional compilation
 
 Note: It is not a design pattern, but a useful for techinque for
