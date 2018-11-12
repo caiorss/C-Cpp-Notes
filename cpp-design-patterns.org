@@ -3016,6 +3016,198 @@ Videos:
  + 
 
  + 
+** Virtual Copy Constructor Idiom 
+
+The virtual copy constructor idiom is a workround for allowing a
+client to clone or performing deep copy at runtime of C++ instances
+of derived classes from a given base class without knowing the type of
+those of those instances. In other words, this idioms makes possible
+to a client to clone instances of derived classes given as pointers to
+base class (the type of pointers is Base*).
+
+File: [[file:src/design-patterns/virtual-constructor1.cpp][file:src/design-patterns/virtual-constructor1.cpp]]
+
+ *Example:*
+
+Note: This example can be improved using smart pointers.
+
+ + Interface class: 
+
+#+BEGIN_SRC cpp 
+  class IBase{
+  public:
+      // Destructor always virtual to avoid memory leak,
+      virtual ~IBase() = default;	
+      // "virtual copy constructor"
+      virtual auto clone() const -> IBase* = 0;
+      // "virtual default constructor"
+      virtual auto create() const        -> IBase*      = 0;	
+      virtual auto getID() const         -> std::string = 0;
+      virtual auto setID(std::string id) -> void	= 0;
+      virtual auto show() const          -> void        = 0;
+  };
+#+END_SRC
+
+ + Concrete class DerivedA: 
+
+#+BEGIN_SRC cpp 
+  class DerivedA: public IBase{
+  private: 
+          std::string _id;
+  public:
+      DerivedA()
+       : _id("unnamed-A"){ }
+
+      DerivedA(std::string id)
+       : _id{std::move(id)}{  }
+
+      auto clone() const -> IBase* {
+        // Invoke copy constructor 
+        return new DerivedA(*this);
+      }
+      auto create() const -> IBase* {
+        // Invoke default constructor 
+        return new DerivedA();
+      }
+      auto getID() const -> std::string {
+        return _id;
+      }
+      auto setID(std::string id) -> void {
+        _id = id;
+      }   
+      auto show() const -> void  {
+        std::cout << " => Class DerivedA - id = " << _id << "\n";
+      }  
+  };
+#+END_SRC
+
+ + Concrete clas DerivedB: 
+
+#+BEGIN_SRC cpp 
+  class DerivedB: public IBase{
+  private:
+       std::string _id;
+  public:
+       DerivedB()
+        : _id("unnamed-B"){ }
+
+       DerivedB(std::string id)
+        : _id{std::move(id)}{  }
+
+       auto clone() const -> IBase* {
+         // Invoke copy constructor 
+         return new DerivedB(*this);
+       }
+       auto create() const -> IBase* {
+         // Invoke default constructor 
+         return new DerivedB();
+       }  
+       auto getID() const -> std::string {
+         return _id;
+       }
+       auto setID(std::string id) -> void {
+          _id = std::move(id);
+       }     
+       auto show() const -> void  {
+          std::cout << " => Class DerivedB - id = " << _id << "\n";
+       }  
+  };
+#+END_SRC
+
+Testing in ROOT REPL:
+
+ + Create test objects: 
+
+#+BEGIN_SRC cpp
+// Load file as a script 
+>> .L virtual-constructor1.cpp 
+
+>> DerivedA da("objectA");
+
+>> DerivedB db("objectB");
+ 
+>> da.show()
+ => Class DerivedA - id = objectA
+>>  
+
+>> db.show()
+ => Class DerivedB - id = objectB
+>> 
+
+>> IBase* ptr = nullptr;
+
+>> ptr->getID()
+(std::string) "objectA"
+
+>> ptr->show()
+ => Class DerivedA - id = objectA
+>> 
+#+END_SRC
+
+Clone object DerivedA: 
+
+#+BEGIN_SRC cpp 
+  >> IBase* clone1 = ptr->clone();
+
+  >> clone1->getID()
+  (std::string) "objectA"
+  >> clone1->show()
+   => Class DerivedA - id = objectA
+
+  >> if(clone1 != ptr) std::puts("Objects are not the same. OK.");
+  Objects are not the same. OK.
+
+  >> clone1->setID("object-A-Clone");
+
+  >> clone1->getID()
+  (std::string) "object-A-Clone"
+
+  >> ptr->getID()
+  (std::string) "objectA"
+  >> 
+
+  // Delete cloned object 
+  >> delete clone1;
+  >> clone1 = nullptr;
+#+END_SRC
+
+Invoke default constructor of class DerivedB through the object
+DerivedB:
+
+#+BEGIN_SRC cpp 
+  >> ptr = &db;
+
+  >> ptr = &db;
+  >> ptr->show()
+   => Class DerivedB - id = objectB
+
+  >> IBase* clone2 = ptr->create();
+
+  >> clone2->show()
+   => Class DerivedB - id = unnamed-B
+  >> 
+#+END_SRC
+
+
+Further Reading: 
+
+ + [[https://isocpp.org/wiki/faq/virtual-functions#virtual-ctors][ISO C++ - FAQ - Inheritance — What is a virtual constructor]]
+
+ + [[http://www.cs.technion.ac.il/users/yechiel/c++-faq/virtual-ctors.html][What is a "virtual constructor"?, C++ FAQ]]
+
+ + [[https://isocpp.org/wiki/faq/virtual-functions#virtual-ctor-rationale][Inheritance — <code>virtual</code> functions, C++ FAQ]]
+
+ + [[https://en.wikibooks.org/wiki/More_C%2B%2B_Idioms/Covariant_Return_Types][More C++ Idioms/Covariant Return Types - Wikibooks, open books for an open world]]
+
+ + [[https://nerdland.net/2009/06/covariant-templatized-virtual-copy-constructors/][Covariant, Templatized Virtual Copy Constructors – Nerdland]]
+
+ + [[http://icu-project.org/docs/papers/cpp_report/the_anatomy_of_the_assignment_operator.html][The Anatomy of the Assignment Operator]]
+
+Codes using "virtual copy constructor":
+
+ + [[https://people.math.ethz.ch/~concepts/doxygen/html/classconcepts_1_1FrmE__TangentialVector.html#a9da3ec4c6f5b2b0d8f3eff38602c624b][Home – Concepts | Numerical C++ Library Concepts | ETH Zurich]]
+
+ + [[http://www.java2s.com/Tutorial/Cpp/0180__Class/Virtualcopyconstructor.htm][Virtual copy constructor : constructor « Class « C++ Tutorial]]
 ** Cross platform code with conditional compilation
 
 Note: It is not a design pattern, but a useful for techinque for
