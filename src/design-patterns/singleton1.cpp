@@ -6,6 +6,8 @@
 #include <string> 
 #include <memory>
 
+//------ It should be  in file: FileRepository.hpp -----//
+
 // Singleton is a design pattern with a single instance
 // It implements a file repository, there can be only one instance
 // of this object.
@@ -15,31 +17,56 @@ class FileRepository
 private:
     std::deque<std::string> _files;	
     // Forbid client code instating a new instance. 
-    FileRepository(){}	
+    FileRepository(){
+		std::cerr << " [LOG] File Respository Initialized." << "\n";
+	}	
     // Forbid client code from creating a copy or using the
     // copy constructor.
-    FileRepository(const FileRepository&){}
+    FileRepository(const FileRepository&){}		
 public:
+	~FileRepository();
+	
 	// Return a reference to not allow client code 
 	// to delete object. 	
-    static auto getInstance() -> FileRepository& {
-        // Initialized once - lazy initialization 
-        static auto _instance = std::unique_ptr<FileRepository>(new FileRepository);
-        return *_instance.get();
-    }
-    void addFile(std::string fname){
-        _files.push_back(fname);
-    }
-	void clearFiles(){
-		_files.clear();
-	}
+    static auto getInstance() -> FileRepository&;	
+
+	// Use old C++ 'member function' syntax.
+	void addFile(std::string fname);
+	void clearFiles();
 	// C++11 member function declaration looks better. 
-    auto showFiles() -> void {
-        for(const auto& file: _files){
-            std::cout << " File = " << file << std::endl;
-        }
-    }
+    auto showFiles() -> void;
 };
+
+//------ It should be  in file: FileRepository.cpp -----//
+
+FileRepository::~FileRepository(){
+	std::cerr << " [LOG] File Respository Deleted. Ok." << "\n";
+}
+
+// Static method
+auto FileRepository::getInstance() -> FileRepository& {
+	static auto instance = std::unique_ptr<FileRepository>{nullptr};		
+	// Initialized once - lazy initialization 
+	if(!instance)
+		instance.reset(new FileRepository);		
+	return *instance.get();
+}
+
+void FileRepository::addFile(std::string fname){
+	_files.push_back(std::move(fname));
+}
+
+void FileRepository::clearFiles(){
+	_files.clear();
+}
+
+auto FileRepository::showFiles() -> void {
+	for(const auto& file: _files)
+		std::cout << " File = " << file << std::endl;
+}
+
+
+//---- It should be file: main.cpp -------------//
 
 int main(){
 

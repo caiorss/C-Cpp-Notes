@@ -64,37 +64,72 @@ pattern, it is still worth knowing how it works.
 
 + File: [[file:src/design-patterns/singleton1.cpp][file:src/design-patterns/singleton1.cpp]]
 
+Header of class FileRepository => (FileRepository.hpp)
+
 #+BEGIN_SRC cpp
-   class FileRepository
-   {
-   private:
-       std::deque<std::string> _files;	
-       // Forbid client code instating a new instance. 
-       FileRepository(){}	
-       // Forbid client code from creating a copy or using the
-       // copy constructor.
-       FileRepository(const FileRepository&){}
-   public:
-       // Return a reference to not allow client code 
-       // to delete object. 
-       static auto getInstance() -> FileRepository& {
-           // Initialized once - lazy initialization 
-           static auto _instance = std::unique_ptr<FileRepository>(new FileRepository);
-           return *_instance.get();
-       }
-       void addFile(std::string fname){
-           _files.push_back(fname);
-       }
-       void clearFiles(){
-               _files.clear();
-       }
-       // C++11 member function declaration looks better. 
-       auto showFiles() -> void {
-           for(const auto& file: _files){
-               std::cout << " File = " << file << "\n";
-           }
-       }
-   };
+  //----- file: FileRepository.hpp ------//
+  #ifndef __file_repository 
+  #define __file_repository
+  #include <std::string>
+
+  class FileRepository
+  {
+  private:
+      std::deque<std::string> _files;	
+      // Forbid client code instating a new instance. 
+      FileRepository(){
+         std::cerr << " [LOG] File Respository Initialized." << "\n";
+      }	
+      // Forbid client code from creating a copy or using the
+      // copy constructor.
+      FileRepository(const FileRepository&){}		
+  public:
+      ~FileRepository();
+	
+      // Return a reference to not allow client code 
+      // to delete object. 	
+      static auto getInstance() -> FileRepository&;	
+
+      // Use old C++ 'member function' syntax.
+      void addFile(std::string fname);
+      void clearFiles();
+      // C++11 member function declaration looks better. 
+      auto showFiles() -> void;
+  };
+  #endif 
+#+END_SRC
+
+Implementation of FileRepository (FileRepository.cpp)
+
+#+BEGIN_SRC cpp
+  #include <iostream>
+  #include "FileRepository.hpp"
+
+  FileRepository::~FileRepository(){
+        std::cerr << " [LOG] File Respository Deleted. Ok." << "\n";
+  }
+
+  // Static method 
+  auto FileRepository::getInstance() -> FileRepository& {
+       static auto instance = std::unique_ptr<FileRepository>{nullptr};		
+       // Initialized once - lazy initialization 
+       if(!instance)
+            instance.reset(new FileRepository);		
+       return *instance.get();
+  }
+
+  void FileRepository::addFile(std::string fname){
+       _files.push_back(std::move(fname));
+  }
+
+  void FileRepository::clearFiles(){
+       _files.clear();
+  }
+  // C++11 Member function declaration 
+  auto FileRepository::showFiles() -> void {
+       for(const auto& file: _files)
+          std::cout << " File = " << file << std::endl;
+  }
 #+END_SRC
 
 Test in CERN ROOT/Clign REPL:
@@ -113,10 +148,8 @@ Test in CERN ROOT/Clign REPL:
        FileRepository(const FileRepository&){}
        ^
    >> FileRepository& repo = FileRepository::getInstance()
-   (FileRepository &) @0x2fc9640
-   >> 
+   [LOG] File Respository Initialized.
 
-   >> FileRepository& repo = FileRepository::getInstance()
    (FileRepository &) @0x2fc9640
    >> 
 
@@ -156,6 +189,10 @@ Test in CERN ROOT/Clign REPL:
    >> &repo == &repo2
    (bool) true
    >> 
+
+   // Exit REPL.
+   >> .q
+  [LOG] File Respository Deleted. Ok.
 #+END_SRC
 
 Main function: 
@@ -184,9 +221,9 @@ Main function:
 Compiling and running ([[file:src/design-patterns/singleton1.cpp][file:src/design-patterns/singleton1.cpp]]): 
 
 #+BEGIN_SRC txt 
-  $ clang++ singleton1.cpp -o singleton1.bin -g -std=c++1z -Wall -Wextra 
-  $ ./singleton1.bin
+  clang++ singleton1.cpp -o singleton1.bin -g -std=c++14 -Wall -Wextra && ./singleton1.bin
 
+   [LOG] File Respository Initialized.
   Same object? (&repo == &repo1 ?) = true
   Repository files
    File = CashFlowStatement.txt
@@ -199,7 +236,9 @@ Compiling and running ([[file:src/design-patterns/singleton1.cpp][file:src/desig
    File = fileX1.pdf
    File = fileX2.pdf
    File = fileX3.pdf
+   [LOG] File Respository Deleted. Ok.
 #+END_SRC
+
 ** Named constructor - static factory method
 
 The named constructor or static factory design pattern uses static
