@@ -8,13 +8,30 @@
 
 //------ It should be  in file: FileRepository.hpp -----//
 
+// Singleton - CRTP 
+template<typename Impl>
+class Singleton{
+public:
+	virtual ~Singleton(){}
+	
+	// Static method
+	static auto getInstance() -> Impl& {
+		static auto instance = std::unique_ptr<Impl>{nullptr};		
+		// Initialized once - lazy initialization 
+		if(!instance) instance.reset(new Impl);		
+		return *instance.get();
+	}
+};
+
+
 // Singleton is a design pattern with a single instance
 // It implements a file repository, there can be only one instance
 // of this object.
 // 
-class FileRepository
-{
+class FileRepository: public Singleton<FileRepository>{
 private:
+	friend Singleton;
+	
     std::deque<std::string> _files;	
     // Forbid client code instating a new instance. 
     FileRepository(){
@@ -28,7 +45,7 @@ public:
 	
 	// Return a reference to not allow client code 
 	// to delete object. 	
-    static auto getInstance() -> FileRepository&;	
+    
 
 	// Use old C++ 'member function' syntax.
 	void addFile(std::string fname);
@@ -41,15 +58,6 @@ public:
 
 FileRepository::~FileRepository(){
 	std::cerr << " [LOG] File Respository Deleted. Ok." << "\n";
-}
-
-// Static method
-auto FileRepository::getInstance() -> FileRepository& {
-	static auto instance = std::unique_ptr<FileRepository>{nullptr};		
-	// Initialized once - lazy initialization 
-	if(!instance)
-		instance.reset(new FileRepository);		
-	return *instance.get();
 }
 
 void FileRepository::addFile(std::string fname){
@@ -68,6 +76,7 @@ auto FileRepository::showFiles() -> void {
 
 //---- It should be file: main.cpp -------------//
 
+#if 0 
 int main(){
 
     FileRepository& repo1 = FileRepository::getInstance();
@@ -91,3 +100,4 @@ int main(){
 	
 	return EXIT_SUCCESS;
 }
+#endif 
