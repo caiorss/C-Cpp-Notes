@@ -3440,7 +3440,154 @@ Example:
   }
 #+END_SRC
 
-* Custom Techniques 
+* Misc Techniques 
+** Polymorphic IO 
+
+This technique allows to design input or output functions which can
+read from any type of input stream or print to any type of output
+stream. Besides C++, this design approach can also be used with any
+object oriented language with an IO class hierarchy where there are an
+root abstract input class (in C++ std::istream C++) and a root abstract
+output class (std::ostream in C++).
+
+File: [[file:src/design-patterns/polymorphic-io1.cpp][file:src/design-patterns/polymorphic-io1.cpp]]
+
+ *Polymorphic IO Functions:*
+
+ + The class std::ostream is the base class of all C++'s output streams. By
+   passing the object std::cout to std::ostream, the function
+   _writeVector_ writes the vector to standard output. If the parameter passed is
+   std::sstringstream, the function writes the vector to the string
+   stream.
+
+ + The function readVector can read a vector of doubles from any input
+   stream since the class std::istream is the base class of all input
+   streams, as a result, it can read vector from std::cin (console or
+   stdin), file stream std::ifstream, string stream and so on.
+
+ + Note: This approach can also be used for binary IO and
+   serialization. 
+
+ + Summary:
+   + In order to design an output agnostic function, write to the
+     abstract output _std::ostream_, instead of writing to concrete
+     outputs such as std::cout, std::cerr and etc.
+   + To design an input agnostic function, use std::istream instead of
+     a concrete input stream.
+
+ + Documentation:
+   + [[https://en.cppreference.com/w/cpp/io][Input/output library - cppreference.com]]
+   + [[http://www.cplusplus.com/reference/ostream/ostream/][ostream - C++ Reference]]
+   + [[http://www.cplusplus.com/reference/istream/istream/][istream - C++ Reference]]
+   + [[http://www.cplusplus.com/reference/fstream/ifstream/][ifstream - C++ Reference]]
+
+#+BEGIN_SRC cpp 
+  namespace VectorIO{
+     auto writeVector(std::ostream& os, const std::vector<double>& xs) -> void
+     {
+         os << "VECTOR";
+         os << " ";
+         for(auto x: xs)
+                 os << x << " ";
+         os << "\n";
+         os.flush();
+     }
+     auto writeVector(std::ostream&& os, const std::vector<double>& xs) -> void
+     {
+         std::cerr << " [LOG] (writeVector) R-value reference" << "\n";
+         writeVector(os, xs);
+     }
+     auto readVector(std::istream& is) -> std::vector<double>
+     {
+         std::vector<double> xlist;
+         std::string label;
+         is >> label;
+         if(label != "VECTOR")
+                 throw std::runtime_error("Error: wrong file layout.");
+         double x;
+         while(is.good() && !is.eof()){
+                 is >> x;
+                 xlist.push_back(x);
+         }
+         return xlist;
+     }
+     auto readVector(std::istream&& is) -> std::vector<double>
+    {
+         std::cerr << " [LOG] (readVector) R-value reference" << "\n";
+         return readVector(is);
+     }
+  }
+#+END_SRC
+
+Main function: 
+
+#+BEGIN_SRC cpp 
+     using VectorIO::writeVector;
+     using VectorIO::readVector;
+
+     std::vector<double> vtest = {2.0, 4.0, 5.0, 10.0, 3.45, 9.5};
+
+     std::cout << "\n TEST1 Writing to stdout (Standard output stream) " << "\n";
+     writeVector(std::cout, vtest);
+
+     std::cout << "\n TEST2 Writing to stderr (Standard error stream) " << "\n";
+     writeVector(std::cerr, vtest);
+
+     std::cout << "\n TEST3 Writing to std::stringstream " << "\n";
+     std::stringstream fakeFile;
+     writeVector(fakeFile, vtest);	
+     std::cout << "fakeFile = " << fakeFile.str() << "\n";
+
+     std::cout << "\n TEST4 Reading from std::stringstream " << "\n";
+     auto out1 = readVector(fakeFile);
+     writeVector(std::cout, out1);
+
+     std::cout << "\n TEST5 Write to a file" << "\n";
+     // Note: It is not possible without R-value reference.
+     writeVector(std::ofstream("vector.txt"), vtest);
+
+     std::cout << "\n TEST6 Read from file - Version 1" << "\n";
+     // Call R-value reference version 
+     auto out2 = readVector(std::ifstream("vector.txt"));
+     writeVector(std::cout, out2);
+
+     std::cout << "\n TEST7 Read from file - Version 2" << "\n";
+     std::ifstream fd{"vector.txt"};
+     // Call L-value reference version of readVector 
+     auto out3 = readVector(fd);
+     writeVector(std::cout, out3);
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC txt 
+  $ clang++ polymorphic-io1.cpp -o polymorphic-io1.bin -g -std=c++11 -Wall -Wextra 
+  $ ./polymorphic-io1.bin
+
+   TEST1 Writing to stdout (Standard output stream) 
+  VECTOR 2 4 5 10 3.45 9.5 
+
+   TEST2 Writing to stderr (Standard error stream) 
+  VECTOR 2 4 5 10 3.45 9.5 
+
+   TEST3 Writing to std::stringstream 
+  fakeFile = VECTOR 2 4 5 10 3.45 9.5 
+
+
+   TEST4 Reading from std::stringstream 
+  VECTOR 2 4 5 10 3.45 9.5 9.5 
+
+   TEST5 Write to a file
+   [LOG] (writeVector) R-value reference
+
+   TEST6 Read from file - Version 1
+   [LOG] (readVector) R-value reference
+  VECTOR 2 4 5 10 3.45 9.5 9.5 
+
+   TEST7 Read from file - Version 2
+  VECTOR 2 4 5 10 3.45 9.5 9.5 
+#+END_SRC
+
 ** Multiple booleans encoded as a single bitmask value 
 
  Note: It is not a design pattern, but a technique for encoding

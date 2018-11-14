@@ -53,7 +53,7 @@ int main(){
 	auto out2 = readVector(std::ifstream("vector.txt"));
 	writeVector(std::cout, out2);
 
-	std::cout << "\n TEST7 Read from file - Version 1" << "\n";
+	std::cout << "\n TEST7 Read from file - Version 2" << "\n";
 	std::ifstream fd{"vector.txt"};
 	// Call L-value reference version of readVector 
 	auto out3 = readVector(fd);
