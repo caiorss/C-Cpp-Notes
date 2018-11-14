@@ -2752,8 +2752,66 @@ Output:
  word =  aquoted string 
  word = next quote
  word = next quote
-
 #+END_SRC
+
+Hand-rolled quoted string parser: 
+
+ + Useful if C++14 is not avaiable.
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <sstream>
+  #include <string>
+
+  // Requires headers: <string> and <sstream>
+  auto readQuoted(std::istream& is) -> std::string {
+       char ch;
+       std::ostringstream so;
+       if(is.eof()) return "";
+       // Find first quote:
+       //-------------------------------------
+       do {
+          ch = static_cast<char>(is.get());
+       } while(is.good() && !is.eof() && std::isspace(ch));	
+       //std::cout << "ch = " << ch  << "\n";	
+       if(ch != '\"'){
+          so << ch;
+          do {
+              ch = static_cast<char>(is.get());
+              so << ch;
+          } while(is.good() && !is.eof() && !std::isspace(ch));
+          if(is.eof()) return "";
+          return so.str();
+       }
+       //std::cout << "ch = " << ch  << "\n";	
+       do {
+          ch = static_cast<char>(is.get());
+          if(ch != '\"') so << ch;
+       } while(is.good() && !is.eof() && ch != '\"');
+       if(is.eof()) // Did not find a matching quote.
+          return "";
+       //std::cout << "ch = " << ch  << "\n";
+       return so.str();
+  }
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC cpp
+   std::string s = "  \" 200 99 888 quoted - string \" KEY \" VALUE PAIR \"  100 \" Sao Paulo City\" 4500 key ";
+   std::stringstream ss{s};
+
+   >>> while(ss.good()) std::cout << "quoted = " << readQuoted(ss) << "\n";
+   quoted =  200 99 888 quoted - string 
+   quoted = KEY 
+   quoted =  VALUE PAIR 
+   quoted = 100 
+   quoted =  Sao Paulo City
+   quoted = 4500 
+   quoted = key 
+   quoted = 
+#+END_SRC
+
 *** Parse comma separated value - CSV row 
 
 Note: the following CSV parser functions fails for heterogeneous data
