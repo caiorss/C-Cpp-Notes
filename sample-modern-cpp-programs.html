@@ -3,7 +3,7 @@
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
-<!-- 2018-11-05 Mon 20:13 -->
+<!-- 2018-11-16 Fri 15:46 -->
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Sample Modern C++ Programs</title>
@@ -239,9 +239,10 @@ for the JavaScript code in this tag.
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents">
 <ul>
-<li><a href="#org62e6244">1. Sample Modern C++ Programs</a>
+<li><a href="#org62bbbe5">1. Sample Modern C++ Programs</a>
 <ul>
-<li><a href="#org24f79a1">1.1. Reverse Polish Notation Interpreter for math computation</a></li>
+<li><a href="#org9fd8969">1.1. Reverse Polish Notation Interpreter for math computation</a></li>
+<li><a href="#org8e73fe2">1.2. Linux/Posix Daemon with syslog</a></li>
 </ul>
 </li>
 </ul>
@@ -251,12 +252,12 @@ for the JavaScript code in this tag.
 <li><a href='index.html'>Index</a></li>
 </ul>
 
-<div id="outline-container-org62e6244" class="outline-2">
-<h2 id="org62e6244"><span class="section-number-2">1</span> Sample Modern C++ Programs</h2>
+<div id="outline-container-org62bbbe5" class="outline-2">
+<h2 id="org62bbbe5"><span class="section-number-2">1</span> Sample Modern C++ Programs</h2>
 <div class="outline-text-2" id="text-1">
 </div>
-<div id="outline-container-org24f79a1" class="outline-3">
-<h3 id="org24f79a1"><span class="section-number-3">1.1</span> Reverse Polish Notation Interpreter for math computation</h3>
+<div id="outline-container-org9fd8969" class="outline-3">
+<h3 id="org9fd8969"><span class="section-number-3">1.1</span> Reverse Polish Notation Interpreter for math computation</h3>
 <div class="outline-text-3" id="text-1-1">
 <p>
 This code is a <span class="underline">reverse polish notation</span> (<a href="https://en.wikipedia.org/wiki/Reverse_Polish_notation">RPN</a>) interactive interpreter
@@ -295,7 +296,7 @@ calculators which uses RPN notation.</li>
 Source code:
 </p>
 <ul class="org-ul">
-<li><a href="src/rpn-calculator.cpp">file:src/rpn-calculator.cpp</a></li>
+<li><a href="src/sample-programs/rpn-calculator.cpp">file:src/sample-programs/rpn-calculator.cpp</a></li>
 </ul>
 
 <p>
@@ -392,10 +393,240 @@ Running:
 </div>
 </div>
 </div>
+<div id="outline-container-org8e73fe2" class="outline-3">
+<h3 id="org8e73fe2"><span class="section-number-3">1.2</span> Linux/Posix Daemon with syslog</h3>
+<div class="outline-text-3" id="text-1-2">
+<p>
+This sample program is an Posix daemon encapsulated in a class which
+runs in background, even when the terminal is closed and logs to
+syslog a hypothetical commodity price simulated by a random number.
+</p>
+
+<p>
+The program was tested on Linux, however it may work in any other
+compatible Posix operating system such as BSD, MacOSX and so on.
+</p>
+
+<p>
+Code: 
+</p>
+
+<ul class="org-ul">
+<li><a href="src/sample-programs/posix-daemon.cpp">file:src/sample-programs/posix-daemon.cpp</a></li>
+</ul>
+
+<p>
+Modern C++ Features used: 
+</p>
+<ul class="org-ul">
+<li>std::functions is used for callback and inject behavior in the
+PosixDaemon class.</li>
+<li>C++11 auto syntax for functions and variables.</li>
+<li>Deleted copy constructor and copy-assignment operator.</li>
+<li>C++11 random number facilities.</li>
+</ul>
+
+<p>
+Posix and Linux APIs used: 
+</p>
+<ul class="org-ul">
+<li>syslog</li>
+<li>close() system calls</li>
+<li>fork()</li>
+<li>umaks()</li>
+</ul>
+
+<p>
+See: 
+</p>
+<ul class="org-ul">
+<li><a href="https://en.wikipedia.org/wiki/Daemon_(computing)">Daemon (computing) - Wikipedia</a></li>
+<li><a href="https://en.wikipedia.org/wiki/Fork_(system_call)">Fork (system call) - Wikipedia</a></li>
+<li><a href="https://en.wikipedia.org/wiki/Fork%E2%80%93exec">Fork–exec - Wikipedia</a></li>
+</ul>
+
+<p>
+<b>Parts</b> 
+</p>
+
+<p>
+Class PosixDaemon:
+</p>
+<ul class="org-ul">
+<li>Encapsulates the U-nix and Posix daemon.</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-keyword">class</span> <span class="org-type">PosixDaemon</span><span class="org-rainbow-delimiters-depth-1">{</span>
+<span class="org-function-name">public</span>:
+     <span class="org-keyword">using</span> <span class="org-type">Action</span> = <span class="org-constant">std</span>::<span class="org-type">function</span><span class="org-rainbow-delimiters-depth-2">&lt;</span><span class="org-type">bool</span> <span class="org-rainbow-delimiters-depth-3">()</span><span class="org-rainbow-delimiters-depth-2">&gt;</span>;
+
+     <span class="org-function-name">PosixDaemon</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-constant">std</span>::<span class="org-type">string</span> <span class="org-variable-name">path</span>, <span class="org-constant">std</span>::<span class="org-type">string</span> <span class="org-variable-name">pidfile</span>,  <span class="org-type">Action</span> <span class="org-variable-name">action</span><span class="org-rainbow-delimiters-depth-2">)</span>
+      : m_path<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-constant">std</span>::move<span class="org-rainbow-delimiters-depth-3">(</span>path<span class="org-rainbow-delimiters-depth-3">)</span><span class="org-rainbow-delimiters-depth-2">)</span>,
+        m_pidfile<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-constant">std</span>::move<span class="org-rainbow-delimiters-depth-3">(</span>pidfile<span class="org-rainbow-delimiters-depth-3">)</span><span class="org-rainbow-delimiters-depth-2">)</span>,
+        m_action<span class="org-rainbow-delimiters-depth-2">(</span>action<span class="org-rainbow-delimiters-depth-2">)</span> <span class="org-rainbow-delimiters-depth-2">{</span> <span class="org-rainbow-delimiters-depth-2">}</span>
+     ~<span class="org-function-name">PosixDaemon</span><span class="org-rainbow-delimiters-depth-2">(){}</span>   
+
+     <span class="org-comment-delimiter">// </span><span class="org-comment">Disable copy constructor in order to forbid copy </span>
+     <span class="org-function-name">PosixDaemon</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-keyword">const</span> <span class="org-type">PosixDaemon</span>&amp;<span class="org-rainbow-delimiters-depth-2">)</span> = <span class="org-keyword">delete</span>;
+     <span class="org-comment-delimiter">// </span><span class="org-comment">Disable copy-assignment operator to make the class non-copiable.</span>
+     <span class="org-type">PosixDaemon</span>&amp; <span class="org-keyword">operator</span><span class="org-function-name">=</span> <span class="org-rainbow-delimiters-depth-2">(</span><span class="org-keyword">const</span> <span class="org-type">PosixDaemon</span>&amp;<span class="org-rainbow-delimiters-depth-2">)</span> = <span class="org-keyword">delete</span>;
+
+     <span class="org-keyword">auto</span> <span class="org-function-name">run</span><span class="org-rainbow-delimiters-depth-2">()</span> -&gt; <span class="org-type">void</span> <span class="org-rainbow-delimiters-depth-2">{</span>
+         <span class="org-comment-delimiter">// </span><span class="org-comment">Make child process</span>
+         <span class="org-type">pid_t</span> <span class="org-variable-name">child_pid</span> = fork<span class="org-rainbow-delimiters-depth-3">()</span>;
+         <span class="org-keyword">if</span><span class="org-rainbow-delimiters-depth-3">(</span>child_pid &lt; 0<span class="org-rainbow-delimiters-depth-3">){</span>
+             <span class="org-constant">std</span>::cerr &lt;&lt; <span class="org-string">"Error: failed to fork this process."</span> &lt;&lt; <span class="org-string">"\n"</span>;
+             <span class="org-keyword">return</span>;
+         <span class="org-rainbow-delimiters-depth-3">}</span>
+         <span class="org-keyword">if</span><span class="org-rainbow-delimiters-depth-3">(</span>child_pid &gt; 0<span class="org-rainbow-delimiters-depth-3">){</span>
+            <span class="org-constant">std</span>::cout &lt;&lt; <span class="org-string">"Process ID of child process = "</span> &lt;&lt; child_pid &lt;&lt; <span class="org-string">"\n"</span>;
+            <span class="org-keyword">return</span>;
+         <span class="org-rainbow-delimiters-depth-3">}</span>
+         <span class="org-comment-delimiter">// </span><span class="org-comment">Umask file mode</span>
+         ::umask<span class="org-rainbow-delimiters-depth-3">(</span>0<span class="org-rainbow-delimiters-depth-3">)</span>;
+         <span class="org-comment-delimiter">// </span><span class="org-comment">Set new session</span>
+         <span class="org-type">pid_t</span> <span class="org-variable-name">sid</span> = ::setsid<span class="org-rainbow-delimiters-depth-3">()</span>;
+         <span class="org-keyword">if</span><span class="org-rainbow-delimiters-depth-3">(</span>sid &lt; 0<span class="org-rainbow-delimiters-depth-3">)</span>
+                 <span class="org-keyword">return</span>;
+         <span class="org-comment-delimiter">//</span><span class="org-comment">------ Code of Forked Process ---------//</span>
+         <span class="org-comment-delimiter">// </span><span class="org-comment">Set path of forked process (daemon)</span>
+         ::chdir<span class="org-rainbow-delimiters-depth-3">(</span>m_path.c_str<span class="org-rainbow-delimiters-depth-4">()</span><span class="org-rainbow-delimiters-depth-3">)</span>;
+
+         <span class="org-comment-delimiter">// </span><span class="org-comment">Check whether there is a running process of this program </span>
+         <span class="org-keyword">auto</span> <span class="org-variable-name">fs</span> = <span class="org-constant">std</span>::ifstream<span class="org-rainbow-delimiters-depth-3">(</span>m_pidfile<span class="org-rainbow-delimiters-depth-3">)</span>;
+         <span class="org-keyword">if</span><span class="org-rainbow-delimiters-depth-3">(</span>fs.good<span class="org-rainbow-delimiters-depth-4">()</span><span class="org-rainbow-delimiters-depth-3">){</span>
+            <span class="org-type">int</span> <span class="org-variable-name">pid</span>;
+            fs &gt;&gt; pid;
+            <span class="org-constant">std</span>::cerr &lt;&lt; <span class="org-string">" [LOG] Kill process of PID = "</span> &lt;&lt; pid &lt;&lt; <span class="org-string">"\n"</span>;
+            ::kill<span class="org-rainbow-delimiters-depth-4">(</span>-pid, SIGTERM<span class="org-rainbow-delimiters-depth-4">)</span>;
+            fs.close<span class="org-rainbow-delimiters-depth-4">()</span>;                         
+         <span class="org-rainbow-delimiters-depth-3">}</span>
+         <span class="org-keyword">auto</span> <span class="org-variable-name">fo</span> = <span class="org-constant">std</span>::ofstream<span class="org-rainbow-delimiters-depth-3">(</span>m_pidfile<span class="org-rainbow-delimiters-depth-3">)</span>;
+         <span class="org-keyword">if</span><span class="org-rainbow-delimiters-depth-3">(</span>fo.good<span class="org-rainbow-delimiters-depth-4">()</span><span class="org-rainbow-delimiters-depth-3">){</span>
+             <span class="org-type">int</span> <span class="org-variable-name">pid</span> = ::getpid<span class="org-rainbow-delimiters-depth-4">()</span>;
+             <span class="org-constant">std</span>::cerr &lt;&lt; <span class="org-string">"Child PID = "</span> &lt;&lt; pid &lt;&lt; <span class="org-string">"\n"</span>;
+             fo &lt;&lt; pid  &lt;&lt; <span class="org-constant">std</span>::flush;
+         <span class="org-rainbow-delimiters-depth-3">}</span> <span class="org-keyword">else</span> <span class="org-rainbow-delimiters-depth-3">{</span>
+             <span class="org-constant">std</span>::cerr &lt;&lt; <span class="org-string">" [LOG] Error: could not open PID file "</span> &lt;&lt; m_pidfile &lt;&lt; <span class="org-string">"\n"</span>;
+             <span class="org-keyword">return</span>;
+         <span class="org-rainbow-delimiters-depth-3">}</span>  
+         <span class="org-comment-delimiter">// </span><span class="org-comment">Close stdin, stdout and stderr file descriptors.</span>
+         close<span class="org-rainbow-delimiters-depth-3">(</span>STDIN_FILENO<span class="org-rainbow-delimiters-depth-3">)</span>;
+         close<span class="org-rainbow-delimiters-depth-3">(</span>STDOUT_FILENO<span class="org-rainbow-delimiters-depth-3">)</span>;
+         close<span class="org-rainbow-delimiters-depth-3">(</span>STDERR_FILENO<span class="org-rainbow-delimiters-depth-3">)</span>;
+         <span class="org-keyword">while</span><span class="org-rainbow-delimiters-depth-3">(</span>m_action<span class="org-rainbow-delimiters-depth-4">()</span><span class="org-rainbow-delimiters-depth-3">)</span>;
+     <span class="org-rainbow-delimiters-depth-2">}</span>  
+ <span class="org-keyword">private</span>:
+     <span class="org-constant">std</span>::<span class="org-type">string</span> <span class="org-variable-name">m_path</span>;
+     <span class="org-constant">std</span>::<span class="org-type">string</span> <span class="org-variable-name">m_pidfile</span>;
+     <span class="org-type">Action</span> <span class="org-variable-name">m_action</span>;
+     <span class="org-comment-delimiter">// </span><span class="org-comment">Action m_onExit;</span>
+<span class="org-rainbow-delimiters-depth-1">}</span>;
+
+</pre>
+</div>
+
+<p>
+Main function:
+</p>
+
+<ul class="org-ul">
+<li>The PosixDaemon's constructor takes the following parameters: the
+path where the daemon process will run, the path to PID file used
+to ensure that only a single instance is running and a lambda
+function which contains the code that will be in the daemon
+process.</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-function-name">std</span>::random_device rdng;    
+<span class="org-keyword">auto</span> <span class="org-variable-name">randomGen</span> = <span class="org-constant">std</span>::bind<span class="org-rainbow-delimiters-depth-1">(</span>
+        <span class="org-constant">std</span>::uniform_real_distribution<span class="org-rainbow-delimiters-depth-2">&lt;</span><span class="org-type">double</span><span class="org-rainbow-delimiters-depth-2">&gt;(</span>10.0, 60.0<span class="org-rainbow-delimiters-depth-2">)</span>,
+        <span class="org-constant">std</span>::default_random_engine<span class="org-rainbow-delimiters-depth-2">(</span>rdng<span class="org-rainbow-delimiters-depth-3">()</span><span class="org-rainbow-delimiters-depth-2">)</span>
+        <span class="org-rainbow-delimiters-depth-1">)</span>;
+
+setlogmask <span class="org-rainbow-delimiters-depth-1">(</span>LOG_UPTO <span class="org-rainbow-delimiters-depth-2">(</span>LOG_INFO<span class="org-rainbow-delimiters-depth-2">)</span><span class="org-rainbow-delimiters-depth-1">)</span>;
+openlog <span class="org-rainbow-delimiters-depth-1">(</span><span class="org-string">"price-service"</span>, LOG_CONS | LOG_PID | LOG_NDELAY, LOG_LOCAL1<span class="org-rainbow-delimiters-depth-1">)</span>; 
+
+<span class="org-type">PosixDaemon</span> <span class="org-variable-name">daemon</span><span class="org-rainbow-delimiters-depth-1">{</span>     
+    <span class="org-string">"/"</span>,
+    <span class="org-string">"/tmp/price-server.pid"</span>,
+    <span class="org-rainbow-delimiters-depth-2">[</span>&amp;<span class="org-variable-name">randomGen</span><span class="org-rainbow-delimiters-depth-2">](){</span>
+      <span class="org-comment-delimiter">// </span><span class="org-comment">Action executed in the child process (daemon)</span>
+      <span class="org-constant">std</span>::<span class="org-type">stringstream</span> <span class="org-variable-name">ss</span>;
+      ss &lt;&lt; <span class="org-constant">std</span>::setprecision<span class="org-rainbow-delimiters-depth-3">(</span>3<span class="org-rainbow-delimiters-depth-3">)</span> &lt;&lt; <span class="org-constant">std</span>::fixed;
+      ss &lt;&lt; <span class="org-string">"Price = "</span> &lt;&lt; randomGen<span class="org-rainbow-delimiters-depth-3">()</span> &lt;&lt; <span class="org-string">" path = "</span> &lt;&lt; getcwd<span class="org-rainbow-delimiters-depth-3">(</span><span class="org-constant">nullptr</span>, 0<span class="org-rainbow-delimiters-depth-3">)</span> ;
+      syslog <span class="org-rainbow-delimiters-depth-3">(</span>LOG_INFO, <span class="org-string">"%s"</span>, ss.str<span class="org-rainbow-delimiters-depth-4">()</span>.c_str<span class="org-rainbow-delimiters-depth-4">()</span><span class="org-rainbow-delimiters-depth-3">)</span>;
+      <span class="org-comment-delimiter">// </span><span class="org-comment">1 seconds delay</span>
+      <span class="org-constant">std</span>::<span class="org-constant">this_thread</span>::sleep_for<span class="org-rainbow-delimiters-depth-3">(</span><span class="org-constant">std</span>::<span class="org-constant">chrono</span>::seconds<span class="org-rainbow-delimiters-depth-4">(</span>1<span class="org-rainbow-delimiters-depth-4">)</span><span class="org-rainbow-delimiters-depth-3">)</span>;
+      <span class="org-keyword">return</span> <span class="org-constant">true</span>;
+    <span class="org-rainbow-delimiters-depth-2">}</span>                     
+<span class="org-rainbow-delimiters-depth-1">}</span>;
+
+daemon.run<span class="org-rainbow-delimiters-depth-1">()</span>;
+</pre>
+</div>
+
+<p>
+Compiling: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">$ clang++ posix-daemon.cpp -o <span class="org-keyword">posix-daemon.bin</span> -g -std=c++1z -Wall -Wextra &amp;&amp; ./posix-daemon.bin
+</pre>
+</div>
+
+<p>
+Running: 
+</p>
+
+<ul class="org-ul">
+<li>If there is already a process of this program running, it is killed
+and a new daemon is launched.</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-sh">$ ./posix-daemon.bin
+Process ID of child process = 6022
+ [LOG] Kill process of PID = 4795
+Child PID = 6022
+</pre>
+</div>
+
+<p>
+See the daemon output with syslog: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">$ journalctl -f -t price-service 
+
+-- Logs begin at Wed 2018-10-03 16:00:02 -03. --
+Nov 16 15:40:39 localhost.localdomain price-service[6022]: Price = 14.357 path = /
+Nov 16 15:40:40 localhost.localdomain price-service[6022]: Price = 22.924 path = /
+Nov 16 15:40:41 localhost.localdomain price-service[6022]: Price = 51.256 path = /
+Nov 16 15:40:42 localhost.localdomain price-service[6022]: Price = 55.588 path = /
+Nov 16 15:40:43 localhost.localdomain price-service[6022]: Price = 43.370 path = /
+Nov 16 15:40:44 localhost.localdomain price-service[6022]: Price = 31.471 path = /
+Nov 16 15:40:45 localhost.localdomain price-service[6022]: Price = 54.759 path = /
+ ...  ...  ...  ...  ...  ...  ...  ...  ... 
+</pre>
+</div>
+
+<p>
+Stop daemon: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">$ kill 6022
+</pre>
+</div>
+</div>
+</div>
 </div>
 </div>
 <div id="postamble" class="status">
-<p class="date">Created: 2018-11-05 Mon 20:13</p>
+<p class="date">Created: 2018-11-16 Fri 15:46</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
 </body>
