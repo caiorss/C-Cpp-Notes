@@ -1827,6 +1827,262 @@ Running:
    Max  = 100.34
    Dataset = [  30.12 40.23 100.34 90.23 52.00] 
 #+END_SRC
+** TODO Functions/Procedures 
+*** Overview 
+
+C++ Functions has the following features: 
+
+ * _Overload_
+   + Unlike in C, in C++, it is possible to define multiple functions
+     implementation sharing the same name, although with the same type
+     signature.
+
+ * _Default Parameters_
+   + C++ functions can have default parameters. 
+
+ * _C++11 auto syntax_
+
+ * _C++14 return type deduction_ 
+*** Example - simple function with all possible declarations
+
+ *Example - Simple function => all possible declaration*
+
+Simple function which returns anything: 
+
+ + Alternative syntax 1:
+
+#+BEGIN_SRC cpp 
+  void someFunction(){
+       std::puts("I am a C++ free function");
+  }
+#+END_SRC
+
+ + Alternative syntax 2:
+   + Note: The early return statement can be used for doing early
+     return and avoiding many nested if-else statements.
+
+#+BEGIN_SRC cpp 
+  void someFunction(){
+       std::puts("I am a C++ free function");
+       return;
+  }
+#+END_SRC
+
+ + Alternative syntax 3:
+
+#+BEGIN_SRC cpp 
+  void someFunction(void){
+       std::puts("I am a C++ free function");
+       // return;       
+  }
+#+END_SRC
+
+ + Alternative syntax 4 (C++11):
+
+#+BEGIN_SRC cpp 
+  auto someFunction(void) -> void {
+       std::puts("I am a C++ free function");
+       return;       
+  }
+#+END_SRC
+
+ + Alternative syntax 5 (C++14) - uses type deduction (aka type
+   inference) for return type. 
+
+#+BEGIN_SRC cpp 
+  auto someFunction() {
+       std::puts("I am a C++ free function");
+       return;       
+  }
+#+END_SRC
+
+*** Example - function with default parameters 
+
+ + Syntax 1: 
+
+#+BEGIN_SRC cpp 
+
+  double someFunction(double x, int n = 4, double z = 3.5 )
+  {
+      std::cout << "  x = "  << x
+                << " ; n = " << n
+                << " ; z = " << z
+                << "\n";
+      return x * n + 4.0 * z;
+  }
+
+  // OR: 
+  double 
+  someFunction(double x, int n = 4, double z = 3.5 )
+  {
+      std::cout << "  x = "  << x
+                << " ; n = " << n
+                << " ; z = " << z
+                << "\n";
+      return x * n + 4.0 * z;
+  }
+
+  // Testing: Cling REPL:
+
+  >> someFunction(3.0)
+    x = 3 ; n = 4 ; z = 3.5
+  (double) 26.000000
+  >> 
+  >> someFunction(3.0, 10, 5)
+    x = 3 ; n = 10 ; z = 5
+  (double) 50.000000
+  >> 
+  >> someFunction(4.0)
+    x = 4 ; n = 4 ; z = 3.5
+  (double) 30.000000
+  >> 
+#+END_SRC
+
+ + Syntax 2 (C++11). In C++14, the return type can be omitted.
+
+#+BEGIN_SRC cpp 
+  auto someFunction(double x, int n = 4, double z = 3.5) -> double
+  {
+      std::cout << "  x = "  << x
+                << " ; n = " << n
+                << " ; z = " << z
+                << "\n";
+      return x * n + 4.0 * z;
+  }
+
+  >> someFunction(3.0)
+    x = 3 ; n = 4 ; z = 3.5
+  (double) 26.000000
+
+  >> someFunction(4.0)
+    x = 4 ; n = 4 ; z = 3.5
+  (double) 30.000000
+
+  >> someFunction(4.0, 10, 5)
+    x = 4 ; n = 10 ; z = 5
+  (double) 60.000000
+  >> 
+
+#+END_SRC
+*** Example - function overload 
+
+Functions can be overloaded as long as they have unique type signature
+and the same return type.
+
+#+BEGIN_SRC cpp 
+  #include <iostream> 
+
+  void show(){
+       std::cout << "Call Version0." << "\n";
+  }
+
+  void show(int x){
+       std::cout << "Call Version1 with =>" << " x [int] = " << x << "\n";
+  }
+
+  void show(double x){
+       std::cout << "Call Version2 with =>" << " x [double] = " << x << "\n";
+  }
+
+  void show(const char* str){
+       std::cout << "Call Version2 with =>" << " x [const char*] = " << str << "\n";
+  }
+
+  void show(int x, double z){
+       std::cout << "Call Version4 with =>"
+                 << " x [int] = " << x
+                 << " z [double] = " << z
+                 << "\n";
+  }
+
+  void show(int x, double z, const char* str){
+       std::cout << "Call Version5 with =>"
+                 << " x [int] = " << x
+                 << " z [double] = " << z
+                 << " std [const char*] = " << str
+                 << "\n";
+  }
+#+END_SRC
+
+Testing: 
+
+#+BEGIN_SRC cpp 
+  >> .L script.C
+
+  >> show()
+  Call Version0.
+
+  >> show(10)
+  Call Version1 with => x [int] = 10
+
+  >> show(3.1415)
+  Call Version2 with => x [double] = 3.1415
+
+  >> show(100, 3.1415)
+  Call Version4 with => x [int] = 100 z [double] = 3.1415
+
+  >> show("Function overload")
+  Call Version2 with => x [const char*] = Function overload
+
+  >> show(100, 3.1415, "overload")
+  Call Version5 with => x [int] = 100 z [double] = 3.1415 std [const char*] = overload
+  >> 
+
+#+END_SRC
+*** Example - functions with static variables - stateful functions 
+
+Variables inside of functions annotated with "static" keyword are
+similar to global variables (global static variables), they are
+initialized after the first function invocation and keeps their state
+during successive function invocations. 
+
+Features: 
+ + Initialized until first function invocation.
+ + Lifetime: Entire program runtime, just like global variables, they
+   are destroyed when the program execution ends.
+ + Once initialized, keeps their state during function calls.
+ + Stored in the program's and process' data segment.
+
+Example: 
+
+ + Counter function with automatic variable (stack-allocated). 
+
+#+BEGIN_SRC cpp 
+  void counterAuto(){
+     int x = 0;
+     std::cout << "counter = " << x++ << "\n";
+  }
+
+  >> counterAuto()
+  counter = 0
+  >> counterAuto()
+  counter = 0
+  >> counterAuto()
+  counter = 0
+  >> counterAuto()
+  counter = 0
+#+END_SRC
+
+ + counter function with static variable. 
+
+#+BEGIN_SRC cpp 
+  void counterStatic(){
+     static int x = 0;
+     std::cout << "counter = " << x++ << "\n";
+  }
+
+  >> counterStatic()
+  counter = 0
+  >> counterStatic()
+  counter = 1
+  >> counterStatic()
+  counter = 2
+  >> counterStatic()
+  counter = 3
+  >> counterStatic()
+  counter = 4
+  >> 
+#+END_SRC
 ** String Manipulation 
 *** Class std::string 
 
@@ -3383,266 +3639,6 @@ Ouput:
      y    1.414
    ,*==============*/
 #+END_SRC
-** TODO Functions/Procedures 
-*** Overview 
-
-C++ Functions has the following features: 
-
- * _Overload_
-   + Unlike in C, in C++, it is possible to define multiple functions
-     implementation sharing the same name, although with the same type
-     signature.
-
- * _Default Parameters_
-   + C++ functions can have default parameters. 
-
- * _C++11 auto syntax_
-
- * _C++14 return type deduction_ 
-*** Example - simple function with all possible declarations
-
- *Example - Simple function => all possible declaration*
-
-Simple function which returns anything: 
-
- + Alternative syntax 1:
-
-#+BEGIN_SRC cpp 
-  void someFunction(){
-       std::puts("I am a C++ free function");
-  }
-#+END_SRC
-
- + Alternative syntax 2:
-   + Note: The early return statement can be used for doing early
-     return and avoiding many nested if-else statements.
-
-#+BEGIN_SRC cpp 
-  void someFunction(){
-       std::puts("I am a C++ free function");
-       return;
-  }
-#+END_SRC
-
- + Alternative syntax 3:
-
-#+BEGIN_SRC cpp 
-  void someFunction(void){
-       std::puts("I am a C++ free function");
-       // return;       
-  }
-#+END_SRC
-
- + Alternative syntax 4 (C++11):
-
-#+BEGIN_SRC cpp 
-  auto someFunction(void) -> void {
-       std::puts("I am a C++ free function");
-       return;       
-  }
-#+END_SRC
-
- + Alternative syntax 5 (C++14) - uses type deduction (aka type
-   inference) for return type. 
-
-#+BEGIN_SRC cpp 
-  auto someFunction() {
-       std::puts("I am a C++ free function");
-       return;       
-  }
-#+END_SRC
-
-*** Example - function with default parameters 
-
- + Syntax 1: 
-
-#+BEGIN_SRC cpp 
-
-  double someFunction(double x, int n = 4, double z = 3.5 )
-  {
-      std::cout << "  x = "  << x
-                << " ; n = " << n
-                << " ; z = " << z
-                << "\n";
-      return x * n + 4.0 * z;
-  }
-
-  // OR: 
-  double 
-  someFunction(double x, int n = 4, double z = 3.5 )
-  {
-      std::cout << "  x = "  << x
-                << " ; n = " << n
-                << " ; z = " << z
-                << "\n";
-      return x * n + 4.0 * z;
-  }
-
-  // Testing: Cling REPL:
-
-  >> someFunction(3.0)
-    x = 3 ; n = 4 ; z = 3.5
-  (double) 26.000000
-  >> 
-  >> someFunction(3.0, 10, 5)
-    x = 3 ; n = 10 ; z = 5
-  (double) 50.000000
-  >> 
-  >> someFunction(4.0)
-    x = 4 ; n = 4 ; z = 3.5
-  (double) 30.000000
-  >> 
-#+END_SRC
-
- + Syntax 2 (C++11). In C++14, the return type can be omitted.
-
-#+BEGIN_SRC cpp 
-  auto someFunction(double x, int n = 4, double z = 3.5) -> double
-  {
-      std::cout << "  x = "  << x
-                << " ; n = " << n
-                << " ; z = " << z
-                << "\n";
-      return x * n + 4.0 * z;
-  }
-
-  >> someFunction(3.0)
-    x = 3 ; n = 4 ; z = 3.5
-  (double) 26.000000
-
-  >> someFunction(4.0)
-    x = 4 ; n = 4 ; z = 3.5
-  (double) 30.000000
-
-  >> someFunction(4.0, 10, 5)
-    x = 4 ; n = 10 ; z = 5
-  (double) 60.000000
-  >> 
-
-#+END_SRC
-*** Example - function overload 
-
-Functions can be overloaded as long as they have unique type signature
-and the same return type.
-
-#+BEGIN_SRC cpp 
-  #include <iostream> 
-
-  void show(){
-       std::cout << "Call Version0." << "\n";
-  }
-
-  void show(int x){
-       std::cout << "Call Version1 with =>" << " x [int] = " << x << "\n";
-  }
-
-  void show(double x){
-       std::cout << "Call Version2 with =>" << " x [double] = " << x << "\n";
-  }
-
-  void show(const char* str){
-       std::cout << "Call Version2 with =>" << " x [const char*] = " << str << "\n";
-  }
-
-  void show(int x, double z){
-       std::cout << "Call Version4 with =>"
-                 << " x [int] = " << x
-                 << " z [double] = " << z
-                 << "\n";
-  }
-
-  void show(int x, double z, const char* str){
-       std::cout << "Call Version5 with =>"
-                 << " x [int] = " << x
-                 << " z [double] = " << z
-                 << " std [const char*] = " << str
-                 << "\n";
-  }
-#+END_SRC
-
-Testing: 
-
-#+BEGIN_SRC cpp 
-  >> .L script.C
-
-  >> show()
-  Call Version0.
-
-  >> show(10)
-  Call Version1 with => x [int] = 10
-
-  >> show(3.1415)
-  Call Version2 with => x [double] = 3.1415
-
-  >> show(100, 3.1415)
-  Call Version4 with => x [int] = 100 z [double] = 3.1415
-
-  >> show("Function overload")
-  Call Version2 with => x [const char*] = Function overload
-
-  >> show(100, 3.1415, "overload")
-  Call Version5 with => x [int] = 100 z [double] = 3.1415 std [const char*] = overload
-  >> 
-
-#+END_SRC
-*** Example - functions with static variables - stateful functions 
-
-Variables inside of functions annotated with "static" keyword are
-similar to global variables (global static variables), they are
-initialized after the first function invocation and keeps their state
-during successive function invocations. 
-
-Features: 
- + Initialized until first function invocation.
- + Lifetime: Entire program runtime, just like global variables, they
-   are destroyed when the program execution ends.
- + Once initialized, keeps their state during function calls.
- + Stored in the program's and process' data segment.
-
-Example: 
-
- + Counter function with automatic variable (stack-allocated). 
-
-#+BEGIN_SRC cpp 
-  void counterAuto(){
-     int x = 0;
-     std::cout << "counter = " << x++ << "\n";
-  }
-
-  >> counterAuto()
-  counter = 0
-  >> counterAuto()
-  counter = 0
-  >> counterAuto()
-  counter = 0
-  >> counterAuto()
-  counter = 0
-#+END_SRC
-
- + counter function with static variable. 
-
-#+BEGIN_SRC cpp 
-  void counterStatic(){
-     static int x = 0;
-     std::cout << "counter = " << x++ << "\n";
-  }
-
-  >> counterStatic()
-  counter = 0
-  >> counterStatic()
-  counter = 1
-  >> counterStatic()
-  counter = 2
-  >> counterStatic()
-  counter = 3
-  >> counterStatic()
-  counter = 4
-  >> 
-#+END_SRC
-
-
-
-
 ** C++11 - Scoped Enum
 
 Scoped enumerations are a more type-safe alternative to the old
