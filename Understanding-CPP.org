@@ -638,15 +638,16 @@ The main function could aso return:
 The compilation produces a *native executable* with: 
 
  + Specific _binary format_ required by operating system. On Linux,
-   Android and BSD variants this format is ELF (Executable Linkable
-   Format); on Windows, this binary format is PE32 or PE64 (Portable
-   Executable) and on MacOSX this format is MachO.
+   Android and BSD variants this format is _ELF_ (Executable Linkable
+   Format); on Windows, this binary format is _PE32_ or _PE64_ (Portable
+   Executable) and on MacOSX this format is _MachO_.
 
  + _Specifc machine code_ (Instruction set) for the processor
    architecture the program was compiled. The most common processor
    architecture used in servers and desktop computers are Intel-x86
-   and Amd-x86-x64. On consumer mobile devices, the most common
-   processor are the ARM-based processors.
+   and Amd-x86-x64. For consumer mobile devices, the most common
+   processors are the _ARM-based processors_ that are used in many
+   Android-based phones, IPhone, IPad and etc.
 
  + Specific _system-calls_ and library calls for the operating system the
    program was compiled for.
@@ -661,6 +662,11 @@ The compilation produces a *native executable* with:
      U-nix like operating systems, including Linux, BSD and MacOSX by
      translating the PE32 binary format and the Windows system-calls
      to the host OS system call.
+
+   + C++ programs can also be compiled to run [[https://en.wikipedia.org/wiki/Bare_machine][bare metal]], it means
+     without any operating system. This type of compilation is widely
+     used for embedded systems, microcontrollers, firmwares, BIOs,
+     operating systems and so on.
 
  *Running:*
 
@@ -2314,6 +2320,42 @@ Reverse string:
   >> std::reverse(ssa.begin(), ssa.end())
   >> ssa
   (std::string &) "hello world string"
+  >> 
+#+END_SRC
+
+*** Concatenate string literals 
+
+Example: concatenate string literas and pass the to the function
+perror of signature:
+
+#+BEGIN_SRC cpp 
+  void std::perror(const char*);
+#+END_SRC
+
+Trial:
+
+#+BEGIN_SRC cpp 
+  const char* s1 = " world ";
+  const char* s2 = " C++ ";
+  const char* s3 = " strings ";
+
+  // Compilation error:
+  >> std::perror( " literal1 " + "literal 2" + s1 + s2 + s3);
+  ROOT_prompt_4:1:27: error: invalid operands to binary expression ('const char *' and 'const char *')
+  std::perror( " literal1 " + "literal 2" + s1 + s2 + s3);
+#+END_SRC
+
+Solution: Wrap the first argument into an std::string. The method
+.data() from the std::string class returns a pointer of type (const
+char*) or a C-null terminated character array.
+
+#+BEGIN_SRC cpp
+  >> std::string text = std::string(" literal1 ") + "literal 2" + s1 + s2 + s3;
+  >> text
+  (std::string &) " literal1 literal 2 world  C++  strings "
+  >> 
+  >> std::perror(text.data())
+   literal1 literal 2 world  C++  strings : No such file or directory
   >> 
 #+END_SRC
 
@@ -5441,7 +5483,6 @@ reference or create a reference to the object.
   + My Precious Compile Time Bool (long introduction to Move
     Semantics)
     + <https://medium.com/@gaussnoise/my-precious-compile-time-bool-long-introduction-to-move-semantics-c9ee73c370c7>
-
 
 ** TODO Memory Allocation - Stack X Heap 
 *** Program/Process memory 
