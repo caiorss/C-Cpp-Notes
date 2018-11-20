@@ -294,3 +294,204 @@ Stop daemon:
 #+BEGIN_SRC sh 
   $ kill 6022
 #+END_SRC
+** Posix - Socket/Server - telnet-like tool 
+
+This is a command line tool which can bind a server or client socket
+to a login shell, thus allowing remote access in a similar way to the
+old telnet protocol. 
+
+ + File: [[file:src/sample-programs/bsd-socket-shell.cpp][file:src/sample-programs/bsd-socket-shell.cpp]]
+ + Gist: [[https://gist.github.com/caiorss/9b528e8c6245b3c8bafef9ec7cd762b1][bsd-socket-shell.cpp]]
+
+Modern C++ Features used: 
+ + Enum classes for modelling and handling socket errors.
+ + C++11 auto keyword for functions, member functions and variables.
+ + Lambda functions for handling daemon process, server's client
+   handling loop and so on. 
+ + =delete annotation for copy-constructor and copy-assignment
+   operator. 
+
+ *Building:*
+
+#+BEGIN_SRC sh 
+  $ clang++ bsd-socket-shell.cpp -o bsd-socket-shell.bin -lpthread -g -std=c++1z -Wall -Wextra
+#+END_SRC
+
+ *Show usage* 
+
+#+BEGIN_SRC sh 
+  $ ./bsd-socket-shell.bin 
+  Usage: 
+  : Success
+   ./bsd-socket-shell.bin echo [port] [host]
+   ./bsd-socket-shell.bin server [port] [host] [shell]
+   ./bsd-socket-shell.bin client [port] [host] [shell]
+
+#+END_SRC
+
+ *Runnign as echo server:*
+
+ + Runing as server: Listen all addresses at port 9070
+
+#+BEGIN_SRC sh
+  $ ./bsd-socket-shell.bin echo 9070 0.0.0.0
+  Running ECHO server.
+   Waiting incoming connections ...: Success
+   [TRACE] Connection received.: Success
+  line = hello world from server
+
+  line = testing server
+
+  line = 
+
+  line = new line to server
+
+   [TRACE] Socket closed OK: Success
+   [TRACE] Connection received.: Success
+
+#+END_SRC
+
+ + Client side: netcat. 
+
+#+BEGIN_SRC sh 
+  $ rlwrap nc -v localhost 9070
+  Ncat: Version 7.60 ( https://nmap.org/ncat )
+  Ncat: Connection to ::1 failed: Connection refused.
+  Ncat: Trying next address...
+  Ncat: Connected to 127.0.0.1:9070.
+  => Connected from: 127.0.0.1:56336
+  hello world from server
+   => ECHO hello world from server
+  testing server
+   => ECHO testing server
+
+   => ECHO 
+  new line to server
+   => ECHO new line to server
+
+
+  $ rlwrap nc -v localhost 9070
+  Ncat: Version 7.60 ( https://nmap.org/ncat )
+  Ncat: Connection to ::1 failed: Connection refused.
+  Ncat: Trying next address...
+  Ncat: Connected to 127.0.0.1:9070.
+  => Connected from: 127.0.0.1:56340
+#+END_SRC
+
+ *Running as a telnet server for remote access* 
+
+ + Server: bsd-socket-shell.bin
+   + When the server starts, the process is forked (copied) as a
+     daemon process which can run even if the terminal is closed. Then,
+     the initial process asks the user to hit return for stopping the
+     daemon process.
+
+#+BEGIN_SRC sh 
+ $ ./bsd-socket-shell.bin server 9070 0.0.0.0 /bin/sh
+  [LOG] Running daemon: Success
+ Process ID of child process = 17763
+  [LOG] Daemon started OK.: Success
+  ===> Enter RETURN for kill the daemon process or type CTRL+C to let it run.
+  [TRACE] Running daemon - PID = 17763
+  ===> Daemon stopped OK.
+#+END_SRC
+
+ + Client: netcat
+   + User types commands in the client side and they processed at the
+     server side.
+
+#+BEGIN_SRC sh 
+   $ rlwrap nc -v localhost 9070
+   Ncat: Version 7.60 ( https://nmap.org/ncat )
+   Ncat: Connection to ::1 failed: Connection refused.
+   Ncat: Trying next address...
+   Ncat: Connected to 127.0.0.1:9070.
+   => Connected from: 127.0.0.1:56366
+
+   pwd
+   /
+   uname -a
+   Linux localhost.localdomain 4.16.3-301.fc28.x86_64 ... ....
+
+   cd /etc
+
+   whoami
+   archbox
+
+  uptime
+   05:31:23 up 1 day, 15:03,  1 user,  load average: 1.85, 1.68, 1.65
+
+   # It is possible to connect and reconnect many times.
+   $ rlwrap nc -v localhost 9070
+   Ncat: Version 7.60 ( https://nmap.org/ncat )
+   Ncat: Connection to ::1 failed: Connection refused.
+   Ncat: Trying next address...
+   Ncat: Connected to 127.0.0.1:9070.
+   => Connected from: 127.0.0.1:56372
+
+   pwd
+   /
+   ls
+   bin
+   boot
+   dev
+   etc
+   home
+   lib
+   lib64
+   lost+found
+   media
+   mnt
+#+END_SRC
+
+ *Running as a telnet server as client*
+
+ + Server: netcat
+   + User types command from this side. 
+
+#+BEGIN_SRC sh 
+   $ rlwrap nc -v -l 0.0.0.0 9060
+   Ncat: Version 7.60 ( https://nmap.org/ncat )
+   Ncat: Generating a temporary 1024-bit RSA key. Use --ssl-key and --ssl-cert to use a permanent one.
+   Ncat: SHA-1 fingerprint: A753 5AC9 F6DF EC54 FE34 EF19 FC4B 02B7 79B5 BA30
+   Ncat: Listening on 0.0.0.0:9060
+   Ncat: Connection from 127.0.0.1.
+   Ncat: Connection from 127.0.0.1:57248.
+   => Reverse shell connected from: 127.0.0.1:9060
+   whoami
+   archbox
+
+   pwd
+   /
+   free -m
+                 total        used        free      shared  buff/cache   available
+   Mem:          15931        7682         654         469        7594        7444
+   Swap:         19659           1       19658
+
+   which clang++
+   /usr/lib64/ccache/clang++
+
+   # Exit remote shell 
+   exit
+
+   # Connect again. 
+   $ rlwrap nc -l 0.0.0.0 9060
+   => Reverse shell connected from: 127.0.0.1:9060
+   which clang++
+   /usr/lib64/ccache/clang++
+
+#+END_SRC
+
+ + Client: If the client-side terminal is closed or the user types
+   CTRL+C, the client daemon process will keep running in background
+   and trying to connect to the server, even if the server-side is
+   shutdown. 
+
+#+BEGIN_SRC sh 
+  $ ./bsd-socket-shell.bin client 9060 127.0.0.1 /bin/sh
+  Process ID of child process = 18231
+   [LOG] Client daemon started OK.: Success
+   ===> Enter RETURN for kill the daemon process or type CTRL+C to let it run.
+   [TRACE] Running daemon - PID = 18231
+#+END_SRC
+
