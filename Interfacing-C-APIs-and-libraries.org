@@ -633,6 +633,237 @@ Example 2:
    >> 
  #+END_SRC
 
+*** Example: Posix system-call execvpe (std::string, std::vector)
+
+ + _Description_: Replaces the current executing process image with an
+   image from a different binary (native executable) or script with
+   shebang at first line #!/path/to/interpreter. If the file
+   parameter.
+
+   + Note 1: If the 'file' parameter is not an absolute path, the
+     program is searched in the directories listed in the PATH
+     environment variable.
+
+   + Note 2: This function calls the following entry-point from the
+     invoked executable. 
+     + int main(int argc, char** argv)
+
+   + Note 3: On Linux, BSD or MacOSX, the documentation of this
+     function be viewed with _$ man execvpe_.
+
+Signature: 
+
+#+BEGIN_SRC cpp 
+  #include <unistd.h>
+
+  int execvpe( const char * file, 
+               char * const argv[], 
+               char * const envp[] );
+#+END_SRC
+
+
+Parameters: 
+
+ + file: Name or path of executable or script which will be launched.
+
+ + argv: Array of null-terminated C-string containing the arguments to
+   be passed to the process. Note: the array must end with NULL
+   pointer and the parameter argv[0] must point to the process name,
+   it cannot be null.
+
+ + envp: Array of null-terminated C-string containing the environment
+   variables to be passed to the process. This array must end with
+   NULL pointer.
+
+ + Return: If the function runs succesfully, it doesn't return to the
+   caller, otherwise it returns -1 and sets the global variable _errno_
+   which can set the flags: E2BIG, EACCES, EINVAL, ELOOP ... 
+
+
+Example: 
+
+ + Failed invocation: 
+
+#+BEGIN_SRC cpp 
+  #include <cerrno>  // std::strerror 
+  #include <unistd.h> // execvep 
+  int status;
+
+  // Parameters to be passed to the process, the first parameter is
+  // argv[0] or the process name.
+  const char* args1 [] = {"processName", "-arg1", "arg2", nullptr};    
+  const char* env1  [] = {"Env1=Value", "KEY=Value2", nullptr};
+  
+  >> status = execvpe("/do/not/exist", (char *const *) args1, (char *const *) env1);
+  >> status
+  (int) -1
+  >> 
+
+  // Sets the global variable errno 
+  >> errno
+  (int) 2
+  >> 
+
+  // Get a human-readable error message from error code 
+  >> std::strerror(2)
+  (char *) "No such file or directory"
+  >> 
+
+  // Get a human-readable error message from errno variable 
+  >> std::strerror(errno)
+  (char *) "No such file or directory"
+  >> 
+
+#+END_SRC
+
+ + Wrapping errno into an exception: 
+
+#+BEGIN_SRC cpp 
+ #include <system_error>
+
+ >> auto ex = std::system_error(errno, std::generic_category());
+
+ >> ex.code()
+ (const std::error_code &) @0x7fe5c614b068
+
+ >> std::cout << "code = " << ex.code() << "\n";
+ code = generic:2
+
+ >> ex.code().message()
+ (std::string) "No such file or directory"
+
+ >> throw ex;
+ Error in <TRint::HandleTermInput()>: std::system_error caught: No such file or directory
+#+END_SRC
+
+ + Successful invocation: 
+
+#+BEGIN_SRC cpp 
+  #include <cerrno>  // std::strerror 
+  #include <unistd.h> // execvep 
+  int status;
+
+  // Parameters to be passed to the process, the first parameter is
+  // argv[0] or the process name.
+  const char* args1 [] = {"python-interpreter", nullptr};    
+  const char* env1  [] = {"Env1=Value", "PROPERTY=Value2", nullptr};
+  
+  status = execvpe("python3", (char *const *) args1, (char *const *) env1);
+
+  // The current process is killed and it is replaced by the python3 process 
+  // 
+  >> status = execvpe("python3", (char *const *) args1, (char *const *) env1);
+  Python 3.6.6 (default, Jul 19 2018, 14:25:17) 
+  [GCC 8.1.1 20180712 (Red Hat 8.1.1-5)] on linux
+  Type "help", "copyright", "credits" or "license" for more information.
+  >>> 
+  >>> print("Loaded Python Interpreter OK!")
+  Loaded Python Interpreter OK!
+  >>> 
+  >>> 
+
+  >>> os.environ["Env1"]
+  'Value'
+
+  >>> os.environ["PROPERTY"]
+  'Value2'
+  >>> 
+#+END_SRC
+
+ + In another terminal is possible to confirm the process name: 
+
+#+BEGIN_SRC sh 
+  $ ps -ef | grep interpreter
+  archbox  10978 10977  0 14:47 pts/2    00:00:00 python-interpreter
+
+  $ kill 10978
+#+END_SRC
+
+ *C++ Wrapper:*
+
+#+BEGIN_SRC cpp 
+  // ----- C++ standard library headers ------// 
+  #include <vector>
+  #include <string>
+  #include <cerrno>
+  #include <system_error>
+  #include <algorithm>   // std::transform 
+  #include <functional>  // std::bind 
+
+  //---- Nix-sepecific headers -------------//
+  #include <unistd.h> // execvep
+
+  namespace NixUtils{
+      void execProcess(
+              const std::string& program,
+              const std::vector<std::string>& args = {},
+              const std::vector<std::string>& env  = {})
+      {
+         // Import placeholders, _1, _2, _3 ... 
+         using namespace std::placeholders; 
+         using std::vector; using std::string; using std::transform;
+
+         vector<const char*> pargs(args.size());
+         vector<const char*> penv(env.size());
+         transform(args.begin(), args.end(), pargs.begin(), std::bind(&string::data, _1));
+         pargs.push_back(nullptr);
+         transform(env.begin(), env.end(), penv.begin(),    std::bind(&string::data, _1));
+         penv.push_back(nullptr);
+         int status = ::execvpe(program.c_str(),
+                                                    (char* const*) pargs.data(),
+                                                    (char* const*) penv.data() );
+         std::cerr << " [TRACE ]status = " << status << " errno = " << errno << "\n";
+         if(status < 0)
+                 throw std::system_error(errno, std::generic_category());
+      }
+  }
+#+END_SRC
+
+Usage example: 
+
+#+BEGIN_SRC sh 
+  >> NixUtils::execProcess("/does/not/exist")
+   [TRACE ]status = -1 errno = 2
+  Error in <TRint::HandleTermInput()>: std::system_error caught: No such file or directory
+
+  // Exit current process 																	  
+  >> NixUtils::execProcess("python3", {}, {"env1=Value", "num-threads=10"})
+  Python 3.6.6 (default, Jul 19 2018, 14:25:17) 
+  [GCC 8.1.1 20180712 (Red Hat 8.1.1-5)] on linux
+  Type "help", "copyright", "credits" or "license" for more information.
+  >>> 
+
+  >>> print("Inside python3 interpreter loaded from C++")
+  Inside python3 interpreter loaded from C++
+  >>> 
+
+  >>> import os
+  >>> os.environ["env1"]
+  'Value'
+  >>> os.environ["num-threads"]
+  '10'
+  >>> 
+#+END_SRC
+
+
+ *References*
+
+C++ headers and functions used: 
+
+ + Header:    [[https://en.cppreference.com/w/cpp/header/cerrno][<cerrno> - cppreference.com]]
+ + Function:  [[https://en.cppreference.com/w/cpp/string/byte/strerror][std::strerror - cppreference.com]]
+ + Exception: [[https://en.cppreference.com/w/cpp/error/system_error/system_error][std::system_error::system_error - cppreference.com]]
+
+Documentation of execvpe system-call: 
+
+ + [[https://linux.die.net/man/3/execvpe][execvpe(3): execute file - Linux man page]]
+ + [[http://www.qnx.com/developers/docs/6.5.0SP1.update/com.qnx.doc.neutrino_lib_ref/e/execvpe.html][QNX docs - execvpe]]
+ + [[https://www.mkssoftware.com/docs/man3/execl.3.asp][execl(), execle(), execlp(), execlpe(), execv(), execve(), execvp(), execvpe() -- execute a file]]
+ + 
+
+Misc: 
+
+ + [[https://news.ycombinator.com/item?id=8449164][Why threads can't fork | Hacker News]]
 *** Example: GSL / C++ Class Wrapper to an C-API in OOP style or with opaque pointers. 
 
  This example shows how to build a C++ wrapper for C-APIs written in
