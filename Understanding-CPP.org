@@ -4934,6 +4934,164 @@ Month of date d is = 4
 Date is 1996-8-20
 #+END_SRC
 
+** Conversion Constructor X Explicit Constructor 
+
+A converting constructor (aka conversion constructor or implicit
+constructor) is any constructor member function callable with a single
+argument not annotated with the _explicit_ keyword. A converting
+constructor allows implicit initialization by assignment or when
+passing a parameter to a function. 
+
+Example: 
+
+#+BEGIN_SRC cpp 
+class TestClass{
+public:
+    // Constructor 1: Conversion constructor 
+    TestClass(int x)
+       : m_x(x)
+    {
+         std::printf(" [LOG] Intialize m_x = %d\n", x);
+    }
+    // Constructor 2: Conversion constructor 
+    TestClass(char ch)
+       : m_ch(ch)
+    {
+         std::printf(" [LOG] Intialize m_ch = %c\n", ch);
+    }
+    // Constructor 3: Not conversion constructor / explicit constructor 
+    explicit TestClass(const std::string& text)
+       : m_text(text)
+    {
+         std::printf(" [LOG] Initialize m_text = %s\n", text.c_str());
+    }
+    // Constructor 4: 
+    TestClass(int x, char ch)
+    {
+         std::printf("[LOG] Intialize m_x = %d - m_ch = %c\n", x, ch);
+    }
+    void show(){
+         std::printf("[LOG] TestClass{ m_x = %d ; m_ch = '%c' ; m_text = '%s' }\n"
+         ,m_x, m_ch, m_text.c_str());
+    }
+    // --- Member variables ---- // 
+    int        m_x;
+    char       m_ch;
+    std::string m_text;
+};
+
+#+END_SRC
+
+Example: 
+
+ + The constructors 1 and 2 not annotated with _explicit_ allows
+   implicit initialization by assignment. While this behavior can be
+   useful, it can lead unintended type conversions. In order to avoid
+   the implicit conversion, it is necessary to annotate the member
+   function with explicit. After this modification, any attempt to
+   implicit conversion will yield a compilation error.
+
+Testing conversion constructors:
+
+#+BEGIN_SRC cpp 
+
+  >> TestClass cls1 = 100;
+   [LOG] Intialize m_x = 100
+  >> 
+  >> TestClass cls2 = 'k';
+   [LOG] Intialize m_ch = k
+
+  // Show contents of cls1 and cls2 
+  >> cls1.show()
+  [LOG] TestClass{ m_x = 100 ; m_ch = '' ; m_text = '' }
+  >> 
+
+  >> cls2.show()
+  [LOG] TestClass{ m_x = 0 ; m_ch = 'k' ; m_text = '' }
+
+  >> cls1 = 200;
+   [LOG] Intialize m_x = 200
+  >> cls1 = 400;
+   [LOG] Intialize m_x = 400
+  >> 
+  >> cls1.show()
+  [LOG] TestClass{ m_x = 400 ; m_ch = '�' ; m_text = '' }
+  >> 
+
+#+END_SRC
+
+Testing explicit constructor (constructor 3 annotated with explicit):
+
+ + It will result in a compiation error. 
+
+#+BEGIN_SRC cpp 
+  // Compilation error - because constructor was annotated with explicit.
+  >> TestClass cls3 = std::string("binary data");
+  ROOT_prompt_5:1:11: error: no viable conversion from 'std::string' (aka 'basic_string<char>') to
+        'TestClass'
+  TestClass cls3 = std::string("binary data");
+            ^      ~~~~~~~~~~~~~~~~~~~~~~~~~~
+  input_line_15:1:7: note: candidate constructor (the implicit copy constructor) not viable: no known
+        conversion from 'std::string' (aka 'basic_string<char>') to
+        'const TestClass &' for 1st argument
+#+END_SRC
+
+A constructor annoatated with explicit can only be initialized in the
+following ways: 
+
+#+BEGIN_SRC cpp 
+  >> TestClass cls3b(std::string("binary data"));
+   [LOG] Initialize m_text = binary data
+
+  >> TestClass cls3c("binary data");
+   [LOG] Initialize m_text = binary data
+
+  >> auto cls3d = TestClass("binary data");
+   [LOG] Initialize m_text = binary data
+
+  >> auto cls3e = TestClass{"binary data"};
+   [LOG] Initialize m_text = binary data
+  >> 
+#+END_SRC
+
+Functions and implicit constructors: 
+
+#+BEGIN_SRC cpp 
+  >> clientCode(10)
+   [LOG] Intialize m_x = 10
+   ==> TestClass{ m_x = 10 ; m_ch = '�' ; m_text = '' }
+  >> 
+
+  >> clientCode('x')
+   [LOG] Intialize m_ch = x
+   ==> TestClass{ m_x = 876161456 ; m_ch = 'x' ; m_text = '' }
+  >> 
+
+  // std::string cannot be implicit converted to TestClass since the 
+  // constructor is annoatated with 'explicit'. 
+  >> clientCode(std::string("helo world"));
+  ROOT_prompt_52:1:1: error: no matching function for call to 'clientCode'
+  clientCode(std::string("helo world"));
+  ^~~~~~~~~~
+  ROOT_prompt_45:1:6: note: candidate function not viable: no known conversion from 'std::string' (aka
+        'basic_string<char>') to 'const TestClass' for 1st argument
+  void clientCode(const TestClass& cls){
+
+  // In this case, the only way to perform the operation is by calling
+  // the constructor explicitly.
+  >> clientCode(TestClass("helo world"));
+   [LOG] Initialize m_text = helo world
+   ==> TestClass{ m_x = 876161456 ; m_ch = '�' ; m_text = 'helo world' }
+  >> 
+#+END_SRC
+
+Further reading: 
+  + [[http://doc.bccnsoft.com/docs/cppreference2015/en/cpp/language/implicit_cast.html][Implicit conversions - cppreference.com]]
+  + [[https://foonathan.net/blog/2017/10/11/explicit-assignment.html][foonathan::blog() - Write explicit constructors - but what about assignment?]]
+  + [[https://us7.proxysite.com/process.php?d=c%2B%2FjhdODjkv4sHHC7%2FRQPgWbtJ5O5I9zVZ9Cygk7QLQ6mLoQqx91dNnmQ5YkU1TwSjpU3PhqjvymyZ77PnD0M6esDzpuEm3res5tpzjq2r3VLz2s3shiyUONdvkj&b=1][What is a converting constructor in C++ ? What is it for? - Stack Overflow]]
+  + [[https://msdn.microsoft.com/en-us/library/wwywka61.aspx][User-Defined Type Conversions (C++)]]
+  + [[https://akrzemi1.wordpress.com/2015/10/22/more-than-you-need/][More than you need | Andrzej's C++ blog]]
+  + [[https://softwareengineering.stackexchange.com/questions/190716/is-relying-on-implicit-argument-conversion-considered-dangerous][c++ - Is relying on implicit argument conversion considered dangerous? - Software Engineering Stack Exchange]]
 ** OOP Value Semantics X Reference Semantics 
 
  According to the - [[https://isocpp.org/wiki/faq/value-vs-ref-semantics][ISO C++]], value and reference semantics are defined
