@@ -879,7 +879,53 @@ Multiple initialization with assignment:
 #+END_SRC
 
 ** Control Structures
+*** ternary operator - question mark (?)
+
+Unlike the if-else statement, the ternary operator (?) or question
+mark operator, can solve return a value, although it cannot have
+complex statements like if-else. In functional languages like Lisp,
+Scala or Haskell, the if-else operator always is evaluated and returns
+
+Limitation: The ternary operator cannot have complex statements like
+if-else.
+
+Syntax:
+
+#+BEGIN_SRC cpp
+ {VARIABLE} = {CONDITION} ? {RETURN-IF-TRUE} : {RETURN-IF-FASLE};
+#+END_SRC
+
+Example:
+
+#+BEGIN_SRC cpp
+  >> true ? "true" : "false"
+  (const char *) "true"
+  >> false ? "true" : "false"
+  (const char *) "false"
+
+  >> int x;
+  >> x = true ? 10 : 25
+  (int) 10
+  >> x
+  (int) 10
+
+  >> x = false ? 10 : 25
+  (int) 25
+  >>
+  >>
+
+  >> std::string s;
+  >> x = 10;
+  >> s = (x < 15) ? "true" : "false"
+  "true"
+
+  >> x = 100;
+  >> s = (x < 15) ? "true" : "false"
+  "false"
+  >>
+#+END_SRC
 *** if-else
+**** True and false 
 
 In C++, everything equal to zero is false and everything other than
 zero is true.
@@ -1000,50 +1046,136 @@ zero is true.
    => False
 #+END_SRC
 
-*** ternary operator - question mark (?)
+**** Returning value from if-else statements 
 
-Unlike the if-else statement, the ternary operator (?) or question
-mark operator, can solve return a value, although it cannot have
-complex statements like if-else. In functional languages like Lisp,
-Scala or Haskell, the if-else operator always is evaluated and returns
+The C++ if-else statement cannot return a value or be evaluated to a
+value as the if-else statement in Lisp, Scheme, Scala, Haskell and
+other functional languages. Despite that the ternary operator (?) can
+be evaluated to some value, it cannot contain complex expressions as
+if-else statements.
 
-Limitation: The ternary operator cannot have complex statements like
-if-else.
+ *if-else in Scala*
 
-Syntax:
+#+BEGIN_SRC scala 
 
-#+BEGIN_SRC cpp
- {VARIABLE} = {CONDITION} ? {RETURN-IF-TRUE} : {RETURN-IF-FASLE};
+  // ========>>> EXPERIMENT 1 ==============//
+  var x: Double = 0.0;
+  var n = 10;
+
+  scala> x = if(n > 100) 256.0 else 300.0
+  x: Double = 300.0
+
+  scala> n = 200
+  n: Int = 200
+
+  scala> x = if(n > 100) 256.0 else 300.0
+  x: Double = 256.0
+
+
+  // ========>>> EXPERIMENT 2 ==============//
+
+  n = 50
+  scala> x =  400 + (if(n > 100) { println("Return 256.0"); 256  } else { println("Return 300.0"); 300.0})
+  Return 300.0
+  x: Double = 700.0
+
+  scala> x =  400 + (if(n > 100) { println("Return 256.0"); 256  } else { println("Return 300.0"); 300.0})
+  Return 256.0
+  x: Double = 656.0
+
 #+END_SRC
 
-Example:
+ *if-else in C++*
 
-#+BEGIN_SRC cpp
-  >> true ? "true" : "false"
-  (const char *) "true"
-  >> false ? "true" : "false"
-  (const char *) "false"
+Desired functionality, however the following code doesn't work.
 
-  >> int x;
-  >> x = true ? 10 : 25
-  (int) 10
+#+BEGIN_SRC cpp 
+  >> double x;
+  >> int n;
+  >> 
+  >> n = 10;
+
+  // Compilation error! It doesn't work in C++ 
+  >> x = if(n > 100) { 
+           std::puts("Return 256");  
+           return 256.0;} 
+        else { 
+           std::puts("Return 300.0"); 
+           return 300.0; 
+        }
+
+  ROOT_prompt_4:1:5: error: expected expression
+  x = if(n > 100) {std::puts("Return 256");  return 256.0;} else { std::pu...
+      ^
+  >> 
+#+END_SRC
+
+It could also be: 
+
+#+BEGIN_SRC cpp 
+  double x;
+  int n; 
+
+  n = 200;
+
+  if(n > 100){
+    std::puts("Return 256");
+    x = 256.0;
+  } else {
+    std::puts("Return 300");
+    x = 300.0 
+  }
+#+END_SRC
+
+Solution: Wrap the if-else statement into a self-executing lambda
+expression. 
+
+#+BEGIN_SRC cpp 
+  T result;
+
+  result = [&](){
+                if(CONDITION){
+                   <COMPTATIONS...FALSE>;
+                   return VALUE-TRUE;
+                } else {
+                   <COMPTATIONS...ELSE>;
+                   return VALUE-FALSE;
+                }			 
+            }();
+#+END_SRC
+
+Example: 
+
+#+BEGIN_SRC cpp 
+  double x;
+  int n;
+
+  n = 50;
+
+  >> x = [&](){ if(n > 100)  {
+                 std::puts(" [LOG] Return 256");
+                 return 256.0;
+          } else { 
+                 std::puts(" [LOG] Return 300.0");
+                 return 300.0;
+          }}();
+   [LOG] Return 300.0
+
   >> x
-  (int) 10
+  (double) 300.00000
+  >> 
 
-  >> x = false ? 10 : 25
-  (int) 25
-  >>
-  >>
+  n = 400;
 
-  >> std::string s;
-  >> x = 10;
-  >> s = (x < 15) ? "true" : "false"
-  "true"
+  >> x = [&](){ if(n > 100)  {
+                  std::puts(" [LOG] Return 256");
+                  return 256.0;
+          } else { 
+                  std::puts(" [LOG] Return 300.0");
+                  return 300.0;
+          }}();
+   [LOG] Return 256
 
-  >> x = 100;
-  >> s = (x < 15) ? "true" : "false"
-  "false"
-  >>
 #+END_SRC
 
 *** switch case
