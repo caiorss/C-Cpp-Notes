@@ -685,7 +685,7 @@ any attempt to insert a repeated value will discard the value to be
 inserted.
 
  + Header: [[http://www.cplusplus.com/reference/set/set/][<set>]]
-
+ + Implementation: Binary search tree. 
  + Note: as this collection has sorting, its unordered version,
    without sorting, [[https://en.cppreference.com/w/cpp/container/unordered_set][std::unordered_set]] performs better.
 
@@ -745,7 +745,197 @@ inserted.
   { 1, 2, 3, 4, 5, 15 }
 #+END_SRC
 
+ + Instantiate a set with copy constructor.
+   + std::set<T>(const T&)
 
+#+BEGIN_SRC cpp 
+  >> std::set<int> xs{1, 1, 10, 1, 2, 5, 10, 4, 4, 5, 1};
+  >> xs
+  { 1, 2, 4, 5, 10 }
+
+  >> std::set<int> copy1(xs);
+  >> copy1
+  (std::set<int> &) { 1, 2, 4, 5, 10 }
+
+  >> auto copy2 = xs;
+  >> copy2
+  { 1, 2, 4, 5, 10 }
+
+  >> auto copy3 = std::set<int>{xs};
+  >> copy3
+  { 1, 2, 4, 5, 10 }
+
+  >> if(&copy1 != &xs){ std::puts(" => Not the same"); }
+   => Not the same
+
+  >> if(&copy2 != &xs){ std::puts(" => Not the same"); }
+   => Not the same
+  
+  >> if(&copy3 != &xs){ std::puts(" => Not the same"); }
+   => Not the same
+#+END_SRC
+
+ + Instantiating a set with a move constructor.
+   + std::set<T>(T&&)
+
+#+BEGIN_SRC cpp 
+  >> std::set<int> xs1{1, 1, 10, 1, 2, 5, 5, 6, 10, 4, 4, 5, 1, 6, 7, 7};
+
+  >> xs1
+  { 1, 2, 4, 5, 6, 7, 10 }
+
+  // Move constructor:  
+  >> std::set<int> m1(std::move(xs1));
+  >> m1
+  (std::set<int> &) { 1, 2, 4, 5, 6, 7, 10 }
+  >> xs1
+  (std::set<int> &) {}
+  >>
+
+  >> std::set<int> xs2{1, 1, 10, 1, 2, 5, 5, 6, 10, 4, 4, 5, 1, 6, 7, 7};
+  >> xs2
+  (std::set<int> &) { 1, 2, 4, 5, 6, 7, 10 }
+
+  // ========  Move constructor ===================
+  >> auto m2 = std::move(xs2);
+  >> m2
+  { 1, 2, 4, 5, 6, 7, 10 }
+  >> xs2
+  (std::set<int> &) {}
+  >> 
+#+END_SRC
+
+ *Operations on sets:*
+
+Instantiating sample set:
+
+#+BEGIN_SRC cpp 
+  >> auto aset = std::set<int> {1, 1, 10, 1, 2, 5, 5, 6, 10, 4, 4, 5, 1, 6, 7, 7};
+  >> aset
+  { 1, 2, 4, 5, 6, 7, 10 }   
+#+END_SRC
+
+Count number of elements:
+
+#+BEGIN_SRC cpp 
+  >> aset.size()
+  (unsigned long) 7
+  >> 
+#+END_SRC
+
+Clear set (remove all elements):
+
+#+BEGIN_SRC cpp 
+  >>  auto asetb = std::set<int> {1, 1, 10, 1, 2, 5, 5, 6, 10, 4, 4, 5, 1, 6, 7, 7};
+  >> asetb
+  { 1, 2, 4, 5, 6, 7, 10 }
+
+  >> asetb.clear();
+  >> asetb
+  {}
+
+  >> asetb.empty()
+  (bool) true
+#+END_SRC
+
+Check whether an element is in the set without iterator: 
+
+#+BEGIN_SRC cpp 
+  >> aset.count(10)
+  (unsigned long) 1
+  >> aset.count(100)
+  (unsigned long) 0
+  >> aset.count(1)
+  (unsigned long) 1
+  >> aset.count(-12)
+  (unsigned long) 0
+  >> 
+  >> if(aset.count(10) != 0 ) { std::puts("Element in the set."); }
+  Element in the set.
+  >> if(aset.count(10)) { std::puts("Element in the set."); }
+  Element in the set.
+  >> if(aset.count(25) != 0 ) { std::puts("Element in the set."); }
+  >> if(aset.count(25)) { std::puts("Element in the set."); }
+  >> 
+
+#+END_SRC
+
+Check if element is in the set with iterator: 
+
+#+BEGIN_SRC cpp 
+  >> aset
+  { 1, 2, 4, 5, 6, 7, 10 }
+
+  >> aset.find(10)
+  (std::set<int, std::less<int>, std::allocator<int> >::iterator) @0x22f1ff0
+  >> 
+
+  std::set<int>::iterator it;
+  >> if((it = aset.find(10)) != aset.end()) std::printf(" ==> Found element = %d\n", *it)
+   ==> Found element = 10
+
+  >> if((it = aset.find(2)) != aset.end()) std::printf(" ==> Found element = %d\n", *it) 
+   ==> Found element = 2
+
+  >> if((it = aset.find(-100)) != aset.end()) std::printf(" ==> Found element = %>> ", *it)
+
+  // Or: ----------------------------------------------------
+  >> auto itr = aset.find(7);
+  >> if(itr == aset.end()) std::puts("Element not found");
+  >> if(itr != aset.end()) std::puts("Element  found");
+  Element  found
+  >> int element = *itr
+  (int) 7
+  >> 
+#+END_SRC
+
+Remove element from set:
+
+#+BEGIN_SRC cpp 
+  >> aset
+  { 1, 2, 4, 5, 6, 7, 10 }
+
+  >> auto itr2 = aset.find(10);
+  // Remove element using iterator.
+  >> aset.erase(itr2);
+
+  >> aset
+  { 1, 2, 4, 5, 6, 7 }
+  
+  // Segmentation fault!! 
+  >> aset.erase(aset.find(-10));
+  free(): invalid pointer
+#+END_SRC
+
+Iterate over a set: 
+
+#+BEGIN_SRC cpp 
+  int i = 0;
+  for(const auto& x: aset){  std::printf(" element[%d] = %d\n", ++i, x); }
+
+  // For-range based loop
+  >> for(const auto& x: aset){  std::printf(" element[%d] = %d\n", ++i, x); }
+   element[1] = 1
+   element[2] = 2
+   element[3] = 4
+   element[4] = 5
+   element[5] = 6
+   element[6] = 7
+   element[7] = 10
+
+  // Iterator based loop 
+  int j = 0;
+  for(auto it = aset.begin(); it != aset.end(); it++){  std::printf(" element[%d] = %d\n", ++j, *it); }
+
+  >> for(auto it = aset.begin(); it != aset.end(); it++){  std::printf(" element[%d] = %d\n", ++j, *it); }
+   element[1] = 1
+   element[2] = 2
+   element[3] = 4
+   element[4] = 5
+   element[5] = 6
+   element[6] = 7
+   element[7] = 10
+#+END_SRC
 
 
 ** C++11 Tuples 
