@@ -17,8 +17,8 @@
 #include<limits>
 
 enum class ASTtype{
-       number,
-       function
+	number,
+	function
 };
 
 struct ASTNode{
