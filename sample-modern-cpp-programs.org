@@ -498,3 +498,98 @@ Modern C++ Features used:
    [TRACE] Running daemon - PID = 18231
 #+END_SRC
 
+** Tool for inspecting binary file
+
+Command line tool for inspectig binary files with the following
+ features:
+ + Identify files by [[https://en.wikipedia.org/wiki/File_format#Magic_number][magic number]]
+ + Extract byte array at a given position.
+ + Extract: 8 bits, 32 bits, 64 bits, integers signed or unsigned at
+   given position.
+
+ + File: [[file:src/sample-programs/binfo.cpp][file:src/sample-programs/binfo.cpp]]
+ + Gist: [[https://gist.github.com/caiorss/c767099bb71a46c6cb5b84e9758a866e][binfo.cpp]]
+
+Build: 
+
+#+BEGIN_SRC sh 
+ $ clang++ binreader.cpp -o binreader.bin -g -std=c++1z -Wall -Wextra 
+#+END_SRC
+
+
+Display usage:
+
+#+BEGIN_SRC sh 
+  $ ./binfo.bin 
+  Binary Info => Extract information from binary files.
+  Usage: ./binreader info       [FILE]
+  Usage: ./binreader get        [TYPE]  [OFFSET] [FILE]
+  Usage: ./binreader bytes-char [SIZE]  [OFFSET] [FILE]
+  Usage: ./binreader bytes-hex  [SIZE]  [OFFSET] [FILE]
+#+END_SRC
+
+Identify file formats by magic number (sequence of bytes in at the
+beginning).
+
+#+BEGIN_SRC sh 
+  $ ./binfo.bin info /usr/bin/bash
+  Maximum size = 16
+  .N/A =>  Unix Executable - ELF
+
+   Bytes at 0x00 ==> 7f 45 4c 46 02 01 01 00 00 00 00 00 00 00 00 00 
+
+  $ ./binfo.bin info ~/account\ mind\ map.pdf 
+  Maximum size = 16
+  .pdf PDF - Portable Document File
+
+   Bytes at 0x00 ==> 25 50 44 46 2d 31 2e 34 0a 25 c3 a4 c3 bc c3 b6 
+
+  $ ./binfo.bin info ~/Documents/logos/6904820-nasdaq-stock-market-new-york.jpg 
+  Maximum size = 16
+  JPEG Image - Extensions .jpg, .jpeg, .jpe, .jif, .jfif, .jfi
+
+   Bytes at 0x00 ==> ff d8 ff e0 00 10 4a 46 49 46 00 01 02 01 01 2c
+#+END_SRC
+
+Show first 10 bytes of files as characters: 
+
+#+BEGIN_SRC sh 
+  $ ./binfo.bin bytes-char 10 0x00 /usr/bin/bash
+   RESULT ==> \0x7f E L F \0x02 \0x01 \0x01 \0x00 \0x00 \0x00 
+
+  $ ./binfo.bin bytes-char 10 0x00 ~/Fedora-Workstation-Live-x86_64-28-1.1.iso 
+   RESULT ==> E R \0x08 \0x00 \0x00 \0x00 \0x90 \0x90 \0x00 \0x00 
+#+END_SRC
+
+Extracting information at specific positions of a binary file (layout
+here [[https://en.wikipedia.org/wiki/Executable_and_Linkable_Format][ELF Format]]) Unix native executable.
+ + "Magic number" identifying bytes 0x7F followed by ELF
+   + offset: 0x00
+   + 0x7F ELF (0x7F 0x45 0x4C 0x46)
+ + ~e_ident[EI_OSABI]~ (size = 1 byte, offset = 0x07)
+   + contains the sytem ABI.
+ + ~e_machine~  (size = 1 byte, offset = 0x12)
+   + Processor or instruction set.
+ + ~e_entry~ (size = 8 bytes [64 bits], offfset = 0x18)
+   + Memory address of entry point where the process starts executing.
+
+#+BEGIN_SRC sh 
+  # Magic number 
+  $ ./binfo.bin bytes-char 4 0x00 /usr/bin/bash
+   RESULT ==> \0x7f E L F 
+
+  $ ./binfo.bin bytes-hex 4 0x00 /usr/bin/bash
+   RESULT ==> 7f 45 4c 46 
+
+  # System ABI => Result 0x00 or SystemV ABI 
+  $ ./binfo.bin get ui1 0x07 /usr/bin/bash
+   RESULT ==> {hex = 0x0 ; dec = 0} 
+
+  # Processor architechture =>> 0x3E or x86-64 (64 bits)
+  $ ./binfo.bin get ui1 0x12 /usr/bin/bash
+   RESULT ==> {hex = 0x3E ; dec = 62} 
+
+  # Entry point 
+  $ ./binfo.bin get ui8 0x18 /usr/bin/bash
+   RESULT ==> {hex = 0x2E4B0 ; dec = 189616} 
+#+END_SRC
