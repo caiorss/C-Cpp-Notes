@@ -1,0 +1,881 @@
+#+INCLUDE: theme/style.org 
+#+TITLE: CPP / C++ - Debuggers 
+#+DESCRIPTION: C++ Debuggers reverse engineering introspection 
+#+STARTUP: content 
+
+* GDB - GNU Debugger - Command Line 
+** GDB Overview 
+
+What is a debugger? 
+
+ + A program which allows to inspect the execution of a program
+   compiled with or without debugging symbols. Essentialy a debugger
+   is an "execution monitor". 
+
+Capabilities: 
+
+ + Inspect any programs or process execution allowing inspecting
+   varibles, manipulating memory.
+ + Attach to runnign process in local machine.
+ + Attach to runnign process in remote machine (GDB - Server)
+
+Use case: 
+
+ + Development tools as it helps to understand the inner working of
+   some program, find bugs, trace function-calls, system-calls and get
+   process state.
+ + Reverse Engineering => Inspect and manipulate any process at runtime.
+ + Vunerability research and exploit development.
+
+Languages supported by GDB: 
+ + C
+ + C++
+ + Ada
+ + Fortran 
+ + Objective-C
+ + D (D-Language)
+ + Go
+ + OpenCL
+ + Rust
+ + Modula-2
+ + Pascal 
+
+Other useful tools: 
+
+ + strace => Trace system calls.
+ + ltrace => Trace system calls.
+
+ + lsof => View process' file descriptors, sockets, file mappings and
+   so on.
+
+ + lslk => View process' locks.
+
+ + ls -l ~/proc/<pid-of-process/>/fd~
+   + Show file descriptors opened by process.
+
+ + Wireshark and TCPDump => Debug and reverse engineer network
+   protocols. 
+
+Front-ends for GDB: 
+ + Nemiver
+ + DDD - Data Display Debugger
+ + Emacs 
+
+** GDB Summary 
+
+Commands: 
+
+| Command                  | Description                                               |   |
+|--------------------------+-----------------------------------------------------------+---|
+| help or h                | Show help                                                 |   |
+| info                     | Show help about all (i) or info commands                  |   |
+|                          |                                                           |   |
+| *Debug Program or Process* |                                                           |   |
+| file [path/to/program]   | Load  some program/executable file (ELF format on U*nix). |   |
+| start                    | Start debugging a loaded program                          |   |
+| attach [PID]             | Attach debugger to a running process.                     |   |
+| detach                   | Detach debugger from process.                             |   |
+| r or run                 | Run the loaded program                                    |   |
+| r [ARG0] [ARG1]  ...     | Run program with arguments ARG0, ARG1 ...                 |   |
+| r > logging.fil          | Run program redirecting output to file.                   |   |
+| tty /dev/pts/4           | Redirect program input and ouput to another terminal      |   |
+| q or quit                | Quit GNU debugger.                                        |   |
+| kill                     | Kill the process being debugged                           |   |
+|                          |                                                           |   |
+| *Break Points*             |                                                           |   |
+| i b or i breakpoints     | Show brakpoints                                           |   |
+| break main               | Set break point at main function                          |   |
+| break [FUNCTION]         | Set break point at some function                          |   |
+| break [OBJECT.method]    | Set break point at some class method.                     |   |
+| break [LINE ]            | Set break point at some line.                             |   |
+| break [FILE]:[LINE]      | Set break point at some line of a given file.             |   |
+| watch n == 10            | Set watchpoint, that pauses program when n == 10 is true. |   |
+| sycall catch fork        | Stop execution whenever this syscall, fork, is invoked.   |   |
+| syscall catch read       | Set break point at read system call.                      |   |
+|                          |                                                           |   |
+| *Setepping through*        |                                                           |   |
+| s or step                | Execute next line, stepping over any function calls.      |   |
+| n or next                | Execute next line, stepping into function calls.          |   |
+| c, cont or continue      | Resume execution until next break point                   |   |
+| pop [RETURN VALUE]       | Pop current stack frame, returning from current function. |   |
+| finish                   | Run until the current function returns                    |   |
+| jump [LINE]  or *address | Resume execution at different address                     |   |
+| lines                    | Show lines of srouce around current line                  |   |
+| where                    | Show current location                                     |   |
+| bt or backtrace          | Show backtrace                                            |   |
+|                          |                                                           |   |
+| *Variables*                |                                                           |   |
+| i locals                 | Show local variables                                      |   |
+| i args                   | Show arguments of current function                        |   |
+| p [VAR] or print [VAR]   | Print some variable                                       |   |
+| display [VAR]            | Add variable to display list                              |   |
+| watch [VAR]              | Watch variable                                            |   |
+| set [VAR] = [VALUE]      | Set variable with some value                              |   |
+| i registers              | Show CPU registers                                        |   |
+| p $pc                    | Show program counter CPU Register                         |   |
+| p $sp                    | Show stack pointer                                        |   |
+| p $fp                    | Show frame pointer                                        |   |
+|                          |                                                           |   |
+| *Process Information*      |                                                           |   |
+| i proc                   | Display basic information about current process.          |   |
+| i proc status            | Show process status                                       |   |
+| i proc all               | Show all information about current process                |   |
+| i inferior               | Show path to executable and PID of debugged process.      |   |
+|                          |                                                           |   |
+| pwd                      | Current process working directory                         |   |
+| cd [DIRECTORY]           | Change process working directory.                         |   |
+| show args                | Show arguments used to invoke the program being debugged. |   |
+| show environment         | Show environment variables of the process being debugged. |   |
+| show paths               | Show PATH variable or serach paths.                       |   |
+|                          |                                                           |   |
+| *Misc*                     |                                                           |   |
+| i threads                | Show threads information                                  |   |
+| i functions              | Show all functions and symbols in the program             |   |
+| set print pretty on      | Turn on pretty print                                      |   |
+| call Function()          | Call some function and print returned value.              |   |
+| layout asm               | Show a window within current terminal with assembly code. |   |
+| laytout src              | Show a window within current terminal with source code.   |   |
+|                          |                                                           |   |
+|                          |                                                           |   |
+
+Key Bindings for Terminal:
+
+| Key Bindign  | Description                                                                        |
+|--------------+------------------------------------------------------------------------------------|
+| Crtl + z     | Suspend GDB process, type fg to resume                                             |
+| Crtl + c     | Terminate debugged process                                                         |
+| Ctrl + l     | Clear screen                                                                       |
+| Ctrl + x + a | Open a window in the terminal which shows the source code around the current line. |
+|              |                                                                                    |
+| *Line Editor*  | Note: The liner editor is based on Emacs and Lib. GNUReadline                      |
+| Ctrl + a     | Move cursor to beggining of line                                                   |
+| Ctrl + e     | Move cursor to end of line                                                         |
+| Ctrl + d     | Send EOF (End of File char) 0x4 - means end of input                               |
+| Ctrl + p     | Previous line from history                                                         |
+| Ctrl + n     | Next from history                                                                  |
+| Ctrl + k     | Delete characters from current cursor location to end of line.                     |
+| Ctrl + u     | Delete characters from current cursor location to beggining of line.               |
+|              |                                                                                    |
+|              |                                                                                    |
+|              |                                                                                    |
+
+
+Note: To run the process input/output in another terminal use:
+
+ + Step 1: Open another terminal and get its name with command $ tty.
+
+#+BEGIN_SRC sh 
+  $ tty
+  /dev/pts/3
+#+END_SRC
+
+ + Step 2: Open GDB use the following command.
+
+#+BEGIN_SRC sh 
+  >>> file program.bin 
+  >>> tty /dev/pts/4 
+  >>> start 
+  >>> b main 
+  >>> b 198
+  >>> c # Continue until next break point. 
+  >>> c  
+#+END_SRC
+
+** GDB Example and work flow 
+
+Compile program with Debug Symbols:
+
+Note: To use the debugger, it is necessary to compile the program with
+appropriate compiler option to build with debug symbols. In GCC and
+Clang, this flag is (-g).
+
+#+BEGIN_SRC sh 
+ $ clang++ line-editor.cpp -o line-editor.bin -g -std=c++1z -Wall -Wextra 
+#+END_SRC
+
+ *Open GDB:*
+
+Run GDB shell. 
+
+#+BEGIN_SRC sh 
+  $ gdb 
+#+END_SRC
+
+Run GDB attached it to an executable: 
+
+#+BEGIN_SRC sh 
+ $ gdb PROGRAM.BIN 
+#+END_SRC
+
+Run GDB attaching it to a running process: 
+
+#+BEGIN_SRC sh 
+ # 7081 is the process ID (PID) of the program to be debugged.
+ $ gdp -pid 7081
+#+END_SRC
+
+
+ *Show help*
+
+ + >>> help
+ + >>> h 
+
+#+BEGIN_SRC sh 
+  >>> h
+  List of classes of commands:
+
+  aliases -- Aliases of other commands
+  breakpoints -- Making program stop at certain points
+  data -- Examining data
+  files -- Specifying and examining files
+  internals -- Maintenance commands
+  obscure -- Obscure features
+  running -- Running the program
+  stack -- Examining the stack
+  status -- Status inquiries
+  support -- Support facilities
+  tracepoints -- Tracing of program execution without stopping the program
+  user-defined -- User-defined commands
+
+  Type "help" followed by a class name for a list of commands in that class.
+  Type "help all" for the list of all commands.
+  Type "help" followed by command name for full documentation.
+  Type "apropos word" to search for commands related to "word".
+  Command name abbreviations are allowed if unambiguous.
+  >>> 
+#+END_SRC
+
+ *Load an executable inside GDB shell*
+
+#+BEGIN_SRC sh 
+ >>> file program.bin 
+#+END_SRC
+
+ *Attach to running process*
+
+Attach GDB to a running process (inside GDB shell): 
+
+ + attach <PID>
+
+#+BEGIN_SRC sh 
+  >>> attach 18071
+#+END_SRC
+ 
+ *Detach GDB from current process* 
+
+#+BEGIN_SRC sh 
+  >>> detach 
+#+END_SRC
+
+ *Show path to executable and PID of debugged process*
+
+#+BEGIN_SRC sh 
+  >>> i inferior
+    Num  Description       Executable        
+  * 1    process 7343      /home/archbox/root-scripts/line-editor.bin 
+#+END_SRC
+
+ *Show current location*
+ 
+Command _where_ - show the current location: 
+
+#+BEGIN_SRC sh 
+  >>> where
+  #0  0x00007f701345de21 in read () from /lib64/libc.so.6
+  #1  0x00007f70133ef6e0 in __GI__IO_file_underflow () from /lib64/libc.so.6
+  #2  0x00007f70133f07e2 in __GI__IO_default_uflow () from /lib64/libc.so.6
+  #3  0x00007f7013dceb11 in __gnu_cxx::stdio_sync_filebuf<char, std::char_traits<char> >::uflow() () from /lib64/libstdc++.so.6
+  #4  0x00007f7013ddd61e in std::istream::get() () from /lib64/libstdc++.so.6
+  #5  0x000000000040257d in main () at line-editor.cpp:182
+  >>> 
+#+END_SRC
+
+ *Set break points:*
+
+ + break <LINE>
+ + break <FILE>:<LINE> 
+
+#+BEGIN_SRC sh 
+  >>> break 200 
+
+  >>> break line-editor.cpp:183
+  Breakpoint 3 at 0x402593: file line-editor.cpp, line 183.
+
+  >>> break line-editor.cpp:249
+  Breakpoint 1 at 0x402b92: file line-editor.cpp, line 249.
+  >>> 
+#+END_SRC
+
+ *Show breakpoints:*
+
+#+BEGIN_SRC sh 
+  >>> info breakpoints
+  No breakpoints or watchpoints.
+
+  >>> info breakpoints
+  Num     Type           Disp Enb Address            What
+  1       breakpoint     keep y   0x0000000000402b92 in main() at line-editor.cpp:249
+  2       breakpoint     keep y   0x0000000000402b92 in main() at line-editor.cpp:249
+  >>> 
+#+END_SRC
+
+Continue until the program execution until the next breakpoint: 
+
+  + cont
+  + continue 
+
+#+BEGIN_SRC sh 
+ >>> continue 
+ >>> cont 
+#+END_SRC
+
+ *Inspect Stack Variables*
+
+At some breakpoint, it is possible to inspect local variables with the
+command print:
+
+#+BEGIN_SRC sh 
+  >>> print key
+  $5 = 104 'h'
+
+  >>> print line_buffer
+  $6 = ""
+
+  >>> print linePos
+  $7 = 0
+  >>> 
+
+  >>> p line_buffer.size()
+  $7 = 12
+  >>> 
+#+END_SRC
+
+Print variable in binary format: 
+
+#+BEGIN_SRC sh 
+  >>> print /t linePos
+  $1 = 1000
+
+  >>> print /t line_buffer
+  $2 = "adsadsad"
+  >>> 
+#+END_SRC
+
+ *Print Variable Types* 
+
+#+BEGIN_SRC sh 
+  >>> ptype line_buffer
+  type = std::string
+
+  >>> ptype linePos
+  type = unsigned long
+  >>> 
+#+END_SRC
+
+ *Add variable to display list*
+
+ + Once variables are added to display list, they will be
+   automatically printed on every new break point.
+
+#+BEGIN_SRC sh 
+  >>> display linePos
+  1: linePos = 9
+  >>> display line_buffer
+  2: line_buffer = "safdsfdsf"
+  >>> 
+
+  # Continue execution until next break point 
+  # the following variables are automatically displayed.
+  >> cont 
+  Breakpoint 2, main () at line-editor.cpp:232
+  232				if(logging)
+  1: linePos = 3
+  2: line_buffer = "asd"
+  >>> 
+#+END_SRC
+
+ *Watch variables* 
+
+ + The debugger will stop the program execution whenever the watched
+   variable is changed. Then the user has to type _continue_ to run the
+   debugged program until the next change happens. 
+
+#+BEGIN_SRC sh 
+  >>> watch linePos 
+
+  >>> continue 
+ 
+  Hardware watchpoint 2: linePos
+
+  Old value = 7
+  New value = 8
+  main () at line-editor.cpp:196
+  196				line_buffer.push_back(key);
+  >>> 
+
+  >>> continue 
+
+  Hardware watchpoint 2: linePos
+
+  Old value = 11
+  New value = 12
+  main () at line-editor.cpp:196
+  196				line_buffer.push_back(key);
+  >>> 
+#+END_SRC
+
+ *Print individual CPU registers*
+
+#+BEGIN_SRC sh 
+  >>> print $eax
+  $1 = -512
+
+  >>> print $rcx
+  $2 = 139647707258401
+
+  >>> print $rax
+  $3 = -512
+#+END_SRC
+
+ *Print registers:*
+
+ + $ info rgisters 
+
+#+BEGIN_SRC sh 
+     >>> info registers
+     rax            0xfffffffffffffe00	-512
+     rbx            0x7f0244290a00	139647710202368
+     rcx            0x7f0243fc1e21	139647707258401
+     rdx            0x400	1024
+     rsi            0xb035a0	11548064
+     rdi            0x0	0
+     rbp            0xd68	0xd68
+     rsp            0x7ffdb09942d8	0x7ffdb09942d8
+     .... .... .... ... ... ... ... 
+#+END_SRC
+
+ *Show backtrace* 
+
+ + backtrace 
+
+#+BEGIN_SRC sh 
+  >>> bt
+  #0  0x00007fc0d7d4beab in raise () from /lib64/libc.so.6
+  #1  0x00007fc0d7d365b9 in abort () from /lib64/libc.so.6
+  #2  0x00007fc0d870ca9b in __gnu_cxx::__verbose_terminate_handler() [clone .cold.1] () from /lib64/libstdc++.so.6
+  #3  0x00007fc0d8712efc in __cxxabiv1::__terminate(void (*)()) () from /lib64/libstdc++.so.6
+  #4  0x00007fc0d8712f57 in std::terminate() () from /lib64/libstdc++.so.6
+  #5  0x00007fc0d87131b8 in __cxa_throw () from /lib64/libstdc++.so.6
+  #6  0x0000000000403061 in main () at line-editor.cpp:253
+  >>> 
+#+END_SRC
+
+ *Show current working directory of debugged program* 
+
+#+BEGIN_SRC sh 
+  >>> pwd
+  Working directory /home/archbox/root-scripts.
+
+ # Change current directory: 
+  >>> cd /
+  Working directory /.
+
+  >>> pwd
+  Working directory /.
+  >>> 
+#+END_SRC
+
+ *Show arguments used to invoke the program* 
+
+#+BEGIN_SRC sh 
+  >>> show args
+  Argument list to give program being debugged when it is started is "".
+#+END_SRC
+
+ *Show environment variables of the debugged program* 
+
+#+BEGIN_SRC sh 
+  >>> show environment
+  LC_ALL=en_US.UTF-8
+  LD_LIBRARY_PATH=:/home/archbox/opt/root/lib:/home/archbox/opt/cling_2018-09-16_fedora27/lib/:/home/archbox/opt/root/lib:/home/archbox/opt/cling_2018-09-16_fedora27/lib/
+  XDG_CONFIG_HOME=/home/archbox/.config
+  TERMINATOR_UUID=urn:uuid:16c59236-2dde-4517-9fec-c472df54476d
+  XDG_MENU_PREFIX=lxqt-
+  LXQT_SESSION_CONFIG=session
+  MODULES_RUN_QUARANTINE=LD_LIBRARY_PATH
+  LANG=en_CA.UTF-8
+  ... ... ... ..
+#+END_SRC
+
+
+ *Show search paths / path variable for current process*
+
+#+BEGIN_SRC sh 
+  >>> show paths
+  Executable and object file path: /usr/share/Modules/bin:...
+#+END_SRC
+
+ *Current Stack frame* 
+
+Show current function. 
+
+ + $ frame or $ f
+   
+
+#+BEGIN_SRC sh 
+   >>> f
+   #0  main () at line-editor.cpp:232
+   232				if(logging)
+   >>> 
+#+END_SRC
+
+Show arguments of current function:
+ 
+ + $ info args
+ + $ i args 
+
+#+BEGIN_SRC sh 
+  >>> i args
+  No arguments.
+  >>> 
+#+END_SRC
+ 
+Show local variables: 
+
+ + $ info locals 
+ + $ i locals
+
+#+BEGIN_SRC sh 
+  >>> i locals
+  term = {
+    m_tty_back = {
+      c_iflag = 17664, 
+      c_oflag = 5, 
+      c_cflag = 191, 
+      c_lflag = 35387, 
+      c_line = 0 '\000', 
+      c_cc = "\003\034\177\025\004\000\001\000\021\023\032\000\022\017\027\026", '\000' <repeats 15 times>, 
+      c_ispeed = 15, 
+      c_ospeed = 15
+    }, 
+    m_fd = 1
+  }
+  key = 10 '\n'
+  lineSize = 0
+  linePos = 8
+  logging = true
+  fd = <incomplete type>
+  line_buffer = "adsadsad"
+  >>> 
+
+#+END_SRC
+
+ *Call a function in the program*
+
+#+BEGIN_SRC sh 
+  >>> call nextChar()
+  $1 = 115 's'
+
+  >>> call printHello()
+  $2 = 100
+  >>> 
+#+END_SRC
+
+ *Disassembly some function*
+
+#+BEGIN_SRC sh 
+  >>> disas printHello
+  Dump of assembler code for function printHello():
+     0x0000000000402800 <+0>:	push   %rbp
+     0x0000000000402801 <+1>:	mov    %rsp,%rbp
+     0x0000000000402804 <+4>:	sub    $0x10,%rsp
+     0x0000000000402808 <+8>:	movabs $0x6071a0,%rdi
+     0x0000000000402812 <+18>:	movabs $0x405300,%rsi
+     0x000000000040281c <+28>:	callq  0x4024c0 <_ZStlsISt11char_traitsIcEERSt13basic_ostreamIcT_ES5_PKc@plt>
+     0x0000000000402821 <+33>:	movabs $0x402420,%rsi
+     0x000000000040282b <+43>:	mov    %rax,%rdi
+     0x000000000040282e <+46>:	callq  0x4024f0 <_ZNSolsEPFRSoS_E@plt>
+     0x0000000000402833 <+51>:	mov    $0x64,%ecx
+     0x0000000000402838 <+56>:	mov    %rax,-0x8(%rbp)
+     0x000000000040283c <+60>:	mov    %ecx,%eax
+     0x000000000040283e <+62>:	add    $0x10,%rsp
+     0x0000000000402842 <+66>:	pop    %rbp
+     0x0000000000402843 <+67>:	retq   
+  End of assembler dump.
+  >>> 
+
+#+END_SRC
+
+ *Show all functions in the program*
+
+#+BEGIN_SRC sh 
+  >>> info functions 
+
+  0x00007f173c67bd80  memcpy
+  0x00007f173c67bd80  memmove
+  0x00007f173c67bf60  memset
+  0x00007f173c67c040  __GI___setitimer
+  0x00007f173c67c040  __GI_setitimer
+  0x00007f173c67c040  __setitimer
+  0x00007f173c67c040  setitimer
+  0x00007f173c67c060  _etext
+  0x00007ffc86bbf9f0  __vdso_clock_gettime
+  0x00007ffc86bbf9f0  clock_gettime
+  0x00007ffc86bbfd20  __vdso_gettimeofday
+  0x00007ffc86bbfd20  gettimeofday
+  0x00007ffc86bbfed0  __vdso_time
+  0x00007ffc86bbfed0  time
+  0x00007ffc86bbfee0  __vdso_getcpu
+  0x00007ffc86bbfee0  getcpu
+  ... ... ... ... ... ... ... ... 
+#+END_SRC
+
+ *Show basic information about the process*
+
+#+BEGIN_SRC cpp 
+  >>> i proc
+  process 18214
+  cmdline = './line-editor.bin'
+  cwd = '/home/archbox/root-scripts'
+  exe = '/home/archbox/root-scripts/line-editor.bin'
+  >>> 
+#+END_SRC
+
+ *Show process status*
+
+#+BEGIN_SRC sh 
+  >>> i proc status
+
+  process 18214
+  Name:	line-editor.bin
+  Umask:	0002
+  State:	t (tracing stop)
+  Tgid:	18214
+  Ngid:	0
+  Pid:	18214
+  PPid:	9944
+  TracerPid:	13314
+  Uid:	1000	1000	1000	1000
+  Gid:	1000	1000	1000	1000
+  FDSize:	256
+  Groups:	10 971 1000 
+  NStgid:	18214
+  NSpid:	18214
+  NSpgid:	18214
+  NSsid:	9944
+  VmPeak:	   13856 kB
+  VmSize:	   13820 kB
+  VmLck:	       0 kB
+  VmPin:	       0 kB
+  VmHWM:	    1844 kB
+  VmRSS:	    1844 kB
+  RssAnon:	     148 kB
+  RssFile:	    1696 kB
+  RssShmem:	       0 kB
+  VmData:	     224 kB
+  VmStk:	     136 kB
+  VmExe:	      28 kB
+  VmLib:	    5160 kB
+  VmPTE:	      72 kB
+  VmSwap:	       0 kB
+  HugetlbPages:	       0 kB
+  CoreDumping:	0
+  Threads:	1
+  SigQ:	0/62735
+  SigPnd:	0000000000000000
+  ShdPnd:	0000000000000000
+  SigBlk:	0000000000000000
+  SigIgn:	0000000000000000
+  SigCgt:	0000000000000000
+  CapInh:	0000000000000000
+  CapPrm:	0000000000000000
+  CapEff:	0000000000000000
+  CapBnd:	0000003fffffffff
+  CapAmb:	0000000000000000
+  NoNewPrivs:	0
+  Seccomp:	0
+  Speculation_Store_Bypass:	thread vulnerable
+  Cpus_allowed:	f
+  Cpus_allowed_list:	0-3
+  Mems_allowed:	00000000,00000000,00000000,00000000,00000000,... ... 
+  Mems_allowed_list:	0
+  voluntary_ctxt_switches:	2
+  nonvoluntary_ctxt_switches:	0
+  >>> 
+
+#+END_SRC
+
+ *Show all information about process*
+
+#+BEGIN_SRC cpp 
+   xe = '/home/archbox/root-scripts/line-editor.bin'
+   >>> i proc all
+   process 18214
+   cmdline = './line-editor.bin'
+   cwd = '/home/archbox/root-scripts'
+   exe = '/home/archbox/root-scripts/line-editor.bin'
+   Mapped address spaces:
+
+             Start Addr           End Addr       Size     Offset objfile
+               0x400000           0x407000     0x7000        0x0 /home/archbox/root-scripts/line-editor.bin
+               0x606000           0x607000     0x1000     0x6000 /home/archbox/root-scripts/line-editor.bin
+               0x607000           0x608000     0x1000     0x7000 /home/archbox/root-scripts/line-editor.bin
+              0x1aff000          0x1b20000    0x21000        0x0 [heap]
+              .. ... . ... ... ... ... ... 
+         0x7f02752b3000     0x7f02752b4000     0x1000    0x27000 /usr/lib64/ld-2.27.so
+         0x7f02752b4000     0x7f02752b5000     0x1000        0x0 
+         0x7fffcf5fd000     0x7fffcf61f000    0x22000        0x0 [stack]
+         0x7fffcf652000     0x7fffcf655000     0x3000        0x0 [vvar]
+         0x7fffcf655000     0x7fffcf657000     0x2000        0x0 [vdso]
+     0xffffffffff600000 0xffffffffff601000     0x1000        0x0 [vsyscall]
+
+   Name:	line-editor.bin
+   Umask:	0002
+   State:	t (tracing stop)
+   Tgid:	18214
+   Ngid:	0
+   Pid:	18214
+   PPid:	9944
+   TracerPid:	13314
+   Uid:	1000	1000	1000	1000
+   Gid:	1000	1000	1000	1000
+   .. .... ... ... 
+   CoreDumping:	0
+   Threads:	1
+   SigQ:	1/62735
+   SigPnd:	0000000000000000
+   ShdPnd:	0000000008000000
+   SigBlk:	0000000000000000
+
+    ... ... ... ... 
+
+   Process: 18214
+   Exec file: line-editor.bin
+   State: t
+   Parent process: 9944
+   Process group: 18214
+   Session id: 9944
+   TTY: 34819
+   TTY owner process group: 18214
+   Flags: 0x40404000
+   Minor faults (no memory page): 142
+   Minor faults, children: 0
+
+    .. ... ... 
+
+   Start of text: 0x400000
+   End of text: 0x4065e4
+   Start of stack: 0x7fffcf61cb60
+
+#+END_SRC
+
+ *Show memory map of current process* 
+
+#+BEGIN_SRC sh 
+   >> info file
+   Symbols from "/home/archbox/root-scripts/line-editor.bin".
+   Native process:
+           Using the running image of attached process 7343.
+           While running this, GDB does not access memory from...
+   Local exec file:
+           `/home/archbox/root-scripts/line-editor.bin', file type elf64-x86-64.
+           Entry point: 0x4026e0
+           0x0000000000400238 - 0x0000000000400254 is .interp
+           0x0000000000400254 - 0x0000000000400274 is .note.ABI-tag
+           0x0000000000400274 - 0x0000000000400298 is .note.gnu.build-id
+           0x0000000000400298 - 0x0000000000400444 is .gnu.hash
+           0x0000000000400448 - 0x0000000000400d18 is .dynsym
+           0x0000000000400d18 - 0x0000000000401d37 is .dynstr
+           ... ... ... ... .... ... .. 
+#+END_SRC
+
+ *Show memory mappings* 
+
+#+BEGIN_SRC sh 
+   >>> i proc m
+   process 1446
+   Mapped address spaces:
+
+             Start Addr           End Addr       Size     Offset objfile
+               0x400000           0x407000     0x7000        0x0 /home/archbox/root-scripts/line-editor.bin
+               0x606000           0x607000     0x1000     0x6000 /home/archbox/root-scripts/line-editor.bin
+               0x607000           0x608000     0x1000     0x7000 /home/archbox/root-scripts/line-editor.bin
+              0x1ce7000          0x1d08000    0x21000        0x0 [heap]
+         0x7f84ad30f000     0x7f84ad4c4000   0x1b5000        0x0 /usr/lib64/libc-2.27.so
+         0x7f84ad4c4000     0x7f84ad6c4000   0x200000   0x1b5000 /usr/lib64/libc-2.27.so
+         0x7f84ad6c4000     0x7f84ad6c8000     0x4000   0x1b5000 /usr/lib64/libc-2.27.so
+         0x7f84ad6c8000     0x7f84ad6ca000     0x2000   0x1b9000 /usr/lib64/libc-2.27.so
+         0x7f84ad6ca000     0x7f84ad6ce000     0x4000        0x0 
+         0x7f84ad6ce000     0x7f84ad6e5000    0x17000        0x0 /usr/lib64/libgcc_s-8-20181105.so.1
+         0x7f84ad6e5000     0x7f84ad8e4000   0x1ff000    0x17000 /usr/lib64/libgcc_s-8-20181105.so.1
+         0x7f84ad8e4000     0x7f84ad8e5000     0x1000    0x16000 /usr/lib64/libgcc_s-8-20181105.so.1
+         0x7f84ad8e5000     0x7f84ad8e6000     0x1000    0x17000 /usr/lib64/libgcc_s-8-20181105.so.1
+         0x7f84ad8e6000     0x7f84ada78000   0x192000        0x0 /usr/lib64/libm-2.27.so
+    ... .... ... ... ... 
+#+END_SRC
+
+
+ *Detach or exit from debugger:*
+
+#+BEGIN_SRC sh 
+  >>> quit
+  A debugging session is active.
+
+          Inferior 1 [process 22370] will be detached.
+#+END_SRC
+
+** References, Bookmarks and Further Reading 
+
+Bookmarks and further reading: 
+
+ + [[https://www.recurse.com/blog/5-learning-c-with-gdb][Learning C with gdb - Blog - Recurse Center]]
+
+ + [[http://faculty.kutztown.edu/spiegel/Debugging/DebugPrimer.htm][Simple Use of GDB]] (GDB usage from Emacs)
+
+ + [[http://peeterjoot.com/category/cc-development-and-debugging/][Peeter Joot's Blog » C/C++ development and debugging.]]
+
+ + GDB Manual: https://users.encs.concordia.ca/~adnna_dz/files/gdb.pdf
+
+ + [[https://hgad.net/posts/object-inspection-in-gdb/][Object Inspection in GDB]]
+
+ + [[http://heather.cs.ucdavis.edu/~matloff/UnixAndC/CLanguage/Debug.html][Guide to Faster, Less Frustrating Debugging]]
+
+ + [[http://liveoverflow.com/binary_hacking/reverse_engineering.html][Reverse Engineering - LiveOverflow]]
+
+ + [[https://www.linux.com/blog/tracing-user-space-and-operating-system-interactions][Tracing the User Space and Operating System Interactions | Linux.com | The source for Linux information]]
+
+ + [[https://stackoverflow.com/questions/12773101/gdb-assembly-instruction-calculation][c - GDB: Assembly instruction calculation - Stack Overflow]]
+
+ + [[https://stackoverflow.com/questions/6473908/can-gdb-change-the-assembly-code-of-a-running-program][linux - Can GDB change the assembly code of a running program? - Stack Overflow]]
+
+ + [[https://bob.cs.sonoma.edu/IntroCompOrg-x64/bookap3.html][C Using the gdb Debugger for Assembly Language]]
+
+ + [[http://visualgdb.com/gdbreference/commands/x][GDB Command Reference - x command]]
+
+ + [[https://suchakra.wordpress.com/2016/06/29/fast-tracing-with-gdb/][Fast Tracing with GDB – Tuxology]]
+
+References: 
+
+ + https://betterexplained.com/articles/debugging-with-gdb/
+
+ + [[http://www.yolinux.com/TUTORIALS/GDB-Commands.html][Linux Tutorial - GNU GDB Debugger Command Cheat Sheet]] 
+
+ + [[http://cseweb.ucsd.edu/classes/fa09/cse141/tutorial_gcc_gdb.html#gcc_flags][Tutorial of gcc and gdb]]
+
+ + [[http://web.eecs.utk.edu/~bvz/cs140/Notes/Recursion/debug.html][CS140 Lecture notes -- Recursion Debugging Example]]
+
+ + [[https://drive.google.com/viewerng/viewer?url=https://www.cs.tau.ac.il/telux/lecture-notes/GDB_Linux_telux.pptx][Debugging with GDB]]
+
+ + [[https://www.cs.dartmouth.edu/~campbell/cs50/gdb.html][gdb – Debugging buggy code with the GNU debugger]]
+
+ + [[http://www.haifux.org/lectures/211/gdb_-_customize_it.html][gdb - customize it the way <b>you</b> want]]
+
+ + [[https://reverseengineering.stackexchange.com/questions/19598/find-base-address-and-memory-size-of-program-debugged-in-gdb][debugging - Find base address and memory size of program debugged in gdb - Reverse Engineering Stack Exchange]]
+
+ + [[http://www.cse.psu.edu/~deh25/cmpsc311/Lectures/GDB.html][CMPSC 311 - GDB]]
+
+ + http://csapp.cs.cmu.edu/public/docs/gdbnotes-ia32.pdf
+
+ + [[https://cs.baylor.edu/~donahoo/tools/gdb/gdb.html][Debugging with GDB]]
+
+
