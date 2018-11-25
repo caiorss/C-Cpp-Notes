@@ -68,6 +68,10 @@ auto ByteArrayToHexString(const ByteArray& str) -> std::string {
 	return os.str();
 }
 
+// Attempt to turn character into string if character is printable
+// otherwise, returns the hexadecimal representation.
+//-------------------------------------------------------------
+auto printChar(char ch) -> std::string;
 
 int main(int argc, char** argv){
 	extern std::map<ByteArray, std::string> SignatureMap;
@@ -81,13 +85,25 @@ int main(int argc, char** argv){
 			std::puts("Usage: ./binreader bytes-hex  [SIZE]  [OFFSET] [FILE]");						 
 		};
 	
+	auto command = std::string{argv[1]};
+
+    // Print the ascii table 
+    if(command == "ascii"){							
+		for(int i = 0; i < 128; i++){							
+			std::cout << std::setw(5)  << std::right << std::dec << i 
+			          << std::setw(8)  << std::right << "0x" << std::hex << i
+			          << std::setw(5)  << " "
+			          << std::setw(10) << std::left  << printChar(i)
+			          << std::endl;
+		}
+		return EXIT_SUCCESS;
+     }
+
 	if(argc < 3){
 		showUsage();
 		//std::perror("HERE");
 		return EXIT_FAILURE;
 	}
-
-	auto command = std::string{argv[1]};
 
 	if(command == "info"){		
 		size_t maxlen = 0;		
@@ -188,9 +204,32 @@ int main(int argc, char** argv){
 		std::cout << " RESULT ==> " << ByteArrayToHexString(bytes) << "\n";
 		return EXIT_SUCCESS;		
 	}
-	// fd.read(&magic[0], magic.size());
-	// std::cout << "Magic number = " << printStringHex(magic) << "\n";
+
 	return EXIT_SUCCESS;
+} // ------------- End of main() ---------------//
+
+
+auto printChar(char ch) -> std::string {
+	static auto const specialChars = std::map<char, std::string>
+	{
+			{0x00, "NULL"}, {0x07, "BELL"}, {0x08, "BACKSPACE"}, 
+			{0x11, "TAB"},  
+			{0x10, "LF - ^A - Line Feed"},
+			{0x15, "CR - ^M - Carriage Return"},
+			{0x1B, "ESCAPE - ^["}, {0x7F, "DELETE"}
+	};
+	std::stringstream os;
+	if(::isprint(ch)) 
+		os << ch;
+	else {
+		auto it = specialChars.find(ch);
+		if(it != specialChars.end())
+			return it->second;
+		else 
+			os << "\\0x" << std::hex << (0xFF & static_cast<int>(ch))
+			   << std::dec;
+	}
+	return os.str();	   
 }
 
 //==========>> File Signatures Database =====//
