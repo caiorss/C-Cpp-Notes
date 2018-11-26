@@ -2142,6 +2142,238 @@ Running in REPL:
   (double) -100.00000
   >> 
 #+END_SRC
+*** Example: Visitor implemented with C++17 std::variant 
+
+The type std::variant and the function std::visit from C++17 standard
+can simplify the implementation of visitor design pattern decreasing
+the amount of boilerplate code and the coupling between classes. In
+fact, by using std::visit, no class modification is required to
+implement this pattern.
+
+File:
+ + [[file:src/design-patterns/visitor1-cpp17.cpp][file:src/design-patterns/visitor1-cpp17.cpp]]
+
+Online Compiler:
+ + [[https://coliru.stacked-crooked.com/a/7130e9b6494370d5][visitor1-cpp17.cpp]] 
+
+Headers used: 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <cstdio>
+  #include <string>
+  #include <memory>
+  #include <functional>
+  #include<type_traits>
+  // C++17 Variant std::variant and std::visit 
+  #include <variant> 
+#+END_SRC
+
+Classes: 
+
+#+BEGIN_SRC cpp 
+  class Circle{
+  public:
+      double radius;
+      Circle(double radius): radius(radius) { }
+  };
+
+  class Square{
+  public:
+      double side;
+      Square(double side): side(side) { }
+  };
+
+  class Blob{
+  public:
+      Blob(){}
+  };
+#+END_SRC
+
+Simple visitor: 
+ + Implements operation which prints the description of an element in
+   the class "hierarchy".
+
+#+BEGIN_SRC cpp 
+  struct PrintNameVisitor{
+      void operator()(const Circle& sh){
+           std::cout << " SHAPE = Circle of radius " << sh.radius << std::endl;
+      }
+      void operator()(const Square& sh){
+           std::cout << " SHAPE = Square of radius " << sh.side << std::endl;
+      }
+      void operator()(const Blob&){
+           std::cout << " SHAPE = Blob - no one knows how it looks like. " << std::endl;
+      }	
+  };
+#+END_SRC
+
+Generic Visitor: 
+ + Turns 3 lambda functions ,which processes each element, into a
+   visitor object. 
+
+#+BEGIN_SRC cpp 
+  /** Visitor which adpts a function */
+  template<typename Result>
+  class FunctionVisitor{
+  private:	
+       template<typename Input> using FN = std::function<Result (const Input&)>;
+       FN<Circle> fn_circle;
+       FN<Square> fn_square;
+       FN<Blob>   fn_blob;
+  public:
+      FunctionVisitor(FN<Circle> fnCircle, FN<Square> fnSquare, FN<Blob> fnBlob)
+       : fn_circle(fnCircle)
+        ,fn_square(fnSquare)
+        ,fn_blob(fnBlob){ }
+      //Result get() const { return result; }
+      Result operator()(const Circle& sh){ return fn_circle(sh); }
+      Result operator()(const Square& sh){ return fn_square(sh); }
+      Result operator()(const Blob& sh){  return fn_blob(sh);   }
+  };
+#+END_SRC
+
+ + Higher order function makeVisitor, turn 3 lambda functions into a
+   single visitor lambda function. 
+
+#+BEGIN_SRC cpp 
+  template<typename Input, typename Result>
+  using FnVisit = std::function<Result (const Input&)>;
+
+  /** Make a visitor using a functional-programming way 
+   ,* Visitor with lambdas look like "pattern matching"  
+   ,* from functional languages.
+   ,*/
+  template<typename Result = void>
+  auto makeVisitor(FnVisit<Circle, Result> fnCircle,
+                   FnVisit<Square, Result> fnSquare,
+                   FnVisit<Blob, Result>   fnBlob ){
+          return [=](auto&& a){
+                     using C = std::decay_t<decltype(a)>;
+                     if constexpr(std::is_same_v<C, Circle>){               
+                          return fnCircle(a);
+                     }
+                     if constexpr(std::is_same_v<C, Square>){
+                          return fnSquare(a);
+                     }
+                     if constexpr(std::is_same_v<C, Blob>){               
+                         return fnBlob(a);
+                     }
+                     std::cerr << "WARNING - Not returned valid result";
+                     return Result{};
+               };
+  } //-- EoF makeVisitor ----// 
+#+END_SRC
+
+Variant type Shape: 
+ + An instance of this type can be a Circle, Square or Blob.
+
+#+BEGIN_SRC cpp 
+   using Shape = std::variant<Circle, Square, Blob>;	
+#+END_SRC
+
+Sample shapes: 
+
+#+BEGIN_SRC cpp 
+  // Sample shapes
+  Shape s1 = Circle(3.0);
+  Shape s2 = Square(4.0);
+  Shape s3 = Blob();
+#+END_SRC
+
+
+ + *Experiment Code 1*
+
+#+BEGIN_SRC cpp 
+   std::puts("\n === EXPERIMENT 1 =================");
+   std::visit(printVisitor, s1);
+   std::visit(printVisitor, s2);
+   std::visit(printVisitor, s3);
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC text 
+   === EXPERIMENT 1 =================
+   SHAPE = Circle of radius 3
+   SHAPE = Square of radius 4
+   SHAPE = Blob - no one knows how it looks like. 
+#+END_SRC
+
+ + *Experiment Code 2*
+
+#+BEGIN_SRC cpp 
+    std::puts("\n === EXPERIMENT 2 =================");
+    auto visitorGetName = FunctionVisitor<std::string>{
+        [](const Circle& ) { return "circle"; },
+        [](const Square& ) { return "square"; },
+        [](const  Blob&  ) { return "blob";   }
+    };
+
+    std::cout << "Type of shape 1 = " << std::visit(visitorGetName, s1) << "\n";
+    std::cout << "Type of shape 2 = " << std::visit(visitorGetName, s2) << "\n";
+    std::cout << "Type of shape 3 = " << std::visit(visitorGetName, s3) << "\n";
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC text 
+   === EXPERIMENT 2 =================
+  Type of shape 1 = circle
+  Type of shape 2 = square
+  Type of shape 3 = blob
+#+END_SRC
+
+ + *Experiment Code 3*
+
+#+BEGIN_SRC cpp 
+   std::puts("\n === EXPERIMENT 3 =================");
+
+   // Creates operation to compute shape perimeter
+   auto visitorGetArea = FunctionVisitor<double>{
+       [](const Circle& s){ return 3.1415 * s.radius * s.radius ; },
+       [](const Square& s){ return s.side * s.side; },
+       [](const Blob&    ){ return 0.0 / 0.0; /* NAN Not a number */   },
+   };
+
+   std::cout << "Area of shape 1 = " << std::visit(visitorGetArea, s1) << "\n";
+   std::cout << "Area of shape 2 = " << std::visit(visitorGetArea, s2) << "\n";
+   std::cout << "Area of shape 3 = " << std::visit(visitorGetArea, s3) << "\n";
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC text 
+   === EXPERIMENT 3 =================
+  Area of shape 1 = 28.2735
+  Area of shape 2 = 16
+  Area of shape 3 = nan
+#+END_SRC
+
+ + *Experiment Code 4*
+
+#+BEGIN_SRC cpp 
+    std::puts("\n === EXPERIMENT 4 =================");
+
+    auto fnVisitorArea = makeVisitor<double>(
+        [](const Circle& s){ return 3.1415 * s.radius * s.radius ; }
+       ,[](const Square& s){ return s.side * s.side; }
+       ,[](const Blob&    ){ return 0.0 / 0.0; /* NAN Not a number */   }
+     );
+
+    std::cout << "Area of shape 1 = " << std::visit(fnVisitorArea, s1) << "\n";
+    std::cout << "Area of shape 2 = " << std::visit(fnVisitorArea, s2) << "\n";
+    std::cout << "Area of shape 3 = " << std::visit(fnVisitorArea, s3) << "\n";
+#+END_SRC
+
+Output:
+
+#+BEGIN_SRC text 
+   === EXPERIMENT 4 =================
+  Area of shape 1 = 28.2735
+  Area of shape 2 = 16
+  Area of shape 3 = nan
+#+END_SRC
 
 * C++ Specific Design Pattern and Idioms
 ** Interface Class 
