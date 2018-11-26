@@ -964,4 +964,1164 @@ References:
 
  + [[https://cs.baylor.edu/~donahoo/tools/gdb/gdb.html][Debugging with GDB]]
 
+* WindBG - Windows Debugger 
+** Overview 
+
+Microsft provides many Windows debuggers other than Visual Studio
+Debugger. Despite their difference their engine is the same, is the
+_DbgEng_ which is a COM component.
+
+Windows Debuggers: 
+ 
+ + NTSD - Microsft NT Symbolic Debugger
+ + CDB  - Microsft Console Debugger 
+ + WinDbg - Graphical interface for Windows debug engine DbgEng.
+ + KD - Kernel Debugger.
+
+The Windows Debugger - Windbg is an invaluable tool for a wide
+variety of tasks such as: 
+ 
+ + Debugging and troubleshooting - processes, applications.
+ + Discover Windows Internals
+ + Analysis of a process crash dumps or post mortem analysis of a
+   processes
+ + Reverse engineering
+ + Security auditing
+ + Development of exploits
+ + Check runtime dependencies of a process or dlls used by a process. 
+
+Capabilities:
+
+ + Usermode debugging
+ + Kernel mode debugging
+ + Remote debugging
+ + Post-mortem or debugging of program crash dump, aka core dump.
+ + Debugging of 32 bits or 64 bits applications.
+ + Attach-to-process deubugging - allows to spy on a process and
+   gather information, reverse engineer, check what it is doing ...
+ + Scriptable and extensible with many programming languages including
+   Python. 
+
+Drawbacks: 
+
+ + Steep learning curve. 
+ + Not very documented and sparse documentation.
+ + Cryptic commands. 
+
+** Command Summary 
+
+ + http://dblohm7.ca/pmo/windbgcheatsheet.html
+
+ + [[http://kipirvine.com/asm/4th/debug/windbg/index.htm][Using Microsoft Windows Debugger]]
+
+ + [[https://bugslasher.net/2011/01/15/memory-exhaustion-even-if-a-large-enough-free-memory-segment-is-available/][Memory management under Windows : what your mother didn’t tell you | BugSlasher]]
+
+ 
+| Command                      | Action                                                                           |
+|------------------------------+----------------------------------------------------------------------------------|
+| version                      | Show debugger version                                                            |
+| ?                            | Show basic help                                                                  |
+| .cls                         | Clear Screen                                                                     |
+| bl                           | Show braking points                                                              |
+| bc                           | Clear breaking points                                                            |
+| bp kernel32!CreateNamedPipeW | Set break point on a symbol (function CreateNamedpipeW) from kernel32.dll        |
+| bp client!main               | Set a break point on main function - note: client.exe is the app being debugged. |
+| t                            | Step Into                                                                        |
+| p                            | Step Over                                                                        |
+| g                            | Continue to the next break point                                                 |
+| q                            | Detach debugger and kill process being debugged                                  |
+| qd                           | Detach debugger without killing process being debugged                           |
+|                              |                                                                                  |
+| .tlist                       | Show all processes in the current machine                                        |
+| .attach <process-id>         | Attach debugger to some process                                                  |
+| .create ~E:\progs\app.exe~     | Create a process                                                                 |
+|                              |                                                                                  |
+| dv                           | Display Local Variables - Equivalent to window local variables                   |
+| ~dt *!*~                        | Display all data structures from all modules (dlls)                              |
+| dt ntdll!*                    | Show all data structures available in the module ntdll (ntdll.dll)               |
+| ~!peb~                         | Show process' PEB - Process Environment Block                                    |
+| lm                           | Show loaded modules (dlls) - shared libraries used by the application.           |
+| lmf                          | Show loaded modules with paths (dlls.)                                           |
+|                              |                                                                                  |
+|                              |                                                                                  |
+
+** Basic Debugger Commands 
+*** Show hlep 
+
+ - Command: !help 
+
+#+BEGIN_SRC text 
+0:000> !help
+address [address]          - Displays the address space layout
+        [-UsageType]       - Displays the address space regions of the given type
+analyze [-v]               - Analyzes current exception or bugcheck
+cpuid [processor]          - Displays CPU version info for all CPUs
+elog_str <message>         - Logs simple message to host event log
+cppexr <exraddress>        - Displays a C++ EXCEPTION_RECORD
+error [errorcode]          - Displays Win32 & NTSTATUS error string
+exchain                    - Displays exception chain for current thread
+for_each_frame <cmd>       - Executes command for each frame in current
+                             thread
+for_each_local <cmd> $$<n> - Executes command for each local variable in
+                             current frame, substituting fixed-name alias
+                             $u<n> for each occurrence of $$<n>
+gle [-all]                 - Displays last error & status for current thread
+imggp <imagebase>          - Displays GP directory entry for 64-bit image
+imgreloc <imagebase>       - Relocates modules for an image
+list [-? | parameters]     - Displays lists
+obja <address>             - Displays OBJECT_ATTRIBUTES[32|64]
+owner [symbol!module]      - Detects owner for current exception or
+                             bugcheck from triage.ini
+rtlavl <address>           - Displays RTL_AVL_TABLE
+std_map <address>          - Displays a std::map<>
+str <address>              - Displays ANSI_STRING or OEM_STRING
+ustr <address>             - Displays UNICODE_STRING
+
+
+#+END_SRC
+
+*** Clear screen 
+
+ - Command: _.cls_
+
+#+BEGIN_SRC text 
+0:000> .cls
+#+END_SRC
+*** Display version 
+ 
+ - Command: version 
+
+#+BEGIN_SRC sh 
+0:000> version
+
+Windows 10 Version 17134 UP Free x64
+Product: WinNt, suite: SingleUserTS
+17134.1.amd64fre.rs4_release.180410-1804
+Machine Name:
+Debug session time: Sun Aug 26 16:54:20.077 2018 (UTC - 7:00)
+System Uptime: 10 days 4:18:43.003
+Process Uptime: 0 days 1:21:04.373
+  Kernel time: 0 days 0:00:00.000
+  User time: 0 days 0:00:00.046
+Live user mode: <Local>
+
+Microsoft (R) Windows Debugger Version 10.0.17134.12 AMD64
+Copyright (c) Microsoft Corporation. All rights reserved.
+
+ ...  ...  ...  ...  ...  ...  ...  ...  ...  ... 
+#+END_SRC
+
+*** Display source search path 
+
+ - Command: .srcpath 
+
+#+BEGIN_SRC text 
+  0:000> .srcpath
+  Source search path is: C:\Users\archbox\Desktop\wincpp\com-ole\comtest
+
+  ************* Path validation summary **************
+  Response                         Time (ms)     Location
+  OK                                             C:\Users\archbox\Desktop\wincpp\com-ole\comtest
+
+#+END_SRC
+
+*** Display loaded modules
+
+ - Command: _lm_
+
+Note: The modules are dlls loaded in the process' addresss space, such
+as ntdll.dll, service.dll and etc.
+
+#+BEGIN_SRC text 
+>> lm
+  start             end                 module name
+  00007ff6`69b50000 00007ff6`69c59000   client     (deferred)             
+  00007ff8`3dfc0000 00007ff8`3e005000   service    (deferred)             
+  00007ff8`4ec10000 00007ff8`4eca8000   uxtheme    (deferred)             
+  00007ff8`50740000 00007ff8`50751000   kernel_appcore   (deferred)             
+  00007ff8`507d0000 00007ff8`50a43000   KERNELBASE   (deferred)             
+  00007ff8`512c0000 00007ff8`51452000   gdi32full   (deferred)             
+  00007ff8`51460000 00007ff8`514da000   bcryptPrimitives   (deferred)             
+  00007ff8`514e0000 00007ff8`5157f000   msvcp_win   (deferred)             
+  00007ff8`51580000 00007ff8`515a0000   win32u     (deferred)             
+  00007ff8`51790000 00007ff8`5188a000   ucrtbase   (deferred)             
+  00007ff8`518f0000 00007ff8`51918000   GDI32      (deferred)             
+  00007ff8`51920000 00007ff8`51a71000   ole32      (deferred)             
+  00007ff8`51e80000 00007ff8`51fa4000   RPCRT4     (deferred)             
+  00007ff8`51fb0000 00007ff8`52140000   USER32     (deferred)             
+  00007ff8`52140000 00007ff8`5219b000   sechost    (deferred)             
+  00007ff8`521a0000 00007ff8`5223e000   msvcrt     (deferred)             
+  00007ff8`52240000 00007ff8`52563000   combase    (private pdb symbols)  C:\ProgramData\dbg\sym\combase.pdb\8BD819B4B577CBB5053ADA5ED7AA29E91\combase.pdb
+  00007ff8`53a80000 00007ff8`53aad000   IMM32      (deferred)             
+  00007ff8`54080000 00007ff8`54120000   clbcatq    (deferred)             
+  00007ff8`54120000 00007ff8`541d2000   KERNEL32   (deferred)             
+  00007ff8`54400000 00007ff8`545e1000   ntdll      (pdb symbols)          C:\ProgramData\dbg\sym\ntdll.pdb\EA3C05F9EA540B02C1971816AF7CC8D21\ntdll.pdb
+
+#+END_SRC
+*** Display loaded modules with file name 
+
+ - Command: _lmf_
+
+#+BEGIN_SRC text 
+   0:000> lmf
+
+   start             end                 module name
+   00007ff6`69b50000 00007ff6`69c59000   client   client.exe  
+   00007ff8`3dfc0000 00007ff8`3e005000   service  C:\Users\archbox\Desktop\wincpp\com-ole\comtest\service.dll
+   00007ff8`4ec10000 00007ff8`4eca8000   uxtheme  C:\WINDOWS\system32\uxtheme.dll
+   00007ff8`50740000 00007ff8`50751000   kernel_appcore C:\WINDOWS\System32\kernel.appcore.dll
+   00007ff8`507d0000 00007ff8`50a43000   KERNELBASE C:\WINDOWS\System32\KERNELBASE.dll
+   00007ff8`512c0000 00007ff8`51452000   gdi32full C:\WINDOWS\System32\gdi32full.dll
+   00007ff8`51460000 00007ff8`514da000   bcryptPrimitives C:\WINDOWS\System32\bcryptPrimitives.dll
+   00007ff8`514e0000 00007ff8`5157f000   msvcp_win C:\WINDOWS\System32\msvcp_win.dll
+   00007ff8`51580000 00007ff8`515a0000   win32u   C:\WINDOWS\System32\win32u.dll
+   00007ff8`51790000 00007ff8`5188a000   ucrtbase C:\WINDOWS\System32\ucrtbase.dll
+   00007ff8`518f0000 00007ff8`51918000   GDI32    C:\WINDOWS\System32\GDI32.dll
+   00007ff8`51920000 00007ff8`51a71000   ole32    C:\WINDOWS\System32\ole32.dll
+   00007ff8`51e80000 00007ff8`51fa4000   RPCRT4   C:\WINDOWS\System32\RPCRT4.dll
+   00007ff8`51fb0000 00007ff8`52140000   USER32   C:\WINDOWS\System32\USER32.dll
+   00007ff8`52140000 00007ff8`5219b000   sechost  C:\WINDOWS\System32\sechost.dll
+   00007ff8`521a0000 00007ff8`5223e000   msvcrt   C:\WINDOWS\System32\msvcrt.dll
+   00007ff8`52240000 00007ff8`52563000   combase  C:\WINDOWS\System32\combase.dll
+   00007ff8`53a80000 00007ff8`53aad000   IMM32    C:\WINDOWS\System32\IMM32.DLL
+   00007ff8`54080000 00007ff8`54120000   clbcatq  C:\WINDOWS\System32\clbcatq.dll
+   00007ff8`54120000 00007ff8`541d2000   KERNEL32 C:\WINDOWS\System32\KERNEL32.DLL
+   00007ff8`54400000 00007ff8`545e1000   ntdll    ntdll.dll   
+
+#+END_SRC
+*** Show verbose information about module 
+
+ - It shows verbose information about a given module including image,
+   symbol, path to file and etc. 
+
+ - Command: _lm vm <module>_
+
+Examples:
+ + lm vm kernel32  (Information about kernel32.dll)
+ + lm vm service   (Information about service.dll)
+
+Show information about module ntdll.dll 
+
+#+BEGIN_SRC text 
+  0:000> lm vm ntdll
+
+  Browse full module list
+  start             end                 module name
+  00007ff8`54400000 00007ff8`545e1000   ntdll      (pdb symbols)          C:\ProgramData\dbg\sym\ntdll.pdb\EA3C05F9EA540B02C1971816AF7CC8D21\ntdll.pdb
+      Loaded symbol image file: C:\WINDOWS\SYSTEM32\ntdll.dll
+      Image path: ntdll.dll
+      Image name: ntdll.dll
+      Browse all global symbols  functions  data
+      Image was built with /Brepro flag.
+      Timestamp:        6D15B6D7 (This is a reproducible build file hash, not a timestamp)
+      CheckSum:         001EA411
+      ImageSize:        001E1000
+      File version:     10.0.17134.228
+      Product version:  10.0.17134.228
+      File flags:       0 (Mask 3F)
+      File OS:          40004 NT Win32
+      File type:        2.0 Dll
+      File date:        00000000.00000000
+      Translations:     0409.04b0
+      Information from resource tables:
+          CompanyName:      Microsoft Corporation
+          ProductName:      Microsoft® Windows® Operating System
+          InternalName:     ntdll.dll
+          OriginalFilename: ntdll.dll
+          ProductVersion:   10.0.17134.228
+          FileVersion:      10.0.17134.228 (WinBuild.160101.0800)
+          FileDescription:  NT Layer DLL
+          LegalCopyright:   © Microsoft Corporation. All rights reserved.
+#+END_SRC
+
+ Show information about module service.dll 
+
+#+BEGIN_SRC text 
+  0:000> lm vm service
+  Browse full module list
+  start             end                 module name
+  00007ff8`3dfc0000 00007ff8`3e005000   service    (deferred)             
+      Image path: C:\Users\archbox\Desktop\wincpp\com-ole\comtest\service.dll
+      Image name: service.dll
+      Browse all global symbols  functions  data
+      Timestamp:        Thu Aug 23 10:44:03 2018 (5B7EF263)
+      CheckSum:         00000000
+      ImageSize:        00045000
+      Translations:     0000.04b0 0000.04e4 0409.04b0 0409.04e4
+      Information from resource tables:
+
+#+END_SRC
+*** Show module headers 
+
+Show module headers 
+
+ - Command: !dh <module> -f 
+
+#+BEGIN_SRC text 
+  :000> !dh out2 -f
+
+  File Type: EXECUTABLE IMAGE
+  FILE HEADER VALUES
+      8664 machine (X64)
+         7 number of sections
+  5B89DE49 time date stamp Fri Aug 31 17:33:13 2018
+
+         0 file pointer to symbol table
+         0 number of symbols
+        F0 size of optional header
+        22 characteristics
+              Executable
+              App can handle >2gb addresses
+
+  OPTIONAL HEADER VALUES
+       20B magic #
+     14.12 linker version
+     CAE00 size of code
+     42E00 size of initialized data
+         0 size of uninitialized data
+      28C4 address of entry point
+      1000 base of code
+           ----- new -----
+  00007ff6c7f40000 image base
+      1000 section alignment
+       200 file alignment
+         3 subsystem (Windows CUI)
+      6.00 operating system version
+      0.00 image version
+      6.00 subsystem version
+    112000 size of image
+       400 size of headers
+         0 checksum
+  0000000000100000 size of stack reserve
+  0000000000001000 size of stack commit
+  0000000000100000 size of heap reserve
+  0000000000001000 size of heap commit
+      8160  DLL characteristics
+              High entropy VA supported
+              Dynamic base
+              NX compatible
+              Terminal server aware
+         0 [       0] address [size] of Export Directory
+    10D3E8 [      28] address [size] of Import Directory
+         0 [       0] address [size] of Resource Directory
+    103000 [    8748] address [size] of Exception Directory
+         0 [       0] address [size] of Security Directory
+    110000 [    11BC] address [size] of Base Relocation Directory
+     E6060 [      38] address [size] of Debug Directory
+         0 [       0] address [size] of Description Directory
+         0 [       0] address [size] of Special Directory
+         0 [       0] address [size] of Thread Storage Directory
+     E60A0 [     100] address [size] of Load Configuration Directory
+         0 [       0] address [size] of Bound Import Directory
+    10D000 [     3E8] address [size] of Import Address Table Directory
+         0 [       0] address [size] of Delay Import Directory
+         0 [       0] address [size] of COR20 Header Directory
+         0 [       0] address [size] of Reserved Directory
+
+#+END_SRC
+
+*** Show memory of module 
+
+List modules: 
+
+#+BEGIN_SRC text  
+  0:000> lm
+  start             end                 module name
+  00007ff6`69b50000 00007ff6`69c59000   client   C (private pdb symbols)  C:\ProgramData\dbg\sym\client.pdb\8051143355D841DDB7EE7257B7AE231814\client.pdb
+   ... ... ... ... 
+  00007ff8`54120000 00007ff8`541d2000   KERNEL32   (pdb symbols)          C:\ProgramData\dbg\sym\kernel32.pdb\63816243EC704DC091BC31470BAC48A31\kernel32.pdb
+  00007ff8`54400000 00007ff8`545e1000   ntdll      (pdb symbols)          C:\ProgramData\dbg\sym\ntdll.pdb\EA3C05F9EA540B02C1971816AF7CC8D21\ntdll.pdb
+
+#+END_SRC
+
+Select module ntdll 
+
+ - 00007ff8`54400000
+   + Show where in the virtual address space the module is loaded.
+ - 00007ff8`545e1000
+
+#+BEGIN_SRC text 
+  00007ff8`54400000 00007ff8`545e1000   ntdll      (pdb symbols)          C:\ProgramData\dbg\sym\ntdll.pdb\EA3C05F9EA540B02C1971816AF7CC8D21\ntdll.pdb
+#+END_SRC
+
+Diplay bytes of the region: 00007ff8`54400000
+ 
+ - db: d(display) b(bytes)
+
+#+BEGIN_SRC text 
+   0:000> db 00007ff8`54400000
+   00007ff8`54400000  4d 5a 90 00 03 00 00 00-04 00 00 00 ff ff 00 00  MZ..............
+   00007ff8`54400010  b8 00 00 00 00 00 00 00-40 00 00 00 00 00 00 00  ........@.......
+   00007ff8`54400020  00 00 00 00 00 00 00 00-00 00 00 00 00 00 00 00  ................
+   00007ff8`54400030  00 00 00 00 00 00 00 00-00 00 00 00 e8 00 00 00  ................
+   00007ff8`54400040  0e 1f ba 0e 00 b4 09 cd-21 b8 01 4c cd 21 54 68  ......	.!..L.!Th
+   00007ff8`54400050  69 73 20 70 72 6f 67 72-61 6d 20 63 61 6e 6e 6f  is program canno
+   00007ff8`54400060  74 20 62 65 20 72 75 6e-20 69 6e 20 44 4f 53 20  t be run in DOS 
+   00007ff8`54400070  6d 6f 64 65 2e 0d 0d 0a-24 00 00 00 00 00 00 00  mode....$.......
+#+END_SRC
+
+Display region as dwords (32 bits values)
+
+#+BEGIN_SRC text 
+   0:000> dc 00007ff8`54400000
+   00007ff8`54400000  00905a4d 00000003 00000004 0000ffff  MZ..............
+   00007ff8`54400010  000000b8 00000000 00000040 00000000  ........@.......
+   00007ff8`54400020  00000000 00000000 00000000 00000000  ................
+   00007ff8`54400030  00000000 00000000 00000000 000000e8  ................
+   00007ff8`54400040  0eba1f0e cd09b400 4c01b821 685421cd  ......	.!..L.!Th
+   00007ff8`54400050  70207369 72676f72 63206d61 6f6e6e61  is program canno
+   00007ff8`54400060  65622074 6e757220 206e6920 20534f44  t be run in DOS 
+   00007ff8`54400070  65646f6d 0a0d0d2e 00000024 00000000  mode....$.......
+#+END_SRC
+
+*** Show formatted output about the Process Environment Block (PEB)
+
+Show PEB - Process Environment Block memory location (aka address)
+
+#+BEGIN_SRC text 
+   0:000> .process
+   Implicit process is now 00000096`d8a7d000
+#+END_SRC
+
+Show PEB - Process Environment Block 
+
+ - Command: _!peb_
+
+#+BEGIN_SRC text 
+  0:000> !peb
+  PEB at 000000a87accf000
+      InheritedAddressSpace:    No
+      ReadImageFileExecOptions: No
+      BeingDebugged:            Yes
+      ImageBaseAddress:         00007ff669b50000
+      Ldr                       00007ff85455c360
+      Ldr.Initialized:          Yes
+      Ldr.InInitializationOrderModuleList: 000002986df32e80 . 000002986df523b0
+      Ldr.InLoadOrderModuleList:           000002986df33030 . 000002986df52390
+      Ldr.InMemoryOrderModuleList:         000002986df33040 . 000002986df523a0
+                      Base TimeStamp                     Module
+              7ff669b50000 5b7ef429 Aug 23 10:51:37 2018 C:\Users\archbox\Desktop\wincpp\com-ole\comtest\client.exe
+              7ff854400000 6d15b6d7 Dec 29 20:06:47 2027 C:\WINDOWS\SYSTEM32\ntdll.dll
+              7ff854120000 5f488a51 Aug 27 21:38:41 2020 C:\WINDOWS\System32\KERNEL32.DLL
+              7ff8507d0000 b0bb231d Dec 16 10:10:37 2063 C:\WINDOWS\System32\KERNELBASE.dll
+              7ff851920000 f6d21073 Mar 22 12:11:47 2101 C:\WINDOWS\System32\ole32.dll
+              7ff852240000 fad18dc5 May 07 20:15:17 2103 C:\WINDOWS\System32\combase.dll
+              7ff851790000 5db729cd Oct 28 10:47:57 2019 C:\WINDOWS\System32\ucrtbase.dll
+              7ff851e80000 a1f1190d Feb 04 15:26:05 2056 C:\WINDOWS\System32\RPCRT4.dll
+              7ff851460000 df1abf1c Aug 11 07:13:48 2088 C:\WINDOWS\System32\bcryptPrimitives.dll
+              7ff8518f0000 2ad7837c Oct 10 18:29:32 1992 C:\WINDOWS\System32\GDI32.dll
+              7ff8512c0000 460017f0 Mar 20 10:20:48 2007 C:\WINDOWS\System32\gdi32full.dll
+              7ff8514e0000 b8c3e718 Mar 24 13:27:04 2068 C:\WINDOWS\System32\msvcp_win.dll
+              7ff851fb0000 fd9a9c22 Oct 29 17:02:42 2104 C:\WINDOWS\System32\USER32.dll
+              7ff851580000 b8eb0e32 Apr 23 06:12:18 2068 C:\WINDOWS\System32\win32u.dll
+              7ff852140000 aa4b708f Jul 14 15:45:35 2060 C:\WINDOWS\System32\sechost.dll
+              7ff853a80000 7a45968f Jan 02 12:01:19 2035 C:\WINDOWS\System32\IMM32.DLL
+              7ff850740000 f0a997a7 Dec 11 16:24:07 2097 C:\WINDOWS\System32\kernel.appcore.dll
+              7ff8521a0000 5cbba6fd Apr 20 16:10:53 2019 C:\WINDOWS\System32\msvcrt.dll
+              7ff84ec10000 66e92861 Sep 16 23:57:37 2024 C:\WINDOWS\system32\uxtheme.dll
+              7ff854080000 9fbc25bf Dec 03 02:49:35 2054 C:\WINDOWS\System32\clbcatq.dll
+              7ff83dfc0000 5b7ef263 Aug 23 10:44:03 2018 C:\Users\archbox\Desktop\wincpp\com-ole\comtest\service.dll
+      SubSystemData:     0000000000000000
+      ProcessHeap:       000002986df30000
+      ProcessParameters: 000002986df32520
+      CurrentDirectory:  'C:\Program Files (x86)\Windows Kits\10\Debuggers\'
+      WindowTitle:  'C:\Users\archbox\Desktop\wincpp\com-ole\comtest\client.exe'
+      ImageFile:    'C:\Users\archbox\Desktop\wincpp\com-ole\comtest\client.exe'
+      CommandLine:  'C:\Users\archbox\Desktop\wincpp\com-ole\comtest\client.exe'
+      DllPath:      '< Name not readable >'
+      Environment:  000002986df31100
+          =::=::\
+          ALLUSERSPROFILE=C:\ProgramData
+          APPDATA=C:\Users\archbox\AppData\Roaming
+          ChocolateyInstall=C:\ProgramData\chocolatey
+          ChocolateyLastPathUpdate=Wed Aug  1 00:29:26 2018
+          ChocolateyToolsLocation=C:\tools
+          CLASSPATH=.;
+          CommonProgramFiles=C:\Program Files\Common Files
+          CommonProgramFiles(x86)=C:\Program Files (x86)\Common Files
+          CommonProgramW6432=C:\Program Files\Common Files
+          COMPUTERNAME=DESKTOP-2TJVI2H
+          ComSpec=C:\WINDOWS\system32\cmd.exe
+          DriverData=C:\Windows\System32\Drivers\DriverData
+          FPS_BROWSER_APP_PROFILE_STRING=Internet Explorer
+          FPS_BROWSER_USER_PROFILE_STRING=Default
+          FSHARPINSTALLDIR=C:\Program Files (x86)\Microsoft SDKs\F#\4.1\Framework\v4.0\
+          HOME=C:\Users\archbox
+          HOMEDRIVE=C:
+          HOMEPATH=\Users\archbox
+          JAVA_HOME=C:\Program Files\Java\jdk1.8.0_162
+          LOCALAPPDATA=C:\Users\archbox\AppData\Local
+          LOGONSERVER=\\DESKTOP-2TJVI2H
+          NUMBER_OF_PROCESSORS=1
+          OneDrive=C:\Users\archbox\OneDrive
+          OS=Windows_NT
+          Path=C:\Program Files (x86)\Windows Kits\10\Debuggers\x64;C:\WINDOWS\system32;C:\WINDOWS;C:\WINDOWS\System32\Wbem;C:\WINDOWS\System32\WindowsPowerShell\v1.0\;C:\ProgramData\chocolatey\bin;C:\Program Files\Java\jdk1.8.0_162\bin;C:\Program Files (x86)\scala\bin;C:\Program Files\Git\cmd;C:\Program Files\LLVM\bin;C:\WINDOWS\System32\OpenSSH\;C:\Users\archbox\bin;C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0\;C:\ProgramData\chocolatey\bin;C:\Program Files\Java\jdk1.8.0_162\bin;C:\Program Files (x86)\scala\bin;C:\Users\archbox\AppData\Local\Microsoft\WindowsApps;;C:\Users\archbox\AppData\Local\Microsoft\WindowsApps;C:\tools\cmder;C:\tools\mingw64\bin;
+          PATHEXT=.COM;.EXE;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.MSC
+          PROCESSOR_ARCHITECTURE=AMD64
+          PROCESSOR_IDENTIFIER=Intel64 Family 6 Model 78 Stepping 3, GenuineIntel
+          PROCESSOR_LEVEL=6
+          PROCESSOR_REVISION=4e03
+          ProgramData=C:\ProgramData
+          ProgramFiles=C:\Program Files
+          ProgramFiles(x86)=C:\Program Files (x86)
+          ProgramW6432=C:\Program Files
+          PSModulePath=C:\Program Files\WindowsPowerShell\Modules;C:\WINDOWS\system32\WindowsPowerShell\v1.0\Modules
+          PUBLIC=C:\Users\Public
+          SESSIONNAME=Console
+          SRCSRV_SHOW_TF_PROMPT=1
+          SRCSRV_TIMEOUT_SECONDS=300
+          SystemDrive=C:
+          SystemRoot=C:\WINDOWS
+          TEMP=C:\Users\archbox\AppData\Local\Temp
+          TMP=C:\Users\archbox\AppData\Local\Temp
+          USERDOMAIN=DESKTOP-2TJVI2H
+          USERDOMAIN_ROAMINGPROFILE=DESKTOP-2TJVI2H
+          USERNAME=archbox
+          USERPROFILE=C:\Users\archbox
+          VS140COMNTOOLS=C:\Program Files (x86)\Microsoft Visual Studio 14.0\Common7\Tools\
+          WINDBG_DIR=C:\Program Files (x86)\Windows Kits\10\Debuggers\x64
+          windir=C:\WINDOWS
+
+#+END_SRC
+
+*** Show variables 
+
+Print local variables. It is equivalent to the window which displays
+local variable. 
+
+ - Command: dv
+
+#+BEGIN_SRC text 
+   0:000> dv
+   00000096`d895f6b0               dwBytesRead = 0x2c8
+   00000096`d895f6a8 NtQueryInformationProcess = 0x00007ff8`2dcfa1c0
+   00000096`d895f6f0                       peb = struct _PEB
+   00000096`d895f690                     hProc = 0xffffffff`ffffffff
+   00000096`d895f6b8                       pbi = struct _PROCESS_BASIC_INFORMATION
+   00000096`d895f698                   retsize = 0x30
+   00000096`d895f6a0                    hNtDLL = 0x00007ff8`2dc60000
+   00000096`d895f684                parent_pid = 0x1c84
+   00000096`d895f688                    status = 0n0
+
+#+END_SRC
+
+Print all local variables of current stack-frame. 
+ 
+ - Command: dv /t
+
+#+BEGIN_SRC text 
+   0:000> dv /t
+
+   00000096`d895f6b0 unsigned int64 dwBytesRead = 0x2c8
+   00000096`d895f6a8 <function> * NtQueryInformationProcess = 0x00007ff8`2dcfa1c0
+   00000096`d895f6f0 struct _PEB peb = struct _PEB
+   00000096`d895f690 void * hProc = 0xffffffff`ffffffff
+   00000096`d895f6b8 struct _PROCESS_BASIC_INFORMATION pbi = struct _PROCESS_BASIC_INFORMATION
+   00000096`d895f698 unsigned long retsize = 0x30
+   00000096`d895f6a0 struct HINSTANCE__ * hNtDLL = 0x00007ff8`2dc60000
+   00000096`d895f684 unsigned long parent_pid = 0x1c84
+   00000096`d895f688 long status = 0n0
+#+END_SRC
+
+*** Show HANDLEs or Kernel objects used by process 
+
+Show all handles used by the process being debugged. 
+
+#+BEGIN_SRC text 
+   0:000> !handle
+   Handle 4
+     Type         	Key
+   Handle 8
+     Type         	Event
+   Handle c
+     Type         	WaitCompletionPacket
+   Handle 10
+     Type         	IoCompletion
+   Handle 14
+     Type         	TpWorkerFactory
+   Handle 18
+     Type         	IRTimer
+   Handle 1c
+     Type         	WaitCompletionPacket
+   Handle 20
+     Type         	IRTimer
+   Handle 24
+     ... ... ... ... 
+   Type           	Count
+   None           	4
+   Event          	3
+   Section        	5
+   File           	6
+   Directory      	1
+   Key            	2
+   Thread         	2
+   IoCompletion   	2
+   TpWorkerFactory	2
+   ALPC Port      	1
+   WaitCompletionPacket	5
+
+#+END_SRC
+
+Show detailed information about a given handle. 
+
+#+BEGIN_SRC text 
+   0:000> !handle 40 f
+   Handle 40
+     Type         	File
+     Attributes   	0
+     GrantedAccess	0x100020:
+            Synch
+            Execute/Traverse
+     HandleCount  	2
+     PointerCount 	65536
+     No Object Specific Information available
+
+   0:000> !handle 34 f
+   Handle 34
+     Type         	Directory
+     Attributes   	0x10
+     GrantedAccess	0x3:
+            None
+            Query,Traverse
+     HandleCount  	117
+     PointerCount 	3826979
+     Name         	\KnownDlls
+     No Object Specific Information available
+
+#+END_SRC
+
+*** Show CPU Registers 
+
+ - Command: _r_
+
+#+BEGIN_SRC text 
+   0:000> r
+
+   rax=0000000080004005 rbx=0000000080004005 rcx=0000000000000000
+   rdx=0000000000000000 rsi=0000000000000000 rdi=0000000000000000
+   rip=00007ff8522faf5a rsp=000000a87ab1e320 rbp=000000a87ab1e420
+    r8=000000a87ab1f650  r9=0000000000000000 r10=0000000000000000
+   r11=000002986df519bc r12=000000a87ab1f650 r13=0000000000000000
+   r14=0000000000000000 r15=0000000000000000
+   iopl=0         nv up ei pl nz na po nc
+   cs=0033  ss=002b  ds=002b  es=002b  fs=0053  gs=002b             efl=00010204
+   combase!CServerContextActivator::CreateInstance+0x23a:
+   00007ff8`522faf5a 488b01          mov     rax,qword ptr [rcx] ds:00000000`00000000=????????????????
+#+END_SRC
+
+*** Show threads 
+
+This commands shows the natives threads in the current process: 
+
+ - Command: (~) tilde. For every thread it is assigned an unique
+   Id. (Threads 0, 1, 2, 3 ...)
+
+#+BEGIN_SRC text 
+  0:000> ~
+
+  .  0  Id: 2144.f68 Suspend: 1 Teb: 000000a8`7acd0000 Unfrozen
+     1  Id: 2144.14c4 Suspend: 1 Teb: 000000a8`7acd4000 Unfrozen
+     2  Id: 2144.2310 Suspend: 1 Teb: 000000a8`7acd2000 Unfrozen
+#+END_SRC
+
+*** Show stack 
+
+Show stack of current thread (in this case thread of id = 0)
+ 
+ - Command: k 
+
+#+BEGIN_SRC text 
+  0:000> k
+   # Child-SP          RetAddr           Call Site
+  00 0000002f`12f3e090 00007ff8`522c5abf combase!CServerContextActivator::CreateInstance+0x23a [onecore\com\combase\objact\actvator.cxx @ 910] 
+  01 0000002f`12f3e210 00007ff8`522d63d1 combase!ActivationPropertiesIn::DelegateCreateInstance+0xef [onecore\com\combase\actprops\actprops.cxx @ 1905] 
+  02 0000002f`12f3e2a0 00007ff8`522d5b62 combase!CApartmentActivator::CreateInstance+0xc1 [onecore\com\combase\objact\actvator.cxx @ 2169] 
+  03 0000002f`12f3e350 00007ff8`522d5e30 combase!CProcessActivator::CCICallback+0x72 [onecore\com\combase\objact\actvator.cxx @ 1637] 
+  04 0000002f`12f3e390 00007ff8`522d5c7e combase!CProcessActivator::AttemptActivation+0x40 [onecore\com\combase\objact\actvator.cxx @ 1524] 
+  05 0000002f`12f3e3e0 00007ff8`522d608b combase!CProcessActivator::ActivateByContext+0xae [onecore\com\combase\objact\actvator.cxx @ 1368] 
+  06 0000002f`12f3e470 00007ff8`522c5a7d combase!CProcessActivator::CreateInstance+0x8b [onecore\com\combase\objact\actvator.cxx @ 1268] 
+  07 0000002f`12f3e4c0 00007ff8`522c334a combase!ActivationPropertiesIn::DelegateCreateInstance+0xad [onecore\com\combase\actprops\actprops.cxx @ 1905] 
+  08 0000002f`12f3e550 00007ff8`522c5a87 combase!CClientContextActivator::CreateInstance+0x14a [onecore\com\combase\objact\actvator.cxx @ 567] 
+  09 0000002f`12f3e800 00007ff8`52273138 combase!ActivationPropertiesIn::DelegateCreateInstance+0xb7 [onecore\com\combase\actprops\actprops.cxx @ 1957] 
+  0a 0000002f`12f3e890 00007ff8`52272589 combase!ICoCreateInstanceEx+0xa38 [onecore\com\combase\objact\objact.cxx @ 1959] 
+  0b 0000002f`12f3f710 00007ff8`52272393 combase!CComActivator::DoCreateInstance+0x169 [onecore\com\combase\objact\immact.hxx @ 385] 
+  0c (Inline Function) --------`-------- combase!CoCreateInstanceEx+0x88 [onecore\com\combase\objact\actapi.cxx @ 177] 
+  0d 0000002f`12f3f830 00007ff6`69b5e220 combase!CoCreateInstance+0xc3 [onecore\com\combase\objact\actapi.cxx @ 121] 
+  0e 0000002f`12f3f8d0 00007ff6`69ba0f40 client!main+0x1a0 [c:\users\archbox\desktop\wincpp\com-ole\comtest\client.cpp @ 34] 
+  0f (Inline Function) --------`-------- client!invoke_main+0x22 [f:\dd\vctools\crt\vcstartup\src\startup\exe_common.inl @ 78] 
+  10 0000002f`12f3f980 00007ff8`54133034 client!__scrt_common_main_seh+0x110 [f:\dd\vctools\crt\vcstartup\src\startup\exe_common.inl @ 283] 
+  11 0000002f`12f3f9c0 00007ff8`54471431 KERNEL32!BaseThreadInitThunk+0x14
+  12 0000002f`12f3f9f0 00000000`00000000 ntdll!RtlUserThreadStart+0x21
+#+END_SRC
+
+Show stack of thread 0 (id = 0)
+ 
+ - Command: k0 
+
+#+BEGIN_SRC text 
+   0:000> k0
+    # Child-SP          RetAddr           Call Site
+   00 0000002f`12f3e090 00007ff8`522c5abf combase!CServerContextActivator::CreateInstance+0x23a [onecore\com\combase\objact\actvator.cxx @ 910] 
+   01 0000002f`12f3e210 00007ff8`522d63d1 combase!ActivationPropertiesIn::DelegateCreateInstance+0xef [onecore\com\combase\actprops\actprops.cxx @ 1905] 
+   02 0000002f`12f3e2a0 00007ff8`522d5b62 combase!CApartmentActivator::CreateInstance+0xc1 [onecore\com\combase\objact\actvator.cxx @ 2169] 
+   03 0000002f`12f3e350 00007ff8`522d5e30 combase!CProcessActivator::CCICallback+0x72 [onecore\com\combase\objact\actvator.cxx @ 1637] 
+   04 0000002f`12f3e390 00007ff8`522d5c7e combase!CProcessActivator::AttemptActivation+0x40 [onecore\com\combase\objact\actvator.cxx @ 1524] 
+   05 0000002f`12f3e3e0 00007ff8`522d608b combase!CProcessActivator::ActivateByContext+0xae [onecore\com\combase\objact\actvator.cxx @ 1368] 
+   06 0000002f`12f3e470 00007ff8`522c5a7d combase!CProcessActivator::CreateInstance+0x8b [onecore\com\combase\objact\actvator.cxx @ 1268] 
+   07 0000002f`12f3e4c0 00007ff8`522c334a combase!ActivationPropertiesIn::DelegateCreateInstance+0xad [onecore\com\combase\actprops\actprops.cxx @ 1905] 
+   08 0000002f`12f3e550 00007ff8`522c5a87 combase!CClientContextActivator::CreateInstance+0x14a [onecore\com\combase\objact\actvator.cxx @ 567] 
+   09 0000002f`12f3e800 00007ff8`52273138 combase!ActivationPropertiesIn::DelegateCreateInstance+0xb7 [onecore\com\combase\actprops\actprops.cxx @ 1957] 
+   0a 0000002f`12f3e890 00007ff8`52272589 combase!ICoCreateInstanceEx+0xa38 [onecore\com\combase\objact\objact.cxx @ 1959] 
+   0b 0000002f`12f3f710 00007ff8`52272393 combase!CComActivator::DoCreateInstance+0x169 [onecore\com\combase\objact\immact.hxx @ 385] 
+   0c (Inline Function) --------`-------- combase!CoCreateInstanceEx+0x88 [onecore\com\combase\objact\actapi.cxx @ 177] 
+   0d 0000002f`12f3f830 00007ff6`69b5e220 combase!CoCreateInstance+0xc3 [onecore\com\combase\objact\actapi.cxx @ 121] 
+   0e 0000002f`12f3f8d0 00007ff6`69ba0f40 client!main+0x1a0 [c:\users\archbox\desktop\wincpp\com-ole\comtest\client.cpp @ 34] 
+   0f (Inline Function) --------`-------- client!invoke_main+0x22 [f:\dd\vctools\crt\vcstartup\src\startup\exe_common.inl @ 78] 
+   10 0000002f`12f3f980 00007ff8`54133034 client!__scrt_common_main_seh+0x110 [f:\dd\vctools\crt\vcstartup\src\startup\exe_common.inl @ 283] 
+   11 0000002f`12f3f9c0 00007ff8`54471431 KERNEL32!BaseThreadInitThunk+0x14
+   12 0000002f`12f3f9f0 00000000`00000000 ntdll!RtlUserThreadStart+0x21
+
+#+END_SRC
+
+Show stack of thread 1 (id = 1)
+
+ - Command: k1 
+
+#+BEGIN_SRC text 
+  0:000> k1
+   # Child-SP          RetAddr           Call Site
+  00 0000002f`12f3e090 00007ff8`522c5abf combase!CServerContextActivator::CreateInstance+0x23a [onecore\com\combase\objact\actvator.cxx @ 910] 
+
+#+END_SRC
+
+Show stack of thread N  where N = 0, 1, 2... (id = N)
+ 
+ - Command: k<N>
+
+*** List Processes 
+
+List all processes in the current machine. 
+
+ - Command: .tlist 
+
+#+BEGIN_SRC text 
+   :000> .tlist
+
+       0n0 System Process
+       0n4 System
+      0n68 Registry
+     0n336 smss.exe
+     0n420 csrss.exe
+     0n492 wininit.exe
+     0n504 csrss.exe
+     0n568 winlogon.exe
+      ...  ...  ...  ...  ...  ...  ... 
+    0n6504 SearchProtocolHost.exe
+    0n3584 SearchFilterHost.exe
+#+END_SRC
+
+*** Show all symbols exported by a module 
+
+ - Command: x<module>!*
+
+Examples: 
+ - xclient!*
+ - xntdll!* 
+
+Show all symbols exported by the module client (client.exe) or application
+being debugged. 
+
+#+BEGIN_SRC text 
+   >>> xclient!*
+   00007ff6`69c22130 client!__newclmap = unsigned char [] "???"
+   00007ff6`69c22130 client!__newclmap = unsigned char [384] "???"
+   00007ff6`69c23828 client!__exp_bias_m1 = 0x3fe
+   00007ff6`69c1f3d8 client!std::money_get<wchar_t,std::istreambuf_iterator<wchar_t,std::char_traits<wchar_t> > >::`vftable' = <function> *[6]
+   00007ff6`69c25af8 client!__acrt_signal_action_table_size = 0xc0
+   00007ff6`69c237d0 client!__pos_zero = 0
+   00007ff6`69c47a38 client!std::_Ptr_wcout = 0x00000000`00000000
+   00007ff6`69c450b0 client!_fltused = 0n39029
+   00007ff6`69c2d130 client!_LInf_C = union _float_const
+   00007ff6`69c2d310 client!__mask_mant = 0x000fffff`ffffffff
+   00007ff6`69c4a000 client!enable_percent_n = 0
+    , ... ... ... ... ... ... ... 
+
+   00007ff6`69c0b27e client!_abstract_sw =  (inline caller) client!_statusfp+a
+   00007ff6`69c0b318 client!_abstract_cw =  (inline caller) client!common_control87+28
+   00007ff6`69c0b3f7 client!_hw_cw =  (inline caller) client!common_control87+107
+   00007ff6`69c0b4f5 client!_abstract_cw =  (inline caller) client!common_control87+205
+#+END_SRC
+
+Show all symbols exported by the module ntdll 
+
+#+BEGIN_SRC text 
+   0:000> xntdll!*
+
+   00007ff8`5445c658 ntdll!RtlpHpVaMgrRangeCreate (void)
+   00007ff8`5444a7b0 ntdll!RtlFindLastBackwardRunClear (void)
+   00007ff8`54443f30 ntdll!EtwDeliverDataBlock (void)
+   00007ff8`54481790 ntdll!RtlpInitializeStaticCriticalSection (void)
+   00007ff8`5443f260 ntdll!RtlpTpWorkCallback (void)
+   00007ff8`544a2608 ntdll!RtlUnicodeStringToOemString$fin$0 (void)
+   00007ff8`54402a88 ntdll!TppETWTimerCancelled (void)
+   00007ff8`5445e5e0 ntdll!RtlpQueryExtendedInformationHeap (void)
+     ... ... .. ... ... .. ... ... .. ... ... .. ... ... 
+#+END_SRC
+
+*** Evaluate C++ Expressions 
+
+Reference: 
+
+ + [[https://blogs.msdn.microsoft.com/debuggingtoolbox/2008/03/04/special-command-using-c-and-poi-with-cc-expressions/][Special Command: Using ??, @@c++() and poi() with C/C++ Expressions – Debugging Toolbox]]
+ + [[http://apprize.info/programming/reverse/5.html][Debugging and Automation - Practical Reverse Engineering: x86, x64, ARM, Windows Kernel, Reversing Tools, and Obfuscation (2014)]]
+
+Commands: 
+ + Set the current expression evaluator to C++
+   + >> .expr /s c++
+ + Set the current expression evaluator to MASM (Microft Macro Assembler)
+   + >> .expr /s masm 
+
+Show available expression evaluators: 
+
+#+BEGIN_SRC text 
+0:000> .expr /q
+
+Available expression evaluators:
+MASM - Microsoft Assembler expressions
+C++ - C++ source expressions
+
+Current expression evaluator: MASM - Microsoft Assembler expressions
+Available expression evaluators:
+MASM - Microsoft Assembler expressions
+C++ - C++ source expressions
+
+Current expression evaluator: MASM - Microsoft Assembler expressions
+
+#+END_SRC
+
+Set C++ as defaul expression evaulator: 
+
+#+BEGIN_SRC text 
+0:000> .expr /s c++
+Current expression evaluator: C++ - C++ source expressions
+Current expression evaluator: C++ - C++ source expressions
+#+END_SRC
+
+Evaluate basic C++ expressions: 
+
+#+BEGIN_SRC text 
+   0:000> ?? @@c++(sizeof(int))
+   unsigned int64 4
+
+   0:000> ?? @@c++(sizeof(double))
+   unsigned int64 8
+
+   0:000> ?? @@c++(sizeof(long))
+   unsigned int64 4
+
+   0:000> ?? @@c++(sizeof(LPVOID))
+   unsigned int64 8
+
+   0:000> ?? @@c++(sizeof(LPSTR))
+   unsigned int64 8
+
+#+END_SRC
+
+Explorer process environment block data structure PEB. Note: The PEB
+can be seen with the command >> !peb 
+
+#+BEGIN_SRC text 
+   0:000> ? @@c++(sizeof(@$peb))
+   Evaluate expression: 8 = 00000000`00000008
+
+   0:000> ? @@c++(@$peb->ImageBaseAddress)
+   Evaluate expression: 140696312152064 = 00007ff6`69b50000
+
+   0:000> ? @@c++(@$peb->Ldr)
+   Evaluate expression: 140704543523680 = 00007ff8`5455c360
+
+   0:000> ? @@c++(@$peb->Ldr->Initialized)
+   Evaluate expression: 1 = 00000000`00000001
+#+END_SRC
+
+*** Exceptions 
+
+Last event: 
+
+#+BEGIN_SRC text 
+   0:000> .lastevent
+   Last event: 1bac.1294: Access violation - code c0000005 (!!! second chance !!!)
+     debugger time: Sun Aug 26 17:12:56.363 2018 (UTC - 7:00)
+
+#+END_SRC
+
+Display most recent exception:
+
+ - Command: .exr -1 
+
+#+BEGIN_SRC text 
+   0:000> .exr -1
+
+   ExceptionAddress: 00007ff8522faf5a (combase!CServerContextActivator::CreateInstance+0x000000000000023a)
+      ExceptionCode: c0000005 (Access violation)
+     ExceptionFlags: 00000000
+   NumberParameters: 2
+      Parameter[0]: 0000000000000000
+      Parameter[1]: 0000000000000000
+   Attempt to read from address 0000000000000000
+#+END_SRC
+
+Show detailed information about current exception: 
+
+ - Command: !analyse -v 
+
+#+BEGIN_SRC text 
+   0:000> !analyze -v
+
+   *******************************************************************************
+   *                                                                             *
+   *                        Exception Analysis                                   *
+   *                                                                             *
+   *******************************************************************************
+
+    ... ... ... ... ... ... ...  ... ... ... ... ... ... ...  ... ... ... ... ...
+
+
+   PROCESS_NAME:  client.exe
+
+   FOLLOWUP_IP: 
+   client!main+1a0 [c:\users\archbox\desktop\wincpp\com-ole\comtest\client.cpp @ 34]
+   00007ff6`69b5e220 89442460        mov     dword ptr [rsp+60h],eax
+
+   READ_ADDRESS:  0000000000000000 
+
+   ERROR_CODE: (NTSTATUS) 0xc0000005 - The instruction at 0x%p referenced memory at 0x%p. The memory could not be %s.
+
+    ... .... ... ... ... ...  ... .... ... ... ... ...  ... .... ... ... ... ... 
+
+   STACK_TEXT:  
+   0000002f`12f3e090 00007ff8`522c5abf : 00000000`00000000 0000002f`12f3f3c0 00000000`00000002 00000212`cb651d00 : combase!CServerContextActivator::CreateInstance+0x23a
+   0000002f`12f3e210 00007ff8`522d63d1 : 00000212`cb630000 0030002d`40000062 0000002f`12f3f110 00000000`00000000 : combase!ActivationPropertiesIn::DelegateCreateInstance+0xef
+   0000002f`12f3e2a0 00007ff8`522d5b62 : 00000000`00000000 00000000`00000000 0000002f`12f3e8e0 00000000`00000000 : combase!CApartmentActivator::CreateInstance+0xc1
+   0000002f`12f3e350 00007ff8`522d5e30 : 00007ff8`525144c0 00000000`00000000 0000002f`12f3f3c0 00007ff8`522c4850 : combase!CProcessActivator::CCICallback+0x72
+   0000002f`12f3e390 00007ff8`522d5c7e : 0000002f`12f3efe8 00000000`00000000 00000000`00000000 00007ff8`52278cb7 : combase!CProcessActivator::AttemptActivation+0x40
+   0000002f`12f3e3e0 00007ff8`522d608b : 00007ff8`525144b0 00000000`524a32c0 00000000`00000000 00000000`00000017 : combase!CProcessActivator::ActivateByContext+0xae
+
+    ... .... ... ... ... ...  ... .... ... ... ... ...  ... .... ... ... ... ...  ... .... ... ... ... ... 
+
+
+   FAULTING_SOURCE_CODE:  
+       30: 
+       31:  IService* pComponent = nullptr;
+       32: 
+       33:  std::cerr << "Creating COM Instance" << std::endl;
+   >   34:  hr = CoCreateInstance(
+       35:          // REFCLSID or GUID rclsid
+       36:          clsid, //IID_IUnknown,
+       37:          // LPUNKNOWN pUnkOuter 
+       38:          NULL,
+       39:          // DWORD dwClsContext
+
+
+   ... ... 
+
+   FAILURE_ID_HASH_STRING:  um:null_pointer_read_c0000005_client.exe!main
+
+   FAILURE_ID_HASH:  {38138cf1-8f6c-6157-2e18-446b4fc12b02}
+
+   Followup:     MachineOwner
+   ---------
+
+
+#+END_SRC
+
+*** Inspect data structures 
+
+Show PEB - Process Environment Block 
+ 
+ - Command: !peb 
+
+#+BEGIN_SRC text 
+   0:000> !peb
+
+   PEB at 000000dc0a234000
+       InheritedAddressSpace:    No
+       ReadImageFileExecOptions: No
+       BeingDebugged:            Yes
+       ImageBaseAddress:         00007ff691ee0000
+       Ldr                       00007ff82ddbc360
+       Ldr.Initialized:          Yes
+       Ldr.InInitializationOrderModuleList: 0000026976932eb0 . 00000269769335d0
+       Ldr.InLoadOrderModuleList:           0000026976933060 . 0000026976933c60
+       Ldr.InMemoryOrderModuleList:         0000026976933070 . 0000026976933c70
+                       Base TimeStamp                     Module
+               7ff691ee0000 5b89d00b Aug 31 16:32:27 2018 C:\Users\archbox\Desktop\wincpp\out.exe
+               7ff82dc60000 6d15b6d7 Dec 29 20:06:47 2027 C:\WINDOWS\SYSTEM32\ntdll.dll
+               7ff82b0f0000 5f488a51 Aug 27 21:38:41 2020 C:\WINDOWS\System32\KERNEL32.DLL
+               7ff82aae0000 b0bb231d Dec 16 10:10:37 2063 C:\WINDOWS\System32\KERNELBASE.dll
+       SubSystemData:     0000000000000000
+       ProcessHeap:       0000026976930000
+    ... ... ... ....  ... ... ... ....  ... ... ... ....  ... ... ... ....  ... ... ... .... 
+#+END_SRC
+
+Show TEB - Thread Environment Block 
+ 
+ - Command: !teb 
+
+#+BEGIN_SRC text 
+   0:000> !teb
+   TEB at 000000dc0a235000
+       ExceptionList:        0000000000000000
+       StackBase:            000000dc0a180000
+       StackLimit:           000000dc0a17d000
+       SubSystemTib:         0000000000000000
+       FiberData:            0000000000001e00
+       ArbitraryUserPointer: 0000000000000000
+       Self:                 000000dc0a235000
+       EnvironmentPointer:   0000000000000000
+       ClientId:             0000000000001940 . 0000000000000b24
+       RpcHandle:            0000000000000000
+       Tls Storage:          000000dc0a235058
+       PEB Address:          000000dc0a234000
+       LastErrorValue:       0
+       LastStatusValue:      c00000bb
+       Count Owned Locks:    0
+       HardErrorMode:        0
+   TEB at 000000dc0a235000
+       ExceptionList:        0000000000000000
+       StackBase:            000000dc0a180000
+       StackLimit:           000000dc0a17d000
+       SubSystemTib:         0000000000000000
+       FiberData:            0000000000001e00
+       ArbitraryUserPointer: 0000000000000000
+       Self:                 000000dc0a235000
+       EnvironmentPointer:   0000000000000000
+       ClientId:             0000000000001940 . 0000000000000b24
+       RpcHandle:            0000000000000000
+       Tls Storage:          000000dc0a235058
+       PEB Address:          000000dc0a234000
+       LastErrorValue:       0
+       LastStatusValue:      c00000bb
+       Count Owned Locks:    0
+       HardErrorMode:        0
+#+END_SRC
+
+Show all data structures exported by ntdll 
+
+ - Command: dt ntdll!*
+
+#+BEGIN_SRC text 
+   0:000> dt ntdll!*
+
+             ntdll!LIST_ENTRY64
+             ntdll!LIST_ENTRY32
+             ntdll!SE_WS_APPX_SIGNATURE_ORIGIN
+             ntdll!_PS_MITIGATION_OPTION
+             ntdll!_PS_MITIGATION_OPTIONS_MAP
+             ntdll!_PS_MITIGATION_AUDIT_OPTIONS_MAP
+             ntdll!_KSYSTEM_TIME
+             ntdll!_NT_PRODUCT_TYPE
+             ntdll!_ALTERNATIVE_ARCHITECTURE_TYPE
+             ntdll!_KUSER_SHARED_DATA
+             ntdll!<unnamed-tag>
+             ntdll!_ULARGE_INTEGER
+             ntdll!_TP_POOL
+             ntdll!_TP_CLEANUP_GROUP
+             ntdll!_ACTIVATION_CONTEXT
+             ... ... ... ... ... 
+#+END_SRC
+
+Show layout of data structure ~_peb~ - process neviromnet block.
+
+ - Command: ~dt ntdll!_peb~
+
+#+BEGIN_SRC text 
+   :000> dt ntdll!_peb
+
+      +0x000 InheritedAddressSpace : UChar
+      +0x001 ReadImageFileExecOptions : UChar
+      +0x002 BeingDebugged    : UChar
+      +0x003 BitField         : UChar
+       ... ... ... ... ... 
+#+END_SRC
+
+Show content of data structure PEB. 
+
+#+BEGIN_SRC text 
+   0:000> dt ntdll!_PEB @$peb
+
+      +0x000 InheritedAddressSpace : 0 ''
+      +0x001 ReadImageFileExecOptions : 0 ''
+      +0x002 BeingDebugged    : 0x1 ''
+      +0x003 BitField         : 0x4 ''
+      +0x003 ImageUsesLargePages : 0y0
+      +0x003 IsProtectedProcess : 0y0
+      +0x003 IsImageDynamicallyRelocated : 0y1
+      +0x003 SkipPatchingUser32Forwarders : 0y0
+      +0x003 IsPackagedProcess : 0y0
+      +0x003 IsAppContainer   : 0y0
+      +0x003 IsProtectedProcessLight : 0y0
+      +0x003 IsLongPathAwareProcess : 0y0
+      +0x004 Padding0         : [4]  ""
+      +0x008 Mutant           : 0xffffffff`ffffffff Void
+      +0x010 ImageBaseAddress : 0x00007ff6`c7f40000 Void
+      +0x018 Ldr              : 0x00007ff8`2ddbc360 _PEB_LDR_DATA
+      +0x020 ProcessParameters : 0x000001d7`cc5825c0 _RTL_USER_PROCESS_PARAMETERS
+      +0x028 SubSystemData    : (null) 
+      +0x030 ProcessHeap      : 0x000001d7`cc580000 Void
+      +0x038 FastPebLock      : 0x00007ff8`2ddbbe80 _RTL_CRITICAL_SECTION
+      +0x040 AtlThunkSListPtr : (null) 
+      +0x048 IFEOKey          : (null) 
+      +0x050 CrossProcessFlags : 1
+      +0x050 ProcessInJob     : 0y1
+      +0x050 ProcessInitializing : 0y0
+    .. ... ... .. ... ... .. ... ... .. ... ... 
+#+END_SRC
+
+
+Get process base address. 
+
+#+BEGIN_SRC text 
+  start             end                 module name
+  start             end                 module name
+  00007ff6`91ee0000 00007ff6`91fec000   00007ff6`91ee0000 00007ff6`91fec000   outout      out.exe     
+  00007ff8`2aae0000 00007ff8`2ad53000         out.exe     
+  00007ff8`2aae0000 00007ff8`2ad53000   KERNELBASEKERNELBASE C:\WINDOWS\System32\KERNELBASE.dll
+  00007ff8`2b0f0000 00007ff8`2b1a2000    C:\WINDOWS\System32\KERNELBASE.dll
+  00007ff8`2b0f0000 00007ff8`2b1a2000   KERNEL32KERNEL32 C:\WINDOWS\System32\KERNEL32.DLL
+  00007ff8`2dc60000 00007ff8`2de41000    C:\WINDOWS\System32\KERNEL32.DLL
+  00007ff8`2dc60000 00007ff8`2de41000   ntdllntdll    ntdll.dll   
+      ntdll.dll   
+
+#+END_SRC
+
+** References 
+
+ + [[https://www.codeproject.com/Articles/6084/Windows-Debuggers-Part-1-A-WinDbg-Tutorial][Windows Debuggers: Part 1: A WinDbg Tutorial - CodeProject]] 
+
+ + [[https://www.codeproject.com/Articles/22245/Quick-start-to-using-WinDbg][Quick start to using WinDbg - CodeProject]]
+
+ + [[https://www.codeproject.com/Articles/707488/Part-1-Windows-Debugging-Techniques-Debugging-Ap-2][Part 1: Windows Debugging Techniques - Debugging Application Crash (Windbg) - CodeProject]]
+
+ + [[https://briolidz.wordpress.com/2013/11/17/windbg-some-debugging-commands/][WinDbg: Some debugging commands | Kamel Messaoudi]]
+
+ + Robert Kuster. *WinDbg From A to Z* -
+   <http://windbg.info/download/doc/pdf/WinDbg_A_to_Z_bw2.pdf> 
+
+ + Arno Hutter. *Windows Debugging with WinDbg* -
+   <https://www.slideshare.net/ArnoHuetter/windows-debugging-with-windbg>
+
+ + Revealing Stealth Malware UMD CMSC389M -
+   <https://drive.google.com/viewerng/viewer?url=https://www.cs.umd.edu/class/winter2013/cmsc389m/Syllabus_files/StealthMalware_1-10-2013_1.pptx>
+
+ + [[http://kiewic.com/2014-07-26/win32-mutex-handles-and-windbg-handle-extension][Win32 Mutex, HANDLEs and WinDbg !handle extension. - kiewic (formerly Monkey Weekend)]]
+
+ + [[https://blogs.msdn.microsoft.com/debuggingtoolbox/2008/03/04/special-command-using-c-and-poi-with-cc-expressions/][Special Command: Using ??, @@c++() and poi() with C/C++ Expressions – Debugging Toolbox]]
+
+ + [[https://mtaulty.com/2004/08/03/m_4656/][A word for WinDbg – Mike Taulty]]
+
+ + *Chapter 8 - Advanced Native Ciode Techniques with WinDBG* -
+   <https://drive.google.com/viewerng/viewer?url=http://ecs.syr.edu/faculty/fawcett/Handouts/TestingSeminar/Chapter8.ppt> 
+
+ + [[https://blogs.msdn.microsoft.com/doronh/2006/03/28/debugger-commands-dps-dpp-that-make-my-life-easier-part-5/][Debugger commands (dps, dpp) that make my life easier (part 5) – A Hole In My Head]]
 
