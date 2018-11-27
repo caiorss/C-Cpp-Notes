@@ -2838,6 +2838,104 @@ Or:
   // Once the escope is gone, the resource is released.
 #+END_SRC
 
+ Another more specific RAAI Example: 
+
+ + In this example, the resource acquired in the constructor, a
+   heap-allocated array of type T, is released at the destructor when
+   a HeapArray object goes out of scope. All STL containers such as
+   std::vector, std::map, std::deque and so on uses RAII technique for
+   avoiding memory leak by deleting the heap-allocated objects when
+   no longer needed. 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+  #include <ostream>
+
+  template<typename T>
+  class HeapArray{
+    private:
+    size_t m_size;
+    T*     m_resource;  
+  public:  
+    // Resource is acquired at constructor 
+    HeapArray(size_t size, T init)
+      : m_size(size),
+        m_resource(new (std::nothrow) T[size])
+    {
+      std::cout << " [LOG] Intialize array with size = " << size
+                << " and init = " << init << std::endl;
+      if(m_resource != nullptr)
+        for(size_t i = 0; i < size; i++)
+          m_resource[i] = init;
+    }
+    // Delegated constructor on the right size 
+    HeapArray(size_t size): HeapArray(size, T{}){ }
+   
+    // Resource is released at destructor 
+    ~HeapArray()
+    {
+      std::cout << " [LOG] Destructor -> Delete array" << std::endl;
+      // Always safe to delete 
+      delete [] m_resource;
+      m_resource = nullptr;
+    }
+
+    // Forbid copy constructor
+    HeapArray(const HeapArray&) = delete;
+    // Forbid copy-assignment operator 
+    HeapArray& operator= (const HeapArray&) = delete;
+    // Move constructor 
+    HeapArray(HeapArray&& rhs)
+    {
+      std::cout << " [LOG] Move constructor " << std::endl;
+      std::swap(this->m_resource, rhs.m_resource);
+    }
+    // Move assignment operator 
+    HeapArray& operator= (HeapArray&& rhs)
+    {
+      std::cout << " [LOG] Move assignment operator " << std::endl;
+      std::swap(this->m_resource, rhs.m_resource);
+      return *this;
+    }
+    size_t size() const {
+      return m_size;
+    }    
+    T& operator[](size_t n){
+      return m_resource[n];
+    }
+  
+    friend auto operator<< (std::ostream& os, const HeapArray<T>& rhs) -> std::ostream&
+    {
+     os << "[" << rhs.m_size << "]( ";
+     for(size_t i = 0; i < rhs.m_size; i++)
+       os << rhs.m_resource[i] << " ";  
+     os << ")";
+     return os;
+    }  
+  };
+
+#+END_SRC
+
+Usage example: 
+
+#+BEGIN_SRC cpp 
+  >> .L raai1.cpp
+
+  >> auto vb = HeapArray<double>(4, 3.5);
+   [LOG] Intialize array with size = 4 and init = 3.5
+  >> std::cout << "vb = " << vb << std::endl;
+  vb = [4]( 3.5 3.5 3.5 3.5 )
+
+  >> vb[0] = 10.0;
+  >> vb[1] = 20.0;
+  >> vb[2] = -10.2;
+
+  >> std::cout << "vb = " << vb << std::endl;
+  vb = [4]( 10 20 -10.2 3.5 )
+#+END_SRC
+
+
  *References*
 
  + [[https://www.codeproject.com/Articles/580077/ResourceplusAcquisitionplusisplusInitializationplu][Resource Acquisition is Initialization (RAII) - CodeProject]]
