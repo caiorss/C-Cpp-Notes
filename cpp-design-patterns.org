@@ -2742,6 +2742,7 @@ References and further:
  + *Modern and Lucid C++ Advanced for Professional Programmers* -
    <https://wiki.ifs.hsr.ch/CppAdvanced/files/lecture_12_advanced_library_design.pdf> 
 ** RAII - Resource Aquisition Is Initialization
+*** Overview 
 
 Comes from book: _C++ Programming with Design Patterns Revealed_ 
 
@@ -2811,7 +2812,7 @@ Or:
    delete heapObject; 
 #+END_SRC
  
- *Solution - RAAI Pattern*
+ *Solution - RAAI idiom*
 
  - An object is used to control the lifetime of a resource ensuring
    that is released when the object goes out of scope or an exception
@@ -2841,6 +2842,7 @@ Or:
   Operation(hnd);
   // Once the escope is gone, the resource is released.
 #+END_SRC
+*** Example - Heap-allocated memory
 
  Another more specific RAAI Example: 
 
@@ -2946,6 +2948,133 @@ Usage example:
  + [[https://stackoverflow.com/questions/2321511/what-is-meant-by-resource-acquisition-is-initialization-raii][c++ - What is meant by Resource Acquisition is Initialization (RAII)? - Stack Overflow]]
  + [[https://www.codeproject.com/Articles/122129/RAII-Resource-Acquisition-Is-Initialization-C-Help][RAII (Resource Acquisition Is Initialization) C# Helper Classes - CodeProject]]
  + [[http://jrdodds.blogs.com/blog/2004/08/raii_in_c.html/][RAII in C++ (constructive nonconformist)]]
+  
+*** Example - Managing Resource with custom wrapper
+
+Resource is everything that needs to be released or cleaned up after
+no longer needed. Some examples of resource are file descriptors,
+handlers, socket handlers, data base handlers and heap allocated
+memory. The RAAI technique can help managing resources since it
+ensures that a resource cleanup always will happen after the wrapper
+object goes out of scope. 
+
+ *Example:*
+
+In the C-file API, the resource is the FILE* file pointer. The API
+requies the client code to call fclose after the pointer is no longer
+needed. Despite that this case is applied to the C-file API, it can
+applied to any other type of resource. 
+
+Note: It is better to use the C++ file API since it is more C++
+friendly and already has RAII. The C-file API was used in this section
+for simulating a generic resource.
+
+API: 
+
+#+BEGIN_SRC cpp 
+   #include <cstdio> // <stdio.h> in C.
+   // Open file getting the resource FILE*
+   FILE* fopen(const char *pathname, const char *mode);
+   // Release resource. 
+   int   fclose(FILE* stream);
+
+   int   fputs(const char* s, FILE* stream);
+   int   putc(int c, FILE* stream);
+#+END_SRC
+
+Solution 1: Use a custom RAAI wrapper object. 
+
+#+BEGIN_SRC cpp 
+   #include <iostream>
+   #include <cstdio>
+
+   template<class Resource>
+   class RAIIWrapper{
+      public:
+      using Cleanup_fn = std::function<void (Resource*)>;
+
+      // Constructor: Acquire resource 
+      // Parameter res      => Wrapped Resource 
+      // Parameter cleanup  => Clenup function which releases resources. 
+      RAIIWrapper(Resource* res, Cleanup_fn cleanup)
+       :m_res(res), m_cleanup(cleanup) { }
+
+      // Forbid copy-constructor 
+      RAIIWrapper(const RAIIWrapper& rhs) = delete;
+      // Forbid copy-assignment operator 
+      RAIIWrapper& operator= (const RAIIWrapper& rhs) = delete;
+
+      // Move constructor => Transfer resource ownership 
+      //  from teporary object rhs (R-value) to new object (this).
+      RAIIWrapper(RAIIWrapper&& rhs){
+        this->m_res = rhs.m_res;
+        rhs.m_res = nullptr;
+      }
+      // Move assignment operator - move resource ownership 
+      // from temporary object (rhs) in the right hand-size of (=)
+      // to this object. 
+      RAIIWrapper& operator= (RAIIWrapper&& rhs){
+         std::swap(this->m_res, rhs.m_res);
+         return *this;
+      }    
+
+      void close(){
+        if(m_res != nullptr) m_cleanup(m_res);
+        m_res = nullptr;
+        std::cerr << "LOG cleanup resource.";
+      }
+
+      // Destructor => Release resource 
+      ~RAIIWrapper(){
+         this->close();
+       }
+      Resource* get() const { return m_res; }
+
+      // Conversion operator to check whether wrapped pointer is null. 
+      operator bool() const {
+        return m_res != nullptr;
+      }
+
+      private:
+      Resource* m_res;
+      Cleanup_fn m_cleanup;      
+   };
+#+END_SRC
+
+Sample client code: 
+
+#+BEGIN_SRC cpp 
+  void writeFile(const char* file){
+       // The wrapper automatically release the wrapped resource when out of scope
+       RAIIWrapper<FILE> fptr(::fopen(file, "w"), &fclose);
+       if(!fptr){
+          ::fputs(" [ERROR] Failed to create file\n", stderr);
+          return;
+       }
+       ::fputs("Testing line 1\n", fptr.get());
+       ::fputs("Testing line 2\n", fptr.get());
+       ::fputs("C++17 is AWESOME! AMAZING!\n", fptr.get());
+  }
+#+END_SRC
+
+Test: 
+
+#+BEGIN_SRC cpp 
+  >> writeFile("/tmp/raii-resource.txt")
+  LOG cleanup resource.>> 
+
+  >> writeFile("/etc/raii-resource.txt")
+   [ERROR] Failed to create file
+  LOG cleanup resource.>> 
+  >> 
+  // Check created file. 
+  >> .! cat /tmp/raii-resource.txt
+  Testing line 1
+  Testing line 2
+  C++17 is AWESOME! AMAZING!
+  >> 
+#+END_SRC
+
 
 ** Type Erasure
 *** Overview  
