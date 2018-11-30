@@ -3023,13 +3023,11 @@ Solution 1: Use a custom RAAI wrapper object.
         m_res = nullptr;
         std::cerr << "LOG cleanup resource.";
       }
-
       // Destructor => Release resource 
       ~RAIIWrapper(){
          this->close();
        }
       Resource* get() const { return m_res; }
-
       // Conversion operator to check whether wrapped pointer is null. 
       operator bool() const {
         return m_res != nullptr;
@@ -3075,7 +3073,55 @@ Test:
   >> 
 #+END_SRC
 
+*** Example - Managing Resource with smart pointer 
 
+The smart pointer std::unique_ptr is not only suitable for managing
+heap-allocated objects, it is also useful for managing resources.
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <memory>     // Smart pointers 
+  #include <functional> // std::function 
+
+  // Used for simulating a generic resource. 
+  // FILE*, fopen, fclose .... 
+  #include <cstdio> 
+
+  // Type alias for smart pointer with custom deleter 
+  template<typename T>
+  using Resource = std::unique_ptr<T, std::function<void (T*)>>;
+
+  void writeFile(const char* file)
+  {
+       // The wrapper automatically release the resource when out of scope
+       Resource<FILE> fptr(::fopen(file, "w"),
+                           // Custom-deleter function 
+                           [](FILE* hnd){
+                             std::cerr << " [TRACE] File closed OK." << std::endl;
+                             if(hnd != nullptr) ::fclose(hnd);
+                           });
+       if(!fptr){
+          ::fputs(" [ERROR] Failed to create file\n", stderr);
+          return;
+       }
+       ::fputs("Testing line 1\n", fptr.get());
+       ::fputs("Testing line 2\n", fptr.get());
+       ::fputs("C++17 is AWESOME! AMAZING!\n", fptr.get());
+  }
+
+  >> writeFile("/tmp/resource1.txt");
+   [TRACE] File closed OK.
+ 
+  >> .! cat /tmp/resource1.txt
+  Testing line 1
+  Testing line 2
+  C++17 is AWESOME! AMAZING!
+
+  >> writeFile("/boot/resource1.txt");
+   [ERROR] Failed to create file
+  >> 
+ 
+#+END_SRC
 ** Type Erasure
 *** Overview  
 
