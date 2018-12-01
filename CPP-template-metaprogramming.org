@@ -696,8 +696,10 @@ Running:
  
 AKA: template template. 
 
-Example: Every STL container has two type parameters, the element type
-and the allocator type which has the element type as parameter. In the
+ *Example 1:* 
+
+Every STL container has two type parameters, the element type and the
+allocator type which has the element type as parameter. In the
 following code, the type parameter named Container is used for
 changing the STL container used by the stack class.
 
@@ -756,6 +758,92 @@ Running:
    stack:  x y w k
   >> 
 #+END_SRC
+
+ *Example 2:* Generic higher-order function which can peform a
+ fold-operation on any STL sequence container.
+
+ + Version A - Using for-range based loop.
+
+
+#+BEGIN_SRC cpp 
+  template<
+       typename Acc,
+       typename Element,	
+       typename Func,
+       template<typename> class Allocator,
+       template<typename, typename> class Container
+       >
+  Acc foldContainerA(Acc init, const Container<Element, Allocator<Element>>& cont, Func func)
+  {
+       Acc acc {init};
+       for(const auto& x: cont) acc = func(acc, x);
+       return acc;
+  }
+#+END_SRC
+
+
+ + Version B - Using iterator based loop 
+
+#+BEGIN_SRC cpp 
+  template<
+      typename Acc,
+      typename Element,	
+      typename Func,
+      template<typename> class Allocator,
+      template<typename, typename> class Container
+      >
+  Acc foldContainerB(Acc init, const Container<Element, Allocator<Element>>& cont, Func func)
+  {
+      Acc acc {init};
+      // Dependent name 
+      using Iterator = typename Container<Element, Allocator<Element>>::const_iterator;
+      // Or: typedef typename Container<Element, Allocator<Element>>::const_iterator Iterator;
+      for(Iterator it = cont.begin(); it < cont.end(); it++)
+              acc = func(acc, *it);
+      return acc;
+  }
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC cpp 
+  #include <functional>
+
+  >> std::vector<int> xsa{1, 2, 3, 4, 5, 6};
+
+  >> foldContainerA<int>(0, xsa, [](int acc, int x){ return 10 * acc + x;})
+  (int) 123456
+  >> 
+
+  >> foldContainerB<int>(0, xsa, [](int acc, int x){ return 10 * acc + x;})
+  (int) 123456
+
+  // 1 + 2 + 3 + 4 + 5 + 6
+  >> foldContainerA<int>(0, xsa, [](int acc, int x){ return acc + x;})
+  (int) 21
+
+  >> foldContainerB<int>(0, xsa, [](int acc, int x){ return  acc + x;})
+  (int) 21
+
+  >> foldContainerA<int>(0, xsa, std::plus<int>())
+  (int) 21
+  >> 
+
+  >> std::deque<int> xsb{1, 2, 3, 4, 5};
+
+  >> foldContainerA<int>(0, xsb, std::plus<int>())
+  (int) 15
+
+  >> foldContainerA<int>(1, xsb, std::multiplies<int>())
+  (int) 120
+  >> 
+
+  >> foldContainerB<int>(1, xsb, std::multiplies<int>())
+  (int) 120
+
+
+#+END_SRC
+
 
 ** Templates and STL Containers 
 *** Overview  
