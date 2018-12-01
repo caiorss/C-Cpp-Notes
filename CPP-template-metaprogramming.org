@@ -276,7 +276,7 @@ Summary:
 
  + Templates are widely used in the STL (Standard Template Library)
    and the Boost Library.
-** Class Templates 
+** Class Template
 *** Example: Generic stack class 
 
 Note: 
@@ -590,15 +590,17 @@ Running:
   >> 
 
 #+END_SRC
-** Non-type template parameters 
+** Non-class template parameters 
+*** Overview 
 
 It is possible to use the following kinds of template parameters.
+
  + class or typename 
  + Integers
  + Function pointer
  + Member function pointer 
 
- *Integer as template parameter*
+*** Integer as template parameter
 
 #+BEGIN_SRC cpp 
   // n => Numeric template argument with default value 3 
@@ -633,7 +635,7 @@ Running:
    Repeat n times
 #+END_SRC
 
- *Function pointer as template parameter*
+*** Function pointer as template parameter
 
 #+BEGIN_SRC cpp 
   #include <iostream>
@@ -688,6 +690,71 @@ Running:
       1     1.000
       2     1.260
       3     1.442
+#+END_SRC
+
+*** Class templates as template parameters
+ 
+AKA: template template. 
+
+Example: Every STL container has two type parameters, the element type
+and the allocator type which has the element type as parameter. In the
+following code, the type parameter named Container is used for
+changing the STL container used by the stack class.
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <vector>
+  #include <deque>
+  #include <list>
+
+  template<
+       // Type of stack element 
+       typename Element,
+       // Every STL container has two type parameters Container<Element, Allocator>
+       // The allocator has the type parameter Allocator<Element>
+       template<typename, typename> class Container = std::deque
+       >
+  class Stack{
+  private:
+      Container<Element, std::allocator<Element>> _stack;
+  public:
+      void push(const Element& t){
+           _stack.push_back(t);
+      }
+      Element pop(){
+           auto x = _stack.back();
+           _stack.pop_back();
+           return x;
+      }
+      size_t size(){  return _stack.size(); }
+      bool   empty(){ return _stack.empty(); }
+      void   clear(){ _stack.clear(); }
+      void print(){
+           std::cout << " stack: ";
+           for(const auto& x: _stack)
+                   std::cout << " " << x ;
+           std::cout << "\n";
+      }
+  };
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC cpp 
+  >> Stack<int> s1;
+  >> s1.push(10), s1.push(15), s1.push(25); s1.print()
+   stack:  10 15 25
+  >> 
+
+  >> Stack<std::string, std::vector> s2;
+  >> s2.push("C++"), s2.push("IOT"), s2.push("Network"), s2.print();
+   stack:  C++ IOT Network
+  >> 
+
+  >> auto sn = Stack<char, std::list>{};
+  >> sn.push('x'), sn.push('y'), sn.push('w'), sn.push('k'), sn.print();
+   stack:  x y w k
+  >> 
 #+END_SRC
 
 ** Templates and STL Containers 
