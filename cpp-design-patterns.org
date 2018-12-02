@@ -2380,367 +2380,6 @@ Output:
 #+END_SRC
 
 * C++ Specific Design Pattern and Idioms
-** Interface Class 
-*** Overview  
-
-Unlike C# and Java, C++ doesn't have any keyword for implementing
-interface, however it can be implemented by creating a class with only
-pure virtual functions, in other words, only abstract methods or
-methods without implementation. 
-
-The interface class has a runtime overhead due to the virtual methods
-that are resolved at runtime. An alternative solution when the virtual
-methods calls performance overhead is not acceptable, is to use
-generic programming or templates which doesn't have runtime cost since
-the methods to be called are resolved at compile-time.
-
-Note: 
- + The annotation *virtual* - means that the method (member function)
-   can be overriden by the derived class. Methods in the base class
-   not annotated as virtual cannot be overriden in the derived
-   classes. Unlike Java, C++ methods are not virtual by default. 
-
- + The annotation (=0) - means a pure virtual member function, aka
-   pure virtual function which is an _abstract method_, method without
-   implementation. 
-
- *Example*: Interface Class Declaration: 
-
-#+BEGIN_SRC cpp 
-  class IStack{
-  public:
-      virtual ~IStack() = default;
-      virtual int    size()         const = 0;
-      virtual void   push(double x)       = 0;
-      virtual double pop()                = 0;
-      virtual double peek()         const = 0;
-  };
-#+END_SRC
-
-Or: 
-
-#+BEGIN_SRC cpp 
-  struct IStack{
-      virtual ~IStack() = default;
-      virtual int    size()         const = 0;
-      virtual void   push(double x)       = 0;
-      virtual double pop()                = 0;
-      virtual double peek()         const = 0;
-  };
-#+END_SRC
-
-Or using C++ auto keyword for functions: 
-
-#+BEGIN_SRC cpp 
-  struct IStack{
-      virtual ~IStack() = default;
-      virtual auto size() const   -> int    = 0;
-      virtual auto push(double x) -> void   = 0;
-      virtual auto pop()          -> double = 0;
-      virtual auto peek() const   -> double = 0;
-  };
-#+END_SRC
-*** Example 
-
- *Complete Code Example*
- - File:  [[file:src/design-patterns/interface-class.cpp][file:src/design-patterns/interface-class.cpp]]
-
-Interface class declaration:
-
-#+BEGIN_SRC cpp 
-  // Interface Stack. (Should be placed in the header file.) 
-  class IStack{
-  public:
-          virtual ~IStack() = default;
-          virtual int    size()         const = 0;
-          virtual void   push(double x)       = 0;
-          virtual double pop()                = 0;
-          virtual double peek()         const = 0;
-  };
-#+END_SRC
-
-Example: Interface implementations. 
-
- - Implementation of interface IStack using vector as internal
-   representation.
-
-#+BEGIN_SRC cpp 
-  class StackVector: public IStack{
-  public:
-          StackVector(){}
-          StackVector(const std::initializer_list<double>& xs){
-                  _stack.insert(_stack.begin(), xs.begin(), xs.end());
-          }
-          int size() const {
-                  return _stack.size();
-          }	
-          void push(double x){
-                  _stack.push_back(x);
-          }   
-          double pop(){
-                  if(this->size() == 0)
-                          throw std::runtime_error("Error: stack is empty");
-                  double top = _stack.back();
-                  _stack.pop_back();
-                  return top;
-          }
-          double peek() const {
-                  if(this->size() == 0)
-                          throw std::runtime_error("Error: stack is empty");		
-                  return _stack.back();
-          }
-  private:
-          std::vector<double> _stack{};
-  };
-#+END_SRC
-
- - Implementation using deque as internal representation:
-
-#+BEGIN_SRC cpp 
-  class StackDeque: public IStack{
-  public:
-          StackDeque(){}
-          StackDeque(const std::initializer_list<double>& xs){
-                  _stack.insert(_stack.begin(), xs.begin(), xs.end());
-          }	
-          int size() const {
-                  return _stack.size();
-          }	
-          void push(double x){
-                  _stack.push_back(x);
-          }   
-          double pop(){
-                  if(this->size() == 0)
-                          throw std::runtime_error("Error: stack is empty");
-                  double top = _stack.back();
-                  _stack.pop_back();
-                  return top;
-          }
-          double peek() const {
-                  if(this->size() == 0)
-                          throw std::runtime_error("Error: stack is empty");		
-                  return _stack.back();
-          }
-  private:
-          std::deque<double> _stack{};
-  };
-#+END_SRC
-
- - Sample client code: 
-
-#+BEGIN_SRC cpp 
-
-  auto stack_sum(IStack& s) -> double{
-          //std::cerr << " ==> stack_sum for references" << std::endl;
-          double sum = 0.0;
-          if(s.size() == 0)
-                  return sum;
-          while(s.size() != 0)
-                  sum += s.pop();
-          return sum;
-  }
-
-  auto stack_sum(IStack* s) -> double{
-          // std::cerr << " ==> stack_sum for pointers" << std::endl;
-          double sum = 0.0;
-          if(s->size() == 0)
-                  return sum;
-          while(s->size() != 0)
-                  sum += s->pop();
-          return sum;
-  }
-#+END_SRC
-
-Function main: 
-
-#+BEGIN_SRC cpp 
-   StackVector sv = {1.0, 2.0, 3.0, 5.0, 6.0};
-   StackDeque  sd = {1.0, 2.0, 3.0, 5.0, 6.0};
-   // The same client code works with any implementation of the interface. 
-   std::cout << "stack_sum(sv) = " << stack_sum(sv) << std::endl;
-   std::cout << "stack_sum(sd) = " << stack_sum(sd) << std::endl;
-
-   IStack* spointer = nullptr;
-   StackVector sv2 = {1.0, 2.0, 3.0, 5.0, 6.0};
-   StackDeque  sd2 = {1.0, 2.0, 3.0, 5.0, 6.0};
-   spointer = &sv2;
-   std::cout << "stack_sum(spointer) = " << stack_sum(spointer) << std::endl;
-   spointer = &sd2;
-   std::cout << "stack_sum(spointer) = " << stack_sum(spointer) << std::endl;
-
-   auto sptr = std::unique_ptr<IStack, std::function<void (IStack*)>>{
-           nullptr,
-           // Custom deleter 
-           [](IStack* p){
-                   std::cerr << " ==== Stack deleted OK" << std::endl ;
-                   delete p;
-           }
-   };
-   sptr.reset(new StackVector());
-   sptr->push(10);
-   sptr->push(25.0);
-   sptr->push(20.0);
-   std::cout << "stack_sum(sptr) = " << stack_sum(*sptr) << std::endl;
-   sptr.reset(new StackDeque());
-   sptr->push(10);
-   sptr->push(25.0);
-   sptr->push(20.0);
-   std::cout << "stack_sum(sptr) = " << stack_sum(*sptr) << std::endl;
-#+END_SRC
-
-Compiling Running: 
-
-#+BEGIN_SRC txt 
-   $ clang++ interface-class.cpp -o interface-class.bin -g -std=c++1z -Wall -Wextra 
-   $ ./interface-class.bin
-   stack_sum(sv) = 17
-   stack_sum(sd) = 17
-   stack_sum(spointer) = 17
-   stack_sum(spointer) = 17
-   stack_sum(sptr) = 55
-    ==== Stack deleted OK
-   stack_sum(sptr) = 55
-    ==== Stack deleted OK
-#+END_SRC
-
-References and further reading: 
- + [[https://en.wikibooks.org/wiki/More_C%2B%2B_Idioms/Interface_Class][More C++ Idioms/Interface Class - Wikibooks, open books for an open world]]
- + [[https://accu.org/index.php/journals/269][ACCU - Separating Interface and Implementation in C++]]
- + [[https://www.boost.org/doc/libs/1_63_0/libs/smart_ptr/sp_techniques.html][Smart Pointer Programming Techniques - 1.63.0]]
-
-** PIMPL - Pointer to Implementation
-
-The PIMPL - Pointer to Implementation idiom, also known as compiler
-firewall, is a widely used technique  in C++ for completly hiding class
-private members in the public header file. This technique uses an
-opaque pointer to an internal non declared class in the current header
-file encapsulating all fields of the outer class.
-
-Also known as: 
- + PIMPL - Pointer to Implementation
- + Compiler firewall idiom
- + Cheshire Cat
-
-Motivation and Benefits: 
-
- + Reduce compilation time as the number of #include headers in the
-   class header is not changed.
-
- + Makes the class data member in the public header really private.
-
- + Changing of private members of the class which are encapsulated in
-   the opaque pointer class does not require recompilation of client
-   code. This feature is very important for library development as it
-   avoid client code recompilation as the public headers are not
-   changed.
-
- + Less likely to breaking binary compatibility - ABI Application
-   Binary Interface.
-
- + Note: Changing class member variables or member functions (methods)
-   breaks the ABI and requires the recompilation of client code. The
-   pimpl maintains the binary compatibility by not changing class'
-   private members.
-
- + TL;DR
-   + PIMPL: Allow changes to implementation without the
-     need to recompile client code.
-
-Drawbacks: 
-
- + More complexity and work for API implementators.
- + Not convenient when there are protected members which needs to be
-   accessed by subclasses. 
- + Runtime performance overhead due to the pointer indirection. 
-
-Example: All private members of class CashFlow are conained in the
-opaque type Impl which is not defined in the header file.
-
- - file: _CashFlow.h_  -> Class public interface.
-
-#+BEGIN_SRC cpp 
-  #ifndef _CashFlow_H_
-  #define _CashFlow_H_
-
-  // C++ 11's smart pointers
-  #include <memory>
-
-  class CashFlow{
-  private:
-      // Forward declaration of incomplete type.
-      struct Impl;
-      // This opaque type encapsulate the outer class' private member 
-      // Pointer to implementation (PIMPL)
-      std::unique_ptr<Impl> m_pimpl;
-  public:
-      // Default ctor 
-      CashFlow();
-      void show();
-      void add(double x);
-      int  size();
-      // Net Present Value - NPV of cash flow for a given rate of return 
-      double npv(double rate); 
-      // Compute IRR - Internal rate of return 
-      double irr(); 
-  };
-
-  #endif // --- EOF ---- // 
-#+END_SRC
-
- - file: _CashFlow.cpp_  -> Class implementation.
-
-#+BEGIN_SRC cpp 
-  // C++ 11's smart pointers
-  #include <memory>
-  #include "CashFlow.h"
-
-  // Struct is just class with all members
-  // public by default 
-  struct CashFlow::Impl{
-      // cash flow vector 
-      std::vector<double> m_clf;
-      // Default ctor 
-      Impl(){}
-      // Default dtor 
-      ~Impl() = default;  
-  };
-
-  // Default ctor 
-  CashFlow::~CashFlow = default;
-  // Ctor 
-  CashFlow::CashFlow(): m_pimpl(new Impl()) {}
-
-  void CashFlow::add(double x){
-      m_pimpl->m_clf.push_back(x);
-  }
-
-  double CashFlow::get(int i){
-      return m_pimpl->m_clf[i];
-  }
-     ... ... ... .... 
-#+END_SRC  
-
-References and further: 
-
- + *Pimpl Idiom* - <>
- 
- + *Best Friends: C++11 Move Semantics and Pimpl* -
-   <https://www.embeddeduse.com/2016/05/30/best-friends-cpp11-move-semantics-and-pimpl/>
-
- + *Improving C++ Encapsulation with the Pimpl Idiom* -
-   <https://visualstudiomagazine.com/articles/2012/11/29/the-pimpl-idiom-in-c-plus-plus.aspx> 
-
- + *Why every C++ developer should know about the pimpl idiom pattern* -
-   <https://tonka2013.wordpress.com/2013/08/31/why-every-c-developer-should-know-about-the-pimpl-idiom-pattern/> 
-
- + *Passing Containing Parent to pimpl idiom implementation class* -
-   http://www.sharprobotica.com/2010/04/passing-containing-parent-to-pimpl-idiom-implementation-class/
-
- + *Dive in to C++ and survive* -
-   <https://www.embedded.com/print/4008235> 
- 
- + *Modern and Lucid C++ Advanced for Professional Programmers* -
-   <https://wiki.ifs.hsr.ch/CppAdvanced/files/lecture_12_advanced_library_design.pdf> 
 ** RAII - Resource Aquisition Is Initialization
 *** Overview 
 
@@ -3132,6 +2771,468 @@ heap-allocated objects, it is also useful for managing resources.
   >> 
  
 #+END_SRC
+** PIMPL - Pointer to Implementation
+
+The PIMPL - Pointer to Implementation idiom, also known as compiler
+firewall, is a widely used technique  in C++ for completly hiding class
+private members in the public header file. This technique uses an
+opaque pointer to an internal non declared class in the current header
+file encapsulating all fields of the outer class.
+
+Also known as: 
+ + PIMPL - Pointer to Implementation
+ + Compiler firewall idiom
+ + Cheshire Cat
+
+Motivation and Benefits: 
+
+ + Reduce compilation time as the number of #include headers in the
+   class header is not changed.
+
+ + Makes the class data member in the public header really private.
+
+ + Changing of private members of the class which are encapsulated in
+   the opaque pointer class does not require recompilation of client
+   code. This feature is very important for library development as it
+   avoid client code recompilation as the public headers are not
+   changed.
+
+ + Less likely to breaking binary compatibility - ABI Application
+   Binary Interface.
+
+ + Note: Changing class member variables or member functions (methods)
+   breaks the ABI and requires the recompilation of client code. The
+   pimpl maintains the binary compatibility by not changing class'
+   private members.
+
+ + TL;DR
+   + PIMPL: Allow changes to implementation without the
+     need to recompile client code.
+
+Drawbacks: 
+
+ + More complexity and work for API implementators.
+ + Not convenient when there are protected members which needs to be
+   accessed by subclasses. 
+ + Runtime performance overhead due to the pointer indirection. 
+
+Example: All private members of class CashFlow are conained in the
+opaque type Impl which is not defined in the header file.
+
+ - file: _CashFlow.h_  -> Class public interface.
+
+#+BEGIN_SRC cpp 
+  #ifndef _CashFlow_H_
+  #define _CashFlow_H_
+
+  // C++ 11's smart pointers
+  #include <memory>
+
+  class CashFlow{
+  private:
+      // Forward declaration of incomplete type.
+      struct Impl;
+      // This opaque type encapsulate the outer class' private member 
+      // Pointer to implementation (PIMPL)
+      std::unique_ptr<Impl> m_pimpl;
+  public:
+      // Default ctor 
+      CashFlow();
+      void show();
+      void add(double x);
+      int  size();
+      // Net Present Value - NPV of cash flow for a given rate of return 
+      double npv(double rate); 
+      // Compute IRR - Internal rate of return 
+      double irr(); 
+  };
+
+  #endif // --- EOF ---- // 
+#+END_SRC
+
+ - file: _CashFlow.cpp_  -> Class implementation.
+
+#+BEGIN_SRC cpp 
+  // C++ 11's smart pointers
+  #include <memory>
+  #include "CashFlow.h"
+
+  // Struct is just class with all members
+  // public by default 
+  struct CashFlow::Impl{
+      // cash flow vector 
+      std::vector<double> m_clf;
+      // Default ctor 
+      Impl(){}
+      // Default dtor 
+      ~Impl() = default;  
+  };
+
+  // Default ctor 
+  CashFlow::~CashFlow = default;
+  // Ctor 
+  CashFlow::CashFlow(): m_pimpl(new Impl()) {}
+
+  void CashFlow::add(double x){
+      m_pimpl->m_clf.push_back(x);
+  }
+
+  double CashFlow::get(int i){
+      return m_pimpl->m_clf[i];
+  }
+     ... ... ... .... 
+#+END_SRC  
+
+References and further: 
+
+ + *Pimpl Idiom* - <>
+ 
+ + *Best Friends: C++11 Move Semantics and Pimpl* -
+   <https://www.embeddeduse.com/2016/05/30/best-friends-cpp11-move-semantics-and-pimpl/>
+
+ + *Improving C++ Encapsulation with the Pimpl Idiom* -
+   <https://visualstudiomagazine.com/articles/2012/11/29/the-pimpl-idiom-in-c-plus-plus.aspx> 
+
+ + *Why every C++ developer should know about the pimpl idiom pattern* -
+   <https://tonka2013.wordpress.com/2013/08/31/why-every-c-developer-should-know-about-the-pimpl-idiom-pattern/> 
+
+ + *Passing Containing Parent to pimpl idiom implementation class* -
+   http://www.sharprobotica.com/2010/04/passing-containing-parent-to-pimpl-idiom-implementation-class/
+
+ + *Dive in to C++ and survive* -
+   <https://www.embedded.com/print/4008235> 
+ 
+ + *Modern and Lucid C++ Advanced for Professional Programmers* -
+   <https://wiki.ifs.hsr.ch/CppAdvanced/files/lecture_12_advanced_library_design.pdf> 
+** Non-copiable class 
+
+Classes where copying doesn't make sense such as classes managing
+resources or singletons should have the copy constructor and copy
+assignment operator no accessible to any external code. It can be done
+by making the both member functions private or by annotating them as
+deleted (C++11).
+
+ + Note: resource means anything that needs to be disposed when no
+   longer needed such as heap memory, database handlers, socket
+   handlers, file descriptors and etc.
+
+ *Prior to C++11*
+
+Notes: 
+
+ + The copy-constructor and copy-assignment operators should be
+   declared private, even if they are not declared the copiler will
+   generate both by default what can lead to unexpected bugs.
+
+ + If the following class used the default copy constructor and
+   copy-assignment operator, the socket handler would be copied, but
+   the initial class and the copy would still use the same resource,
+   in this case connection. Then, if one of the classes went out of
+   scope, the destructor would be invoked disposing the
+   resource. Therefore, it would close the connection and make the
+   socket unavailable to the remaining class and any attempt to use
+   the disposed resource would result in a runtime error hard to
+   debug. 
+
+#+BEGIN_SRC cpp 
+  //=========>> Header - file: socket.hpp <<===========;
+  class SocketWrapper{
+  public:
+      // Constructor 
+      SocketWrapper();
+      // Destructor 
+      ~SocketWrapper();			
+  private:
+      // Copy constructor 
+      SocketWrapper(const SocketWrapper&);
+      // Copy assignment operator
+      SocketWrapper& operator=(const SocketWrapper&);
+	
+      // Resource - socket file descriptor 
+      int m_sockfd;   
+  };
+
+  //====>>> Implementation - file: socket.hpp <<<==========
+  SocketWrapper::SocketWrapper(){
+      m_sockfd = ::socket(AF_INET, SOCK_STREAM, 0);
+  }
+
+  SocketWrapper::~SocketWrapper(){
+     ::close(m_sockfd);
+  }
+
+  // Forbidden copy constructor 
+  SocketWrapper::SocketWrapper(const SocketWrapper&)
+  {	
+  }
+
+  // Forbidden copy-assignemnt operator 
+  SocketWrapper& operator=(const SocketWrapper&)
+  {
+  }
+#+END_SRC
+
+ *>= C++11* 
+
+ + In C++11, it is just necessary to annotate both copy constructor
+   and assignment operator with delete to make them non
+   accessible. Any attempt to copy a class with those member functions
+   annotated as deleted will result in a compile-time error. 
+
+#+BEGIN_SRC cpp 
+  //=========>> Header - file: socket.hpp <<===========;
+  class SocketWrapper{
+  public:
+      // Constructor
+      SocketWrapper();
+      // Destructor 
+      ~SocketWrapper();
+
+      // Copy constructor 
+      SocketWrapper(const SocketWrapper&) = delete;
+      // Copy assignment operator
+      SocketWrapper& operator=(const SocketWrapper&) = delete;	
+  private:
+      // Resource - socket file descriptor 
+      int m_sockfd;   
+  };
+
+  //====>>> Implementation - file: socket.hpp <<<==========
+  SocketWrapper::SocketWrapper(){
+      m_sockfd = ::socket(AF_INET, SOCK_STREAM, 0);
+  }
+  SocketWrapper::~SocketWrapper(){
+     ::close(m_sockfd);
+  }
+#+END_SRC
+
+** Interface Class 
+*** Overview  
+
+Unlike C# and Java, C++ doesn't have any keyword for implementing
+interface, however it can be implemented by creating a class with only
+pure virtual functions, in other words, only abstract methods or
+methods without implementation. 
+
+The interface class has a runtime overhead due to the virtual methods
+that are resolved at runtime. An alternative solution when the virtual
+methods calls performance overhead is not acceptable, is to use
+generic programming or templates which doesn't have runtime cost since
+the methods to be called are resolved at compile-time.
+
+Note: 
+ + The annotation *virtual* - means that the method (member function)
+   can be overriden by the derived class. Methods in the base class
+   not annotated as virtual cannot be overriden in the derived
+   classes. Unlike Java, C++ methods are not virtual by default. 
+
+ + The annotation (=0) - means a pure virtual member function, aka
+   pure virtual function which is an _abstract method_, method without
+   implementation. 
+
+ *Example*: Interface Class Declaration: 
+
+#+BEGIN_SRC cpp 
+  class IStack{
+  public:
+      virtual ~IStack() = default;
+      virtual int    size()         const = 0;
+      virtual void   push(double x)       = 0;
+      virtual double pop()                = 0;
+      virtual double peek()         const = 0;
+  };
+#+END_SRC
+
+Or: 
+
+#+BEGIN_SRC cpp 
+  struct IStack{
+      virtual ~IStack() = default;
+      virtual int    size()         const = 0;
+      virtual void   push(double x)       = 0;
+      virtual double pop()                = 0;
+      virtual double peek()         const = 0;
+  };
+#+END_SRC
+
+Or using C++ auto keyword for functions: 
+
+#+BEGIN_SRC cpp 
+  struct IStack{
+      virtual ~IStack() = default;
+      virtual auto size() const   -> int    = 0;
+      virtual auto push(double x) -> void   = 0;
+      virtual auto pop()          -> double = 0;
+      virtual auto peek() const   -> double = 0;
+  };
+#+END_SRC
+*** Example 
+
+ *Complete Code Example*
+ - File:  [[file:src/design-patterns/interface-class.cpp][file:src/design-patterns/interface-class.cpp]]
+
+Interface class declaration:
+
+#+BEGIN_SRC cpp 
+  // Interface Stack. (Should be placed in the header file.) 
+  class IStack{
+  public:
+          virtual ~IStack() = default;
+          virtual int    size()         const = 0;
+          virtual void   push(double x)       = 0;
+          virtual double pop()                = 0;
+          virtual double peek()         const = 0;
+  };
+#+END_SRC
+
+Example: Interface implementations. 
+
+ - Implementation of interface IStack using vector as internal
+   representation.
+
+#+BEGIN_SRC cpp 
+  class StackVector: public IStack{
+  public:
+          StackVector(){}
+          StackVector(const std::initializer_list<double>& xs){
+                  _stack.insert(_stack.begin(), xs.begin(), xs.end());
+          }
+          int size() const {
+                  return _stack.size();
+          }	
+          void push(double x){
+                  _stack.push_back(x);
+          }   
+          double pop(){
+                  if(this->size() == 0)
+                          throw std::runtime_error("Error: stack is empty");
+                  double top = _stack.back();
+                  _stack.pop_back();
+                  return top;
+          }
+          double peek() const {
+                  if(this->size() == 0)
+                          throw std::runtime_error("Error: stack is empty");		
+                  return _stack.back();
+          }
+  private:
+          std::vector<double> _stack{};
+  };
+#+END_SRC
+
+ - Implementation using deque as internal representation:
+
+#+BEGIN_SRC cpp 
+  class StackDeque: public IStack{
+  public:
+          StackDeque(){}
+          StackDeque(const std::initializer_list<double>& xs){
+                  _stack.insert(_stack.begin(), xs.begin(), xs.end());
+          }	
+          int size() const {
+                  return _stack.size();
+          }	
+          void push(double x){
+                  _stack.push_back(x);
+          }   
+          double pop(){
+                  if(this->size() == 0)
+                          throw std::runtime_error("Error: stack is empty");
+                  double top = _stack.back();
+                  _stack.pop_back();
+                  return top;
+          }
+          double peek() const {
+                  if(this->size() == 0)
+                          throw std::runtime_error("Error: stack is empty");		
+                  return _stack.back();
+          }
+  private:
+          std::deque<double> _stack{};
+  };
+#+END_SRC
+
+ - Sample client code: 
+
+#+BEGIN_SRC cpp 
+
+  auto stack_sum(IStack& s) -> double{
+          //std::cerr << " ==> stack_sum for references" << std::endl;
+          double sum = 0.0;
+          if(s.size() == 0)
+                  return sum;
+          while(s.size() != 0)
+                  sum += s.pop();
+          return sum;
+  }
+
+  auto stack_sum(IStack* s) -> double{
+          // std::cerr << " ==> stack_sum for pointers" << std::endl;
+          double sum = 0.0;
+          if(s->size() == 0)
+                  return sum;
+          while(s->size() != 0)
+                  sum += s->pop();
+          return sum;
+  }
+#+END_SRC
+
+Function main: 
+
+#+BEGIN_SRC cpp 
+   StackVector sv = {1.0, 2.0, 3.0, 5.0, 6.0};
+   StackDeque  sd = {1.0, 2.0, 3.0, 5.0, 6.0};
+   // The same client code works with any implementation of the interface. 
+   std::cout << "stack_sum(sv) = " << stack_sum(sv) << std::endl;
+   std::cout << "stack_sum(sd) = " << stack_sum(sd) << std::endl;
+
+   IStack* spointer = nullptr;
+   StackVector sv2 = {1.0, 2.0, 3.0, 5.0, 6.0};
+   StackDeque  sd2 = {1.0, 2.0, 3.0, 5.0, 6.0};
+   spointer = &sv2;
+   std::cout << "stack_sum(spointer) = " << stack_sum(spointer) << std::endl;
+   spointer = &sd2;
+   std::cout << "stack_sum(spointer) = " << stack_sum(spointer) << std::endl;
+
+   auto sptr = std::unique_ptr<IStack, std::function<void (IStack*)>>{
+           nullptr,
+           // Custom deleter 
+           [](IStack* p){
+                   std::cerr << " ==== Stack deleted OK" << std::endl ;
+                   delete p;
+           }
+   };
+   sptr.reset(new StackVector());
+   sptr->push(10);
+   sptr->push(25.0);
+   sptr->push(20.0);
+   std::cout << "stack_sum(sptr) = " << stack_sum(*sptr) << std::endl;
+   sptr.reset(new StackDeque());
+   sptr->push(10);
+   sptr->push(25.0);
+   sptr->push(20.0);
+   std::cout << "stack_sum(sptr) = " << stack_sum(*sptr) << std::endl;
+#+END_SRC
+
+Compiling Running: 
+
+#+BEGIN_SRC txt 
+   $ clang++ interface-class.cpp -o interface-class.bin -g -std=c++1z -Wall -Wextra 
+   $ ./interface-class.bin
+   stack_sum(sv) = 17
+   stack_sum(sd) = 17
+   stack_sum(spointer) = 17
+   stack_sum(spointer) = 17
+   stack_sum(sptr) = 55
+    ==== Stack deleted OK
+   stack_sum(sptr) = 55
+    ==== Stack deleted OK
+#+END_SRC
+
+References and further reading: 
+ + [[https://en.wikibooks.org/wiki/More_C%2B%2B_Idioms/Interface_Class][More C++ Idioms/Interface Class - Wikibooks, open books for an open world]]
+ + [[https://accu.org/index.php/journals/269][ACCU - Separating Interface and Implementation in C++]]
+ + [[https://www.boost.org/doc/libs/1_63_0/libs/smart_ptr/sp_techniques.html][Smart Pointer Programming Techniques - 1.63.0]]
 ** Type Erasure
 *** Overview  
 
