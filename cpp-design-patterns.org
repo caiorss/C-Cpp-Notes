@@ -3005,6 +3005,209 @@ Notes:
      ::close(m_sockfd);
   }
 #+END_SRC
+** Copy and swap idiom 
+
+The copy-and-swap idiom is a widely used technique for implementing
+the _rule-of-three_ by defining the copy-assignment operator with a
+custom _swap function_. In C++11, the idiom can also be used for
+implementing the rule-of-five by defining the move constructor and
+move assignment operator with a swap function.
+
+Notes: 
+
+ + The _copy-assignment operator_ is needed by the _rule-of-three_
+   (pre-C++11) which states that a class managing a resouce, which
+   implements copy constructor, copy assignment operator and a
+   destructor, should all of them.
+
+ + The _move-assignment operator_ is needed by the _rule-of-five_ (C++11)
+   which states that a class, which wraps some resource implementing a
+   copy constructor, copy assignment operator, move constructor, move
+   assignment operator and a destructor, should implement all of them.
+
+ + Note: This idiom is only applicable to _copiable classes_ which
+   manages some resource. 
+
+Benefits: 
+
+ + Less code duplication.
+
+ + Just a swap to rule them all for implementing the copy-assignment
+   operator, move assignment operator and move constructor in C++11.
+
+The following member functions are necessary to implement this idiom:
+
+ + Copy-constructor
+ + Destructor
+ + _Swap function_ which can swap the data of two objects of same
+   class. This function all member variables of both objects. 
+   + DO NOT use std::swap as this function.
+   + This functions must be non-throwing. 
+
+ *Example*
+
+The following redundant class String manages a resource, a
+heap-allocated array of characters. 
+
+ + File: [[file:src/design-patterns/copy-swap1.cpp][file:src/design-patterns/copy-swap1.cpp]]
+ + Gist: [[https://gist.github.com/caiorss/899d8fcb09dd29b920aa0069e5b9b4ab][copy-swap1.cpp]]
+ + Online Compiler: https://rextester.com/XWJA10133
+
+#+BEGIN_SRC cpp 
+  class String
+  {
+  public:
+      // Default constructor 
+      String();
+      String(size_t size, char ch);
+      String(const char* text);
+      // Copy-constructor (rule-of-three and rule-of-five)
+      String(const String& rhs);
+      // Move-constructor (rule-of-three and rule-of-five)
+      String(String&& rhs);
+      // Destructor (rule-of-three and rule-of-five)
+      ~String();
+
+      // Copy-assignment operator (rule-of-three and rule-of-five)
+      String& operator= (const String& rhs);
+      // Move-assignment operator (rule-of-five)
+      String& operator= (String&& rhs);
+
+      String operator+(const char* text);
+
+      // Swap function (std::swap overload) 
+      // needed by the copy-and-swap idiom.
+      friend void swap(String& lhs, String& rhs);
+
+      // Make class printable - note this operator is a member
+      // function of class ostream, no from this class.
+      friend std::ostream& operator<<(std::ostream& os, const String& rhs);
+
+      size_t      size();
+      const char* data();
+  private:	
+      // String size 
+      size_t m_size;
+      // Resource: Pointer to first string character 
+      char*  m_data;	
+  };
+#+END_SRC
+
+The idiom needs the following functions: 
+
+ + *Copy constructor*
+
+#+BEGIN_SRC cpp 
+  String::String(const String& rhs){
+     this->m_size = rhs.m_size;
+     this->m_data = new (std::nothrow) char [rhs.m_size + 1];
+     std::copy(rhs.m_data, rhs.m_data + rhs.m_size + 1, this->m_data);
+  }
+#+END_SRC
+
+ + *Destructor* 
+
+#+BEGIN_SRC cpp 
+  String::~String()
+  {
+     // Check for null to avoid dangling pointer.
+     if(m_data != nullptr)
+             delete [] m_data;
+     m_data = nullptr;
+     m_size = 0;	
+  }
+#+END_SRC
+
+ + *Swap function* which can be a member function or a friend function
+   overload of std::swap. In this case, it was used the friend
+   std::swap version. 
+
+#+BEGIN_SRC cpp 
+   // std::swap overload - Implementation of
+   // => friend void swap(String& lhs, String& rhs)
+   void swap(String& lhs, String& rhs){
+        std::swap(lhs.m_data, rhs.m_data);
+        std::swap(lhs.m_size, rhs.m_size);
+   }
+#+END_SRC
+
+The copy-assignment operator, move-assignment operator and move
+constructor are implemented with the custom _std::swap_ overload. 
+
+ + _Copy-assignment operator_:
+
+   + The temporary copy is used for disposing the current's object
+     data which is transferred to the temporary object and deleted
+     when the object goes out of scope.
+
+#+BEGIN_SRC cpp 
+  // Copy-assignment operator (rule-of-three and rule-of-five)
+  // Copy-and-swap implementation 
+  String& String::operator= (const String& rhs)
+  {
+      // Temporary copy 
+      String temp(rhs);
+      swap(*this, temp);
+      return *this;
+  }
+#+END_SRC
+
+ + _Move constructor_ (C++11, Rule of five)
+
+#+BEGIN_SRC cpp 
+  // Move-constructor
+  String::String(String&& rhs)
+   : String() // Delegated constructor 
+  {
+     swap(*this, rhs);
+  }
+#+END_SRC
+
+ + _Move assignment operator_ (C++11, Rule of five)
+
+#+BEGIN_SRC cpp 
+   // Move-assignment operator (rule-of-five)
+   // Transfer resource ownership from right hand-side object
+   // to this object being instantiated. 
+   String& String::operator= (String&& rhs){
+       swap(*this, rhs);	
+       return *this;
+   }
+#+END_SRC
+
+
+ *Useful C++ Documentation*
+
+ + [[https://en.cppreference.com/w/cpp/language/copy_assignment][Copy assignment operator - cppreference.com]]
+
+ + [[https://en.cppreference.com/w/cpp/algorithm/swap][std::swap - cppreference.com]] (Header <utility>)
+
+ + [[http://www.cplusplus.com/reference/algorithm/swap/][swap - C++ Reference]]
+
+ *Reference and further reading*
+
+ + [[http://web.archive.org/web/20140113221447/http://cpp-next.com/archive/2009/08/want-speed-pass-by-value/][Want Speed? Pass by Value. « C++Next]]
+
+ + [[http://open-std.org/JTC1/SC22/WG21/docs/papers/2017/p0208r1.pdf][Copy-swap transaction]] 
+
+ + [[https://en.wikibooks.org/wiki/More_C%2B%2B_Idioms/Copy-and-swap][More C++ Idioms/Copy-and-swap - Wikibooks, open books for an open world]]
+
+ + [[https://www.heise.de/developer/artikel/C-Vor-und-Nachteile-des-d-Zeiger-Idioms-Teil-1-1097781.html?seite=all][C++: Vor- und Nachteile des d-Zeiger-Idioms, Teil 1 | heise Developer]]
+   + Note: In German. 
+
+ + [[https://en.wikibooks.org/wiki/More_C%2B%2B_Idioms/Non-throwing_swap][More C++ Idioms/Non-throwing swap - Wikibooks, open books for an open world]]
+
+ + [[https://cpppatterns.com/patterns/copy-and-swap.html][Copy-and-swap - C++ Patterns]] 
+
+ + [[https://www.geeksforgeeks.org/copy-swap-idiom-c/][Copy-and-Swap Idiom in C++ - GeeksforGeeks]]
+
+ + [[https://gist.github.com/ZenLulz/34e3ea73893cad952c904b7e9387a847][C/C++ - The perfect Copy-And-Swap idiom usage · GitHub]]
+
+ + [[https://codereview.stackexchange.com/questions/85539/applying-the-copy-swap-idiom-to-humans-and-employees][c++ - Applying the copy-swap idiom to humans and employees - Code Review Stack Exchange]]
+
+ + [[http://www.vollmann.ch/en/blog/implementing-move-assignment-variations-in-c++.html][C++: More on Implementing Move Assignment]]
+
+ + [[https://stackoverflow.com/questions/19841626/move-assignment-incompatible-with-standard-copy-and-swap][c++ - Move Assignment incompatible with Standard Copy and Swap - Stack Overflow]]
 
 ** Interface Class 
 *** Overview  
