@@ -7,6 +7,311 @@
 
 * Videos and Conferences 
 ** Fundamentals 
+*** Engineering Distinguished Speaker Series: Howard Hinnant
+
+ + [[https://www.youtube.com/watch?v=vLinb2fgkHk&feature=youtu.be][Engineering Distinguished Speaker Series: Howard Hinnant - YouTube]]
+   + "Howard Hinnant spoke at Bloomberg presenting everything you need
+     to know about move semantics."
+
+Notes: 
+
+"Special member functions are those member functions that the compiler
+can be asked to automatically generate code for."
+
+In C++ 98, there were 4 _special member_ functions that the compiler
+can generate if not specified, namely: 
+
+| Member Function           | Signature:                |
+|---------------------------+---------------------------|
+| Default constructor       | X()                       |
+| Copy constructor          | X(const X&)               |
+| Destructor                | ~X()                      |
+| Copy assignment operator. | X& X::operator=(const X&) |
+|---------------------------+---------------------------|
+
+In C++11, there 6 are member functions that the compiler can generate:
+
+| Member Function           | Signature:                |
+|---------------------------+---------------------------|
+| Default constructor       | X()                       |
+| Copy constructor          | X(const X&)               |
+| Destructor                | ~X()                      |
+| Copy assignment operator. | X& X::operator=(const X&) |
+| Move Constructor          | X(X&&)                    |
+| Move assignment operator  | X& X::operator=(X&&)      |
+|                           |                           |
+|---------------------------+---------------------------|
+
+A special member function can be: 
+
+ + not declared 
+
+ + implicitly declared (The compiler can be asked to generate the
+   function automatically)
+
+   + _delete_ annotation C++11
+
+   + _default_ annotation C++11
+
+C++ => Declaration X Definition (aka implementation)
+
+ + _Declaration_: only method signature, class signature ... without any
+   definition. Generally in *.hpp files (header files).
+
+ + _Definition_: a full definition => Function Signature + Body =>
+   Generally in *.cpp files. 
+ 
+User-declared: 
+
+#+BEGIN_SRC cpp 
+  struct X
+  {
+    /* Default Constructor: User declared => The definition or implementation 
+     ,* is elsewhere, generally in *.cpp file. 
+     ,*/
+    X() {} 
+
+    X();           // User declared 
+    X() = default; // User declared
+    X() = delete;  // User declared, any attempt to use a deleted member
+                   // functions yields a compile-time error.
+  };
+#+END_SRC
+
+Default constructor and overload resolution (1): 
+
+ + If the template has zero arguments, the preferred constructor will
+   be the CTOR2 since according to C++ standard, the non-templated
+   function will be preferred in an overload resolution.
+   + TL;DR => Function CTOR2 gets called.
+
+#+BEGIN_SRC cpp 
+   struct X
+   {
+      // ===> CTOR1 (Variadic constructor)
+      // Universal reference 
+      // (It can be either, L-value reference or R-value reference.)   
+      template <typename ... Args> 
+       X(Args&& ... args); // Implementation is elsewhere 
+
+      // ====> CTOR2 (If the template has zero args, this function gets called.)
+      X() = default; 
+   };
+#+END_SRC
+
+Default constructor and overload resolution (2): 
+
+  + deleted members pariticipate in overload resolution.
+  + members not-declared DO NOT pariticipate in overload resolution.
+  + Any attempt to call the default constructor X() (CTOR2) will
+    result in a compile-time error.
+
+#+BEGIN_SRC cpp 
+   struct X
+   {
+      // ===> CTOR1 (Variadic constructor)
+      // Universal reference 
+      // (It can be either, L-value reference or R-value reference.)   
+      template <typename ... Args> 
+       X(Args&& ... args); // Implementation is elsewhere 
+
+      // ====> CTOR2 (If the template has zero args, this function gets called.)
+      X() = delete; 
+   };
+#+END_SRC
+
+Under what circunstances are special members implicitly provided by
+the compiler. 
+
+ + A user-declared destructor will inhibit the implicit declaration of
+   the move members.
+
+ + (Row D) - The implicitly defaulted copy members are deprecated. 
+
+ + (Row D) RULE OF THREE: If any of destructor, copy-ctor or copy-assignment
+   is declared, all should be declared, even if not necessary,
+   specially in classes managing resources or heap-memory (free store).
+
+ + (Row F) A user declared copy-constructor inhibit move members and the
+   copy-assignment operator is deprecated. It should defined and
+   declared explicitly. (RULE OF THREE)
+
+ + (Row H) If only the move constructor is declared, the compiler sets
+   the copy constructor and copy assignment as deleted and the
+   constructor is not declared. The underlying class becomes a
+   _move-only class_.
+   + Example: std::unique_ptr. 
+
+
+ *Compiler Implicitly Declares for C++11*
+
+ + Note: The defaulted functions are only generated if they are
+   used. It means, invoked in some part of the code. 
+
+|---+---------------------+---------------+---------------+---------------+---------------+---------------+---------------|
+|   |                     | default       | destructor    | copy          | copy          | move          | move          |
+|   |                     | constructor   |               | constructor   | assignment    | constructore  | assignment    |
+|---+---------------------+---------------+---------------+---------------+---------------+---------------+---------------|
+| A | Nothing             | defaulted     | defaulted     | defaulted     | defaulted     | defaulted     | defaulted     |
+| B | Any constructor     | _not declared_  | defaulted     | defaulted     | defaulted     | defaulted     | defaulted     |
+| C | Default Constructor | *user declared* | defaulted     | defaulted     | defaulted     | defaulted     | defaulted     |
+| D | Destructor          | defaulted     | *user declared* | *defaulted    | *defaulted    | not declared  | not declared  |
+| F | Copy constructor    | _not declared_  | defaulted     | *user declared* | *defaulted    | not declared  | not declared  |
+| G | Copy assignment     | defaulted     | defaulted     | defaulted     | *user declared* | not declared  | not declared  |
+| H | Move constructor    | not declared  | defaulted     | deleted       | deleted       | *user declared* | not declared  |
+| I | Move assignment     | defaulted     | defaulted     | deleted       | deleted       | not declared  | *user declared* |
+|---+---------------------+---------------+---------------+---------------+---------------+---------------+---------------|
+
+ *Compiler Implicitly Declares for C++98/03*
+
+|---+---------------------+---------------+---------------+---------------|
+|   |                     | default       | destructor    | copy          |
+|   |                     | constructor   |               | constructor   |
+|---+---------------------+---------------+---------------+---------------|
+| A | Nothing             | defaulted     | defaulted     | defaulted     |
+| B | Any constructor     | _not declared_  | defaulted     | defaulted     |
+| C | Default Constructor | *user declared* | defaulted     | defaulted     |
+| D | Destructor          | defaulted     | *user declared* | *defaulted    |
+| F | Copy constructor    | _not declared_  | defaulted     | *user declared* |
+| G | Copy assignment     | defaulted     | defaulted     | defaulted     |
+|---+---------------------+---------------+---------------+---------------|
+
+The function std::move, just casts an L-value (X&) to R-value
+(generally temporary objects from which it is not possible to take an
+address) (X&&). It has to use, to force the invocation of move
+constructor or move assignment operator for transfering resource
+ownership.
+
+All STL containers have move constructors and move assignment
+operator by default which makes efficient to return them by value from
+functions. 
+
+ *Can I define one special member function in terms of another?*
+
+  + YES. It turns out that it is possible.
+  + However, the lecturer advises to NOT DO SO. Advice: "Give each
+    special member function the tender loving care it deserves."
+    Specially move semantics which can enhance performance
+    significantly.
+  + The entire point of move semantics is to boost performance.
+
+
+ *Copy and Swap Idiom* 
+
+ + Note: This trick is neat, however it has some performance cost. The
+   code can be optimized by writing both copy-assignment and
+   move-assignment individually.
+ + Benefit: _Strong exception safety_ 
+
+#+BEGIN_SRC cpp 
+  class X
+  {
+   std::vector<int> m_v;
+   public: 
+   // Implements both copy and move assignment operator. 
+   X& operator=(X x){
+      m_v.swap(x.m_v);
+      return *this;
+   }
+  };
+#+END_SRC
+
+ *Rule of Zero* 
+
+ + If the class only uses STL containers as member functions (not
+   pointers or unrwapped resources such as socket handlers), most of
+   the time, it is not necessary to define the special member
+   functions explicitly and the default generated member functions
+   already have optimal performance.
+
+#+BEGIN_SRC cpp 
+  class X
+  {
+   std::vector<int> m_v;
+   public: 
+   // ===> Everything declared explicitly 
+   // as explicit is always better than implicit. 
+   //----------------------------------
+
+   /* Default ctor */
+   X() = default; 
+   /* Default dtor */
+  ~X() = default; 
+   /* Default copy-ctor */
+   X(const X&) = default; 
+   /* Default move-ctor */
+   X(X&&) = default;
+   /* Copy assignment operator */
+   X& operator=(const X&)  = default;
+   /* Move assignment operator */
+   X& operator=(const X&&) = default;
+  };
+#+END_SRC
+
+ *Trick for strong exception sfaety on assignment*
+
+Note: It is an alternative to copy-and-swap diim. 
+
+#+BEGIN_SRC cpp 
+  template <class C>
+  C& strong_assign(C& dest, C src){
+    std::swap(dest, src);
+    return dest;
+  }
+#+END_SRC
+
+Usage: 
+
+#+BEGIN_SRC cpp 
+  // Instead of assignment 
+  x = y; 
+
+  // Use - strong_assign where 
+  // strong exception safety is needed. 
+  // Gets the best of both worlds.
+  strong_assign(x, y);
+#+END_SRC
+
+ *In a hurry?* 
+
+If there is not time think carefully, the copy members should be
+deleted. It disables all the special members, except the destructor
+which is implicitly declared. Any attempt to use any of disabled
+members functions results in a compile-time error. 
+
+#+BEGIN_SRC cpp 
+  class X
+  {
+   public:
+      X(const X& X) = delete;
+      X& operator=(const X& X) = delete;
+  };
+#+END_SRC
+
+ *What is the state of a moved-from object?* 
+
+ + The state from a moved-from object is often unspecified. It is not
+   the same as undefined behavior, just the object's state is not
+   known. 
+
+ *What is a precondition?* 
+
+ + A requirement in the function specification which restricts the
+   state of the object prior to the call. For instance,
+   + std::vector<T>::pop_back()
+   + Requires the PRECONDITION: empty() shall be false before changing
+     the state of the vector.
+
+ *Summary* 
+
+ + Known when the compiler is defaulting or deleting special member
+   for you, and what defaulted memebrs will do.
+ + Always define or delete special members whn the compiler's implicit
+   action is not corret.
+ + Give tender lovign care to each of 6 special member functions, even
+   if the result is to let the compiler handle it. 
+
+
 ** Misc 
 *** Bjarne Stroustrup - The Essence of C++
 
