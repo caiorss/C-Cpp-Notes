@@ -199,7 +199,179 @@ Windows Programming:
 
  + [[https://www.codeproject.com/Articles/3004/The-Complete-Guide-to-C-Strings-Part-II-String-Wra][The Complete Guide to C++ Strings, Part II - String Wrapper Classes - CodeProject]]
 
-** Literature 
+** SAL - Source Code Annotation Language 
+
+Annotation such as ~__In__~ or ~__Out__~ commonly found on Windows API
+documetation, as shown in the code below, is called _SAL - Source Code_
+_Annotation language_. In a C code, it is hard to figure out which
+parameters are used to return values or are read-only used only as
+input. The SAL solves this problem by declaring which function
+parameters are input, read-only and which parameters are output.
+
+#+BEGIN_QUOTE
+  SAL is the Microsoft source code annotation language.  By using source
+  code annotations, you can make the intent behind your code
+  explicit. These annotations also enable automated static analysis
+  tools to analyze your code more accurately, with significantly fewer
+  false positives and false negatives.
+#+END_QUOTE
+
+ -- http://msdn.microsoft.com/en-us/library/hh916383.aspx
+
+#+BEGIN_SRC cpp 
+   HANDLE CreateRemoteThreadEx(
+     __in__ HANDLE                       hProcess,
+     __in__ LPSECURITY_ATTRIBUTES        lpThreadAttributes,
+     __in__ SIZE_T                       dwStackSize,
+     __in__ LPTHREAD_START_ROUTINE       lpStartAddress,
+     __in__ LPVOID                       lpParameter,
+     __in__ DWORD                        dwCreationFlags,
+     __in__ LPPROC_THREAD_ATTRIBUTE_LIST lpAttributeList,
+     __out__ LPDWORD                     lpThreadId
+   );
+
+   DWORD WINAPI FormatMessage(
+      _In_     DWORD dwFlags,
+      _In_opt_ LPCVOID lpSource,
+      _In_     DWORD dwMessageId,
+      _In_     DWORD dwLanguageId,
+      _Out_    LPTSTR lpBuffer,
+      _In_     DWORD nSize,
+      _In_opt_ va_list *Arguments
+   );
+
+#+END_SRC
+
+To allow those annotations in the source code, it is necessary to add
+the header _#include <sal.h>_. This SAL annotation is not standard among
+C++ compilers and is not defined by any C or C++ standard, as a
+result, the annotations only works on MSVC - Microsoft Visual C++
+Compiler. This feature can be implemented in a portable way with
+macros.
+
+SAL Fundamentals: 
+
+| SAL Annotatio | Description                                                                                |
+|---------------+--------------------------------------------------------------------------------------------|
+| ~_In_~          | Input parameter - read only argument no modified inside the by the function.               |
+|               | Generally has the const qualifier such as const char*.                                     |
+| ~_In_Out_~      | Optional input parameter, can be ignored by passing a null pointer.                        |
+|               |                                                                                            |
+| ~_Out_~         | Output paramenter - Argument is written by the called function. It is generally a pointer. |
+|               |                                                                                            |
+| ~_Out_opt_~     | Optional output parameter. Can be ignored by setting it to null pointer.                   |
+|               |                                                                                            |
+| ~_Inout_~       | Data is passed to the function and pontentially modified.                                  |
+|               |                                                                                            |
+| ~_Outptr_~      | Output to caller. The value returned by written to the parameter is pointer.               |
+|               |                                                                                            |
+| ~_Outptr_opt_~  | Optional output pointer to caller, can be ignored by passing NULL pointer.                 |
+|               |                                                                                            |
+
+Note: if the parameter is not annotated with ~_opt_~ the caller is not
+supposed to pass a NULL pointer, otherwise the parameter must be
+annotated with ~_In_opt_~, ~_Out_opt_~ and etc.
+
+Usage example: 
+
+ - This annotation enhances the readability by telling reader which
+   parameters are input and which parameters are output or used for
+   returning values.
+
+File: sal1.cpp 
+
+#+BEGIN_SRC cpp
+  #include <sal.h>     // Microsft's Source Code Annotation Language 
+  #include <iostream>
+
+  // Computes elementwise product of two vectors 
+  void vector_element_product(
+        _In_ size_t size,
+        _In_ const double xs[],
+        _In_ const double ys[],
+        _Out_      double zs[]
+        ){
+        for(int i = 0; i < size; i++){
+            zs[i] = xs[i] * ys[i];
+        }
+  }
+
+  void showArray(size_t size, double xs[]){
+    std::cout << "(" << size << ")[ ";
+    for(int i = 0; i < size; i++){
+      std::cout << xs[i] << " ";
+    }
+    std::cout << "] ";
+  }
+
+  int main(){
+    double xs [] = {4, 5, 6, 10};
+    double ys [] = {4, 10, 5, 25};
+    double zs [4];
+    vector_element_product(4, xs, ys, zs);
+    std::cout << "xs = "; showArray(4, xs); std::cout << "\n";
+    std::cout << "ys = "; showArray(4, ys); std::cout << "\n";
+    std::cout << "zs = "; showArray(4, zs); std::cout << "\n";
+    
+  }
+#+END_SRC
+
+Compiling: 
+
+ - MSVC (CL.EXE):
+
+#+BEGIN_SRC sh 
+   $ cl.exe sal1.cpp /nologo /Fe:sal1-a.exe && sal1-a.exe
+   sal1.cpp
+   C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Tools\MSVC\14.12.25827\include\xlocale(313): warning C4530: C++ exception handler used, but unwind semantics are not enabled. Specify /EHsc
+   xs = (4)[ 4 5 6 10 ]
+   ys = (4)[ 4 10 5 25 ]
+   zs = (4)[ 16 50 30 250 ]
+#+END_SRC
+
+ - Mingw/G++
+
+#+BEGIN_SRC sh
+   $ g++ sal1.cpp -o sal1-b.exe -std=c++11 && sal1-b.exe
+   xs = (4)[ 4 5 6 10 ]
+   ys = (4)[ 4 10 5 25 ]
+   zs = (4)[ 16 50 30 250 ]
+#+END_SRC
+
+
+Note: It doesn't work on Linux or other OSes. But it can be
+implemented with header files.
+
+ *Open Source SAL Implementation:*
+
+ + Source-code annotation language (SAL) compatibility header -
+   <https://github.com/nemequ/salieri> 
+
+   + "Salieri is a header which provides definitions for Microsoft's
+     source-code annotation language (SAL). Simply drop the header
+     into your code and use it instead of including <sal.h> directly,
+     and you can use SAL annotations even if you want your program to
+     be portable to compilers which don't support it."
+
+   + "SAL provides lots of annotations you can use to describe the
+     behavior of your program. There is a Best Practices and Examples
+     (SAL) page on MSDN if you want to get a very quick idea of how it
+     works, but the basic idea is that you end up with something like
+     this:" 
+
+ *References:*
+
+  + [[https://docs.microsoft.com/en-us/visualstudio/code-quality/understanding-sal][Understanding SAL - Visual Studio | Microsoft Docs]]
+  + [[https://msdn.microsoft.com/en-us/library/hh916382.aspx][Annotating Function Parameters and Return Values]]
+  + [[https://msdn.microsoft.com/en-us/library/ms182032.aspx?f=255&MSPPError=-2147217396][Using SAL Annotations to Reduce C-C++ Code Defects]]
+  + [[https://msdn.microsoft.com/en-us/library/jj159525.aspx][Best Practices and Examples (SAL)]]
+  + [[https://stackoverflow.com/questions/11457328/what-is-in-in-c][What is _In_ in C++? - Stack Overflow]]
+  + [[https://ariccio.com/2015/04/02/preventing-bugs-and-improving-code-quality-with-microsoft-sal-part-2-custom-preconditions-for-structs-objects/][Preventing bugs, and improving code quality with Microsoft SAL (Part 2, custom preconditions for structs & objects) | Alexander Riccio]]
+  + SQLite Source Code Annotated with SAL -
+    https://github.com/ariccio/SQLite-Test-SAL and [[https://ariccio.com/2015/05/10/using-sal-in-the-sqlite-api/][Using SAL in the SQLite API | Alexander Riccio]]
+  + [[https://www.osr.com/blog/2015/02/23/sal-annotations-dont-hate-im-beautiful/][SAL Annotations: Don’t Hate Me Because I’m Beautiful – OSR]]
+
+** Books  
 
 Books: 
 
