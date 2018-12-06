@@ -405,6 +405,135 @@ implemented with header files.
     https://github.com/ariccio/SQLite-Test-SAL and [[https://ariccio.com/2015/05/10/using-sal-in-the-sqlite-api/][Using SAL in the SQLite API | Alexander Riccio]]
   + [[https://www.osr.com/blog/2015/02/23/sal-annotations-dont-hate-im-beautiful/][SAL Annotations: Don’t Hate Me Because I’m Beautiful – OSR]]
 
+** Character Encoding in WinAPI - ANSI x utf8 x utf16 (wchar_t)
+*** Overview 
+
+Unlike Linux, MacOSX and BSD where the API supports unicode UTF-8,
+the Windows API only supports ANSI enconding (char) and UTF16 or
+Unicode with 2 bytes per character _wchar_t_. 
+
+ *Macros and types for enconding portability*
+
+The following macros are widely used by Windows API for portability
+between ANSI and Unicode: 
+
+ + Strings:
+   + [[http://www.cplusplus.com/reference/string/][<std::string>]] (UTF8 enconding) - Ordinary string (aka multi-byte string) 
+
+   + [[http://www.cplusplus.com/reference/string/wstring/][std::wstring]] (UTF-16 enconding) - Wide string - string defined as
+     array of wide characters wchar_t.
+
+ + _TCHAR_ (Header: <tchar.h>) - When the _UNICODE_ is defined TCHAR
+   becomes wchar_t, otherwise, it becomes char.
+
+#+BEGIN_SRC cpp 
+  #ifdef _UNICODE
+    typedef wchar_t TCHAR;
+  #else
+    typedef char TCHAR;
+  #endif
+#+END_SRC
+
+ + String Literal *_T* or TEXT macro. 
+
+#+BEGIN_SRC cpp 
+  #ifdef _UNICODE 
+     #define _T(str)   L##str
+     #define TEXT(c)   L##str
+  #else 
+     #define _T(str)     str 
+     #define TEXT(str)   str
+  #endif
+#+END_SRC
+
+ + Character array type definition: 
+
+| Type    | Definition     |   |
+|---------+----------------+---|
+| LPSTR   | char*          |   |
+| LPCSTR  | const char*    |   |
+|         |                |   |
+| LPWSTR  | wchar_t*       |   |
+| LPCWSTR | const wchar_t* |   |
+|         |                |   |
+| LPTSTR  | TCHAR*         |   |
+| LPCTSTR | const TCHAR*   |   |
+|         |                |   |
+
+ *String Literals*
+
+ + _Utf-8 string literal_ (narrow characters or multibyte string) -
+   cannot be used with Windows APIs as they will interpret those
+   string literals as ANSI, thus not all characters will be
+   represented.
+
+#+BEGIN_SRC cpp 
+  "UTF8 - Unicode 8 bits multi-byte literal";
+  // Note: It doesn't work with Windows APIs (Windows specific functions)
+  char utf8_text [] = "Random text in Chinese script (UTF8): 读写汉字1";
+#+END_SRC
+
+ + _Utf-16 string literal_ (wide characters - wchar_t). Windows Unicode
+   APIs or functions only works with wide characters (wchar_t).
+
+#+BEGIN_SRC cpp   
+  L"UTF16 Wchar wide chracters literal";
+  wchar_t utf16_text [] = L"Random text in Chinese script (UTF16): 读写汉字1";
+#+END_SRC
+
+ + String prefixed with _T or TEXT. If Unicode is defined the string
+   literal becomes an unicode UTF16 string literal and prefix 'L' is
+   added to the string, otherwise nothing happens.
+
+#+BEGIN_SRC cpp 
+  TCHAR text [] = _T("Random text in Chinese script  读写汉字1");
+  // OR 
+  TCHAR text [] = TEXT("Random text in Chinese script  读写汉字1");
+#+END_SRC
+
+If _UNICODE_ is not defined, it becomes: 
+
+#+BEGIN_SRC cpp 
+  char text [] = "Random text in Chinese script 读写汉字1";
+#+END_SRC
+
+If Unicode is defined, it becomes: 
+
+#+BEGIN_SRC cpp
+  wchar_t text [] = L"Random text in Chinese script 读写汉字1";
+#+END_SRC
+
+ *Windows APIs - ANSI X Unicode version*
+
+Almost every function in Windows API such as [[https://docs.microsoft.com/en-us/windows/desktop/api/fileapi/nf-fileapi-createdirectorya][CreateDirectory]] has an
+ANSI and Unicode UTF16 (with wide chars wchar_t) version. The ANSI
+version of CreateDirectory API is [[https://docs.microsoft.com/en-us/windows/desktop/api/fileapi/nf-fileapi-createdirectorya][CreateDirectoryA]] (suffix A) and the
+unicode version is [[https://docs.microsoft.com/en-us/windows/desktop/api/fileapi/nf-fileapi-createdirectoryw][CreateDirectoryW]]. The API _CreateDirectory_ is
+expanded to CreateDirectoryW if #define UNICODE preprocessor flag is
+not defined, otherwise it is expanded to CreateDirectoryA. 
+
+ + ANSI Version: 
+
+#+BEGIN_SRC cpp 
+  BOOL CreateDirectoryA(
+    LPCSTR /* const char */  lpPathName,
+    LPSECURITY_ATTRIBUTES    lpSecurityAttributes
+  );
+#+END_SRC
+
+ + Unicode Version: 
+
+#+BEGIN_SRC cpp 
+  BOOL CreateDirectoryW(
+    LPCWSTR /* const wchar_t*  */  lpPathName,   
+    LPSECURITY_ATTRIBUTES          lpSecurityAttributes
+  );
+#+END_SRC
+
+
+
+
+
 ** Install Building Tools and Compilers 
 *** Install Mingw 
 
