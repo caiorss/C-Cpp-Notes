@@ -2650,7 +2650,185 @@ Output:
   Area of shape 3 = nan
 #+END_SRC
 * C++ Specific Design Pattern and Idioms
-** RAII - Resource Aquisition Is Initialization
+** Erase-Remove Idiom 
+
+The algorithms [[http://www.cplusplus.com/reference/algorithm/remove/][std::remove]] and [[http://www.cplusplus.com/reference/algorithm/remove_if/][std::remove_if]] don't remove anythign
+from a container, they just move the elements supposed to be removed
+to the end of the container. The erase/remove idiom is a just a simple
+technique for really removing the elements from the container.
+
+Example: 
+
+ + The following session in CERN's ROOT REPL shows that std::remove
+   does not remove elements of deque zs equal to 1. In order to
+   really remove them, it is necessary to use COTAINER.erase method. 
+
+#+BEGIN_SRC cpp 
+        // =======>>> BEFORE <<<============//
+
+  >> auto zs = std::deque<int> {1, 10, 1, 2, 2, 5, 10, 1, 1, 1, 5, 2};
+  >> zs
+  { 1, 10, 1, 2, 2, 5, 10, 1, 1, 1, 5, 2 }
+
+        // =======>>> std::remove <<<============//
+
+  // Remove all elements equal to 1 
+  >> auto it = std::remove(zs.begin(), zs.end(), 1);
+
+  // Elements are not removed 
+  >> zs
+  { 10, 2, 2, 5, 10, 5, 2, 1, 1, 1, 5, 2 }
+
+  // Iterator 
+  >> it
+  (std::_Deque_iterator<int, int &, int *> &) @0x7f1eb9a99060
+
+  // Now elements are removed. 
+  >> zs.erase(it, zs.end())
+  (std::deque<int, std::allocator<int> >::iterator) @0x3b50df0
+
+  // ==========>>> AFETER <<<===================
+  >> zs
+  (std::deque<int, std::allocator<int> > &) { 10, 2, 2, 5, 10, 5, 2 }
+#+END_SRC
+
+For short 
+
+ + Note: It not only works for deque, it works for all STL iterators. 
+
+#+BEGIN_SRC cpp 
+  >>  auto elems = std::deque<int> {1, 10, 1, 2, 2, 1, 1, 5, 10, 1, 1, 1, 5, 2};
+   
+  // Before removing 
+  >> elems
+  { 1, 10, 1, 2, 2, 1, 1, 5, 10, 1, 1, 1, 5, 2 }
+  >> 
+
+  // Really remove all elements equal to 1. 
+  >> elems.erase(std::remove(elems.begin(), elems.end(), 1), elems.end())
+  (std::deque<int, std::allocator<int> >::iterator) @0x3bc3e80
+
+  // After removing 
+  >> elems
+  { 10, 2, 2, 5, 10, 5, 2 }
+  >> 
+#+END_SRC
+
+The boilerplate code can be reduced by defining generic functions 
+(templated functions) which operates on any container, namely
+_erase_equal_ and _erase_if_. 
+
+ *Function: erase_equal*
+
+Remove all elements equal to some value. 
+
+#+BEGIN_SRC cpp 
+  // Erase all elements of a container equal to a given value 
+  template< class T
+           ,template<class>        class Allocator
+           ,template<class, class> class Container
+           >
+  void erase_equal(Container<T, Allocator<T>>& container, const T& value){
+       auto it = std::remove(container.begin(), container.end(), value);
+       container.erase(it, container.end());
+  }
+#+END_SRC
+
+Usage example for deque: 
+
+#+BEGIN_SRC cpp 
+  >> std::deque<int> elems1 = {1, 10, 1, 2, 2, 1, 1, 5, 10, 1, 1, 1, 5, 2};
+
+  >> elems1
+  { 1, 10, 1, 2, 2, 1, 1, 5, 10, 1, 1, 1, 5, 2 }
+
+  >> erase_equal(elems1, 1)
+  >> elems1
+  (std::deque<int> &) { 10, 2, 2, 5, 10, 5, 2 }
+
+  >> erase_equal(elems1, 10)
+  >> elems1
+  { 2, 2, 5, 5, 2 }
+  >> 
+#+END_SRC
+
+Usage example for vector: 
+
+#+BEGIN_SRC cpp 
+  //========= VECTOR ======================
+   auto words = std::vector<std::string>{ "c++", "breakthrough", "c++", "RUST", "asm", "ARM", 
+      "RISC", "CISC", "asm", "forth", "forth", "c++", "low level", "RUST", "asm"
+    };
+
+   >> words
+   { "c++", "breakthrough", "c++", "RUST", "asm", "ARM", "RISC", "CISC", "asm", 
+     "forth", "forth", "c++", "low level", "RUST", "asm" }
+   >> 
+
+  // Cannot infer type of of parameter T
+  >> erase_equal
+  ROOT_prompt_28:1:1: error: reference to overloaded function could not be resolved; did you mean to call it?
+  erase_equal
+  ^~~~~~~~~~~
+  input_line_34:5:6: note: possible target for call
+  void erase_equal(Container<T, Allocator<T>>& container, const T& value){
+       ^
+
+  >> erase_equal<std::string>(words, "c++")
+  >> words
+  { "breakthrough", "RUST", "asm", "ARM", "RISC", "CISC", "asm", "forth", "forth", "low level", "RUST", "asm" }
+  >> 
+
+  >> erase_equal<std::string>(words, "asm")
+  >> words
+  { "breakthrough", "RUST", "ARM", "RISC", "CISC", "forth", "forth", "low level", "RUST" }
+  >> 
+#+END_SRC
+
+ *Function: erase_if*
+
+Remove all elements matching a predicate function: 
+
+#+BEGIN_SRC cpp 
+  // Erase all elements of a container equal to a given value 
+  template< class T
+           ,class Predicate  /* Some predicate function */
+           ,template<class>        class Allocator
+           ,template<class, class> class Container
+           >
+  void erase_if(Container<T, Allocator<T>>& container, Predicate predicate){
+       auto it = std::remove_if(container.begin(), container.end(), predicate);
+       container.erase(it, container.end());
+  }
+#+END_SRC
+
+
+#+BEGIN_SRC cpp 
+  >> std::deque<int> adeque = {6, 10, 6, 7, 5, 1, 4, 2, 1, 6, 10, 2, 9, 8, 1, 1, 5, 2};
+  >> adeque
+  { 6, 10, 6, 7, 5, 1, 4, 2, 1, 6, 10, 2, 9, 8, 1, 1, 5, 2 }
+  >> 
+
+  // Remove all elemets less than 5
+  >> erase_if(adeque, [](int x){ return x < 5; })
+  >> adeque
+  (std::deque<int> &) { 6, 10, 6, 7, 5, 6, 10, 9, 8, 5 }
+  >> 
+#+END_SRC
+
+
+References: 
+
+ + [[https://www.codeproject.com/Articles/1227392/Erase-remove-Idiom-Revisited][Erase-remove Idiom Revisited - CodeProject]]
+ + [[https://en.wikibooks.org/wiki/More_C%2B%2B_Idioms/Erase-Remove][More C++ Idioms/Erase-Remove - Wikibooks, open books for an open world]]
+ + [[https://www.geeksforgeeks.org/difference-between-stdremove-and-vectorerase-for-vectors/][Difference between std::remove and vector::erase for vectors - GeeksforGeeks]]
+
+Further Reading:
+
+ + [[https://www.fluentcpp.com/2018/09/18/how-to-remove-pointers-from-a-vector-in-cpp/][How to Remove Pointers from a Vector in C++ - Fluent C++]]
+ + [[http://amse.ru/courses/cpp2/2011_03_14.html][C++. STL algorithms]] (in Russian)
+
+** RAII idiom - Resource Aquisition Is Initialization
 *** Overview 
 
 Comes from book: _C++ Programming with Design Patterns Revealed_ 
@@ -3041,7 +3219,7 @@ heap-allocated objects, it is also useful for managing resources.
   >> 
  
 #+END_SRC
-** PIMPL - Pointer to Implementation
+** PIMPL idiom - Pointer to Implementation
 
 The PIMPL - Pointer to Implementation idiom, also known as compiler
 firewall, is a widely used technique  in C++ for completly hiding class
@@ -3175,7 +3353,7 @@ References and further:
  
  + *Modern and Lucid C++ Advanced for Professional Programmers* -
    <https://wiki.ifs.hsr.ch/CppAdvanced/files/lecture_12_advanced_library_design.pdf> 
-** Non-copiable class 
+** Non-copiable class idiom
 
 Classes where copying doesn't make sense such as classes managing
 resources or singletons should have the copy constructor and copy
@@ -3480,7 +3658,7 @@ constructor are implemented with the custom _std::swap_ overload.
 
  + [[https://stackoverflow.com/questions/19841626/move-assignment-incompatible-with-standard-copy-and-swap][c++ - Move Assignment incompatible with Standard Copy and Swap - Stack Overflow]]
 
-** Interface Class 
+** Interface Class idiom
 *** Overview  
 
 Unlike C# and Java, C++ doesn't have any keyword for implementing
@@ -3707,7 +3885,7 @@ References and further reading:
  + [[https://en.wikibooks.org/wiki/More_C%2B%2B_Idioms/Interface_Class][More C++ Idioms/Interface Class - Wikibooks, open books for an open world]]
  + [[https://accu.org/index.php/journals/269][ACCU - Separating Interface and Implementation in C++]]
  + [[https://www.boost.org/doc/libs/1_63_0/libs/smart_ptr/sp_techniques.html][Smart Pointer Programming Techniques - 1.63.0]]
-** Type Erasure
+** Type Erasure Pattern 
 *** Overview  
 
 Type erasure is a set of techniques for providing an uniform interface
