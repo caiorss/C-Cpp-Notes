@@ -26,7 +26,6 @@
     Linux or BSD. 
 
 
-
 ** Windows API Main Header Files
 
 Most used headers: 
@@ -530,9 +529,219 @@ not defined, otherwise it is expanded to CreateDirectoryA.
   );
 #+END_SRC
 
+*** Example - Unicode and Windows API 
+
+Complete File:
+ + [[file:src/windows/winapi-enconding1.cpp][file:src/windows/winapi-enconding1.cpp]] 
+
+Compiling with GCC: 
+
+#+BEGIN_SRC sh 
+ # Build 
+ $ g++ winapi-encoding1.cpp -o out-gcc.exe -std=c++14  
+ # Compile 
+ $ out-gcc.exe 
+#+END_SRC
+
+Compiling with MSVC:
+ + Note: If there is any unicode literal in the source, such as some
+   text in Chinese or Hidi script, it is necessary to compile with the
+   options (/source-charset:utf-8 /execution-charset:utf-8), otherwise
+   the 
+
+#+BEGIN_SRC sh 
+ # Build 
+ $ cl.exe winapi-encoding1.cpp user32.lib /EHsc /Zi /nologo /source-charset:utf-8 /execution-charset:utf-8 \
+    /Fe:out-msvc.exe 
+ # Run 
+ $ out-msvc.exe 
+#+END_SRC
 
 
+Headers: 
 
+ + To enable the expansion to unicode versions of WinAPIs, the flags
+   UNICODE and ~_UNICODE~ must be enabled. For instance, if those flags
+   are enabled CreateDirectory is expanded to CreateDirectoryW and TCHAR
+   is expanded to wchar_t. Otherwise, CreateDirectory is expanded to
+   CreateDirectoryA and TCHAR to char.
+
+ + Note: The unicode flags must be defined before any windows specific
+   header such as <windows.h> or <tchar.h>.
+
+#+BEGIN_SRC cpp 
+  #include <fstream> 
+  #include <string>
+  #include <sstream>
+
+  // Enable Unicode version of Windows API compile with -DWITH_UNICODE 
+  #ifdef WITH_UNICODE
+    #define UNICODE
+    #define _UNICODE
+  #endif 
+
+  #include <windows.h>
+  #include <tchar.h>
+#+END_SRC
+
+ *Experiment 1* - Print to console: 
+
+#+BEGIN_SRC cpp 
+  // ===========> EXPERIMENT 1 - Print to Console ============//	
+  std::cout << "\n ===>>> EXPERIMENT 1: Print to terminal [ANSI/UTF8] <<<=== " << std::endl;
+  {
+     std::cout  <<  " [COUT] Some text example - указан - 读写汉字1 " << "\n";
+     std::wcout << L" [WCOUT] Some text example - указан - 读写汉字1 " << L"\n";	
+  }
+#+END_SRC
+
+Output: 
+
+ + This piece of code fails because the Windows' console (cmd.exe)
+   cannot print unicode text by default. It needs to be configured
+   before printing unicode, otherwise it will print garbage.
+
+#+BEGIN_SRC text 
+ ===>>> EXPERIMENT 1: Print to terminal [ANSI/UTF8] <<<
+ [COUT] Some text example - ╤â╨║╨░╨╖╨░╨╜ - Φ»╗σåÖµ▒ëσ¡ù
+ [WCOUT] Some text example -
+#+END_SRC
+
+ *Experiment 2* - Print to File
+
+#+BEGIN_SRC cpp 
+   // ===========> EXPERIMENT 2 - Print to File ============//
+   std::cout << "\n ===>>> EXPERIMENT 2: Write non ANSI Chars to File <<<=== " << "\n";
+   std::stringstream ss;
+   ss << " Text in Cyrllic Script: Если указан параметр  " << "\n"
+      << " Text in Chinese Script: 读写汉字1 " << "\n"
+      << "\n";
+
+   auto dfile = std::ofstream("logging.txt");
+   dfile << ss.str() << std::flush;
+#+END_SRC
+
+Output: file - loggin.txt  
+ + By opening the file logging.txt with notepad.exe, it is
+   possible view all characters as show in the following block.
+
+#+BEGIN_SRC text 
+ Text in Cyrllic Script: Если указан параметр  
+ Text in Chinese Script: 读写汉字1 
+#+END_SRC
+
+  *Experiment 3* - WinAPI - [[https://docs.microsoft.com/en-us/windows/desktop/api/fileapi/nf-fileapi-createdirectorya][CreateDirectory]]  
+
+This code experiment attempts to create 3 directories: 
+
+  + Directory: directoryANSI-读写汉字1 with CreateDirectoryA
+    function (ANSI version of the underlying API)
+
+  + Directory: directoryWCHAR-读写汉字 with CreateDirectoryW (Unicode
+    version of the API).
+
+  + Directory: directoryTCHAR-读写汉字 with _CreateDirectory macro_
+    which is expanded to CreateDirectoryW when UNICODE is defined,
+    othewise it is expanded to CreateDirectoryA.
+
+#+BEGIN_SRC cpp 
+     // ===========> EXPERIMENT 4 - WinAPI - CreateDirectory ============//
+     std::cout << "\n ===>>> EXPERIMENT 3: WinAPI CreateDirectory <<<=== " << std::endl;
+
+     { // -- ANSI Version of CreateDirectory API 
+         bool res;
+         res = CreateDirectoryA("directoryANSI-读写汉字1", NULL);
+         std::cout << "Successful 1 ?=  " << std::boolalpha << res << std::endl;
+     }
+
+     {  // -- Unicode (UTF16) - Wide character version of CreateDirectory API 
+         bool res;
+         res = CreateDirectoryW(L"directoryWCHAR-读写汉字", NULL);
+         std::cout << "Successful 2 ?= " << std::boolalpha << res << std::endl;  		
+     }
+     {
+        // -- TCHAR Version Wide character version of CreateDirectory API 
+        bool res;
+
+        #ifdef UNICODE
+          std::cout << " [INFO] UNICODE (UTF16) CreateDirectory expanded to CreateDirectoryW" << std::endl;
+        #else
+          std::cout << " [INFO] ANSI CreateDirectory expanded to CreateDirectoryA" << std::endl;
+        #endif
+        res = CreateDirectory(_T("directoryTCHAR-读写汉字"), NULL);
+        std::cout << "Successful 3 ?= " << std::boolalpha << res << std::endl;  		
+  }
+#+END_SRC
+
+Output when compiling without -DWITH_UNICODE: 
+
+#+BEGIN_SRC sh
+   $ g++ winapi-encoding1.cpp -o out-gcc.exe -std=c++14  && out-gcc.exe 
+
+   ... ....  ... 
+   ===>>> EXPERIMENT 3: WinAPI CreateDirectory <<<=== 
+  Successful 1 ?=  true
+  Successful 2 ?= true
+   [INFO] ANSI CreateDirectory expanded to CreateDirectoryA
+  Successful 3 ?= true
+   ... ....  ... 
+#+END_SRC
+
+Directories created: 
+
+ + [FAILED]  ~directoryANSI-è¯»å†™æ±‰å­—1~
+ + [SUCCESS] ~directoryWCHAR-读写汉字~
+   + Only the Unicode (CreateDirectoryW) function  works, the ANSI
+     function CreateDirectoryA fails even if the string is encoded
+     with UTF-8.
+ + [FAILED]  ~directoryTCHAR-è¯»å†™æ±‰å­—~
+   + Without UNICODE flag, CreateDirectory expands to
+     CreateDirectoryA. 
+
+Output when compiling without -DWITH_UNICODE: 
+
+#+BEGIN_SRC sh 
+   $ g++ winapi-encoding1.cpp -o out-gcc.exe -std=c++14 -DWITH_UNICODE  && out-gcc.exe 
+
+      ... .... ... ... ...   
+   ===>>> EXPERIMENT 3: WinAPI CreateDirectory <<<=== 
+  Successful 1 ?=  true
+  Successful 2 ?= true
+   [INFO] UNICODE (UTF16) CreateDirectory expanded to CreateDirectoryW
+  Successful 3 ?= true
+      ... .... ... ... ...   
+#+END_SRC
+
+Directories created: 
+
+ + [FAILED] ~directoryANSI-è¯»å†™æ±‰å­—1~
+ + [SUCCESS] ~directoryWCHAR-读写汉字~
+ + [SUCCESS] ~directoryTCHAR-读写汉字~
+
+
+  *Experiment 4* - WinAPI 
+
+#+BEGIN_SRC cpp 
+    // ===========> EXPERIMENT 4 - WinAPI - MessageBox ============//
+    std::cout << "\n ===>>> EXPERIMENT 4: MessageBox <<<=== " << std::endl;
+
+    DWORD const infoboxOptions  = MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND;
+    // Text in UTF8 => Note => Windows API doesn't work with UTF8
+    // or multi-byte characters as the API treats the chars as they were ANSI.
+    char narrowText []  = "Some chinese text não inglês  读写汉字 - 学中文";
+    // Unicode text in UTF16 
+    wchar_t wideText []  = L"Some chinese text não inglês 读写汉字 - 学中文";
+    MessageBoxA( 0, narrowText, "ANSI (narrow) text:", infoboxOptions );    
+    MessageBoxW( 0, wideText, L"Unicode (wide) text:", infoboxOptions );
+#+END_SRC
+ 
+Output of [[https://docs.microsoft.com/en-us/windows/desktop/api/winuser/nf-winuser-messageboxa][MessageBoxA]] (failure, it cannot deal with unicode UTF-8 chars):
+
+ [[file:images/messagebox-ansi1.png][file:images/messagebox-ansi1.png]]
+
+Output of [[https://docs.microsoft.com/en-us/windows/desktop/api/winuser/nf-winuser-messageboxw][MessageBoxW]] (success):
+
+ [[file:images/messabox-unicode1.png][file:images/messabox-unicode1.png]]
 
 ** Install Building Tools and Compilers 
 *** Install Mingw 
