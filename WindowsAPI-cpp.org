@@ -868,11 +868,102 @@ Output:
 #+CAPTION: Graphical output - messagebox 
 [[file:images/output-messageboxUTF8.png][file:images/output-messageboxUTF8.png]] 
 
+*** Example - Setting Console to UTF8 
 
+ + Source Code: [[file:src/windows/console-utf8.cpp][file:src/windows/console-utf8.cpp]]
+ + Gist: [[https://gist.github.com/caiorss/54f73d235b87bbb897b0e3f943876345][console-utf8.cpp]]
 
+The class ConsoleUTF8 uses RAII - Resource Acquisition is
+Initialization for setting the console to UTF8 and restoring it when
+a class object goes out scope. 
 
+#+BEGIN_SRC cpp 
+  // Uses RAII for setting console to UTF8
+  // and restoring its previous settings.
+  class ConsoleUTF8{
+  public:
+     // Constructor saves context 
+     ConsoleUTF8(){
+         m_config = ::GetConsoleOutputCP();
+         ::SetConsoleOutputCP(CP_UTF8);
+         std::perror(" [TRACE] Console set to UTF8");
+     }
+     // Destructor restores context 
+     ~ConsoleUTF8(){
+        std::perror(" [TRACE] Console restored.");
+        ::SetConsoleOutputCP(m_config);
+     }
+  private:
+     unsigned int m_config;
+  };
+#+END_SRC
 
+Class ExitPrompt uses RAII for asking the user to type RETURN to exit
+in order to allow its output to be ovserved by blocking the program
+from exiting immediately when it is invoked by clicking the
+executable.
 
+#+BEGIN_SRC cpp 
+  struct ExitPrompt{
+      ~ExitPrompt(){
+          std::puts(" >>> Enter RETURN to exit");
+          std::cin.get();
+      }
+  };
+#+END_SRC
+
+Main function: 
+
+#+BEGIN_SRC cpp 
+    #ifdef UTF8
+    auto utf8Console = ConsoleUTF8();
+    #endif 
+    //auto codePage = ::SetConsoleOutputCP(CP_UTF8);
+
+    auto exitPrompt = ExitPrompt();
+    std::puts("Testing Console output with UTF8");
+    std::puts("--------------------------------");
+
+    std::puts("Text with UTF8 - SÃO JOÃO -  ");
+    std::puts("Japanese Kanji - 漢字 ; Japanese Hiragrama - 平仮名 ");
+    std::puts("Cyrllic Script - Sputnik = Спутник-1");
+    std::puts("Greek/Latin Script = Α α, Β β, Γ γ, Δ δ, Ε ε, Ζ ζ, Η η, Θ θ");
+
+    //::SetConsoleOutputCP(codePage);
+    return 0;
+#+END_SRC
+
+Compiling with MSVC: 
+
+#+BEGIN_SRC cpp 
+  // Compile and run with UTF8 flag disabled 
+  $ cl.exe console-utf8.cpp /EHsc /Zi /nologo /Fe:out.exe && out.exe
+
+    // Compile and run with UTF8 flag disabled // Compile run with UTF8 flag enabled  
+  $ cl.exe console-utf8.cpp /EHsc /Zi /nologo /Fe:out.exe -DUTF8 && out.exe
+#+END_SRC
+
+Compiling with Mingw/GCC:
+
+#+BEGIN_SRC cpp 
+  // Compile and run with UTF8 flag disabled 
+   g++ console-utf8.cpp -o out-gcc.exe -std=c++14 -Wall && out-gcc.exe
+  // Compile and run with UTF8 flag disabled 
+   g++ console-utf8.cpp -o out-gcc.exe -std=c++14 -Wall -DUTF8 && out-gcc.exe
+#+END_SRC
+
+#+CAPTION: Output with UTF8 disabled => Terminal in ANSI mode. 
+[[file:images/windows-console-ansi-mode.png][file:images/windows-console-ansi-mode.png]]
+
+#+CAPTION: Output with UTF8 enalbed => Terminal in unicode UTF8 mode 
+[[file:images/windows-console-unicode-utf8.png][file:images/windows-console-unicode-utf8.png]]
+
+See: 
+
+ + WINAPI - [[https://docs.microsoft.com/en-us/windows/console/setconsoleoutputcp][SetConsoleOutputCP function - Windows Console | Microsoft Docs]]
+ + WINAPI - [[https://docs.microsoft.com/en-us/windows/console/getconsoleoutputcp][GetConsoleOutputCP function - Windows Console | Microsoft Docs]]
+ + [[https://stackoverflow.com/questions/26834947/how-to-output-unicode-in-c-without-setmode/27894773][How to output unicode in C++ without _setmode - Stack Overflow]]
+ + [[https://unicodebook.readthedocs.io/operating_systems.html][10. Operating systems — Programming with Unicode]]
 
 ** Install Building Tools and Compilers 
 *** Install Mingw 
