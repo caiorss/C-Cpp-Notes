@@ -1049,6 +1049,109 @@ See:
  + [[https://stackoverflow.com/questions/26834947/how-to-output-unicode-in-c-without-setmode/27894773][How to output unicode in C++ without _setmode - Stack Overflow]]
  + [[https://unicodebook.readthedocs.io/operating_systems.html][10. Operating systems — Programming with Unicode]]
 
+** CODE - Show processes 
+
+This code prints to stdout (console) and to a file the list of running
+processes in current machine:
+
+Source: 
+ + [[file:src/windows/showProcesses.cpp][file:src/windows/showProcesses.cpp]]
+
+Parts:
+
+ + Function which prints all processes to any output stream: 
+
+#+BEGIN_SRC cpp 
+  // Show all processes in current machine
+  auto showProcessInfo(std::ostream& os) -> int {
+    // Get snapshot with process listing.
+    HANDLE hProcessSnapShot =
+      CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);  
+    // Instnatiate process' entry structure.
+    PROCESSENTRY32 ProcessEntry = { 0 };
+    ProcessEntry.dwSize = sizeof( ProcessEntry );
+    BOOL Return = FALSE;
+    Return = Process32First( hProcessSnapShot, &ProcessEntry );
+    // Returns -1 if process failed 
+    if(!Return ) {  return -1;}
+    do { // print process' data
+        os << "EXE File     = " << ProcessEntry.szExeFile      << "\n"
+           << "PID          = " << ProcessEntry.th32ProcessID  << "\n"
+           << "References   = " << ProcessEntry.cntUsage       << "\n"
+           << "Thread Count = " << ProcessEntry.cntThreads     << "\n"  
+           << "-----------------------------------------------\n";
+      }
+    while( Process32Next( hProcessSnapShot, &ProcessEntry ));
+    // Close handle releasing resource.
+    CloseHandle( hProcessSnapShot );
+    return 1;
+  }
+
+#+END_SRC
+
+ + Main function: 
+
+#+BEGIN_SRC cpp 
+   // Log file 
+   auto plog = std::ofstream("process-log.txt");
+   // Print all processes to stdout. 
+   showProcessInfo(std::cout);
+   // Write all processes to file 
+   showProcessInfo(plog);
+   // Flush buffer - force data to be written to file.
+   plog.flush();
+
+   std::cout << "\n ==> Type return to exit." << std::endl;
+   std::cin.get();
+   return 0;
+#+END_SRC
+
+ + Compiling and running: 
+
+#+BEGIN_SRC cpp 
+  # Build 
+  $ cl.exe showProcesses.cpp /EHsc /Zi /nologo /Fe:showProcesses.exe  
+
+  # Run: 
+  $ showProcesses 
+  # Run 
+  $ showProcesses.exe 
+#+END_SRC
+
+ + Output: 
+
+#+BEGIN_SRC text 
+     $ showProcesses.exe
+    ... ... ... ... 
+  -----------------------------------------------
+  EXE File     = Registry
+  PID          = 68
+  References   = 0
+  Thread Count = 3
+  -----------------------------------------------
+  EXE File     = smss.exe
+  PID          = 308
+  References   = 0
+  Thread Count = 2
+  -----------------------------------------------
+  EXE File     = csrss.exe
+  PID          = 412
+  References   = 0
+  Thread Count = 10
+  -----------------------------------------------
+  EXE File     = wininit.exe
+  PID          = 484
+  References   = 0
+  Thread Count = 1
+  -----------------------------------------------
+    ... ... ... 
+#+END_SRC
+
+API DOCS:
+ + [[https://docs.microsoft.com/en-us/windows/desktop/api/tlhelp32/nf-tlhelp32-createtoolhelp32snapshot][CreateToolhelp32Snapshot function | Microsoft Docs]]
+ + [[https://docs.microsoft.com/en-us/windows/desktop/api/tlhelp32/nf-tlhelp32-process32first][Process32First function | Microsoft Docs]]
+ + [[https://docs.microsoft.com/en-us/windows/desktop/api/tlhelp32/nf-tlhelp32-process32firstw][Process32FirstW function | Microsoft Docs]]
+
 ** Install Building Tools and Compilers 
 *** Install Mingw 
 
