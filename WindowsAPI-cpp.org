@@ -1210,6 +1210,152 @@ Running:
   00007FFBF65C0000     C:\WINDOWS\SYSTEM32\CRYPTBASE.DL
 
 #+END_SRC
+
+Parts: 
+
+ + Class ResourceHandler<HANDLER> is a RAII (Resource Aquisition Is
+   Initialization) for any generic resource which may not be a
+   pointer such as an integer for a file descriptor. 
+
+#+BEGIN_SRC cpp 
+  template<class HANDLER>
+  class ResourceHandler
+  {
+  public:
+      using Disposer = std::function<void (HANDLER)>;
+      ResourceHandler(HANDLER hnd, Disposer disposer)
+         : m_hnd(hnd), m_fndisp(disposer)
+      {  }
+      auto get() -> HANDLER {
+         return m_hnd;
+      }
+      ~ResourceHandler(){
+         m_fndisp(m_hnd);
+      }
+      // Disable copy-constructor and copy-assignment operator 
+      ResourceHandler(const ResourceHandler&) = delete;
+      auto operator= (const ResourceHandler&) -> ResourceHandler& = delete;
+      // Move member functios
+      ResourceHandler(ResourceHandler&& rhs)
+       : m_hnd(rhs.m_hnd),
+         m_fndisp(rhs.m_fndisp){ }
+      auto operator= (ResourceHandler&& rhs){
+          std::swap(this->m_hnd, rhs.m_hnd);
+          this->m_fndisp = rhs->m_fndisp;		
+      }
+  private:
+      HANDLER m_hnd;
+      Disposer m_fndisp;
+  };
+#+END_SRC
+
+Namespace WProcess contains functions for querying processes:
+
+#+BEGIN_SRC cpp 
+  namespace WProcess{
+       using ModuleConsumer = std::function<auto (HMODULE, const std::string&) -> void>;	
+       auto GetName(HANDLE hProc) -> std::string;
+       auto GetExecutablePath(HANDLE hProc) -> std::string;
+       auto ForEachModule(HANDLE hProc, ModuleConsumer FunIterator) -> void;
+  }
+#+END_SRC
+
+ *Main function*
+
+ + Get PID (Process ID) as program argument. 
+
+#+BEGIN_SRC cpp 
+  DWORD pid;
+  DWORD  flags = PROCESS_QUERY_INFORMATION | PROCESS_VM_READ;
+  
+  try{
+      pid  = std::stoi(argv[1]);
+  } catch(const std::invalid_argument& ex){
+      std::cerr << "Error invalid PID" << std::endl;
+      return EXIT_FAILURE;
+  }  
+    
+  // Automatically closes this handle when it goes out of scope.
+  auto hProc = ResourceHandler<HANDLE>{
+      ::OpenProcess(flags, FALSE, pid),
+      ::CloseHandle
+  };
+#+END_SRC
+
+Print process name: 
+
+#+BEGIN_SRC cpp 
+
+  std::cout << "Process base name = "
+            << WProcess::GetName(hProc.get())
+            << std::endl; 
+#+END_SRC
+
+Print path to executable: 
+
+#+BEGIN_SRC cpp 
+  std::cout << "Process path      = "
+            << WProcess::GetExecutablePath(hProc.get())
+            << std::endl;
+#+END_SRC
+
+Print all DLLs used by the process:
+
+#+BEGIN_SRC cpp 
+  // Print all DLLs used by some process 
+  WProcess::ForEachModule(
+	  hProc.get(),
+	  [](HMODULE hmod, const std::string& path) -> void
+	  {
+             std::cout << std::setw(10) << hmod
+                       << std::setw(5)  << " "
+                       << std::left     << std::setw(45) << path
+                       << "\n";					
+	  }
+  	  );
+#+END_SRC
+
+ *Functions in namespace WProcess*
+
+ + WProcess::GetName 
+
+#+BEGIN_SRC cpp 
+    auto GetName(HANDLE hProc) -> std::string {
+          std::wstring basename(MAX_PATH, 0);
+          int n1 = ::GetModuleBaseNameW(hProc, NULL, &basename[0], MAX_PATH);
+          basename.resize(n1);
+          return utf8_encode(basename);
+    }
+#+END_SRC
+
+ + WProcess::GetExecutablePath 
+
+#+BEGIN_SRC cpp 
+    auto GetExecutablePath(HANDLE hProc) -> std::string {
+         std::wstring path(MAX_PATH, 0);
+         int n2 = ::GetModuleFileNameExW(hProc, NULL, &path[0], MAX_PATH);
+         path.resize(n2);
+         return utf8_encode(path);
+    }
+#+END_SRC
+
+ + WProcess::ForEachModule 
+
+#+BEGIN_SRC cpp 
+   auto ForEachModule(HANDLE hProc, ModuleConsumer FunIterator) -> void {
+        HMODULE hMods[1024];
+        DWORD   cbNeeded;
+        if (::EnumProcessModules(hProc, hMods, sizeof(hMods), &cbNeeded)){
+               int n = cbNeeded / sizeof(HMODULE);
+               std::wstring path(MAX_PATH, 0);
+               for(int i = 0; i < n; i++){
+                       DWORD nread = ::GetModuleFileNameExW(hProc, hMods[i], &path[0], MAX_PATH);
+                       path.resize(nread);		
+                       if(nread) FunIterator(hMods[i], utf8_encode(path));
+               }
+        }	
+   }
+#+END_SRC
 ** Install Building Tools and Compilers 
 *** Install Mingw 
 
