@@ -1356,6 +1356,167 @@ Print all DLLs used by the process:
         }	
    }
 #+END_SRC
+** CODE - List directory files 
+
+Source:
+ + File: [[file:src/windows/listFiles.cpp][file:src/windows/listFiles.cpp]]
+ + Gist: [[https://gist.github.com/caiorss/17e9f2d79566b58b1ba65820c26bc1aa][listFiles.cpp]] 
+
+Compiling: 
+ 
+ + MSVC 
+
+#+BEGIN_SRC cpp 
+  $ cl.exe listFiles.cpp /EHsc /Zi /nologo /Fe:listFiles.exe 
+#+END_SRC
+
+ + Mingw/GCC 
+
+#+BEGIN_SRC cpp 
+ $ g++ listFiles.cpp -o listFiles.exe -std=c++14 
+#+END_SRC
+
+Usage: 
+
+#+BEGIN_SRC sh 
+  $ listFiles.exe "C:\*"
+   [TRACE] Console set to UTF8
+  directoryPath = C:\*
+   => $GetCurrent
+   => $Recycle.Bin
+   ... . ... ... .... .. .. ... 
+   => pagefile.sys
+   => PerfLogs
+   => Program Files
+   => Program Files (x86)
+   ... ... ... ... 
+   => Users
+   => Windows
+   => Windows10Upgrade
+   [LOG] Handler <hFile> closed OK.
+   [LOG] End sucessfully
+   [TRACE] Console restored.
+
+  $ listFiles.exe "E:\*"
+   [TRACE] Console set to UTF8
+  directoryPath = E:\*
+   [LOG] Handler <hFile> closed OK.
+   => Error code    = 3
+   => Error message = The system cannot find the path specified.
+   [TRACE] Console restored.
+
+
+  $ listFiles.exe "C:\windows\system32\*.dll" 2> log
+  directoryPath = C:\windows\system32\*.dll
+   => aadauthhelper.dll
+   => aadcloudap.dll
+   => aadjcsp.dll
+   => aadtb.dll
+   => aadWamExtension.dll
+   => AboutSettingsHandlers.dll
+   => AboveLockAppHost.dll
+   ...    ...    ...    ... 
+   [LOG] End sucessfully
+#+END_SRC
+
+ *Parts* 
+
+ + Function: getLastErrorAsString - Returns a human readable
+   std::string description of GetLastError().
+
+#+BEGIN_SRC cpp 
+  // Print human-readable description of GetLastError() - Error Code
+  // Source: https://stackoverflow.com/questions/1387064 Requires:
+  // <string>, <sstream>, <windows.h>,
+  auto getLastErrorAsString() -> std::string {
+      //Get the error message, if any.
+      DWORD errorMessageID = ::GetLastError();
+      if(errorMessageID == 0)
+          return std::string();
+      LPSTR messageBuffer = nullptr;
+      static const DWORD flags  =
+        FORMAT_MESSAGE_ALLOCATE_BUFFER
+        | FORMAT_MESSAGE_FROM_SYSTEM
+        | FORMAT_MESSAGE_IGNORE_INSERTS;
+      size_t size = FormatMessageA(
+                  flags,
+                  NULL,
+                  errorMessageID,
+                  MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                  (LPSTR)&messageBuffer, 0, NULL);
+      auto message = std::string(messageBuffer, size);
+          auto ss = std::stringstream(message);
+          auto line = std::string{};
+          std::getline(ss, line, '\r');
+      //Free the buffer.
+      LocalFree(messageBuffer);
+      return line;  
+  }
+#+END_SRC
+
+ + Function _EnumereFiles_ encapsulates the WinAPIs [[https://docs.microsoft.com/en-us/windows/desktop/api/fileapi/nf-fileapi-findfirstfilew][FindFileFirstW]] and
+   [[https://docs.microsoft.com/en-us/windows/desktop/api/fileapi/nf-fileapi-findnextfilew][FindNextFileW]]. This function iterate over files of some directory
+   and applies an Enumerator function taking a string (file name) and
+   returning a boolean. The iteration continues until the enumerator
+   function returns false.
+
+#+BEGIN_SRC cpp 
+   using FileEnumerator = std::function<bool (const std::string&)>;
+
+  /** Enumerate files of some directory util enumerator function (callback) returns false. 
+    ,* - path       - Directory path to be listed 
+    ,* - Enumerator - Functions which consumes a string (file listed) and returns bool.
+    ,*                this function returns false when it is no longer interested in 
+    ,*                being called. When it returns false the iteration stops. 
+    ,*
+    ,* - Return    - Returns error code from GetLastError(). If it is successful, 
+    ,*               the function returns ERROR_SUCCESS.
+    ,*/
+  auto EnumerateFiles(const std::string& path, FileEnumerator Enumerator) -> int {
+       WIN32_FIND_DATAW fdata;
+       HANDLE hFind = INVALID_HANDLE_VALUE;
+       // Ensure that resource hFind is always disposed. 
+       auto close_hFind = CloseHandleRAAI(std::bind(CloseHandleLog, hFind, "hFile"));
+       hFind = FindFirstFileW(utf8_decode(path).c_str(), &fdata);
+       if(hFind == INVALID_HANDLE_VALUE)
+               return GetLastError();
+       do { //Consumer function 
+               if(!Enumerator(utf8_encode(fdata.cFileName))) break;
+       } while(FindNextFileW(hFind, &fdata) != 0);
+       return ERROR_SUCCESS;
+  }
+#+END_SRC
+
+Main function: 
+
+#+BEGIN_SRC cpp 
+    if(argc < 2){
+        std::cerr << "Usage: " << argv[0] << " " << "[PATH]" << std::endl;
+        return EXIT_FAILURE;
+    }
+    auto utf8Console = ConsoleUTF8();
+    auto directoryPath = std::string{argv[1]};
+    std::cout << "directoryPath = " << directoryPath << "\n";
+    int count = 0;	
+    // Show 50 first files. 
+    int status = EnumerateFiles(
+        directoryPath,
+        [&count](const auto& file){
+                std::cout << " => " << file << "\n";
+                if(count++ < 50)
+                        return true;
+                else
+                        return false;
+        });
+    if(status != ERROR_SUCCESS){
+         std::cout << " => Error code    = " << ::GetLastError() << std::endl;
+         std::cout << " => Error message = " << getLastErrorAsString() << std::endl;
+         return EXIT_FAILURE;
+    }	
+    std::puts(" [LOG] End sucessfully");
+    return EXIT_SUCCESS;
+#+END_SRC
+
 ** Install Building Tools and Compilers 
 *** Install Mingw 
 

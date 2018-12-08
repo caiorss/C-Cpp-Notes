@@ -59,12 +59,9 @@ int main(int argc, char** argv){
 		std::cerr << "Usage: " << argv[0] << " " << "[PATH]" << std::endl;
 		return EXIT_FAILURE;
 	}
-	
 	auto utf8Console = ConsoleUTF8();
 	auto directoryPath = std::string{argv[1]};
-
 	std::cout << "directoryPath = " << directoryPath << "\n";
-	
 	int count = 0;	
 	// Show 50 first files. 
 	int status = EnumerateFiles(
@@ -76,17 +73,12 @@ int main(int argc, char** argv){
 			else
 				return false;
 		});
-
 	if(status != ERROR_SUCCESS){
 		std::cout << " => Error code    = " << ::GetLastError() << std::endl;
 		std::cout << " => Error message = " << getLastErrorAsString() << std::endl;
 		return EXIT_FAILURE;
-	}
-		
+	}	
 	std::puts(" [LOG] End sucessfully");
-	
-	// FindClose(hFile);
-	//CloseHandle(hFind);
 	return EXIT_SUCCESS;
 }
 //---------------------------------------------------------//
