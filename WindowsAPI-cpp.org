@@ -1049,6 +1049,116 @@ See:
  + [[https://stackoverflow.com/questions/26834947/how-to-output-unicode-in-c-without-setmode/27894773][How to output unicode in C++ without _setmode - Stack Overflow]]
  + [[https://unicodebook.readthedocs.io/operating_systems.html][10. Operating systems — Programming with Unicode]]
 
+** CODE - Display information about current process 
+
+Print information about current process and copy itself to desktop
+directory. 
+
+File: [[file:src/windows/currentProcess.cpp][file:src/windows/currentProcess.cpp]] 
+
+Compile: MSVC
+
+#+BEGIN_SRC sh 
+  $ cl.exe currentProcess.cpp /EHsc /Zi /nologo /Fe:currentProcess.exe && currentProcess.exe
+#+END_SRC
+
+Running on console (from cmd.exe or cmder terminal): 
+
+#+BEGIN_SRC sh 
+   $ currentProcess.exe 
+   =========== Current Process Info ========
+   PID              = 5712
+   hProc            = 0x00007FF65D890000
+   Executable path  = C:\Users\archbox\Desktop\experiments\currentProcess.exe
+   Current path     = c:\Users\archbox\Desktop\experiments
+#+END_SRC
+
+Running program by clicking on it: 
+  + If program checks whether it was launched by click, it waits for
+    the user to type RETURN before terminating. 
+ 
+#+BEGIN_SRC cpp 
+  =========== Current Process Info ========
+  PID              = 6916
+  hProc            = 0x00007FF72C300000
+  Executable path  = C:\Users\archbox\Desktop\experiments\currentProcess.exe
+  Current path     = C:\Users\archbox\Desktop\experiments
+
+   ==> Type RETURN to exit.
+#+END_SRC
+
+Code: 
+
+ + Function: isInOwnConsole - returns true if program was launched by
+   click. Returns false if it was launched from any type console such
+   as cmd.exe or cmder. 
+
+#+BEGIN_SRC cpp 
+  // Return true if program was launched by clicking on it, 
+  // return false if this program was launched from command line.
+  auto isInOwnConsole() -> bool {
+       DWORD procIDs[2];
+       DWORD maxCount = 2;
+       DWORD result = GetConsoleProcessList((LPDWORD)procIDs, maxCount);
+       return result != 1;
+  }
+#+END_SRC
+
+ + Lambda function ExecutablePath - Returns the path of some process
+   executable given its PID (Process ID). 
+
+#+BEGIN_SRC cpp 
+  auto ExecutablePath = [](int pid){
+       HANDLE hProc = OpenProcess( PROCESS_QUERY_INFORMATION
+                                  | PROCESS_VM_READ, FALSE, pid );
+       // Get process file path 
+       std::string process_path(MAX_PATH, 0);
+       DWORD size = MAX_PATH; 
+       QueryFullProcessImageNameA(hProc, 0, &process_path[0], &size);
+       process_path.resize(size);	
+       CloseHandle(hProc);
+       return process_path;
+  };
+#+END_SRC
+
+ + Lambda function CurrentDirectory - returns current directory. 
+
+#+BEGIN_SRC cpp 
+  auto CurrentDirectory = []{
+       DWORD size = ::GetCurrentDirectory(0, nullptr);
+       assert(size != 0);
+       std::string path(size + 1, 0x00);
+       size = ::GetCurrentDirectory(path.size(), &path[0]);
+       path.resize(size);
+       return path;
+  };
+#+END_SRC
+
+ + Main function: 
+
+#+BEGIN_SRC cpp 
+    // Get current process ID 
+    DWORD    pid   = GetCurrentProcessId();
+    // Return module handle of current process 
+    HMODULE  hProc = GetModuleHandleA(nullptr);
+    // Get process module
+    std::cout << "=========== Current Process Info ========"  << std::endl;
+    std::cout << "PID              = " << pid                 << std::endl;
+    std::cout << "hProc            = 0x" << hProc             << std::endl;
+    std::cout << "Executable path  = " << ExecutablePath(pid) << std::endl;
+    std::cout << "Current path     = " << CurrentDirectory()  << std::endl;
+
+    // Copy itself to Desktop
+    CopyFile(ExecutablePath(pid).c_str(), "C:\\Users\\archbox\\Desktop\\appinfo.exe", false) ;
+
+    // Stop program from exiting if it was launched by clicking on it.
+    if(!isInOwnConsole()){
+            std::cout << "\n ==> Type RETURN to exit." << std::endl;
+            std::cin.get();
+    }	
+    return EXIT_SUCCESS;
+#+END_SRC
+
 ** CODE - List processes 
 
 This code prints to stdout (console) and to a file the list of running
