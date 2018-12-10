@@ -2249,6 +2249,219 @@ Cleanup Winsock, release resource and exit application.
    return EXIT_SUCCESS;
 #+END_SRC
 
+*** WinlNet - Windows high level APIs for HTTP and FTP protocol 
+**** Overview 
+
+Windows provides many ready-to-use high level APIs for accessing
+most used internet procols such as Http and Ftp, which makes easier to
+deal with those protocols without reiventing the whell and caring
+about their implementation or low level details. Those APIs are
+exposed through the DLLs _wininet.dll_ and _urlmon.dll_.  
+
+ See: [[https://docs.microsoft.com/en-us/windows/desktop/wininet/wininet-functions][WinINet Functions | Microsoft Docs]]
+
+ Functions in _wininet.dll_
+
+  + InternetOpen
+    - Initializes Winnet environment. This function must be called
+      before any other Winnet function. 
+ 
+ #+BEGIN_SRC cpp 
+ HINTERNET WINAPI InternetOpen(
+     LPCTSTR lpszAgent,
+     DWORD   dwAccessType,
+     LPCTSTR lpszProxyName, 
+     LPCTSTR lpszProxyBypass, 
+     DWORD   dwFlags
+ );
+ #+END_SRC
+
+  + InternetConnect
+    - Starts new HTTP or FTP session 
+
+ #+BEGIN_SRC cpp 
+ HINTERNET InternetConnect(
+     HINTERNET       hInternet,
+     LPCTSTR         lpszServerName,
+     INTERNET_PORT   nServerPort,
+     LPCTSTR         lpszUsername,
+     LPCTSTR         lpszPassword,
+     DWORD           dwService,
+     DWORD           dwFlags,
+     DWORD_PTR       dwContext
+ );
+ #+END_SRC
+
+  + HttpOpenRequest
+
+  + HttpQueryInfo
+
+  + HttpAddRequestHeaders
+
+  + HttpSendRequest
+
+  + HttpSendRequest
+
+  + InternetReadFile
+
+  + InternetCloseHandle
+    - Close internet connection and ends any ongoing operation. 
+
+ #+BEGIN_SRC cpp 
+ BOOL InternetCloseHandle(
+     HINTERNET hInternet
+ );
+ #+END_SRC
+
+  - InternetReadFile
+
+ #+BEGIN_SRC cpp 
+ BOOL InternetReadFile(
+     HINTERNET hFile,
+     LPVOID    lpBuffer,
+     DWORD     dwNumberOfBytesToRead,
+     LPDWORD   lpdwNumberOfBytesRead
+ );
+ #+END_SRC
+**** Example 
+
+Source: 
+
+ + File: [[file:src/windows/client-socket-shell1.cpp][file:src/windows/winlNet-basic.cpp]]
+ + GIST: [[https://gist.github.com/caiorss/28cd50c6f3ac08c4b8671e7c7aac515e][winlNet-basic.pp]] 
+
+ *Compiling and running:*
+
+ #+BEGIN_SRC sh 
+ $ cl.exe winhttp-basic.cpp /EHsc /Zi /nologo /Fe:out.exe && out.exe
+
+ winhttp.cpp
+ Download successful OK.
+ Download failed.
+ {
+   "args": {}, 
+   "headers": {
+     "Cache-Control": "no-cache", 
+     "Connection": "close", 
+     "Host": "www.httpbin.org", 
+     "User-Agent": "Fake browser"
+   }, 
+   "origin": "177.36.10.17", 
+   "url": "http://www.httpbin.org/get"
+ }
+ Öa/
+ Compilation finished at Mon Sep  3 09:53:07
+#+END_SRC
+
+ *Parts* 
+
+ + Function _downloadFile_ - Wrappers WinlNet function
+   URLDownloadToFileA (ANSI version of URLDownloadToFile) to make it
+   more C++-friendly. This function just downloads a file from a URL. 
+
+#+BEGIN_SRC cpp 
+  HRESULT downloadFile(std::string url, std::string file){
+     HRESULT hr = URLDownloadToFileA(
+          // (pCaller)    Pointer to IUknown instance (not needed)
+          NULL
+          // (szURL)      URL to the file that will be downloaded
+          ,url.c_str()
+          // (szFileName) File name that the downloaded file will be saved.
+          ,file.c_str()
+          // (dwReserved) Reserverd - always 0
+          ,0
+          // (lpfnCB)     Status callback
+          ,NULL       
+          );
+     return hr;
+  }
+#+END_SRC
+
+Tests HTTP GET request to http:://www.httpbin.org/get 
+
+#+BEGIN_SRC cpp 
+  void testHTTPRequest(){
+       // Reference: http://www.cplusplus.com/forum/beginner/75062/
+       HINTERNET hConnect = InternetOpen("Fake browser",INTERNET_OPEN_TYPE_PRECONFIG,NULL, NULL, 0);
+       if(!hConnect){
+               std::cerr << "Error: Connection Failure.";
+               return;
+       }
+       HINTERNET hAddr = InternetOpenUrl(
+            hConnect
+            ,"http://www.httpbin.org/get"
+            ,NULL
+            ,0
+            ,INTERNET_FLAG_PRAGMA_NOCACHE | INTERNET_FLAG_KEEP_CONNECTION
+            ,0
+            );
+
+       if ( !hAddr )
+       {
+            DWORD errorCode = GetLastError();
+            std::cerr << "Failed to open URL" << '\n' << "Error Code = " << errorCode;
+            InternetCloseHandle(hConnect);
+            return;
+       }
+
+       // Buffer size - 4kb or 4096 bytes 
+       char  bytesReceived[4096];
+       DWORD NumOfBytesReceived = 0;
+       while(InternetReadFile(hAddr, bytesReceived, 4096, &NumOfBytesReceived) && NumOfBytesReceived )
+       {
+               std::cout << bytesReceived;
+       }
+
+       InternetCloseHandle(hAddr);
+       InternetCloseHandle(hConnect);
+     
+  } // --- EoF testHTTPRequest() --- // 
+
+#+END_SRC
+
+Main function: 
+
+#+BEGIN_SRC cpp 
+    // ==================  File Download  ========================= //
+    //
+    HRESULT hr;
+
+    hr = downloadFile("http://httpbin.org/image/jpeg", "image.jpeg");   
+    if(SUCCEEDED(hr))
+            std::cout << "Download successful OK." << '\n';
+    else
+            std::cout << "Download failed." << '\n';
+
+    hr = downloadFile("httpxpabin.org/image/jpeg-error", "image2.jpeg");    
+    if(SUCCEEDED(hr))
+        std::cout << "Download sucessful OK." << '\n';
+    else
+        std::cout << "Download failed." << '\n';
+
+    //=============== HTTP Protocol ===================================//
+    //
+    testHTTPRequest();
+
+    if(!launchedFromConsole()){
+            std::cout << "Type RETURN to exit" << std::endl;
+            std::cin.get();     
+    }   
+    return 0;
+#+END_SRC
+
+**** Reference
+  
+   + [[https://codereview.stackexchange.com/questions/69801/wininet-c-wrapper][http - WinInet C++ Wrapper - Code Review Stack Exchange]]
+
+   + [[https://www.mql5.com/en/articles/73][Using WinInet.dll for Data Exchange between Terminals via the Internet - MQL5 Articles]]
+
+   + [[https://rsdn.org/article/inet/wininet.xml][Введение в WinInet]] (In Russian.)
+
+   + [[https://www.cnblogs.com/zhcncn/articles/3289366.html][IEWinINet API，WinInet的异步使用方法 - 金石开 - 博客园]]
+
+   + [[http://blog.lekevin.com/computer/using-the-wininet-api-to-access-the-internet-from-visual-basic-6/][Using the WinInet API to access the internet from Visual Basic 6 - Le Kevin]]
+
+   + [[http://www.devx.com/getHelpOn/10MinuteSolution/20373][WinInet API Programming]]
 ** Install Building Tools and Compilers 
 *** Install Mingw 
 
