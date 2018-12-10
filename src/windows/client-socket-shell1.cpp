@@ -71,10 +71,10 @@ int main(int argc, char** argv){
 		} else {
 			buffer.resize(n);
 			if(buffer == "exit\n" ){
-				std::string exitMessage = " [CLIENT] Disconnect gracifully - OK.\n";
+				std::string exitMessage = " [CLIENT] Disconnect gracefully - OK.\n";
 				::send(client, exitMessage.c_str(), exitMessage.size(), 0);				
 				std::cerr << "[LOG] I got an exit message. Shutdowing socket now!" << "\n";
-				std::cerr << "[LOG] Gracifully disconnecting application" << "\n";
+				std::cerr << "[LOG] Gracefully disconnecting application" << "\n";
 				std::cerr.flush();
 				break;
 			}        

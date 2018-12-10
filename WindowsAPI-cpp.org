@@ -2011,9 +2011,25 @@ References:
 *** CODE - Basic Socket Client 
 **** Setup and usage 
 
-Source:  [[file:src/windows/client-socket-shell1.cpp][file:src/windows/client-socket-shell1.cpp]]
+Source: 
+ + File: [[file:src/windows/client-socket-shell1.cpp][file:src/windows/client-socket-shell1.cpp]]
+ + GIST: [[https://gist.github.com/caiorss/6f86bd879b339982550064f31b2ea75a][client-socket-shell1.cpp]]
 
-Usage: 
+ *Build* 
+
+ + MSVC: 
+
+#+BEGIN_SRC sh 
+  $ cl.exe client-socket-shell1.cpp /EHsc /Zi /nologo  
+#+END_SRC
+
+ + Mingw/GCC 
+
+#+BEGIN_SRC sh 
+  λ  g++ client-socket-shell1.cpp -o winsock-client-shell1.exe -std=c++1z -lws2_32
+#+END_SRC
+
+ *Usage:*
  
 STEP 1 - Set up a server with netcat from local computer or remote
 machine. In this case netcat is set up from a Linux box.
@@ -2038,6 +2054,16 @@ program.
    [SERVER SENT] >>
 #+END_SRC
 
+If the netcat server is running in the same machine, the address is
+127.0.0.1 or localhost and the command for connecting to the server
+is: 
+
+#+BEGIN_SRC sh 
+   λ client-socket-shell1.exe localhost 9090
+   # OR: 
+   λ client-socket-shell1.exe 127.0.0.1 9090
+#+END_SRC
+
 STEP 3 - Send commands to client program from server terminal
 (netcat). 
 
@@ -2058,8 +2084,8 @@ STEP 3 - Send commands to client program from server terminal
 
 #+END_SRC
 
-STEP 4 - Type any commands from server side and they will be sent back
-to the client. 
+STEP 4 - Type any commands from server side and they will be to the
+client side which will echo it back to the server. 
 
 #+BEGIN_SRC sh 
   Ncat: Connection from 192.168.18.161.
@@ -2081,6 +2107,11 @@ to the client.
 
    [CLIENT SHELL]>> reverse shell - echo shell
    => [ECHO] reverse shell - echo shell
+
+  [CLIENT SHELL]>> exit
+  => [ECHO] exit
+
+  [CLIENT] Disconnect gracefully - OK.
 #+END_SRC
 
 STEP 5 - Output in the client terminal (Windows): 
@@ -2094,7 +2125,123 @@ STEP 5 - Output in the client terminal (Windows):
    [SERVER SENT] >> uname -a
    [SERVER SENT] >> reverse shell - echo shell
 #+END_SRC
+**** Parts 
 
+Get client socket configuration from command line: 
+
+#+BEGIN_SRC cpp 
+int main(int argc, char** argv){
+    if(argc < 3){
+            std::cerr << "Usage: " << argv[0] << " [HOSTNAME or ADDRESS] [PORT]" << std::endl;
+            return EXIT_FAILURE;
+    }
+
+    // Client configuration 
+    const char*  host = argv[1];
+    unsigned int port = std::stoi(argv[2]);
+    ... ... ...    ... ... ...    ... ... ...
+#+END_SRC
+
+Start up Winsock data structure: 
+
+#+BEGIN_SRC cpp 
+   //Start up Winsock…
+   WSADATA wsadata;
+   int error = WSAStartup(0x0202, &wsadata);
+   if(error){
+           std::cerr << "Error: failed to initialize WinSock." << std::endl;
+           return EXIT_FAILURE;
+   }
+#+END_SRC
+
+Create client socket: 
+
+#+BEGIN_SRC cpp 
+   // Create client socket 
+   SOCKET client = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+   if(client == INVALID_SOCKET){
+           std::cerr << "Error, I cannot create socket" << std::endl;
+           return EXIT_FAILURE;
+   }
+   SOCKADDR_IN  addr;
+   memset(&addr, 0, sizeof(addr));
+   addr.sin_family      = AF_INET;
+   addr.sin_addr.s_addr = inet_addr(host);
+   addr.sin_port        = htons(port);
+#+END_SRC
+
+Attemp to connect to server and exit if there is any failure: 
+
+#+BEGIN_SRC cpp 
+   // Attemp to connect to server and exit on failure. 
+   int connval = connect(client, reinterpret_cast<sockaddr*>(&addr), sizeof(addr));
+   if(connval == SOCKET_ERROR){
+           std::cerr << "Error: cannot connect to server." << std::endl;
+           //Returns status code other than zero
+           return EXIT_FAILURE;
+   }
+#+END_SRC
+
+Send message "[CLIENT] Connected to server OK" to server once
+the client is connected:
+
+#+BEGIN_SRC cpp 
+   std::string msgClientConnect = " [CLIENT] Connected to server OK.\n";	
+   ::send(client, msgClientConnect.c_str(), msgClientConnect.size(), 0);
+
+   std::string msg = " [CLIENT SHELL]>> ";
+   std::string echo;
+#+END_SRC
+
+Main loop: 
+ + Send prompt string to server "[CLIENT SHELL]>> "
+ + Receive command from server typed in the server terminal by the
+   user.
+ + Echo command back to server.
+ + If server send command "exit", the client exits the main loop and
+   diconnets from server sending the message " [CLIENT] Disconnect
+   gracefully - OK".
+
+#+BEGIN_SRC cpp 
+   bool flag = true;
+   while(flag){    
+      ::send(client, msg.c_str(), msg.size(), 0);
+      // Create a buffer with 2024 bytes or 2kb
+      std::string buffer(2024, 0);
+      //Returns the number of received bytes 
+      int n = ::recv(client, &buffer[0], buffer.size()-1, 0);
+      echo = " => [ECHO] " + buffer + "\n";
+      ::send(client, echo.c_str(), echo.size(), 0);
+      if(WSAGetLastError() == SOCKET_ERROR){
+          std::cerr << "Disconnected OK." << std::endl;
+          flag  = false;
+          break;
+      } else {
+          buffer.resize(n);
+          if(buffer == "exit\n" ){
+                  std::string exitMessage = " [CLIENT] Disconnect gracefully - OK.\n";
+                  ::send(client, exitMessage.c_str(), exitMessage.size(), 0);				
+                  std::cerr << "[LOG] I got an exit message. Shutdowing socket now!" << "\n";
+                  std::cerr << "[LOG] Gracefully disconnecting application" << "\n";
+                  std::cerr.flush();
+                  break;
+          }        
+          std::cout << " [SERVER SENT] >> " << buffer ; //<< std::endl;
+          // Force writing buffer to the stdout
+          std::cout.flush();
+      }
+   }
+#+END_SRC
+
+Cleanup Winsock, release resource and exit application.
+
+#+BEGIN_SRC cpp 
+   std::cerr << "Finished." << std::endl;   
+   ::closesocket(client);
+   ::WSACleanup();    
+   // Returns status code 0
+   return EXIT_SUCCESS;
+#+END_SRC
 
 ** Install Building Tools and Compilers 
 *** Install Mingw 
