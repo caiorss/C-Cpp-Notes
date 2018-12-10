@@ -1939,6 +1939,74 @@ References:
 
  + [[http://space.wccnet.edu/~chasselb/linux275/ClassNotes/sockets/ms_winsock.htm][Winsock Socket Programming]]
 
+*** CODE - Show IPv4 address of a hostname
+
+ File: showIP.cpp 
+
+ #+BEGIN_SRC cpp 
+   /* Show IPV4 Address of a given hostname
+    ,*===================================*/
+
+   #include <iostream>
+   #include <string.h>
+   #include <windows.h>
+
+   int main(int argc, char *argv[])
+   {
+     if(argc != 2){
+       std::cerr << "Usage: " << argv[0] << " <hostname> " << std::endl;
+       return EXIT_FAILURE;
+     }
+     // Initialize Winsock 2.2 
+     WSADATA wsaData;
+     WSAStartup(MAKEWORD(2, 2), &wsaData);
+    
+     hostent* host = gethostbyname(argv[1]);
+     char *ip = inet_ntoa(*reinterpret_cast<in_addr*>(*host->h_addr_list));
+
+     std::cout << " ipv4 Address = " << ip                << std::endl;
+     std::cout << " hostname     = " << host->h_name      << std::endl;
+     std::cout << " Address type = " << host->h_addrtype  << std::endl;
+    
+     WSACleanup();
+     return EXIT_SUCCESS;
+   }
+
+ #+END_SRC
+
+ Compiling and runnign with MSVC: 
+
+ #+BEGIN_SRC sh
+   $ cl.exe showIP.cpp /EHsc /Zi /nologo /Fe:out.exe ws2_32.lib && showip.exe 
+ #+END_SRC
+
+ Compiling and runnign with Mingw/GCC:
+
+#+BEGIN_SRC sh 
+   $ g++ showIP.cpp -o showip.exe -std=c++11 -lws2_32 && showip.exe 
+#+END_SRC
+
+ Running: 
+
+ #+BEGIN_SRC sh 
+   $ showip.exe
+   Usage: showip.exe <hostname>
+
+   $ showip.exe www.google.co
+    ipv4 Address = 172.217.29.110
+    hostname     = www3.l.google.com
+    Address type = 2
+
+   $ showip.exe www.yandex.com
+    ipv4 Address = 213.180.204.62
+    hostname     = www.yandex.com
+    Address type = 2
+
+   $ showip.exe www.bing.ca
+    ipv4 Address = 204.79.197.219
+    hostname     = a-0016.a-msedge.net
+    Address type = 2
+ #+END_SRC
 
 
 ** Install Building Tools and Compilers 
