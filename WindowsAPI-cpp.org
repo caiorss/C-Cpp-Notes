@@ -1742,6 +1742,205 @@ WinAPIs used:
  + [[https://docs.microsoft.com/en-us/windows/desktop/api/fileapi/nf-fileapi-findnextfilew][FindNextFileW]]
  + [[https://msdn.microsoft.com/en-us/library/windows/desktop/ms679360(v=vs.85).aspx][GetLastError]]
  + [[https://docs.microsoft.com/en-us/windows/desktop/api/winbase/nf-winbase-formatmessage][FormatMessage]]
+** Windows Socket - Winsock 
+*** Overview 
+
+ *Winsock API* 
+
+ + Winsock 1.x - Adapation from BSD Berkley Socket API used by most
+   Unix-like operating systems.
+ + Winsock 2.x - Provides new features:
+   - Overlapped IO 
+   - Asynchrnous calls and callbacks
+   - Layered service provided - LSP architechture.
+
+ + Note: Unlike Unix implementation of sockets - BSD sockets, Winsocks
+   API doesn't allow read/write operations with sockets as they where
+   files, as a result, casting to file pointer from <stdio.h> doesn't
+   work and leads to the program crashing at runtime. However, socket
+   can be casted to Windows HANDLES and manipulated with Win32 File IO
+   functions.
+
+ + Note: Windows Sockets are not portable and specific to only
+   Windows, so in order to write an operating system agnostic network
+   code, it is necessary to use an high level network library such as
+   Boost-ASIO library or POCO frameworks.1
+
+ *Headers and Libraries*
+
+ + <windows.h>
+ + <winsock2.h>
+
+Library: 
+ 
+ + ~Ws2_32.lib~
+ + ~Ws2_32.dll~
+
+ *Main System Calls* 
+
+| System Call   | Target                  | Description                                                    |
+|---------------+-------------------------+----------------------------------------------------------------|
+| socket()      | client or server socket | Create a socket                                                |
+| listen()      | server socket           | Server socket listen for incoming connections.                 |
+| accept()      | server socket           | Make a server socket ccept a connection from a client socket.  |
+|               |                         |                                                                |
+| connect()     | client socket           | Stablish a connection from a client socket to a server socket. |
+| send()        | client or server socket | Send data to socket                                            |
+| sednto()      | client or server socket | Send data to non connected socket                              |
+| recev()       | client or server socket | Receives data/bytes from connected socket                      |
+| recevfrom()   | client or server socket | Receives data from non connected socket                        |
+|               |                         |                                                                |
+| shutdown()    | client or server socket | Disables send and receive on socket                            |
+| closesocket() | client or server socket | Close a socket, closing the connection.                        |
+|               |                         |                                                                |
+
+ *Creating a socket:*
+
+ + af : Address familty
+   - ~PF_INET~
+   - ~AF_INET~ - IP Protocol 
+ + type: Connection-oriented (TCP) or Datagra-oriented (UDP)
+   + ~SOCK_STREAM~ - (TCP) Connection-Oriented.
+   + ~SOCK_DGRAM~  - (UDP) Datagram-Oriented.
+ + protocol: Unecessary when the af is ~AF_INET~ and can be set to 0.
+ + Return: Socket handler and returns the constant ~INVALID_SOCKET~ on
+   failure. 
+
+#+BEGIN_SRC cpp 
+  SOCKET socket(int af, int type, int protocol)
+#+END_SRC
+
+ *Socket-Client Function* 
+ 
+ - s - socket object created with the function socket.
+ - lpName - Hostname of machine to be connected, IP address.
+ - nNameLen - ~sizeof(struct sockaddr_in)~
+ - RETURN: Returns 0 to indicate a successfull connection and
+   ~SOCKET_ERROR~ for connection failure.
+
+#+BEGIN_SRC cpp 
+int connect(SOCKET s, LPSOCKADDR lpName, int nNameLen);
+#+END_SRC
+
+ *Byte Ordering Functions*  -- [[http://beej.us/guide/bgnet/html/single/bgnet.html#htonsman][Beej's Guide to Network Programming]]
+
+ - htons() - Host to network short
+ - htonl() - Host ot network long
+ - ntohs() - Network to Host Short
+ - ntohl() - Network to host long 
+
+ *Data Structure hostent*
+
+#+BEGIN_SRC cpp 
+  struct hostent {
+      // Official name of the host (PC).
+      char FAR *  h_name;           
+      // A NULL -terminated array of alternate names.
+      char FAR * FAR *h_aliases;    
+      // The type of address being returned; for Windows Sockets this is always PF_INET.
+      short       h_addrtype;       
+      // The length, in bytes, of each address; for PF_INET, this is always 4.
+      short       h_length;         
+      // A NULL-terminated list of addresses for the host. Addresses are returned in network byte order.
+      char FAR * FAR *h_addr_list;  
+  };
+#+END_SRC
+
+ *Data Structure in_addr*
+
+#+BEGIN_SRC cpp 
+  /*
+   ,* Internet address (old style... should be updated)
+   ,*/
+  struct in_addr {
+          union {
+                  struct { u_char s_b1,s_b2,s_b3,s_b4; } S_un_b;
+                  struct { u_short s_w1,s_w2; } S_un_w;
+                  u_long S_addr;
+          } S_un;
+#+END_SRC
+
+ *Data structures - sockaddr and sockaddr_6*
+
+See: https://www.tenouk.com/Winsock/Winsock2example7.html
+
+ + IPv4
+
+#+BEGIN_SRC cpp 
+  struct sockaddr {
+   ushort sa_family;
+   char sa_data[14];
+  };
+
+  struct sockaddr_in {
+          short   sin_family;
+          u_short sin_port;
+          struct  in_addr sin_addr;
+          char    sin_zero[8];
+  };
+#+END_SRC
+
+ + IPv6
+ 
+#+BEGIN_SRC cpp 
+  struct sockaddr_in6 {
+          short   sin6_family;
+          u_short sin6_port;
+          u_long  sin6_flowinfo;
+          struct  in6_addr sin6_addr;
+          u_long  sin6_scope_id;
+  };
+
+  typedef struct sockaddr_in6 SOCKADDR_IN6;
+  typedef struct sockaddr_in6 *PSOCKADDR_IN6;
+  typedef struct sockaddr_in6 FAR *LPSOCKADDR_IN6;
+#+END_SRC
+
+ *Data Structure WSAData*
+
+Before using Winsocks, it is necessary to initialize the library with
+the function WSAStartup and the data structure WSDATA. After the
+program has finished its execution, it necessary to run WSACleanup
+function. 
+
+#+BEGIN_SRC cpp 
+typedef struct WSAData {
+ WORD wVersion;
+ WORD wHighVersion;
+ char szDescription[WSADESCRIPTION_LEN+1];
+ char szSystemStatus[WSASYS_STATUS_LEN+1];
+ unsigned short iMaxSockets;
+ unsigned short iMaxUdpDg;
+ char FAR* lpVendorInfo;
+} WSADATA, *LPWSADATA; 
+#+END_SRC
+
+Example: 
+
+#+BEGIN_SRC cpp 
+  WSADATA wd;
+  // Intialize with Winsocks 1.0 
+  WSAStartup(MAKEWORD(1, 0), &wd);
+  // Intialize with Winsocks 2.0 
+  WSAStartup(MAKEWORD(2, 2), &wd);
+  // Intialize with Winsocks 2.0 
+  WSAStartup(MAKEWORD(2, 0), &wd);
+#+END_SRC
+
+References: 
+
+ + [[https://en.wikibooks.org/wiki/Windows_Programming/Winsock][Windows Programming/Winsock - Wikibooks, open books for an open world]]
+
+ + [[https://www.tenouk.com/Winsock/Winsock2example.html][An introduction to Windows socket/Winsock 2/Windows network programming tutorial with practical C program examples]]
+
+ + [[https://www.binarytides.com/receive-full-data-with-recv-socket-function-in-c/][Receive full data with recv socket function in C – BinaryTides]]
+
+ + [[http://beej.us/guide/bgnet/html/single/bgnet.html][Beej's Guide to Network Programming]]
+
+ + [[http://space.wccnet.edu/~chasselb/linux275/ClassNotes/sockets/ms_winsock.htm][Winsock Socket Programming]]
+
+
+
 ** Install Building Tools and Compilers 
 *** Install Mingw 
 
