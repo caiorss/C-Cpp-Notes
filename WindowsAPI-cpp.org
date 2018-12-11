@@ -2894,8 +2894,101 @@ Function *WinMessageToString*
   }
 #+END_SRC
 
+*** GUI Without WinMain 
+
+This code presents a minimal Win32 GUI graphical user interface
+without the WinMain function entry point. 
+
+Source: 
+ + File: [[file:src/windows/gui-without-winmain.cpp][file:src/windows/gui-without-winmain.cpp]] 
+ + GIST: [[https://gist.github.com/caiorss/e8967d4d3dad522c82aab18ccd8f8304][gui-without-winmain.cpp]]
+
+This code is similar to the previous example, the difference is the
+changing of the entry point function from non-standard WinMain to
+main. 
+
+ + Before - [[https://gist.github.com/caiorss/cab14ba11e207bbc7beed9a2f0b4ebc4][gui-basic1.cpp]] 
+
+#+BEGIN_SRC cpp 
+  int WINAPI WinMain(
+          // Handle to current application isntance 
+          HINSTANCE hInstance,
+          HINSTANCE hPrevInstance,
+          // Command line 
+          LPSTR     lpCmdLine,
+          int       nCmdShow
+          ){
+     ... .... ... 
+       return 0;
+   }
+#+END_SRC
+
+ + After - [[https://gist.github.com/caiorss/e8967d4d3dad522c82aab18ccd8f8304][gui-without-winmain.cpp]] 
+
+#+BEGIN_SRC cpp 
+  int main(int argc, char** argv){
+      //---- Get WinMain Parameters ----//
+      HINSTANCE hInstance = GetModuleHandle(NULL);
+      STARTUPINFO si;
+      GetStartupInfo(&si);  
+      int nCmdShow = si.wShowWindow;
+      ... ... ... ... 
+
+     return 0
+  }
+#+END_SRC
+
+ *Compiling with MSVC for console subsystem*
+
+Produces: gui-without-winmain.exe 
+
+When the user clicks at the application's executable file, a terminal
+is opened alongside the window where it is possible to view the
+printed messages. 
+
+#+BEGIN_SRC sh 
+  $ cl.exe gui-without-winmain.cpp /EHsc /Zi /nologo user32.lib gdi32.lib 
+#+END_SRC
+
+By clicking at the program the Window is opened with a terminal: 
+
+#+CAPTION: Program compiled for the console subystem.
+[[file:images/gui-program-console-subsystem.png][file:images/gui-program-console-subsystem.png]]
+
+ *Compiling with MSVC for window subsystem*
+
+When the program is compiled for the _window subsystem_, no terminal is
+opened as any Window's GUI application. 
+
+#+BEGIN_SRC cpp 
+ $ cl.exe gui-without-winmain.cpp /EHsc /Zi /nologo /link /subsystem:windows /entry:mainCRTStartup user32.lib gdi32.lib 
+#+END_SRC
+
+Note: the compiler flags.
+
+ + /subsystem:windows     => Compiles for Windows subsystem no
+   terminal is opened. It actually, just changes a flag in the PE32
+   executable file.
+
+ + /entry:mainCRTStartup  => Changes program entry-point 
 
 
+ *Compiling with Mingw/GCC for console subsystem*
+
+Any program is compiled for the console subystem by default. 
+
+#+BEGIN_SRC sh 
+  $ g++ gui-without-winmain.cpp -o gui-without-winmain.exe -std=c++1z -g -lgdi32 -luser32
+#+END_SRC
+
+ *Compiling with Mingw/GCC for window subsystem*
+
+The flag (-Wl,-subsystem,windows) is required for compiling sources to
+the windows subsystem. 
+
+#+BEGIN_SRC sh 
+  $ g++ gui-without-winmain.cpp -o gui-without-winmain.exe -std=c++1z -g -lgdi32 -luser32 -Wl,-subsystem,windows
+#+END_SRC
 ** Install Building Tools and Compilers 
 *** Install Mingw 
 
