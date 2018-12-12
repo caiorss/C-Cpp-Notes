@@ -1833,7 +1833,8 @@ Program output:
    *=> Driver list in STL container std::deque  = C:\, D:\, 
    *=> Driver list in STL container std::vector = C:\, D:\, 
 #+END_SRC
-** Loading DLLs - shared libraries at runtime - DLLs
+** Loading DLLs - shared libraries at runtime 
+*** Example 1 - Basic Dynamic Loading 
 
 This example demonstrates how to dynamic load functions from a shared
 library at runtime with WinAPIs Loadlibrary, GetProcAddress and
@@ -1841,6 +1842,7 @@ FreeLibrary.
 
 Source:
  + File: [[file:src/windows/dynamic-loading1.cpp][file:src/windows/dynamic-loading1.cpp]] 
+ + GIST: [[https://gist.github.com/caiorss/5ec138f86b6208214fb8866344f15e77][dynamic-loading1.cpp]]
 
 Types of loading:
 
@@ -2140,7 +2142,187 @@ Command output:
 
  + [[https://docs.microsoft.com/en-us/windows/desktop/dlls/dynamic-link-library-security][Dynamic-Link Library Security]]
 
- + [[https://docs.python.org/2/library/ctypes.html][15.17. ctypes — A foreign function library for Python — Python 2.7.15 documentation]]
+ + [[https://docs.python.org/2/library/ctypes.html][15.17. ctypes — A
+   foreign function library for Python — Python 2.7.15 documentation]]
+*** Example 2 - Dynamic loading using a class
+
+This code uses a class DLLoader to load a shared library hiding the
+complexity and implementation detail. It also uses RAII for ensuring
+that the resource is released.
+
+Source: 
+ + File: [[file:src/windows/dynamic-loading2.cpp][file:src/windows/dynamic-loading2.cpp]]
+ + GIST: [[https://gist.github.com/caiorss/c5dd06a401f4816920bb682367455f5e][dynamic-loading2.cpp]]
+
+ *Build and run with MSVC* 
+
+#+BEGIN_SRC sh 
+   $ cl.exe dynamic-loading2.cpp /EHsc /Zi /nologo /Fe:out.exe && out.exe
+
+   dynamic-loading2.cpp
+   [INFO] DLL loaded OK.
+   ===== Experiment 1 =========== 
+   [INFO] Function URLDownloadToFileW loaded OK. 
+    [INFO] Download successful OK. 
+   ===== Experiment 2 =========== 
+    [INFO] Download successful OK. 
+    [INFO] DLL handler released OK.
+#+END_SRC
+
+ *Build and run with Mingw/GCC* 
+
+#+BEGIN_SRC sh 
+   $ g++ dynamic-loading2.cpp -std=c++14 -g -o out-gcc.exe && out-gcc.exe
+
+   [INFO] DLL loaded OK.
+   ===== Experiment 1 =========== 
+   [INFO] Function URLDownloadToFileW loaded OK. 
+    [INFO] Download successful OK. 
+   ===== Experiment 2 =========== 
+    [INFO] Download successful OK. 
+    [INFO] DLL handler released OK.
+#+END_SRC
+
+ *Parts* 
+
+Main function - Load Library: 
+
+#+BEGIN_SRC cpp
+    // Wide-unicode strings 
+    std::wstring fileURL = L"http://httpbin.org/image/jpeg";
+    std::wstring file1   = L"download-file1.jpeg";
+    std::wstring file2   = L"download-file2.jpeg";	
+
+    auto dll = DLLLoader("urlmon.dll");
+    if(!dll){
+            std::cerr << "[Error] failed to load DLL." << std::endl;
+            return EXIT_FAILURE;
+    }
+    std::cerr << "[INFO] DLL loaded OK." << std::endl;
+
+#+END_SRC
+
+Main function - Experiment 1: 
+
+#+BEGIN_SRC cpp
+    std::cout << "===== Experiment 1 =========== " << std::endl;
+
+    auto URLDownloadToFileW =
+        dll.GetFunction<HRESULT (LPUNKNOWN,
+                                 LPCWSTR,
+                                 LPCWSTR,
+                                 DWORD,
+                                 LPBINDSTATUSCALLBACK)>("URLDownloadToFileW");
+
+    if(URLDownloadToFileW == nullptr){
+        std::cerr << "[Error] failed to load function. " << std::endl;
+        return EXIT_FAILURE;
+    }
+    std::cerr << "[INFO] Function URLDownloadToFileW loaded OK. " << std::endl;
+#+END_SRC
+
+Main function - Experiment 2: 
+
+#+BEGIN_SRC cpp
+    std::cout << "===== Experiment 2 =========== " << std::endl;
+    // Note: Calling convention __cdecl can be omitted
+    using URLDownloadToFileW_t =
+        HRESULT (*) (LPUNKNOWN, LPCWSTR, LPCWSTR, DWORD, LPBINDSTATUSCALLBACK);	
+
+    auto URLDownloadToFileW2 =
+        dll.GetFunction<URLDownloadToFileW_t>("URLDownloadToFileW");
+
+    HRESULT result2 =
+        URLDownloadToFileW(nullptr, fileURL.c_str(), file2.c_str(), 0, nullptr);
+
+    if(SUCCEEDED(result2))
+        std::cerr << " [INFO] Download successful OK. " << std::endl;
+    else
+        std::cerr << " [ERROR] Download failure. " << std::endl;	   	
+    return 0;
+#+END_SRC
+
+Class DLLoader: 
+
+#+BEGIN_SRC cpp 
+  //========== File: DLLLoader.hpp =======//
+  class DLLLoader
+  {
+  private:
+       HMODULE      m_hLib;
+       std::string  m_file;
+  public:
+     DLLLoader(const std::string& file);
+     DLLLoader(const DLLLoader&) = delete;	
+     DLLLoader(DLLLoader&& rhs);
+     ~DLLLoader();
+     auto operator=(const DLLLoader&) = delete;
+     auto operator=(DLLLoader&& rhs);
+
+     auto GetFile() const ->  std::string;
+     auto IsLoaded() const -> bool;
+     operator bool() const;
+
+     template<class FunctionSignature>
+     auto GetFunction(const std::string& functionName ) const -> FunctionSignature*
+     {
+        if(m_hLib == nullptr)
+           return nullptr;		
+        FARPROC hFunc = ::GetProcAddress(m_hLib, functionName.c_str());
+        if(hFunc == nullptr)
+           return nullptr;
+        return reinterpret_cast<FunctionSignature*>(hFunc);
+     }	
+  };
+#+END_SRC
+
+Member functions of class DLLoader:
+
+#+BEGIN_SRC cpp 
+  ///==== Implementations - file: DLLoader.hpp =======//
+
+  DLLLoader::DLLLoader(const std::string& file):
+       m_file(file),
+       m_hLib(::LoadLibraryA(file.c_str()))
+  {
+  }
+
+  // Move CTOR
+  DLLLoader::DLLLoader(DLLLoader&& rhs):
+          m_hLib(std::move(rhs.m_hLib)),
+          m_file(std::move(rhs.m_file))
+  {   	
+  }
+  auto DLLLoader::operator=(DLLLoader&& rhs)		
+  {
+      std::swap(this->m_hLib, rhs.m_hLib);
+      std::swap(this->m_file, rhs.m_file);
+  }
+	
+  DLLLoader::~DLLLoader()
+  {
+     std::cerr << " [INFO] DLL handler released OK." << std::endl;
+     if(m_hLib != nullptr)
+             ::FreeLibrary(m_hLib);
+  }
+
+  auto DLLLoader::GetFile() const ->  std::string
+  {
+     return m_file;
+  }
+	
+  auto DLLLoader::IsLoaded() const -> bool
+  {
+     return m_hLib == nullptr;
+  }
+
+  DLLLoader::operator bool() const
+  {
+     return m_hLib != nullptr;
+  }
+
+#+END_SRC
+
 ** Windows Socket - Winsock 
 *** Overview 
 
