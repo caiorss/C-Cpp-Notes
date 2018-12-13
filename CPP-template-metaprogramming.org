@@ -1120,6 +1120,90 @@ Running:
             y      1000
             x       200
 #+END_SRC
+** Templates with Ranges 
+
+ *Example 1:*
+
+#+BEGIN_SRC cpp 
+  template<class Range, class Function>
+  void forEachRange(const Range& range, Function func){
+      for(const auto& x: range) func(x);
+  }
+#+END_SRC
+
+Testing: 
+
+#+BEGIN_SRC cpp 
+ auto xs = std::vector<int>{1, 2, 3, 4, 5, 6, 7};
+
+ >> forEachRange(xs, [](int x){ std::cout << " x = " << x << std::endl;})
+  x = 1
+  x = 2
+  x = 3
+  x = 4
+  x = 5
+  x = 6
+  x = 7
+
+  >> auto list = std::deque<std::string>{ "c++", "asm", "rust", "DLang"};
+
+  >> forEachRange(::list, [](const std::string& x){ 
+                               std::cout << " => " << x << st => c++; })
+   => asm
+   => rust
+   => DLang
+#+END_SRC
+
+ *Example 2:*
+
+#+BEGIN_SRC cpp 
+  template<class Range, class Acc, class Function>
+  Acc foldRange(const Range& range, const Acc& init, Function func){
+      auto acc = init;
+      for(const auto& x: range) acc = func(acc, x);
+      return acc;
+  }
+#+END_SRC
+
+Testing: 
+
+#+BEGIN_SRC cpp 
+  //---------- std::vector --------------//
+
+  >> auto xs = std::vector<int>{1, 2, 3, 4, 5, 6, 7};
+  >> 1 + 2 + 3 + 4 + 5 + 6 + 7
+  (int) 28
+  >> foldRange(xs, 0, std::plus<int>())
+  (int) 28
+
+  >> 1 * 2 * 3 * 4 * 5 * 6 * 7
+  (int) 5040
+  >> foldRange(xs, 1, std::multiplies<int>())
+  (int) 5040
+
+  >> foldRange(xs, 0, [](int acc, int x){ return 10 * acc + x; })
+  (int) 1234567
+  >> 
+
+  //---------- std::deque -------------------//
+
+  >> auto ys = std::deque<int>{1, 2, 3, 4, 5, 6, 7};
+
+  >> foldRange(ys, 0, std::plus<int>())
+  (int) 28
+
+  >> foldRange(ys, 1, std::multiplies<int>())
+  (int) 5040
+  >> 
+
+  // ------------- std::set -----------------//
+
+  >> auto zs = std::set<int>{1, 2, 3, 4, 5, 6, 7};
+  >> 
+  >> foldRange(zs, 1, std::multiplies<int>())
+  (int) 5040
+  >> 
+#+END_SRC
 ** Basic Template Specialization 
    :PROPERTIES:
    :ID:       80f3766a-39eb-47ef-a3f5-5a49ef183db0
