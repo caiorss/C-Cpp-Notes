@@ -1832,499 +1832,276 @@ Program output:
    *=> Driver list in STL container std::deque  = C:\, D:\, 
    *=> Driver list in STL container std::vector = C:\, D:\, 
 #+END_SRC
-** Loading DLLs - shared libraries at runtime 
-*** Example 1 - Basic Dynamic Loading 
 
-This example demonstrates how to dynamic load functions from a shared
-library at runtime with WinAPIs Loadlibrary, GetProcAddress and
-FreeLibrary. 
+** CODE - Launching and controlling sub-processes 
+
+This sample program contains a class process builder which
+encapsulates the complexity of Windows API process. It can be used for
+launching processes, streaming process output line by line, wait for
+process execution, get PID and also terminate the subprocess.
 
 Source:
- + File: [[file:src/windows/dynamic-loading1.cpp][file:src/windows/dynamic-loading1.cpp]] 
- + GIST: [[https://gist.github.com/caiorss/5ec138f86b6208214fb8866344f15e77][dynamic-loading1.cpp]]
-
-Types of loading:
-
-  + _Implicit loading_ (static loading) - the DLL is linked at
-    compile-time and the application doesn't refer to the DLL file
-    directly.
-
-  + _Explicit loading_ (dynamic loading) - the DLL is linked at runtime
-    or loaded at runtime and the application refer to the DLL file and
-    its function explicitly using the WinAPIs - LoadLibrary,
-    GetProcAddress and FreeLibrary.
-
-This code loads the function [[https://msdn.microsoft.com/en-us/ie/ms775123(v=vs.94)][URLDownloadToFile]] at runtime from the DLL
-(Dynamically Linked Library) or shared library _urlmon.dll_. This
-function is used to donwload the image file from the URL
-http://httpbin.org/image/jpeg as file1.jpeg and file2.jpeg.
-
-Signature of URLDownloadToFileW (wide unicode version) of
-URLDownloadToFile.
-
-#+BEGIN_SRC cpp 
-   HRESULT URLDownloadToFile(
-                            LPUNKNOWN            pCaller,
-                            LPCTSTR              szURL,
-                            LPCTSTR              szFileName,
-     _Reserved_             DWORD                dwReserved,
-                            LPBINDSTATUSCALLBACK lpfnCB
-   );
-
-   HRESULT URLDownloadToFileW(
-                            LPUNKNOWN            pCaller,
-                            LPCWSTR              szURL,
-                            LPCWSTR              szFileName,
-     _Reserved_             DWORD                dwReserved,
-                            LPBINDSTATUSCALLBACK lpfnCB
-   );
-#+END_SRC
-
-Compiling and running with MSVC: 
+  + File: [[file:src/windows/winprocess.cpp][file:src/windows/winprocess.cpp]]
+  + GIST: [[https://gist.github.com/caiorss/7af874c24f9340e3148329896efc7dfd][winprocess.cpp]] 
+ 
+Compiling MSVC:
 
 #+BEGIN_SRC sh 
-  $ cl.exe dynamic-linking1.cpp /EHsc /Zi /nologo /Fe:out.exe && out.exe
-
-  dynamic-linking1.cpp
-   [INFO] DLL Loaded OK
-  ============ EXPERIMENT 1 ===================
-   [INFO] Function loaded OK
-   [INFO] Download successful OK. 
-  ============ EXPERIMENT 2 ===================
-   [INFO] Download successful OK. 
-   [INFO] Application ended gracefully. OK.
+  $ cl.exe winprocess.cpp /EHsc /Zi /nologo /Fe:winprocess.exe 
 #+END_SRC
 
-Compiling and running with Mingw/GCC (GNU C/C++ Compiler): 
+Compiling Mingw/GCC:
 
-#+BEGIN_SRC cpp 
- $ g++ dynamic-loading1.cpp -o out2.exe -std=c++1z && out2.exe
-
-   [INFO] DLL Loaded OK
-  ============ EXPERIMENT 1 ===================
-   [INFO] Function loaded OK
-   [INFO] Download successful OK. 
-  ============ EXPERIMENT 2 ===================
-   [INFO] Download successful OK. 
-   [INFO] Application ended gracefully. OK.
-
-#+END_SRC
-
- *Parts inside the main function*
-
- + Function parameters that will be used later. 
-
-#+BEGIN_SRC cpp 
-   // Wide-unicode strings 
-   std::wstring fileURL = L"http://httpbin.org/image/jpeg";
-   std::wstring file1   = L"download-file1.jpeg";
-   std::wstring file2   = L"download-file2.jpeg";	
-#+END_SRC
-
- + *Load shared library* (aka module) _urlmon.dll_ at runtime using [[https://docs.microsoft.com/en-us/windows/desktop/api/libloaderapi/nf-libloaderapi-loadlibraryw][LoadLibraryW]] API
-   and perform error checking and exiting the application on
-   error. The mentioned DLL is loaded into the current process _address space_. 
-
-   + Note: If the application is 64 bits, the DLL must be compiled for
-     64 bits, otherwise it will not work. The same happens if the
-     application is 32 bits.
-
-   + Signature: _HMODULE LoadLibraryW (LPCWSTR lpLibFileName);_
-
-   + The file urlmon.dll is at ~C:\Windows\System32\urlmon.dll~.
-
-   + If the extension of the DLL is omitted, the function
-     automatically appends .dll to the file name, therefore it is also
-     possible to load the DLL using just "urlmon" instead of
-     "urlmon.dll".
-
-   + If the DLL is provided without absolute path as
-     ~C:\Windows\System32\urlmon.dll~, the DLL is searched in the
-     following order:
-     1. Directory where is the underlying application
-     2. System directory - ~%SystemRoot%\system32~ or  ~C:\Windows\System32\~
-     3. Current Working Directory (CWD) - Note: The process current
-        working directory may not be the same as the application.
-     4. Directories listed in the $PATH environment variable.
-
-#+BEGIN_SRC cpp 
-    // Wide unicode version for LoadLibrary API
-    HMODULE hLib = ::LoadLibraryW(L"urlmon.dll");
-    if(hLib == nullptr){
-         std::cerr << " [ERROR] Error: failed to load shared library" << std::endl;
-         // Early return on Error. 
-         return EXIT_FAILURE;		
-    }
-    std::cerr << " [INFO] DLL Loaded OK" << std::endl;
-#+END_SRC
-
- + *Loading function* - In order to load the function
-   URLDownloadToFileW, it is necessary to know: the function symbol
-   and its its exact type signature and calling convention. In
-   general, the symbol has the same name of the function to be
-   loaded. Windows Applications and DLLs of 32 bits supports the
-   calling conventions ~__cdecl~ (default), ~__stdcall~ and
-   ~__fastcall~. Windows applications and DLLs of 64 bits have always
-   the same calling conventions ~__cdecl~. The default calling
-   convention can be omitted in the function signature.
-
-Function pointer type alias (FunptrType) with must type signature of
-the function URLDownloadToFileW:
-
-#+BEGIN_SRC cpp 
-    // C+11 type alias for function pointer 
-    using FunptrType =
-       HRESULT (__cdecl *)(LPUNKNOWN, LPCWSTR, LPCWSTR, DWORD, LPBINDSTATUSCALLBACK);
-   //  __cdecl can be omited 
-   //  HRESULT (__cdecl *)(LPUNKNOWN, LPCWSTR, LPCWSTR, DWORD, LPBINDSTATUSCALLBACK);
-
-    // Alternative 2 for type alias (C++98/03)
-    typedef HRESULT (__cdecl * FunptrTypeTypedef)(LPUNKNOWN, LPCWSTR, LPCWSTR, DWORD, LPBINDSTATUSCALLBACK);
-#+END_SRC
-
-Function is loaded using the WinAPI [[https://docs.microsoft.com/en-us/windows/desktop/api/libloaderapi/nf-libloaderapi-getprocaddress][GetProcAddress]]
- + Signature: _FARPROC GetProcAddress(HMODULE hModule,  LPCSTR  lpProcName);_
-
-#+BEGIN_SRC cpp 
-    FARPROC hFunc = ::GetProcAddress(hLib, "URLDownloadToFileW");
-    if(hFunc == nullptr){
-        std::cerr << " [Error] Failed to load function from DLL" << std::endl;
-        return EXIT_FAILURE;
-    }
-    std::cerr << " [INFO] Function loaded OK" << std::endl;
-#+END_SRC
-
-The value hFunc must be casted to a function type before usage:
-
- + Note: It is alos possible to use C-style casting. However, it is not
-   encouraged as this type of casting is not explicit as
-   _reinterpret_cast_ which communicates the that operation is unsafe
-   and that it can lead to _undefined behavior_. 
-
-#+BEGIN_SRC cpp 
-   // Functin Pointer 
-   FunptrType URLDownloadToFileFunPTR = reinterpret_cast<FunptrType>(hFunc);	  	
-#+END_SRC
-
- + *Perform experiment 1* - Use function pointer _URLDownloadToFileFunPTR_
-   ,which points to the function _URLDownloadToFileW_, to perform a
-   download of the image http://httpbin.org/image/jpeg and save it to
-   file download-file1.jpeg. 
-
-#+BEGIN_SRC cpp 
-    HRESULT result1 = URLDownloadToFileFunPTR(nullptr, fileURL.c_str(), file1.c_str(), 0, nullptr);
-    if(SUCCEEDED(result1))
-        std::cerr << " [INFO] Download successful OK. " << std::endl;
-    else
-        std::cerr << " [ERROR] Download failure. " << std::endl;
+#+BEGIN_SRC sh 
+  $ g++ winprocess.cpp -o winprocess.exe -Wall -Wextra -std=c++14
 #+END_SRC
 
  
- + *Experiment 2* - This piece of code is similar to the previous
-   one. However, it uses a different syntax for the function pointer.
+ *Main function*
 
-   + Note: The function pointer DownloadFile points to the function
-     _URLDownloadToFileW_. 
-
-#+BEGIN_SRC cpp 
-    std::cout << "============ EXPERIMENT 2 ===================" << std::endl;
-    // Same cast as reinterpret_cast 
-    void* hFunc2 = (void*) ::GetProcAddress(hLib, "URLDownloadToFileW");
-    // Omit error checking if(hFunct2 == nullptr){ ... }
-
-    // Note: Calling convention __cdecl can be omitted
-    using URLDownloadToFileW_t =
-        auto __cdecl (LPUNKNOWN, LPCWSTR, LPCWSTR, DWORD, LPBINDSTATUSCALLBACK) -> HRESULT;
-    //  auto (LPUNKNOWN, LPCWSTR, LPCWSTR, DWORD, LPBINDSTATUSCALLBACK) -> HRESULT;
-
-    auto DownloadFile = reinterpret_cast<URLDownloadToFileW_t*>(hFunc2);
-
-    HRESULT hresult2 = DownloadFile(nullptr, fileURL.c_str(), file2.c_str(), 0, nullptr);
-    if(SUCCEEDED(result1))
-        std::cerr << " [INFO] Download successful OK. " << std::endl;
-    else
-        std::cerr << " [ERROR] Download failure. " << std::endl;
-#+END_SRC
-
- + *Release acquired resource hLib*. This operation is unsafe and prone
-   to resource leaking, therefore the code would be safer and more
-   robust if it used RAII (Resource Acquisition Is Initialization)
-   idiom for releasing the resouce. 
+The main function accepts a single argument which can be test0, test1,
+test2, test3 and test4. Each argument tests a different action. 
 
 #+BEGIN_SRC cpp 
-   ::FreeLibrary(hLib);
-   std::cerr << " [INFO] Application ended gracefully. OK." << std::endl;
-#+END_SRC
-
- *Show symbols (functions) exported by DLL urmon.dll*
-
- + Open the MSVC developer shell prompt and use the following
-   commands: 
-
-#+BEGIN_SRC sh 
-  # Print to console 
-  $ dumpbin /exports C:\Windows\System32\urlmon.dll
-
-  # Or print to file redirecting the stdout to a file result.txt 
-  $ dumpbin /exports C:\Windows\System32\urlmon.dll > C:\Users\archbox\Desktop\result.txt
-#+END_SRC
-
-Command output: 
-
-#+BEGIN_SRC cpp 
-   $ dumpbin /exports C:\Windows\System32\urlmon.dll > C:\Users\archbox\Desktop\result.txt
-
-   Microsoft (R) COFF/PE Dumper Version 14.12.25835.0
-   Copyright (C) Microsoft Corporation.  All rights reserved.
-
-
-   Dump of file C:\Windows\System32\urlmon.dll
-
-   File Type: DLL
-
-     Section contains the following exports for urlmon.dll
-
-       00000000 characteristics
-       F6A98BC3 time date stamp
-           0.00 version
-            100 ordinal base
-            481 number of functions
-            132 number of names
-
-       ordinal hint RVA      name
-
-           121    0 000718E0 AsyncGetClassBits
-           122    1 000AE7A0 AsyncInstallDistributionUnit
-           123    2 000A0CD0 BindAsyncMoniker
-           124    3 000CF110 CAuthenticateHostUI_CreateInstance
-           125    4 000AF130 CDLGetLongPathNameA
-           126    5 000AF150 CDLGetLongPathNameW
-           127    6 00107B70 CORPolicyProvider
-           128    7 000AE830 CoGetClassObjectFromURL
-           129    8 000AED90 CoInstall
-           130    9 00035E90 CoInternetCanonicalizeIUri
-           131    A 00035FB0 CoInternetCombineIUri     
-       ... ... ...     ... ... ...     ... ... ...     ... ... ... 
-           227   71 000E48C0 URLDownloadA
-           228   72 000EDF10 URLDownloadToCacheFileA
-           229   73 000EE090 URLDownloadToCacheFileW
-           230   74 000EE200 URLDownloadToFileA
-           231   75 0006D300 URLDownloadToFileW
-           232   76 000E4920 URLDownloadW
-           233   77 000EE350 URLOpenBlockingStreamA
-           234   78 000EE430 URLOpenBlockingStreamW
-           235   79 000EE540 URLOpenPullStreamA
-           236   7A 000EE610 URLOpenPullStreamW
-           237   7B 000EE6E0 URLOpenStreamA
-       ... ... ...     ... ... ...     ... ... ...     ... ... ... 
-     Summary
-
-           D000 .data
-           1000 .didat
-           1000 .isoapis
-           F000 .pdata
-          3D000 .rdata
-           3000 .reloc
-          52000 .rsrc
-         117000 .text
-#+END_SRC
-
- *Further Reading:*
-
- + WinAPIS:  [[https://docs.microsoft.com/en-us/windows/desktop/api/libloaderapi/nf-libloaderapi-loadlibraryw][LoadLibraryW]],  [[https://docs.microsoft.com/en-us/windows/desktop/api/libloaderapi/nf-libloaderapi-getprocaddress][GetProcAddress]] and [[https://docs.microsoft.com/en-us/windows/desktop/api/libloaderapi/nf-libloaderapi-freelibrary][FreeLibrary]].
-
- + https://github.com/numpy/numpy/wiki/windows-dll-notes
-
- + [[http://www.flounder.com/loadlibrary_explorer.htm][The LoadLibrary Explorer]]
-
- + [[https://docs.microsoft.com/en-us/windows/desktop/dlls/dynamic-link-library-search-order][Dynamic-Link Library Search Order]]
-
- + [[https://docs.microsoft.com/en-us/windows/desktop/dlls/dynamic-link-library-data][Dynamic-Link Library Data]]
-
- + [[https://docs.microsoft.com/en-us/windows/desktop/dlls/dynamic-link-library-redirection][Dynamic-Link Library Redirection]]
-
- + [[https://docs.microsoft.com/en-us/windows/desktop/dlls/dynamic-link-library-security][Dynamic-Link Library Security]]
-
- + [[https://docs.python.org/2/library/ctypes.html][15.17. ctypes — A
-   foreign function library for Python — Python 2.7.15 documentation]]
-*** Example 2 - Dynamic loading using a class
-
-This code uses a class DLLoader to load a shared library hiding the
-complexity and implementation detail. It also uses RAII for ensuring
-that the resource is released.
-
-Source: 
- + File: [[file:src/windows/dynamic-loading2.cpp][file:src/windows/dynamic-loading2.cpp]]
- + GIST: [[https://gist.github.com/caiorss/c5dd06a401f4816920bb682367455f5e][dynamic-loading2.cpp]]
-
- *Build and run with MSVC* 
-
-#+BEGIN_SRC sh 
-   $ cl.exe dynamic-loading2.cpp /EHsc /Zi /nologo /Fe:out.exe && out.exe
-
-   dynamic-loading2.cpp
-   [INFO] DLL loaded OK.
-   ===== Experiment 1 =========== 
-   [INFO] Function URLDownloadToFileW loaded OK. 
-    [INFO] Download successful OK. 
-   ===== Experiment 2 =========== 
-    [INFO] Download successful OK. 
-    [INFO] DLL handler released OK.
-#+END_SRC
-
- *Build and run with Mingw/GCC* 
-
-#+BEGIN_SRC sh 
-   $ g++ dynamic-loading2.cpp -std=c++14 -g -o out-gcc.exe && out-gcc.exe
-
-   [INFO] DLL loaded OK.
-   ===== Experiment 1 =========== 
-   [INFO] Function URLDownloadToFileW loaded OK. 
-    [INFO] Download successful OK. 
-   ===== Experiment 2 =========== 
-    [INFO] Download successful OK. 
-    [INFO] DLL handler released OK.
-#+END_SRC
-
- *Parts* 
-
-Main function - Load Library: 
-
-#+BEGIN_SRC cpp
-    // Wide-unicode strings 
-    std::wstring fileURL = L"http://httpbin.org/image/jpeg";
-    std::wstring file1   = L"download-file1.jpeg";
-    std::wstring file2   = L"download-file2.jpeg";	
-
-    auto dll = DLLLoader("urlmon.dll");
-    if(!dll){
-            std::cerr << "[Error] failed to load DLL." << std::endl;
-            return EXIT_FAILURE;
-    }
-    std::cerr << "[INFO] DLL loaded OK." << std::endl;
-
-#+END_SRC
-
-Main function - Experiment 1: 
-
-#+BEGIN_SRC cpp
-    std::cout << "===== Experiment 1 =========== " << std::endl;
-
-    auto URLDownloadToFileW =
-        dll.GetFunction<HRESULT (LPUNKNOWN,
-                                 LPCWSTR,
-                                 LPCWSTR,
-                                 DWORD,
-                                 LPBINDSTATUSCALLBACK)>("URLDownloadToFileW");
-
-    if(URLDownloadToFileW == nullptr){
-        std::cerr << "[Error] failed to load function. " << std::endl;
+int main(int argc, char** argv){
+    if(argc < 2){
+        std::cerr << "Usage: " << argv[0] << " [test0 | test1 | test2 | test3 | test4 ]" << std::endl;
         return EXIT_FAILURE;
     }
-    std::cerr << "[INFO] Function URLDownloadToFileW loaded OK. " << std::endl;
-#+END_SRC
+    auto tryExit = [&argc, &argv](std::function<int ()> Action) -> void {
+         try {
+             // End current process with exit code returned
+             // from function
+             int status = Action();			
+             std::cerr << "[SUCCESS] End gracefully";
+             std::exit(status);
+         } catch(const std::runtime_error& ex)
+         {
+              std::cerr << "[ERROR  ] " << ex.what() << std::endl;
+              std::exit(1);
+         }		
+    };
 
-Main function - Experiment 2: 
+   /** Stream process output to stdout line by line. Print line read form subprocess 
+    * output as soon as it arrives. */
+   if(std::string(argv[1]) == "test0")
+       tryExit([]{
+               auto p = ProcessBuilder();
+               p.SetProgram("ping 8.8.8.8");				
+               std::puts("Stream output of process ping to stdout.");
+               p.StreamLines([](std::string line){
+                      std::cout << " line = " << line << std::endl;
+                      return true;
+                   });
+               return EXIT_SUCCESS;
+           });     
 
-#+BEGIN_SRC cpp
-    std::cout << "===== Experiment 2 =========== " << std::endl;
-    // Note: Calling convention __cdecl can be omitted
-    using URLDownloadToFileW_t =
-        HRESULT (*) (LPUNKNOWN, LPCWSTR, LPCWSTR, DWORD, LPBINDSTATUSCALLBACK);	
+  /** Read whole process output and then print it to console and to a file. 
+     * run $ dir . at path C:\\windows\\system32, read the whole process output 
+     * as string printing it and saving it to a log file. (output.log)
+     */
+   if(std::string(argv[1]) == "test1")
+     ... ... ... ... 
+  
+    std::cerr << "Error: invalid option " << std::endl;	
+    return EXIT_FAILURE;
+   }
+#+END_SRC  
 
-    auto URLDownloadToFileW2 =
-        dll.GetFunction<URLDownloadToFileW_t>("URLDownloadToFileW");
+ *Command test0*
 
-    HRESULT result2 =
-        URLDownloadToFileW(nullptr, fileURL.c_str(), file2.c_str(), 0, nullptr);
-
-    if(SUCCEEDED(result2))
-        std::cerr << " [INFO] Download successful OK. " << std::endl;
-    else
-        std::cerr << " [ERROR] Download failure. " << std::endl;	   	
-    return 0;
-#+END_SRC
-
-Class DLLoader: 
+The command test0 stream process (ping.exe) output line by line read
+from the sub-process as soon as the process prints the line.
 
 #+BEGIN_SRC cpp 
-  //========== File: DLLLoader.hpp =======//
-  class DLLLoader
+   if(std::string(argv[1]) == "test0")
+       tryExit([]{
+          auto p = ProcessBuilder();
+          p.SetProgram("ping 8.8.8.8");				
+          std::puts("Stream output of process ping to stdout.");
+          p.StreamLines([](std::string line){
+               std::cout << " line = " << line << std::endl;
+               return true;
+            });
+          return EXIT_SUCCESS;
+          });
+#+END_SRC
+
+Output: $ winprocess.exe test0
+
+#+BEGIN_SRC text 
+  $ winprocess.exe test0
+
+  Stream output of process ping to stdout.
+   line =
+   line = Pinging 8.8.8.8 with 32 bytes of data:
+   line = Reply from 8.8.8.8: bytes=32 time=105ms TTL=127
+   line = Reply from 8.8.8.8: bytes=32 time=106ms TTL=127
+   line = Reply from 8.8.8.8: bytes=32 time=105ms TTL=127
+   line = Reply from 8.8.8.8: bytes=32 time=106ms TTL=127
+   line =
+   line = Ping statistics for 8.8.8.8:
+   line =     Packets: Sent = 4, Received = 4, Lost = 0 (0% loss),
+   line = Approximate round trip times in milli-seconds:
+   line =     Minimum = 105ms, Maximum = 106ms, Average = 105ms
+  [SUCCESS] End gracefully
+#+END_SRC
+
+ *Command test1* 
+
+Runs the process _$ dir ._ (dir.exe) at the directory
+~C::\Windows\\System32\\~, reads the whole process output containing the
+directory listening saving it to a string and writing it to a file named
+output.log.
+
+#+BEGIN_SRC cpp 
+   if(std::string(argv[1]) == "test1")
+       tryExit([]{
+           std::puts("Get output of tasklist.");
+            auto p = ProcessBuilder("dir .");		
+            p.SetCWD("C:\\windows\\system32");
+            std::cout << "Process output = " << std::endl;
+            auto out = p.GetOutput();
+            std::cout << out << std::endl;
+
+            std::ofstream fs("output.log");
+            fs << " ==>>> Process output = " << "\n";
+            fs << " +=================+ " << "\n";
+            fs << out;	
+            return EXIT_SUCCESS;
+      });
+#+END_SRC
+
+Output: $ winprocess.exe test1 
+
+#+BEGIN_SRC sh 
+  $ winprocess.exe test1 
+
+   ... ... ... ... 
+  wwanprotdim.dll
+  wwansvc.dll
+  wwapi.dll
+  xbgmengine.dll
+  xbgmsvc.exe
+  xboxgipsvc.dll
+  xboxgipsynthetic.dll
+  xcopy.exe
+  xh-ZA
+  xmlfilter.dll
+  xmllite.dll
+  ... .... ... .... ... .... 
+#+END_SRC
+
+ *Command test2* 
+
+Launch a process (for window subsystem), notepad.exe and wait for its
+termination.
+
+#+BEGIN_SRC cpp 
+    if(std::string(argv[1]) == "test2")
+       tryExit([]{
+              std::puts("Launch process and wait for its termination");
+              auto p = ProcessBuilder("notepad");
+              p.Run();
+              std::cout << "Waiting for process termination" << std::endl;
+              p.Wait();
+              std::cout << "Process terminated. OK." << std::endl;
+              return EXIT_SUCCESS;
+        });	
+#+END_SRC
+
+Output: $ winprocess.exe test2
+
+ + The sub-process notepad.exe (window subsystem) is launched and then
+   the program waits for its termination. 
+
+#+BEGIN_SRC sh 
+   $ winprocess.exe test2
+   Launch process and wait for its termination
+   Waiting for process termination
+   Process terminated. OK.
+   [SUCCESS] End gracefully
+#+END_SRC
+
+ *Command test3* 
+
+Launch sub-process notepad.exe without waiting and waits for user to
+type RETURN. When user types this key, the process is terminated. 
+
+#+BEGIN_SRC cpp 
+  if(std::string(argv[1]) == "test3")
+          tryExit([]{
+              std::puts("Launch process and wait for its termination");
+              auto p = ProcessBuilder("notepad");
+              p.Run();
+              std::cout << "Enter RETURN to terminate process => PID = " << p.GetPID() << std::endl;
+              std::cin.get();
+              p.Terminate();
+              std::cout << " Process terminated OK.";
+              return EXIT_SUCCESS;
+          });
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC sh 
+  $ winprocess.exe test3
+  Launch process and wait for its termination
+  Enter RETURN to terminate process => PID = 2324
+
+   Process terminated OK.[SUCCESS] End gracefully
+#+END_SRC
+
+ *Class ProcessBuilder* 
+
+#+BEGIN_SRC cpp 
+  //========= File: ProcessBuilder.hpp - Header ===================//
+
+  /** Requires: <iostream> <string>, <functional> <vector> <windows.h> */
+  class ProcessBuilder
   {
   private:
-       HMODULE      m_hLib;
-       std::string  m_file;
-  public:
-     DLLLoader(const std::string& file);
-     DLLLoader(const DLLLoader&) = delete;	
-     DLLLoader(DLLLoader&& rhs);
-     ~DLLLoader();
-     auto operator=(const DLLLoader&) = delete;
-     auto operator=(DLLLoader&& rhs);
+      // Program to be run 
+      std::string              m_program;
+      // Arguments passed to the program 
+      std::vector<std::string> m_args = {};
+      // If this flag is true, the program is launched on console 
+      bool                     m_console = true;
+      std::string              m_cwd; 
+      STARTUPINFO              m_si = { sizeof(STARTUPINFO)};
+      PROCESS_INFORMATION      m_pi;
+  public:	
+      using SELF = ProcessBuilder&;
+      using LineConsumer = std::function<bool (std::string)>;
 
-     auto GetFile() const ->  std::string;
-     auto IsLoaded() const -> bool;
-     operator bool() const;
-
-     template<class FunctionSignature>
-     auto GetFunction(const std::string& functionName ) const -> FunctionSignature*
-     {
-        if(m_hLib == nullptr)
-           return nullptr;		
-        FARPROC hFunc = ::GetProcAddress(m_hLib, functionName.c_str());
-        if(hFunc == nullptr)
-           return nullptr;
-        return reinterpret_cast<FunctionSignature*>(hFunc);
-     }	
-  };
+      ProcessBuilder() = default;
+      ProcessBuilder(const std::string& program, const std::vector<std::string>& args = {});
+      ProcessBuilder(const ProcessBuilder&) = delete;
+      auto operator=(const ProcessBuilder&)  = delete;	
+      ~ProcessBuilder();
+      ProcessBuilder(ProcessBuilder&& rhs);
+      auto operator=(ProcessBuilder&& rhs) -> SELF;
+      auto SetProgram(const std::string& program) -> SELF;	
+      auto SetConsole(bool flag) -> SELF;
+      /** Set process directory.
+       ,* @param path - Process directory path.
+       ,*/
+      auto SetCWD(const std::string& path) -> SELF;	
+      /** Start process without waiting for its termination.  */
+      auto Run() -> bool;
+      auto Wait() -> void;
+      // Start process and wait for its termination. 
+      auto RunWait() -> bool;
+      auto GetPID() -> DWORD;
+      auto Terminate() -> bool;
+      auto isRunning() -> bool;	
+      auto StreamLines(LineConsumer consumer) -> bool; 
+      auto GetOutput() -> std::string;	
+  private:
+      auto ReadLineFromHandle(HANDLE hFile) -> std::pair<bool, std::string>;	
+  }; //========= End of Class ProcessBuilder ===== // 
 #+END_SRC
 
-Member functions of class DLLoader:
-
-#+BEGIN_SRC cpp 
-  ///==== Implementations - file: DLLoader.hpp =======//
-
-  DLLLoader::DLLLoader(const std::string& file):
-       m_file(file),
-       m_hLib(::LoadLibraryA(file.c_str()))
-  {
-  }
-
-  // Move CTOR
-  DLLLoader::DLLLoader(DLLLoader&& rhs):
-          m_hLib(std::move(rhs.m_hLib)),
-          m_file(std::move(rhs.m_file))
-  {   	
-  }
-  auto DLLLoader::operator=(DLLLoader&& rhs)		
-  {
-      std::swap(this->m_hLib, rhs.m_hLib);
-      std::swap(this->m_file, rhs.m_file);
-  }
-	
-  DLLLoader::~DLLLoader()
-  {
-     std::cerr << " [INFO] DLL handler released OK." << std::endl;
-     if(m_hLib != nullptr)
-             ::FreeLibrary(m_hLib);
-  }
-
-  auto DLLLoader::GetFile() const ->  std::string
-  {
-     return m_file;
-  }
-	
-  auto DLLLoader::IsLoaded() const -> bool
-  {
-     return m_hLib == nullptr;
-  }
-
-  DLLLoader::operator bool() const
-  {
-     return m_hLib != nullptr;
-  }
-
-#+END_SRC
 
 ** Windows Socket - Winsock 
 *** Overview 
@@ -3572,6 +3349,499 @@ the windows subsystem.
 
 #+BEGIN_SRC sh 
   $ g++ gui-without-winmain.cpp -o gui-without-winmain.exe -std=c++1z -g -lgdi32 -luser32 -Wl,-subsystem,windows
+#+END_SRC
+** Loading DLLs - shared libraries at runtime 
+*** Example 1 - Basic Dynamic Loading 
+
+This example demonstrates how to dynamic load functions from a shared
+library at runtime with WinAPIs Loadlibrary, GetProcAddress and
+FreeLibrary. 
+
+Source:
+ + File: [[file:src/windows/dynamic-loading1.cpp][file:src/windows/dynamic-loading1.cpp]] 
+ + GIST: [[https://gist.github.com/caiorss/5ec138f86b6208214fb8866344f15e77][dynamic-loading1.cpp]]
+
+Types of loading:
+
+  + _Implicit loading_ (static loading) - the DLL is linked at
+    compile-time and the application doesn't refer to the DLL file
+    directly.
+
+  + _Explicit loading_ (dynamic loading) - the DLL is linked at runtime
+    or loaded at runtime and the application refer to the DLL file and
+    its function explicitly using the WinAPIs - LoadLibrary,
+    GetProcAddress and FreeLibrary.
+
+This code loads the function [[https://msdn.microsoft.com/en-us/ie/ms775123(v=vs.94)][URLDownloadToFile]] at runtime from the DLL
+(Dynamically Linked Library) or shared library _urlmon.dll_. This
+function is used to donwload the image file from the URL
+http://httpbin.org/image/jpeg as file1.jpeg and file2.jpeg.
+
+Signature of URLDownloadToFileW (wide unicode version) of
+URLDownloadToFile.
+
+#+BEGIN_SRC cpp 
+   HRESULT URLDownloadToFile(
+                            LPUNKNOWN            pCaller,
+                            LPCTSTR              szURL,
+                            LPCTSTR              szFileName,
+     _Reserved_             DWORD                dwReserved,
+                            LPBINDSTATUSCALLBACK lpfnCB
+   );
+
+   HRESULT URLDownloadToFileW(
+                            LPUNKNOWN            pCaller,
+                            LPCWSTR              szURL,
+                            LPCWSTR              szFileName,
+     _Reserved_             DWORD                dwReserved,
+                            LPBINDSTATUSCALLBACK lpfnCB
+   );
+#+END_SRC
+
+Compiling and running with MSVC: 
+
+#+BEGIN_SRC sh 
+  $ cl.exe dynamic-linking1.cpp /EHsc /Zi /nologo /Fe:out.exe && out.exe
+
+  dynamic-linking1.cpp
+   [INFO] DLL Loaded OK
+  ============ EXPERIMENT 1 ===================
+   [INFO] Function loaded OK
+   [INFO] Download successful OK. 
+  ============ EXPERIMENT 2 ===================
+   [INFO] Download successful OK. 
+   [INFO] Application ended gracefully. OK.
+#+END_SRC
+
+Compiling and running with Mingw/GCC (GNU C/C++ Compiler): 
+
+#+BEGIN_SRC cpp 
+ $ g++ dynamic-loading1.cpp -o out2.exe -std=c++1z && out2.exe
+
+   [INFO] DLL Loaded OK
+  ============ EXPERIMENT 1 ===================
+   [INFO] Function loaded OK
+   [INFO] Download successful OK. 
+  ============ EXPERIMENT 2 ===================
+   [INFO] Download successful OK. 
+   [INFO] Application ended gracefully. OK.
+
+#+END_SRC
+
+ *Parts inside the main function*
+
+ + Function parameters that will be used later. 
+
+#+BEGIN_SRC cpp 
+   // Wide-unicode strings 
+   std::wstring fileURL = L"http://httpbin.org/image/jpeg";
+   std::wstring file1   = L"download-file1.jpeg";
+   std::wstring file2   = L"download-file2.jpeg";	
+#+END_SRC
+
+ + *Load shared library* (aka module) _urlmon.dll_ at runtime using [[https://docs.microsoft.com/en-us/windows/desktop/api/libloaderapi/nf-libloaderapi-loadlibraryw][LoadLibraryW]] API
+   and perform error checking and exiting the application on
+   error. The mentioned DLL is loaded into the current process _address space_. 
+
+   + Note: If the application is 64 bits, the DLL must be compiled for
+     64 bits, otherwise it will not work. The same happens if the
+     application is 32 bits.
+
+   + Signature: _HMODULE LoadLibraryW (LPCWSTR lpLibFileName);_
+
+   + The file urlmon.dll is at ~C:\Windows\System32\urlmon.dll~.
+
+   + If the extension of the DLL is omitted, the function
+     automatically appends .dll to the file name, therefore it is also
+     possible to load the DLL using just "urlmon" instead of
+     "urlmon.dll".
+
+   + If the DLL is provided without absolute path as
+     ~C:\Windows\System32\urlmon.dll~, the DLL is searched in the
+     following order:
+     1. Directory where is the underlying application
+     2. System directory - ~%SystemRoot%\system32~ or  ~C:\Windows\System32\~
+     3. Current Working Directory (CWD) - Note: The process current
+        working directory may not be the same as the application.
+     4. Directories listed in the $PATH environment variable.
+
+#+BEGIN_SRC cpp 
+    // Wide unicode version for LoadLibrary API
+    HMODULE hLib = ::LoadLibraryW(L"urlmon.dll");
+    if(hLib == nullptr){
+         std::cerr << " [ERROR] Error: failed to load shared library" << std::endl;
+         // Early return on Error. 
+         return EXIT_FAILURE;		
+    }
+    std::cerr << " [INFO] DLL Loaded OK" << std::endl;
+#+END_SRC
+
+ + *Loading function* - In order to load the function
+   URLDownloadToFileW, it is necessary to know: the function symbol
+   and its its exact type signature and calling convention. In
+   general, the symbol has the same name of the function to be
+   loaded. Windows Applications and DLLs of 32 bits supports the
+   calling conventions ~__cdecl~ (default), ~__stdcall~ and
+   ~__fastcall~. Windows applications and DLLs of 64 bits have always
+   the same calling conventions ~__cdecl~. The default calling
+   convention can be omitted in the function signature.
+
+Function pointer type alias (FunptrType) with must type signature of
+the function URLDownloadToFileW:
+
+#+BEGIN_SRC cpp 
+    // C+11 type alias for function pointer 
+    using FunptrType =
+       HRESULT (__cdecl *)(LPUNKNOWN, LPCWSTR, LPCWSTR, DWORD, LPBINDSTATUSCALLBACK);
+   //  __cdecl can be omited 
+   //  HRESULT (__cdecl *)(LPUNKNOWN, LPCWSTR, LPCWSTR, DWORD, LPBINDSTATUSCALLBACK);
+
+    // Alternative 2 for type alias (C++98/03)
+    typedef HRESULT (__cdecl * FunptrTypeTypedef)(LPUNKNOWN, LPCWSTR, LPCWSTR, DWORD, LPBINDSTATUSCALLBACK);
+#+END_SRC
+
+Function is loaded using the WinAPI [[https://docs.microsoft.com/en-us/windows/desktop/api/libloaderapi/nf-libloaderapi-getprocaddress][GetProcAddress]]
+ + Signature: _FARPROC GetProcAddress(HMODULE hModule,  LPCSTR  lpProcName);_
+
+#+BEGIN_SRC cpp 
+    FARPROC hFunc = ::GetProcAddress(hLib, "URLDownloadToFileW");
+    if(hFunc == nullptr){
+        std::cerr << " [Error] Failed to load function from DLL" << std::endl;
+        return EXIT_FAILURE;
+    }
+    std::cerr << " [INFO] Function loaded OK" << std::endl;
+#+END_SRC
+
+The value hFunc must be casted to a function type before usage:
+
+ + Note: It is alos possible to use C-style casting. However, it is not
+   encouraged as this type of casting is not explicit as
+   _reinterpret_cast_ which communicates the that operation is unsafe
+   and that it can lead to _undefined behavior_. 
+
+#+BEGIN_SRC cpp 
+   // Functin Pointer 
+   FunptrType URLDownloadToFileFunPTR = reinterpret_cast<FunptrType>(hFunc);	  	
+#+END_SRC
+
+ + *Perform experiment 1* - Use function pointer _URLDownloadToFileFunPTR_
+   ,which points to the function _URLDownloadToFileW_, to perform a
+   download of the image http://httpbin.org/image/jpeg and save it to
+   file download-file1.jpeg. 
+
+#+BEGIN_SRC cpp 
+    HRESULT result1 = URLDownloadToFileFunPTR(nullptr, fileURL.c_str(), file1.c_str(), 0, nullptr);
+    if(SUCCEEDED(result1))
+        std::cerr << " [INFO] Download successful OK. " << std::endl;
+    else
+        std::cerr << " [ERROR] Download failure. " << std::endl;
+#+END_SRC
+
+ 
+ + *Experiment 2* - This piece of code is similar to the previous
+   one. However, it uses a different syntax for the function pointer.
+
+   + Note: The function pointer DownloadFile points to the function
+     _URLDownloadToFileW_. 
+
+#+BEGIN_SRC cpp 
+    std::cout << "============ EXPERIMENT 2 ===================" << std::endl;
+    // Same cast as reinterpret_cast 
+    void* hFunc2 = (void*) ::GetProcAddress(hLib, "URLDownloadToFileW");
+    // Omit error checking if(hFunct2 == nullptr){ ... }
+
+    // Note: Calling convention __cdecl can be omitted
+    using URLDownloadToFileW_t =
+        auto __cdecl (LPUNKNOWN, LPCWSTR, LPCWSTR, DWORD, LPBINDSTATUSCALLBACK) -> HRESULT;
+    //  auto (LPUNKNOWN, LPCWSTR, LPCWSTR, DWORD, LPBINDSTATUSCALLBACK) -> HRESULT;
+
+    auto DownloadFile = reinterpret_cast<URLDownloadToFileW_t*>(hFunc2);
+
+    HRESULT hresult2 = DownloadFile(nullptr, fileURL.c_str(), file2.c_str(), 0, nullptr);
+    if(SUCCEEDED(result1))
+        std::cerr << " [INFO] Download successful OK. " << std::endl;
+    else
+        std::cerr << " [ERROR] Download failure. " << std::endl;
+#+END_SRC
+
+ + *Release acquired resource hLib*. This operation is unsafe and prone
+   to resource leaking, therefore the code would be safer and more
+   robust if it used RAII (Resource Acquisition Is Initialization)
+   idiom for releasing the resouce. 
+
+#+BEGIN_SRC cpp 
+   ::FreeLibrary(hLib);
+   std::cerr << " [INFO] Application ended gracefully. OK." << std::endl;
+#+END_SRC
+
+ *Show symbols (functions) exported by DLL urmon.dll*
+
+ + Open the MSVC developer shell prompt and use the following
+   commands: 
+
+#+BEGIN_SRC sh 
+  # Print to console 
+  $ dumpbin /exports C:\Windows\System32\urlmon.dll
+
+  # Or print to file redirecting the stdout to a file result.txt 
+  $ dumpbin /exports C:\Windows\System32\urlmon.dll > C:\Users\archbox\Desktop\result.txt
+#+END_SRC
+
+Command output: 
+
+#+BEGIN_SRC cpp 
+   $ dumpbin /exports C:\Windows\System32\urlmon.dll > C:\Users\archbox\Desktop\result.txt
+
+   Microsoft (R) COFF/PE Dumper Version 14.12.25835.0
+   Copyright (C) Microsoft Corporation.  All rights reserved.
+
+
+   Dump of file C:\Windows\System32\urlmon.dll
+
+   File Type: DLL
+
+     Section contains the following exports for urlmon.dll
+
+       00000000 characteristics
+       F6A98BC3 time date stamp
+           0.00 version
+            100 ordinal base
+            481 number of functions
+            132 number of names
+
+       ordinal hint RVA      name
+
+           121    0 000718E0 AsyncGetClassBits
+           122    1 000AE7A0 AsyncInstallDistributionUnit
+           123    2 000A0CD0 BindAsyncMoniker
+           124    3 000CF110 CAuthenticateHostUI_CreateInstance
+           125    4 000AF130 CDLGetLongPathNameA
+           126    5 000AF150 CDLGetLongPathNameW
+           127    6 00107B70 CORPolicyProvider
+           128    7 000AE830 CoGetClassObjectFromURL
+           129    8 000AED90 CoInstall
+           130    9 00035E90 CoInternetCanonicalizeIUri
+           131    A 00035FB0 CoInternetCombineIUri     
+       ... ... ...     ... ... ...     ... ... ...     ... ... ... 
+           227   71 000E48C0 URLDownloadA
+           228   72 000EDF10 URLDownloadToCacheFileA
+           229   73 000EE090 URLDownloadToCacheFileW
+           230   74 000EE200 URLDownloadToFileA
+           231   75 0006D300 URLDownloadToFileW
+           232   76 000E4920 URLDownloadW
+           233   77 000EE350 URLOpenBlockingStreamA
+           234   78 000EE430 URLOpenBlockingStreamW
+           235   79 000EE540 URLOpenPullStreamA
+           236   7A 000EE610 URLOpenPullStreamW
+           237   7B 000EE6E0 URLOpenStreamA
+       ... ... ...     ... ... ...     ... ... ...     ... ... ... 
+     Summary
+
+           D000 .data
+           1000 .didat
+           1000 .isoapis
+           F000 .pdata
+          3D000 .rdata
+           3000 .reloc
+          52000 .rsrc
+         117000 .text
+#+END_SRC
+
+ *Further Reading:*
+
+ + WinAPIS:  [[https://docs.microsoft.com/en-us/windows/desktop/api/libloaderapi/nf-libloaderapi-loadlibraryw][LoadLibraryW]],  [[https://docs.microsoft.com/en-us/windows/desktop/api/libloaderapi/nf-libloaderapi-getprocaddress][GetProcAddress]] and [[https://docs.microsoft.com/en-us/windows/desktop/api/libloaderapi/nf-libloaderapi-freelibrary][FreeLibrary]].
+
+ + https://github.com/numpy/numpy/wiki/windows-dll-notes
+
+ + [[http://www.flounder.com/loadlibrary_explorer.htm][The LoadLibrary Explorer]]
+
+ + [[https://docs.microsoft.com/en-us/windows/desktop/dlls/dynamic-link-library-search-order][Dynamic-Link Library Search Order]]
+
+ + [[https://docs.microsoft.com/en-us/windows/desktop/dlls/dynamic-link-library-data][Dynamic-Link Library Data]]
+
+ + [[https://docs.microsoft.com/en-us/windows/desktop/dlls/dynamic-link-library-redirection][Dynamic-Link Library Redirection]]
+
+ + [[https://docs.microsoft.com/en-us/windows/desktop/dlls/dynamic-link-library-security][Dynamic-Link Library Security]]
+
+ + [[https://docs.python.org/2/library/ctypes.html][15.17. ctypes — A
+   foreign function library for Python — Python 2.7.15 documentation]]
+*** Example 2 - Dynamic loading using a class
+
+This code uses a class DLLoader to load a shared library hiding the
+complexity and implementation detail. It also uses RAII for ensuring
+that the resource is released.
+
+Source: 
+ + File: [[file:src/windows/dynamic-loading2.cpp][file:src/windows/dynamic-loading2.cpp]]
+ + GIST: [[https://gist.github.com/caiorss/c5dd06a401f4816920bb682367455f5e][dynamic-loading2.cpp]]
+
+ *Build and run with MSVC* 
+
+#+BEGIN_SRC sh 
+   $ cl.exe dynamic-loading2.cpp /EHsc /Zi /nologo /Fe:out.exe && out.exe
+
+   dynamic-loading2.cpp
+   [INFO] DLL loaded OK.
+   ===== Experiment 1 =========== 
+   [INFO] Function URLDownloadToFileW loaded OK. 
+    [INFO] Download successful OK. 
+   ===== Experiment 2 =========== 
+    [INFO] Download successful OK. 
+    [INFO] DLL handler released OK.
+#+END_SRC
+
+ *Build and run with Mingw/GCC* 
+
+#+BEGIN_SRC sh 
+   $ g++ dynamic-loading2.cpp -std=c++14 -g -o out-gcc.exe && out-gcc.exe
+
+   [INFO] DLL loaded OK.
+   ===== Experiment 1 =========== 
+   [INFO] Function URLDownloadToFileW loaded OK. 
+    [INFO] Download successful OK. 
+   ===== Experiment 2 =========== 
+    [INFO] Download successful OK. 
+    [INFO] DLL handler released OK.
+#+END_SRC
+
+ *Parts* 
+
+Main function - Load Library: 
+
+#+BEGIN_SRC cpp
+    // Wide-unicode strings 
+    std::wstring fileURL = L"http://httpbin.org/image/jpeg";
+    std::wstring file1   = L"download-file1.jpeg";
+    std::wstring file2   = L"download-file2.jpeg";	
+
+    auto dll = DLLLoader("urlmon.dll");
+    if(!dll){
+            std::cerr << "[Error] failed to load DLL." << std::endl;
+            return EXIT_FAILURE;
+    }
+    std::cerr << "[INFO] DLL loaded OK." << std::endl;
+
+#+END_SRC
+
+Main function - Experiment 1: 
+
+#+BEGIN_SRC cpp
+    std::cout << "===== Experiment 1 =========== " << std::endl;
+
+    auto URLDownloadToFileW =
+        dll.GetFunction<HRESULT (LPUNKNOWN,
+                                 LPCWSTR,
+                                 LPCWSTR,
+                                 DWORD,
+                                 LPBINDSTATUSCALLBACK)>("URLDownloadToFileW");
+
+    if(URLDownloadToFileW == nullptr){
+        std::cerr << "[Error] failed to load function. " << std::endl;
+        return EXIT_FAILURE;
+    }
+    std::cerr << "[INFO] Function URLDownloadToFileW loaded OK. " << std::endl;
+#+END_SRC
+
+Main function - Experiment 2: 
+
+#+BEGIN_SRC cpp
+    std::cout << "===== Experiment 2 =========== " << std::endl;
+    // Note: Calling convention __cdecl can be omitted
+    using URLDownloadToFileW_t =
+        HRESULT (*) (LPUNKNOWN, LPCWSTR, LPCWSTR, DWORD, LPBINDSTATUSCALLBACK);	
+
+    auto URLDownloadToFileW2 =
+        dll.GetFunction<URLDownloadToFileW_t>("URLDownloadToFileW");
+
+    HRESULT result2 =
+        URLDownloadToFileW(nullptr, fileURL.c_str(), file2.c_str(), 0, nullptr);
+
+    if(SUCCEEDED(result2))
+        std::cerr << " [INFO] Download successful OK. " << std::endl;
+    else
+        std::cerr << " [ERROR] Download failure. " << std::endl;	   	
+    return 0;
+#+END_SRC
+
+Class DLLoader: 
+
+#+BEGIN_SRC cpp 
+  //========== File: DLLLoader.hpp =======//
+  class DLLLoader
+  {
+  private:
+       HMODULE      m_hLib;
+       std::string  m_file;
+  public:
+     DLLLoader(const std::string& file);
+     DLLLoader(const DLLLoader&) = delete;	
+     DLLLoader(DLLLoader&& rhs);
+     ~DLLLoader();
+     auto operator=(const DLLLoader&) = delete;
+     auto operator=(DLLLoader&& rhs);
+
+     auto GetFile() const ->  std::string;
+     auto IsLoaded() const -> bool;
+     operator bool() const;
+
+     template<class FunctionSignature>
+     auto GetFunction(const std::string& functionName ) const -> FunctionSignature*
+     {
+        if(m_hLib == nullptr)
+           return nullptr;		
+        FARPROC hFunc = ::GetProcAddress(m_hLib, functionName.c_str());
+        if(hFunc == nullptr)
+           return nullptr;
+        return reinterpret_cast<FunctionSignature*>(hFunc);
+     }	
+  };
+#+END_SRC
+
+Member functions of class DLLoader:
+
+#+BEGIN_SRC cpp 
+  ///==== Implementations - file: DLLoader.hpp =======//
+
+  DLLLoader::DLLLoader(const std::string& file):
+       m_file(file),
+       m_hLib(::LoadLibraryA(file.c_str()))
+  {
+  }
+
+  // Move CTOR
+  DLLLoader::DLLLoader(DLLLoader&& rhs):
+          m_hLib(std::move(rhs.m_hLib)),
+          m_file(std::move(rhs.m_file))
+  {   	
+  }
+  auto DLLLoader::operator=(DLLLoader&& rhs)		
+  {
+      std::swap(this->m_hLib, rhs.m_hLib);
+      std::swap(this->m_file, rhs.m_file);
+  }
+	
+  DLLLoader::~DLLLoader()
+  {
+     std::cerr << " [INFO] DLL handler released OK." << std::endl;
+     if(m_hLib != nullptr)
+             ::FreeLibrary(m_hLib);
+  }
+
+  auto DLLLoader::GetFile() const ->  std::string
+  {
+     return m_file;
+  }
+	
+  auto DLLLoader::IsLoaded() const -> bool
+  {
+     return m_hLib == nullptr;
+  }
+
+  DLLLoader::operator bool() const
+  {
+     return m_hLib != nullptr;
+  }
+
 #+END_SRC
 ** Install Building Tools and Compilers 
 *** Install GCC/Mingw + a couple of GNU tools 

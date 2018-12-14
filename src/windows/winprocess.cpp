@@ -65,12 +65,10 @@ private:
 
 
 int main(int argc, char** argv){
-
 	if(argc < 2){
-		std::cerr << "Usage: " << argv[0] << " [test0 | test1 | test2 | test3]" << std::endl;
+		std::cerr << "Usage: " << argv[0] << " [test0 | test1 | test2 | test3 | test4 ]" << std::endl;
 		return EXIT_FAILURE;
 	}
-
 	auto tryExit = [&argc, &argv](std::function<int ()> Action) -> void {
 		try {
 			// End current process with exit code returned
