@@ -50,10 +50,13 @@ int main(){
 		std::cout << " " << dataset[i] ;
 	std::cout << "] \n";
 
-	#ifdef _WIN32 
+    #ifdef _WIN32 
        std::cout << "\n" << "Type RETURN to quit." << "\n";
+       std::cin.clear(); 
+       std::cin.ignore(10, '\n');
+       // Wait for single character 
        std::cin.get();
-    #endif 		
-	
+     #endif 
+		
 	return EXIT_SUCCESS;
 };
