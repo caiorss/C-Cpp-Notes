@@ -1,0 +1,176 @@
+#+INCLUDE: theme/style.org
+#+TITLE: Shared Libraries - Binary Components
+#+DESCRIPTION: cpp c++ code examples, demonstrations, design pattern and integration.
+#+STARTUP: content 
+
+ - [[wiki:index][Index]]
+
+* Shared Libraries - Binary Components
+** Overview 
+
+Shared libraries are compiled object-code exporting functions, data
+structures and classes which can be used by many different
+programs. They provide many benefits such as: faster compilation time;
+less disk space usage since each program using the library do not
+need a copy of the library source code or its compiled-code; ability
+to update the library and provide security fixes to client
+applications without recompilation, just by replacing the library
+file. 
+
+On Windows, shared libraries are called DLLs which stands for Dynamic
+Linked Libraries, on Unix-like operating systems such as Linux, BSD
+and MacOSX, they are called SO - shared objects or DSO - dynamic
+shared objects. 
+
+#+CAPTION: Comparison of shared libraries across different operating systems 
+| Operating | Long Name               | Short name | File          | Binary Format                         |
+| System    |                         |            | Extension     |                                       |
+|-----------+-------------------------+------------+---------------+---------------------------------------|
+| Windows   | Dynamic Linked Library  | DLL        | .dll          | PE32/PE64 - Portable Executable       |
+| Linux     | (Dynamic) Shared Object | DSO or SO  | .so           | ELF or ELF64 (for 64 bits processors) |
+| BSD       | (Dynamic) Shared Object | DSO or SO  | .so           | ELF or ELF64                          |
+| MacOSX    | -                       | dylib      | .dylib or .so | MachO                                 |
+|-----------+-------------------------+------------+---------------+---------------------------------------|
+
+ + Shared libraries are similar to executables, however they do not
+   have the main() function entry point.
+
+In addition to C and C++, shared libraries, containing functions with
+C-linkage, can also be used as binary components (libraries) and be
+consumed from higher level programming languages such as Python, Ruby,
+Java or C# through some foreign-function interface. In Python
+C-functions can be imported from shared libraries using the [[https://docs.python.org/3/library/ctypes.html][cytpes]]
+library; in C# C-functions can be consumed using the P-invoke API and
+in Java it is possible to use C-functions from shared libraries using
+the JNI (Java Native Interface) or JNA, which is easier to use.
+
+Note: 
+ + Shared libraries are specific to a particular operating system and
+   are not part of C++ standard.
+
+** Shared Libraries - DLLs on Windows
+*** Overview 
+
+ *Source:*
+
+Shared library Source Code
+
+ + File: [[file:dll-shared-library/example-windows1/libtest.cpp][file:dll-shared-library/example-windows1/libtest.cpp]]
+ + File: [[file:dll-shared-library/example-windows1/libtest.hpp][file:dll-shared-library/example-windows1/libtest.hpp]]
+
+Sample Client C++ Program:
+
+ + File: [[file:dll-shared-library/example-windows1/client1.cpp][file:dll-shared-library/example-windows1/client1.cpp]]  
+
+*** Shared Library 
+
+Sources:
+ + File: [[file:dll-shared-library/example-windows1/libtest.cpp][file:dll-shared-library/example-windows1/libtest.cpp]]
+ + File: [[file:dll-shared-library/example-windows1/libtest.hpp][file:dll-shared-library/example-windows1/libtest.hpp]]
+
+ *teslib.hpp / Heade File - Macros*
+
+The header files uses the following macros to reduce the boilerplate
+necessary to export the library functions and classes. 
+
+ + file: libstes.hpp => Macros for exporting functions and classes. 
+
+#+BEGIN_SRC cpp
+  #ifndef _WIN32
+    // If not compiled for Windows, remove declspec directive.
+    #define __declspec(param)  
+  #endif 
+
+  #define EXPORT_CPP 	__declspec(dllexport)
+ 
+  #ifdef __cplusplus
+    // Indicat that a given symbol/function has C-linkage and
+    // does not have name mangling. 
+    #define EXPORT_C extern "C" __declspec(dllexport)
+  #else
+    // If a C-compiler uses this header, remove 'extern "C"'
+    #define EXPORT_C  __declspec(dllexport)
+  #endif 
+#+END_SRC
+
+ *Namespace Linalg*
+
+Namespace containing sample linear algebra functions, the function norm
+computes an Euclidean norm of a N-dimension vector, the function
+linTransform computes a linear transformation performing the
+computation v[i] * a + b for each vector element. 
+
+On Windows, all DLL symbols, such as functions, variables and clases,
+are private by default, they are not exported by default as happens in
+Unix-like OSes shared libraries. Therefore, in order to a function be
+exported in a Windows shared library, it is necessary to use the MSVC or visual C++
+compiler extension ~__declspec(dllexport)~ before the function declaration.
+ 
+ + Interface => File: *libtest.hpp*
+
+#+BEGIN_SRC cpp 
+  /** The macro __cplusplus is used for allowing this 
+   ,* header to be used from 'C'. If a C compiler is used
+   ,* all definitions inside this #ifdef are discarded.
+   ,*/
+  #ifdef __cplusplus
+  namespace Linalg {
+          EXPORT_CPP double norm(const std::vector<double>& xs);
+
+          EXPORT_CPP std::vector<double> linTransform(
+                  double a,
+                  double b,
+                  std::vector<double>& xs
+                  );
+
+          EXPORT_CPP
+          std::ostream&
+          printVector(std::ostream& os, std::vector<double>& xs);	
+  }
+  #endif 
+#+END_SRC
+
+The macro ~EXPORT_CPP~ expands to: 
+
+#+BEGIN_SRC cpp
+  EXPORT_CPP double norm(const std::vector<double>& xs);
+  // Macro EXPORT_CPP expansion 
+  __declspec(dllexport) double norm(const std::vector<double>& xs);
+#+END_SRC
+
+The compiler directives *#ifdef __cplusplus ... #endif* are used for
+disabling this code block when the header is used by a C-compiler as
+the C-language does not support classes, namespaces and many other C++
+features. 
+
+ + Implementation => file: *libtest.cpp*
+
+#+BEGIN_SRC cpp 
+   // Linear algebra tools 
+   namespace Linalg{
+        __declspec(dllexport)
+        double norm(const std::vector<double>& xs){
+           double sum = 0.0;
+           for(const auto& x : xs) sum += x * x;
+               return std::sqrt(sum);
+        }
+
+         __declspec(dllexport)
+        std::vector<double>
+        linTransform(double a, double b, std::vector<double>& xs){
+            std::vector<double> out(xs.size());
+            ... ... .... 
+        }
+
+       ... ... 
+   }
+#+END_SRC
+
+
+
+
+
+
+
+
+** Shared Libraries on Linux 
