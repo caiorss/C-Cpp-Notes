@@ -1005,6 +1005,220 @@ $ g++ client.cpp -g -o client-gcc.exe -std=c++14 testlib.dll -DDISABLE   && clie
 
 
 
+*** Python Client Code 
+
+Functions with C-linkage can be called by Python using the ctypes
+library. The following code presents how it can be done: 
+
+Load the library: 
+
+#+BEGIN_SRC python 
+  C:\Users\archbox\Desktop\experiments
+  λ "C:\Users\archbox\Miniconda3\pkgs\python-3.6.5-h0c2934d_0\python"
+  Python 3.6.5 |Anaconda, Inc.| (default, Mar 29 2018, 13:32:41) [MSC v.1900 64 bit (AMD64)] on win32
+  Type "help", "copyright", "credits" or "license" for more information.
+
+  >>> import ctypes
+
+  // This messages is print by the DLLMain function 
+  >>> lib = ctypes.cdll.LoadLibrary("testlib.dll")
+   [StaticObject] => Initialize DLL
+  testlib.cpp:39: <DllMain> DLL Loaded into the process => PID = 4280
+  testlib.cpp:45: <DllMain> DLL attached to process.
+  >>> testlib.cpp:39: <DllMain> DLL Loaded into the process => PID = 4280
+  testlib.cpp:53: <DllMain> DLL detached to thread.
+#+END_SRC
+
+Check whether exported functions with C-linkage exists: 
+
+#+BEGIN_SRC python 
+  >>> lib.testlib_vectorD_make0
+  <_FuncPtr object at 0x0000021BFCAFF388>
+
+  >>> lib.testlib_vectorD_Linalg_printVector
+  <_FuncPtr object at 0x0000021BFCAFF458>
+  >>>
+
+  >>> lib.testlib_vectorD_delete
+  <_FuncPtr object at 0x0000021BFCAFF528>
+#+END_SRC
+
+ *Load std::vector<double> and Linalg namespace wrapper functions*
+
+Set up the std::vector<double> functions to be imported.
+ 
+ + Note: hVectorD => Handle for std::vector<double> is the same as
+   void* or an opaque pointer. 
+
+#+BEGIN_SRC python
+  # Funciton: hVectorD testlib_vectorD_make0(size_t n, double x)
+  # Set function arguments
+  lib.testlib_vectorD_make0.argtypes = [ctypes.c_int, ctypes.c_double]
+  # Set return type 
+  lib.testlib_vectorD_make0.restype  = ctypes.c_void_p
+
+ 
+  # void testlib_vectorD_Linalg_printVector(const char* name, hVectorD hv)
+  lib.testlib_vectorD_Linalg_printVector.argtypes = [ctypes.POINTER(ctypes.c_char), ctypes.c_void_p ]
+  lib.testlib_vectorD_Linalg_printVector.restype = None 
+
+  # Set vector elements hv[n] = x
+  # void testlib_vectorD_set(hVectorD hv, size_t n, double x)
+  lib.testlib_vectorD_set.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_double]
+  lib.testlib_vectorD_set.restype  = None
+#+END_SRC
+
+Testing C-interface functions for std::vector<double>: 
+
+#+BEGIN_SRC python 
+  # Creating a std::vector<double> with 4 elements equal to 3.0 
+  >>> vec1 = lib.testlib_vectorD_make0(4, 3.0)
+
+  # This number is the address contained in the the opaque pointer,
+  # it cannot be used directly. 
+  >>> vec1
+  2319184200912
+  >>>
+
+  # ========== Modify vector elements ======== #
+
+  # Printarray2 the wrapped std::vector<double>
+  >>> lib.testlib_vectorD_Linalg_printVector("vec1".encode('utf-8'), vec1)
+  vec1 = [4]( 3, 3, 3, 3,  )
+  >>>
+
+  >>> lib.testlib_vectorD_set(vec1, 0, 5.0)
+  >>> lib.testlib_vectorD_set(vec1, 1, 10.5)
+  >>> lib.testlib_vectorD_set(vec1, 2, 4.78)
+
+  >>> lib.testlib_vectorD_Linalg_printVector("vec1".encode('utf-8'), vec1)
+  vec1 = [4]( 5, 10.5, 4.78, 3,  )
+#+END_SRC
+
+Compute vector Euclidian norm: 
+
+#+BEGIN_SRC python 
+  # Wrapper for function 
+  # double Linalg::norm(const std::vector<double>& xs)
+  # double testlib_vectorD_Linalg_norm(hVectorD hv)
+  lib.testlib_vectorD_Linalg_norm.argtypes = [ ctypes.c_void_p ]
+  lib.testlib_vectorD_Linalg_norm.restype  = ctypes.c_double
+
+  >>> lib.testlib_vectorD_Linalg_printVector("vec1".encode('utf-8'), vec1)
+  vec1 = [4]( 5, 10.5, 4.78, 3,  )
+
+  >>> lib.testlib_vectorD_Linalg_norm(vec1)
+  12.926654632966722
+
+  # Check if calculations are right 
+  >>> math.sqrt(5 * 5 + 10.5 * 10.5 + 4.78 * 4.78 + 3 * 3)
+  12.926654632966722
+  >>>
+#+END_SRC
+
+Delete vector vec1 using its destructor function: 
+
+#+BEGIN_SRC python 
+  # Function: void testlib_vectorD_delete(hVectorD hv)
+  lib.testlib_vectorD_delete.argtypes = [ ctypes.c_void_p ]
+  lib.testlib_vectorD_delete.restype = None
+
+  >>> lib.testlib_vectorD_delete(vec1)
+#+END_SRC
+
+ *Load wrapper function for interface class InterfaceClass*
+
+Load factory function: 
+ + void* teslib_InterfaceClass_factory(const char* class_id)
+
+#+BEGIN_SRC python 
+# InterfaceClass* teslib_InterfaceClass_factory(const char* class_id)
+lib.teslib_InterfaceClass_factory.argtypes = [ ctypes.POINTER(ctypes.c_char) ]
+lib.teslib_InterfaceClass_factory.restype  = ctypes.c_void_p
+
+# const char* testlib_InterfaceClass_getID(InterfaceClass* hinst)
+lib.testlib_InterfaceClass_getID.argtypes = [ ctypes.c_void_p ]
+lib.testlib_InterfaceClass_getID.restype  = ctypes.POINTER(ctypes.c_char)
+#+END_SRC
+
+Creating class instances and testing member function C-wrappers:
+
+#+BEGIN_SRC python 
+  >>> hinstA = lib.teslib_InterfaceClass_factory("ImplementationA".encode('utf-8'))
+  >>> hinstA
+  2319184196864
+  >>>
+
+  >>> hinstB = lib.teslib_InterfaceClass_factory("ImplementationB".encode('utf-8'))
+  >>> hinstB
+  2319184198016
+
+  >>> s1 = lib.testlib_InterfaceClass_getID(hinstA)
+  >>> s1
+  <ctypes.LP_c_char object at 0x0000021BFBBF14C8>
+  >>> ctypes.string_at(s1)
+  b'ImplementationA'
+  >>>
+
+  >>> s2 = lib.testlib_InterfaceClass_getID(hinstB)
+  >>> ctypes.string_at(s2)
+  b'ImplementationB'
+
+  >>> ctypes.string_at(lib.testlib_InterfaceClass_getID(hinstB))
+  b'ImplementationB'
+  >>>
+#+END_SRC
+
+Load more C-wrappers for member function of class InterfaceClass:
+
+#+BEGIN_SRC python
+   # const char* testlib_InterfaceClass_getName(InterfaceClass* hinst) 
+   lib.testlib_InterfaceClass_getName.argtypes = [ ctypes.c_void_p ]
+   lib.testlib_InterfaceClass_getName.restype  = ctypes.POINTER(ctypes.c_char)
+
+   # void testlib_InterfaceClass_setName(InterfaceClass* hinst, const char* name)
+   >>> lib.testlib_InterfaceClass_setName.argtypes = [ ctypes.c_void_p, ctypes.POINTER(ctypes.c_char) ]
+   >>> lib.testlib_InterfaceClass_setName.restype = None
+
+   >>> lib.testlib_InterfaceClass_getName(hinstA)
+   <ctypes.LP_c_char object at 0x0000021BFBBF1548>
+
+   >>> ctypes.string_at(lib.testlib_InterfaceClass_getName(hinstA))
+   b'Unammed-A'
+
+   >>> ctypes.string_at(lib.testlib_InterfaceClass_getName(hinstB))
+   b'Unammed-B'
+
+   >>> lib.testlib_InterfaceClass_setName(hinstA, "Instance-ClassA1".encode('utf-8'))
+   >>> ctypes.string_at(lib.testlib_InterfaceClass_getName(hinstA))
+   b'Instance-ClassA1'
+
+   >>> lib.testlib_InterfaceClass_setName(hinstB, "Instance-B1".encode('utf-8'))
+   >>> ctypes.string_at(lib.testlib_InterfaceClass_getName(hinstB))
+   b'Instance-B1'
+
+#+END_SRC
+
+Load C-functions wrappers for the InterfaceClass destructor and
+dispose both instances hinstA and hinstB: 
+
+#+BEGIN_SRC python 
+  # Destructor function:
+  # void testlib_InterfaceClass_delete(InterfaceClass* hinst)
+  >>> lib.testlib_InterfaceClass_delete.argtypes = [ ctypes.c_void_p ]
+  >>> lib.testlib_InterfaceClass_delete.restype  = None
+
+  # Dispose class hinstA, delete this object 
+  >>> lib.testlib_InterfaceClass_delete(hinstA)
+   [INFO] ImplementationA deleted => name = Instance-ClassA1 ; type = ImplementationA
+
+  >>> lib.testlib_InterfaceClass_delete(hinstB)
+   [INFO] ImplementationB deleted => name = Instance-B1 ; type = ImplementationB
+#+END_SRC
+
+
+
+
 *** View symbols exported by the DLL 
 
  *Location of dumpbin tool*
