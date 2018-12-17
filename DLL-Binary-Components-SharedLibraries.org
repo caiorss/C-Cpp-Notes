@@ -253,7 +253,7 @@ from C programs or foreign function interfaces.
 
 *** Non-polymorphic Class - SampleClass 
 
- + File: *libtest.hpp* => Class declaration. 
+  + File: *libtest.hpp* => Class declaration. 
 
 In order to a class be exported in a Windows' shared library, it
 requires the annotation ~__declspec(dllexport)~.
@@ -314,6 +314,225 @@ pointers (void* pointers).
   }	
 #+END_SRC
 
+*** C-interface for SampleClass
 
+ + File: *libtest.hpp* => Functions declarations. 
+
+#+BEGIN_SRC cpp 
+  /* ----- C-Wrappers for SampleClass namespace ---- */
+  using hSampleClass = void*;
+
+  /** Nullable constructor zero-arg constructor */
+  extern "C" __declspec(dllexport)
+  hSampleClass
+  testlib_SampleClass_make0();
+
+  /** Other constructor */
+  EXPORT_C hSampleClass testlib_SampleClass_make1(const char* name);
+
+  /** Destructor */
+  EXPORT_C
+  void
+  testlib_SampleClass_delete(hSampleClass hnd);
+
+  /** Wrapper for get method */
+  EXPORT_C
+  int
+  testlib_SampleClass_get(hSampleClass hnd);
+
+  /** Wrapper for set method */
+  EXPORT_C
+  void
+  testlib_SampleClass_set(hSampleClass hnd, int n);
+
+  EXPORT_C
+  const char*
+  testlib_SampleClass_getName(hSampleClass hnd);
+
+#+END_SRC
+
+ + File: *libtest.cpp* => Functions implementation. 
+
+#+BEGIN_SRC cpp 
+  using hSampleClass = void*;
+
+  /** Nullable constructor zero-arg constructor */
+  extern "C" __declspec(dllexport)
+  hSampleClass
+  testlib_SampleClass_make0(){
+     return new SampleClass();
+  }
+
+  /** Other constructor */
+  extern "C" __declspec(dllexport)
+  hSampleClass
+  testlib_SampleClass_make1(const char* name){
+     return new SampleClass(name);
+  }
+
+  /** Destructor */
+  extern "C" __declspec(dllexport)
+  void
+  testlib_SampleClass_delete(hSampleClass hnd){
+     delete reinterpret_cast<SampleClass*>(hnd);
+  }
+
+  /** Wrapper for get method */
+  extern "C" __declspec(dllexport)
+  int
+  testlib_SampleClass_get(hSampleClass hnd){
+     return reinterpret_cast<SampleClass*>(hnd)->get();
+  }
+#+END_SRC
+
+*** Polymorphic class InterfaceClass 
+
+ + File: *libtest.hpp* => Class declaration. 
+
+As the name implies, this class is an interface class, which is a
+class containing only pure virtual functions (abstract methods). As a
+result, it is declared only in the header file and cannot be
+instatiated directly. 
+
+This class uses only C-types to be binary compatible with different
+compilers, if it used STL containers such as string or any other
+non-compatible C-type, it would not be possible to compile a C++
+program using Mingw/GCC against this DLL built with MSVC.
+
+#+BEGIN_SRC cpp 
+  // Polymorphic Interface class binary compatible across different
+  // compilers as it does not use any STL container on the interface.
+  #ifdef __cplusplus
+  struct InterfaceClass{
+          /* Returns class unique ID */
+          virtual const char* getID()	const = 0;
+          /** Set class internal state */
+          virtual void setName(const char* name) = 0;
+          virtual const char* getName() = 0;
+
+          /** Virtual constructor */
+          virtual ~InterfaceClass() = default;
+          // virtual ~InterfaceClass();
+  };
+  #else
+    #define InterfaceClass void 
+  #endif 
+#+END_SRC
+
+ + File: *libtest.cpp* => class ImplementationA of interface InterfaceClass. 
+
+#+BEGIN_SRC cpp 
+  class ImplementationA: public InterfaceClass
+  {
+  private:
+      std::string m_name;
+  public:
+      static constexpr const char* class_id = "ImplementationA";
+
+      ImplementationA(): m_name("Unammed-A"){ }
+      ImplementationA(const std::string& name)
+         : m_name(name){}	
+      ~ImplementationA(){
+           std::cout << " [INFO] ImplementationA deleted => name = "
+                     << m_name
+                     << " ; type = " << class_id
+                     << std::endl;
+      }
+      const char* getID() const {		
+          return class_id;
+      }
+      void setName(const char* name) {
+          m_name = name;
+      }
+      const char* getName() {
+          return m_name.c_str();
+      }
+  };
+#+END_SRC
+
+ + File: *libtest.cpp* => class ImplementationB of interface InterfaceClass. 
+
+#+BEGIN_SRC cpp 
+  class ImplementationB: public InterfaceClass
+  {
+  private:
+      std::string m_name;
+  public:
+      static constexpr const char* class_id = "ImplementationB";
+
+      ImplementationB(): m_name("Unammed-B"){ }
+      ImplementationB(const std::string& name)
+         : m_name(name){}	
+      ~ImplementationB(){
+          std::cout << " [INFO] ImplementationB deleted => name = "
+                    << m_name
+                    << " ; type = " << class_id
+                    << std::endl;
+      }
+      const char* getID() const {		
+              return class_id;
+      }
+      void setName(const char* name) {
+              m_name = name;
+      }
+      const char* getName() {
+              return m_name.c_str();
+      }
+  };
+
+#+END_SRC
+
+ + File: *libtest.hpp* => C-interface and factory function to load
+   implementations from the DLL.
+
+#+BEGIN_SRC cpp 
+  /** Factory function */
+  EXPORT_C InterfaceClass* teslib_InterfaceClass_factory(const char* class_id);
+
+  /** C-wrapper for destructor */
+  EXPORT_C void testlib_InterfaceClass_delete(InterfaceClass* hinst);
+
+  /** C-wrapper for getID method */
+  EXPORT_C const char* testlib_InterfaceClass_getID(InterfaceClass* hinst);
+
+  EXPORT_C void testlib_InterfaceClass_setName(InterfaceClass* hinst, const char* name);
+
+  EXPORT_C const char* testlib_InterfaceClass_getName(InterfaceClass* hinst);
+#+END_SRC
+
+ + File: *libtest.cpp* => C-interfaces and factory functions
+   definitions.
+
+#+BEGIN_SRC cpp 
+  EXPORT_C InterfaceClass*
+  teslib_InterfaceClass_factory(const char* class_id)
+  {
+      auto s = std::string(class_id);
+      if(s == "ImplementationA")
+              return new ImplementationA();
+      if(s == "ImplementationB")
+              return new ImplementationB();
+      return nullptr;
+  }
+
+  EXPORT_C void testlib_InterfaceClass_delete(InterfaceClass* hinst)
+  {
+      delete hinst;
+  }
+  EXPORT_C
+  const char* testlib_InterfaceClass_getID(InterfaceClass* hinst)
+  {
+      return hinst->getID();
+  }
+  EXPORT_C
+  void testlib_InterfaceClass_setName(InterfaceClass* hinst, const char* name)
+  {
+      hinst->setName(name);
+  }
+  EXPORT_C
+  const char* testlib_InterfaceClass_getName(InterfaceClass* hinst){
+      return hinst->getName();
+  }
+#+END_SRC
 
 ** Shared Libraries on Linux 
