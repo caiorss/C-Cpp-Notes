@@ -3,7 +3,7 @@
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
-<!-- 2018-12-16 Sun 23:51 -->
+<!-- 2018-12-17 Mon 08:34 -->
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Shared Libraries - Binary Components</title>
@@ -239,25 +239,26 @@ for the JavaScript code in this tag.
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents">
 <ul>
-<li><a href="#org6560204">1. Shared Libraries - Binary Components</a>
+<li><a href="#orgc8fbe13">1. Shared Libraries - Binary Components</a>
 <ul>
-<li><a href="#org20d6133">1.1. Overview</a></li>
-<li><a href="#orga687e95">1.2. Example 1 - Shared Library libtest.dll - DLLs on Windows</a>
+<li><a href="#org7677636">1.1. Overview</a></li>
+<li><a href="#orge58e37b">1.2. Example 1 - Shared Library libtest.dll - DLLs on Windows</a>
 <ul>
-<li><a href="#org5123d50">1.2.1. Overview</a></li>
-<li><a href="#orgf5915dd">1.2.2. Header macros</a></li>
-<li><a href="#org98c7c54">1.2.3. Namespace Linalg</a></li>
-<li><a href="#org6f03791">1.2.4. C-interface of Namespace Linalg</a></li>
-<li><a href="#org9e30a1c">1.2.5. Non-polymorphic Class - SampleClass</a></li>
-<li><a href="#org01456a7">1.2.6. C-interface for SampleClass</a></li>
-<li><a href="#org6c16c5c">1.2.7. Polymorphic class InterfaceClass</a></li>
-<li><a href="#org41b1cb2">1.2.8. DLL startup function DLLMain</a></li>
-<li><a href="#orga54867a">1.2.9. DLL entry point for run32dll.exe</a></li>
-<li><a href="#org3861ad8">1.2.10. C++ Client program - client1.cpp</a></li>
-<li><a href="#orge359a67">1.2.11. View symbols exported by the DLL</a></li>
+<li><a href="#orgb11d36d">1.2.1. Overview</a></li>
+<li><a href="#orgda2bf0f">1.2.2. Header macros</a></li>
+<li><a href="#org41e29a6">1.2.3. Namespace Linalg</a></li>
+<li><a href="#org78d9567">1.2.4. C-interface of Namespace Linalg</a></li>
+<li><a href="#org7433306">1.2.5. Non-polymorphic Class - SampleClass</a></li>
+<li><a href="#org3052e8a">1.2.6. C-interface for SampleClass</a></li>
+<li><a href="#orgeecc00d">1.2.7. Polymorphic class InterfaceClass</a></li>
+<li><a href="#org01780ea">1.2.8. DLL startup function DLLMain</a></li>
+<li><a href="#org7a0b26e">1.2.9. DLL entry point for run32dll.exe</a></li>
+<li><a href="#orgcfcfa93">1.2.10. C++ Client program - client1.cpp</a></li>
+<li><a href="#orgaf07420">1.2.11. Python Client Code</a></li>
+<li><a href="#org4213688">1.2.12. View symbols exported by the DLL</a></li>
 </ul>
 </li>
-<li><a href="#org9b2b47d">1.3. <span class="todo TODO">TODO</span> Shared Libraries on Linux</a></li>
+<li><a href="#orgff08d12">1.3. <span class="todo TODO">TODO</span> Shared Libraries on Linux</a></li>
 </ul>
 </li>
 </ul>
@@ -267,12 +268,12 @@ for the JavaScript code in this tag.
 <li><a href='index.html'>Index</a></li>
 </ul>
 
-<div id="outline-container-org6560204" class="outline-2">
-<h2 id="org6560204"><span class="section-number-2">1</span> Shared Libraries - Binary Components</h2>
+<div id="outline-container-orgc8fbe13" class="outline-2">
+<h2 id="orgc8fbe13"><span class="section-number-2">1</span> Shared Libraries - Binary Components</h2>
 <div class="outline-text-2" id="text-1">
 </div>
-<div id="outline-container-org20d6133" class="outline-3">
-<h3 id="org20d6133"><span class="section-number-3">1.1</span> Overview</h3>
+<div id="outline-container-org7677636" class="outline-3">
+<h3 id="org7677636"><span class="section-number-3">1.1</span> Overview</h3>
 <div class="outline-text-3" id="text-1-1">
 <p>
 Shared libraries are compiled object-code exporting functions, data
@@ -374,6 +375,7 @@ in Java it is possible to use C-functions from shared libraries using
 the JNI (Java Native Interface) or JNA, which is easier to use.
 </p>
 
+
 <p>
 Note: 
 </p>
@@ -381,15 +383,112 @@ Note:
 <li>Shared libraries are specific to a particular operating system and
 are not part of C++ standard.</li>
 </ul>
+
+<p>
+Use Cases and advantages: 
+</p>
+
+<ul class="org-ul">
+<li>Multiple programs can reuse the same library reducing disk space.</li>
+
+<li>Faster compilation once the shared library is compiled.</li>
+
+<li>Changes in the library such as security fixes, updates and new
+features may not require client programs recompilation if the ABI is
+not broken.</li>
+
+<li><span class="underline">Better for security updates</span>. For instance, if a program is
+statically compiled with open-ssl library, a program
+recompilation would be required to update the library to a new
+version with security fixes for some vulnerability. It could even
+be a greater security problem and waste of space, if all
+application depending on open-ssl were statically liked with this
+library. If a program uses the open-sll shared library, the library
+can be updated just by replacing a file and the program it will not
+need to be recompiled as long as there are no ABI breaking changes.</li>
+
+<li><span class="underline">Plugin system</span> =&gt; The main program can contain an interface class
+called IInterface and load its implementations from shared
+libraries plugins. The implementation classes provided by the
+plugins or shared library files allow the program to be updated and
+extended at runtime without recompilation.</li>
+
+<li><span class="underline">Cross language interoperability</span> =&gt; Functions using C-linkage can be
+called from any high level programming language with foreign
+function interface such as Python with ctypes library. C++
+functions and classes cannot be called due to name mangling and
+compiler ABI issues. The workaround to this problem is to create a
+C-interface or functions with C-linkage for classes, functions and
+namespaces. Instances of a class can be passed around as opaque
+pointers (void*).</li>
+</ul>
+
+<p>
+Problems: 
+</p>
+
+<ul class="org-ul">
+<li>Due to C++ lack of standard <span class="underline">ABI Application Binary Interface</span>,
+classes, STL containers, functions without C-linkage and namespaces
+may not be reusable with a client program compiled with different
+compiler than used to build the library. However, even in this
+case, there is still the benefit of faster compilation time if the
+shared library and the client application are part of the same
+project.
+<ul class="org-ul">
+<li>TL;DR =&gt; Classes, STL and functions without C-linkage of shared
+library cannot be used with a different compiler than the one
+used to build the DLL.</li>
+</ul></li>
+
+<li>Cross-compiling interoperability - The only way to ensure that a
+shared library can work with all compilers is by using a functions
+with C-linkage (functions with extern "C") annotation and creating
+C-linkage functions wrappers to classes, STL containers and
+classes.</li>
+
+<li>Classes can be made compatible among different compilers by using
+an interface class, a class with only pure virtual member
+functions, using only compatible types in the methods signature or
+declaration, therefore it cannot use STL container types such as
+std::string or std::vector. However, each implementation of an
+interface class can use STL containers internally.</li>
+</ul>
+
+
+<p>
+<b>MSDN Documentation</b>
+</p>
+
+<ul class="org-ul">
+<li><a href="https://docs.microsoft.com/en-us/cpp/build/exporting-cpp-functions-for-use-in-c-language-executables?view=vs-2017">Exporting C++ Functions for Use in C-Language Executables</a></li>
+
+<li><a href="https://docs.microsoft.com/en-us/cpp/build/exporting-c-functions-for-use-in-c-or-cpp-language-executables?view=vs-2017">Exporting C Functions for Use in C or C++ Language Executables</a></li>
+</ul>
+
+
+<p>
+<b>Further Reading</b>
+</p>
+
+<ul class="org-ul">
+<li><a href="http://moppi.inside.org/demopaja/sdk_help/dll_functions.html">Creating the DLL functions</a></li>
+
+<li><a href="https://www.codeproject.com/Articles/28969//Articles/28969/HowTo-Export-C-classes-from-a-DLL">HowTo: Export C++ classes from a DLL - CodeProject</a></li>
+
+<li><a href="http://gernotklingler.com/blog/creating-using-shared-libraries-different-compilers-different-operating-systems/">Creating and using shared libraries with different compilers on different operating systems - Gernot.Klingler</a></li>
+
+<li><a href="http://bigbang.waterlin.org/bang/using-python-ctypes-to-link-cpp-library/">The Big Bang on Reading Busy » Blog Archive » Using Python ctypes to link C/C++ library</a></li>
+</ul>
 </div>
 </div>
 
-<div id="outline-container-orga687e95" class="outline-3">
-<h3 id="orga687e95"><span class="section-number-3">1.2</span> Example 1 - Shared Library libtest.dll - DLLs on Windows</h3>
+<div id="outline-container-orge58e37b" class="outline-3">
+<h3 id="orge58e37b"><span class="section-number-3">1.2</span> Example 1 - Shared Library libtest.dll - DLLs on Windows</h3>
 <div class="outline-text-3" id="text-1-2">
 </div>
-<div id="outline-container-org5123d50" class="outline-4">
-<h4 id="org5123d50"><span class="section-number-4">1.2.1</span> Overview</h4>
+<div id="outline-container-orgb11d36d" class="outline-4">
+<h4 id="orgb11d36d"><span class="section-number-4">1.2.1</span> Overview</h4>
 <div class="outline-text-4" id="text-1-2-1">
 <p>
 <b>Source:</b>
@@ -466,8 +565,8 @@ C++ Client program
 </div>
 </div>
 
-<div id="outline-container-orgf5915dd" class="outline-4">
-<h4 id="orgf5915dd"><span class="section-number-4">1.2.2</span> Header macros</h4>
+<div id="outline-container-orgda2bf0f" class="outline-4">
+<h4 id="orgda2bf0f"><span class="section-number-4">1.2.2</span> Header macros</h4>
 <div class="outline-text-4" id="text-1-2-2">
 <p>
 Sources:
@@ -511,8 +610,8 @@ necessary to export the library functions and classes.
 </div>
 </div>
 
-<div id="outline-container-org98c7c54" class="outline-4">
-<h4 id="org98c7c54"><span class="section-number-4">1.2.3</span> Namespace Linalg</h4>
+<div id="outline-container-org41e29a6" class="outline-4">
+<h4 id="org41e29a6"><span class="section-number-4">1.2.3</span> Namespace Linalg</h4>
 <div class="outline-text-4" id="text-1-2-3">
 <p>
 <b>Functions of Namespace Linalg</b> 
@@ -606,8 +705,8 @@ features.
 </div>
 </div>
 
-<div id="outline-container-org6f03791" class="outline-4">
-<h4 id="org6f03791"><span class="section-number-4">1.2.4</span> C-interface of Namespace Linalg</h4>
+<div id="outline-container-org78d9567" class="outline-4">
+<h4 id="org78d9567"><span class="section-number-4">1.2.4</span> C-interface of Namespace Linalg</h4>
 <div class="outline-text-4" id="text-1-2-4">
 <p>
 <b>C-interface of Namespace Linalg</b> 
@@ -707,9 +806,8 @@ from C programs or foreign function interfaces.
 
 
 
-
-<div id="outline-container-org9e30a1c" class="outline-4">
-<h4 id="org9e30a1c"><span class="section-number-4">1.2.5</span> Non-polymorphic Class - SampleClass</h4>
+<div id="outline-container-org7433306" class="outline-4">
+<h4 id="org7433306"><span class="section-number-4">1.2.5</span> Non-polymorphic Class - SampleClass</h4>
 <div class="outline-text-4" id="text-1-2-5">
 <ul class="org-ul">
 <li>File: <b>testlib.hpp</b> =&gt; Class declaration.</li>
@@ -784,8 +882,8 @@ pointers (void* pointers).
 </div>
 </div>
 
-<div id="outline-container-org01456a7" class="outline-4">
-<h4 id="org01456a7"><span class="section-number-4">1.2.6</span> C-interface for SampleClass</h4>
+<div id="outline-container-org3052e8a" class="outline-4">
+<h4 id="org3052e8a"><span class="section-number-4">1.2.6</span> C-interface for SampleClass</h4>
 <div class="outline-text-4" id="text-1-2-6">
 <ul class="org-ul">
 <li>File: <b>testlib.hpp</b> =&gt; Functions declarations.</li>
@@ -864,8 +962,8 @@ testlib_SampleClass_getName<span class="org-rainbow-delimiters-depth-1">(</span>
 </div>
 </div>
 
-<div id="outline-container-org6c16c5c" class="outline-4">
-<h4 id="org6c16c5c"><span class="section-number-4">1.2.7</span> Polymorphic class InterfaceClass</h4>
+<div id="outline-container-orgeecc00d" class="outline-4">
+<h4 id="orgeecc00d"><span class="section-number-4">1.2.7</span> Polymorphic class InterfaceClass</h4>
 <div class="outline-text-4" id="text-1-2-7">
 <ul class="org-ul">
 <li>File: <b>testlib.hpp</b> =&gt; Class declaration.</li>
@@ -1035,8 +1133,8 @@ EXPORT_C <span class="org-type">void</span> <span class="org-function-name">test
 </div>
 </div>
 </div>
-<div id="outline-container-org41b1cb2" class="outline-4">
-<h4 id="org41b1cb2"><span class="section-number-4">1.2.8</span> DLL startup function DLLMain</h4>
+<div id="outline-container-org01780ea" class="outline-4">
+<h4 id="org01780ea"><span class="section-number-4">1.2.8</span> DLL startup function DLLMain</h4>
 <div class="outline-text-4" id="text-1-2-8">
 <p>
 When a Windows shared library is loaded at compile-time or at runtime
@@ -1144,8 +1242,8 @@ testlib.cpp and not allow them to be used from anywhere else.
 </div>
 </div>
 </div>
-<div id="outline-container-orga54867a" class="outline-4">
-<h4 id="orga54867a"><span class="section-number-4">1.2.9</span> DLL entry point for run32dll.exe</h4>
+<div id="outline-container-org7a0b26e" class="outline-4">
+<h4 id="org7a0b26e"><span class="section-number-4">1.2.9</span> DLL entry point for run32dll.exe</h4>
 <div class="outline-text-4" id="text-1-2-9">
 <p>
 This function is a DLL entry point for the Windows program
@@ -1183,8 +1281,8 @@ the DLL in the system or creating some entry in Windows' registry.
 </div>
 </div>
 </div>
-<div id="outline-container-org3861ad8" class="outline-4">
-<h4 id="org3861ad8"><span class="section-number-4">1.2.10</span> C++ Client program - client1.cpp</h4>
+<div id="outline-container-orgcfcfa93" class="outline-4">
+<h4 id="orgcfcfa93"><span class="section-number-4">1.2.10</span> C++ Client program - client1.cpp</h4>
 <div class="outline-text-4" id="text-1-2-10">
 <ul class="org-ul">
 <li>File: <a href="src/dlls/example-windows1/client1.cpp">file:src/dlls/example-windows1/client1.cpp</a></li>
@@ -1475,10 +1573,370 @@ InterfaceClass.
 
 
 
-
-<div id="outline-container-orge359a67" class="outline-4">
-<h4 id="orge359a67"><span class="section-number-4">1.2.11</span> View symbols exported by the DLL</h4>
+<div id="outline-container-orgaf07420" class="outline-4">
+<h4 id="orgaf07420"><span class="section-number-4">1.2.11</span> Python Client Code</h4>
 <div class="outline-text-4" id="text-1-2-11">
+<p>
+Functions with C-linkage can be called by Python using the ctypes
+library. The following code presents how it can be done: 
+</p>
+
+<p>
+<b>Table for C types / Python ctypes conversion</b>
+</p>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">C-type</th>
+<th scope="col" class="org-left">Python C-types</th>
+<th scope="col" class="org-left">C-type</th>
+<th scope="col" class="org-left">&#xa0;</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">char</td>
+<td class="org-left">ctypes.c_char</td>
+<td class="org-left">char*</td>
+<td class="org-left">ctypes.POINTER(ctypes.c_char)</td>
+</tr>
+
+<tr>
+<td class="org-left">int</td>
+<td class="org-left">ctypes.c_int</td>
+<td class="org-left">int*</td>
+<td class="org-left">ctypes.POINTER(ctypes.c_int)</td>
+</tr>
+
+<tr>
+<td class="org-left">size_t</td>
+<td class="org-left">ctypes.c_int</td>
+<td class="org-left">-</td>
+<td class="org-left">&#xa0;</td>
+</tr>
+
+<tr>
+<td class="org-left">double</td>
+<td class="org-left">ctypes.c_double</td>
+<td class="org-left">double*</td>
+<td class="org-left">ctypes.POINTER(ctypes.c_double)</td>
+</tr>
+
+<tr>
+<td class="org-left">void</td>
+<td class="org-left">None</td>
+<td class="org-left">void*</td>
+<td class="org-left">ctypes.c_void_p</td>
+</tr>
+
+<tr>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">&#xa0;</td>
+</tr>
+
+<tr>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">&#xa0;</td>
+</tr>
+</tbody>
+</table>
+
+<ul class="org-ul">
+<li>Get a Python string from a <span class="underline">const char* ptr</span> or <span class="underline">char* ptr</span>, use ctypes.string_at(ptr).</li>
+<li>Pass a python string to an API with const char*
+(ctypes.POINTER(ctypes.c_char)) as argument, use Function("string-argument".encode('utf-8'))</li>
+</ul>
+
+<p>
+Python C-types documentation and further reading: 
+</p>
+
+<ul class="org-ul">
+<li><a href="https://docs.python.org/3/library/ctypes.html">ctypes — A foreign function library for Python — Python 3.7.2rc1 documentation</a></li>
+<li><a href="https://dbader.org/blog/python-ctypes-tutorial">Extending Python With C Libraries and the “ctypes” Module – dbader.org</a></li>
+<li><a href="https://www.programcreek.com/python/example/1108/ctypes.CDLL">ctypes.CDLL Python Example</a></li>
+<li><a href="https://blogs.msdn.microsoft.com/yizhang/2018/01/20/calling-c-functions-from-python-part-1-using-ctypes/">Calling C functions from Python – part 1 – using ctypes – Yi Zhang's MSDN Blog</a></li>
+<li><a href="https://en.wikibooks.org/wiki/Python_Programming/Extending_with_ctypes">Python Programming/Extending with ctypes - Wikibooks, open books for an open world</a></li>
+<li><a href="https://pgi-jcns.fz-juelich.de/portal/pages/using-c-from-python.html">Using C from Python: How to create a ctypes wrapper - Scientific IT-Systems</a></li>
+</ul>
+
+<p>
+<b>Load the library:</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-python"><span class="org-function-name">C</span>:\Users\archbox\Desktop\experiments
+&#955; <span class="org-string">"C:\Users\archbox\Miniconda3\pkgs\python-3.6.5-h0c2934d_0\python"</span>
+Python 3.6.5 |Anaconda, Inc.| (default, Mar 29 2018, 13:32:41) [MSC v.1900 64 bit (AMD64)] on win32
+Type <span class="org-string">"help"</span>, <span class="org-string">"copyright"</span>, <span class="org-string">"credits"</span> <span class="org-keyword">or</span> <span class="org-string">"license"</span> <span class="org-keyword">for</span> more information.
+
+&gt;&gt;&gt; <span class="org-keyword">import</span> ctypes
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">This messages is print by the DLLMain function </span>
+&gt;&gt;&gt; <span class="org-variable-name">lib</span> = ctypes.cdll.LoadLibrary(<span class="org-string">"testlib.dll"</span>)
+ [StaticObject] =&gt; Initialize DLL
+<span class="org-function-name">testlib.cpp</span>:39: &lt;DllMain&gt; DLL Loaded into the <span class="org-variable-name">process</span> =&gt; <span class="org-variable-name">PID</span> = 4280
+<span class="org-function-name">testlib.cpp</span>:45: &lt;DllMain&gt; DLL attached to process.
+&gt;&gt;&gt; testlib.cpp:39: &lt;DllMain&gt; DLL Loaded into the <span class="org-variable-name">process</span> =&gt; <span class="org-variable-name">PID</span> = 4280
+<span class="org-function-name">testlib.cpp</span>:53: &lt;DllMain&gt; DLL detached to thread.
+</pre>
+</div>
+
+<p>
+Check whether exported functions with C-linkage exists: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-python">&gt;&gt;&gt; lib.testlib_vectorD_make0
+&lt;_FuncPtr <span class="org-builtin">object</span> at 0x0000021BFCAFF388&gt;
+
+&gt;&gt;&gt; lib.testlib_vectorD_Linalg_printVector
+&lt;_FuncPtr <span class="org-builtin">object</span> at 0x0000021BFCAFF458&gt;
+&gt;&gt;&gt;
+
+&gt;&gt;&gt; lib.testlib_vectorD_delete
+&lt;_FuncPtr <span class="org-builtin">object</span> at 0x0000021BFCAFF528&gt;
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">Function which does not exist.</span>
+&gt;&gt;&gt; lib.testlib_InterfaceClass_do_not_exist
+Traceback (most recent call last):
+  File <span class="org-string">"&lt;stdin&gt;"</span>, line 1, <span class="org-keyword">in</span> &lt;module&gt;
+  File <span class="org-string">"C:\Users\archbox\Miniconda3\pkgs\python-3.6.5-h0c2934d_0\lib\ctypes\__init__.py"</span>, line 361, <span class="org-keyword">in</span> __getattr__
+    <span class="org-variable-name">func</span> = <span class="org-keyword">self</span>.__getitem__(name)
+  File <span class="org-string">"C:\Users\archbox\Miniconda3\pkgs\python-3.6.5-h0c2934d_0\lib\ctypes\__init__.py"</span>, line 366, <span class="org-keyword">in</span> __getitem__
+    <span class="org-variable-name">func</span> = <span class="org-keyword">self</span>._FuncPtr((name_or_ordinal, <span class="org-keyword">self</span>))
+<span class="org-function-name">AttributeError</span>: function <span class="org-string">'testlib_InterfaceClass_do_not_exist'</span> <span class="org-keyword">not</span> found
+</pre>
+</div>
+
+<p>
+<b>Load std::vector&lt;double&gt; and Linalg namespace wrapper functions</b>
+</p>
+
+<p>
+Set up the std::vector&lt;double&gt; functions to be imported.
+</p>
+
+<ul class="org-ul">
+<li>Note: hVectorD =&gt; Handle for std::vector&lt;double&gt; is the same as
+void* or an opaque pointer.</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-python"><span class="org-comment-delimiter"># </span><span class="org-comment">Funciton: hVectorD testlib_vectorD_make0(size_t n, double x)</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">Set function arguments</span>
+<span class="org-variable-name">lib.testlib_vectorD_make0.argtypes</span> = [ctypes.c_int, ctypes.c_double]
+<span class="org-comment-delimiter"># </span><span class="org-comment">Set return type </span>
+<span class="org-variable-name">lib.testlib_vectorD_make0.restype</span>  = ctypes.c_void_p
+
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">void testlib_vectorD_Linalg_printVector(const char* name, hVectorD hv)</span>
+<span class="org-variable-name">lib.testlib_vectorD_Linalg_printVector.argtypes</span> = [ctypes.POINTER(ctypes.c_char), ctypes.c_void_p ]
+<span class="org-variable-name">lib.testlib_vectorD_Linalg_printVector.restype</span> = <span class="org-constant">None</span> 
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">Set vector elements hv[n] = x</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">void testlib_vectorD_set(hVectorD hv, size_t n, double x)</span>
+<span class="org-variable-name">lib.testlib_vectorD_set.argtypes</span> = [ctypes.c_void_p, ctypes.c_int, ctypes.c_double]
+<span class="org-variable-name">lib.testlib_vectorD_set.restype</span>  = <span class="org-constant">None</span>
+</pre>
+</div>
+
+<p>
+Testing C-interface functions for std::vector&lt;double&gt;: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-python"><span class="org-comment-delimiter"># </span><span class="org-comment">Creating a std::vector&lt;double&gt; with 4 elements equal to 3.0 </span>
+&gt;&gt;&gt; <span class="org-variable-name">vec1</span> = lib.testlib_vectorD_make0(4, 3.0)
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">This number is the address contained in the the opaque pointer,</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">it cannot be used directly. </span>
+&gt;&gt;&gt; vec1
+2319184200912
+&gt;&gt;&gt;
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">========== Modify vector elements ======== #</span>
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">Printarray2 the wrapped std::vector&lt;double&gt;</span>
+&gt;&gt;&gt; lib.testlib_vectorD_Linalg_printVector(<span class="org-string">"vec1"</span>.encode(<span class="org-string">'utf-8'</span>), vec1)
+<span class="org-variable-name">vec1</span> = [4]( 3, 3, 3, 3,  )
+&gt;&gt;&gt;
+
+&gt;&gt;&gt; lib.testlib_vectorD_set(vec1, 0, 5.0)
+&gt;&gt;&gt; lib.testlib_vectorD_set(vec1, 1, 10.5)
+&gt;&gt;&gt; lib.testlib_vectorD_set(vec1, 2, 4.78)
+
+&gt;&gt;&gt; lib.testlib_vectorD_Linalg_printVector(<span class="org-string">"vec1"</span>.encode(<span class="org-string">'utf-8'</span>), vec1)
+<span class="org-variable-name">vec1</span> = [4]( 5, 10.5, 4.78, 3,  )
+</pre>
+</div>
+
+<p>
+Compute vector Euclidian norm: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-python"><span class="org-comment-delimiter"># </span><span class="org-comment">Wrapper for function </span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">double Linalg::norm(const std::vector&lt;double&gt;&amp; xs)</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">double testlib_vectorD_Linalg_norm(hVectorD hv)</span>
+<span class="org-variable-name">lib.testlib_vectorD_Linalg_norm.argtypes</span> = [ ctypes.c_void_p ]
+<span class="org-variable-name">lib.testlib_vectorD_Linalg_norm.restype</span>  = ctypes.c_double
+
+&gt;&gt;&gt; lib.testlib_vectorD_Linalg_printVector(<span class="org-string">"vec1"</span>.encode(<span class="org-string">'utf-8'</span>), vec1)
+<span class="org-variable-name">vec1</span> = [4]( 5, 10.5, 4.78, 3,  )
+
+&gt;&gt;&gt; lib.testlib_vectorD_Linalg_norm(vec1)
+12.926654632966722
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">Check if calculations are right </span>
+&gt;&gt;&gt; math.sqrt(5 * 5 + 10.5 * 10.5 + 4.78 * 4.78 + 3 * 3)
+12.926654632966722
+&gt;&gt;&gt;
+</pre>
+</div>
+
+<p>
+Delete vector vec1 using its destructor function: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-python"><span class="org-comment-delimiter"># </span><span class="org-comment">Function: void testlib_vectorD_delete(hVectorD hv)</span>
+<span class="org-variable-name">lib.testlib_vectorD_delete.argtypes</span> = [ ctypes.c_void_p ]
+<span class="org-variable-name">lib.testlib_vectorD_delete.restype</span> = <span class="org-constant">None</span>
+
+&gt;&gt;&gt; lib.testlib_vectorD_delete(vec1)
+</pre>
+</div>
+
+<p>
+<b>Load wrapper function for interface class InterfaceClass</b>
+</p>
+
+<p>
+Load factory function: 
+</p>
+<ul class="org-ul">
+<li>void* teslib_InterfaceClass_factory(const char* class_id)</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-python"><span class="org-comment-delimiter"># </span><span class="org-comment">InterfaceClass* teslib_InterfaceClass_factory(const char* class_id)</span>
+<span class="org-variable-name">lib.teslib_InterfaceClass_factory.argtypes</span> = [ ctypes.POINTER(ctypes.c_char) ]
+<span class="org-variable-name">lib.teslib_InterfaceClass_factory.restype</span>  = ctypes.c_void_p
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">const char* testlib_InterfaceClass_getID(InterfaceClass* hinst)</span>
+<span class="org-variable-name">lib.testlib_InterfaceClass_getID.argtypes</span> = [ ctypes.c_void_p ]
+<span class="org-variable-name">lib.testlib_InterfaceClass_getID.restype</span>  = ctypes.POINTER(ctypes.c_char)
+</pre>
+</div>
+
+<p>
+Creating class instances and testing member function C-wrappers:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-python">&gt;&gt;&gt; <span class="org-variable-name">hinstA</span> = lib.teslib_InterfaceClass_factory(<span class="org-string">"ImplementationA"</span>.encode(<span class="org-string">'utf-8'</span>))
+&gt;&gt;&gt; hinstA
+2319184196864
+&gt;&gt;&gt;
+
+&gt;&gt;&gt; <span class="org-variable-name">hinstB</span> = lib.teslib_InterfaceClass_factory(<span class="org-string">"ImplementationB"</span>.encode(<span class="org-string">'utf-8'</span>))
+&gt;&gt;&gt; hinstB
+2319184198016
+
+&gt;&gt;&gt; <span class="org-variable-name">s1</span> = lib.testlib_InterfaceClass_getID(hinstA)
+&gt;&gt;&gt; s1
+&lt;ctypes.LP_c_char <span class="org-builtin">object</span> at 0x0000021BFBBF14C8&gt;
+&gt;&gt;&gt; ctypes.string_at(s1)
+b<span class="org-string">'ImplementationA'</span>
+&gt;&gt;&gt;
+
+&gt;&gt;&gt; <span class="org-variable-name">s2</span> = lib.testlib_InterfaceClass_getID(hinstB)
+&gt;&gt;&gt; ctypes.string_at(s2)
+b<span class="org-string">'ImplementationB'</span>
+
+&gt;&gt;&gt; ctypes.string_at(lib.testlib_InterfaceClass_getID(hinstB))
+b<span class="org-string">'ImplementationB'</span>
+&gt;&gt;&gt;
+</pre>
+</div>
+
+<p>
+Load more C-wrappers for member function of class InterfaceClass:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-python"><span class="org-comment-delimiter"># </span><span class="org-comment">const char* testlib_InterfaceClass_getName(InterfaceClass* hinst) </span>
+<span class="org-variable-name">lib.testlib_InterfaceClass_getName.argtypes</span> = [ ctypes.c_void_p ]
+<span class="org-variable-name">lib.testlib_InterfaceClass_getName.restype</span>  = ctypes.POINTER(ctypes.c_char)
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">void testlib_InterfaceClass_setName(InterfaceClass* hinst, const char* name)</span>
+&gt;&gt;&gt; <span class="org-variable-name">lib.testlib_InterfaceClass_setName.argtypes</span> = [ ctypes.c_void_p, ctypes.POINTER(ctypes.c_char) ]
+&gt;&gt;&gt; <span class="org-variable-name">lib.testlib_InterfaceClass_setName.restype</span> = <span class="org-constant">None</span>
+
+&gt;&gt;&gt; lib.testlib_InterfaceClass_getName(hinstA)
+&lt;ctypes.LP_c_char <span class="org-builtin">object</span> at 0x0000021BFBBF1548&gt;
+
+&gt;&gt;&gt; ctypes.string_at(lib.testlib_InterfaceClass_getName(hinstA))
+b<span class="org-string">'Unammed-A'</span>
+
+&gt;&gt;&gt; ctypes.string_at(lib.testlib_InterfaceClass_getName(hinstB))
+b<span class="org-string">'Unammed-B'</span>
+
+&gt;&gt;&gt; lib.testlib_InterfaceClass_setName(hinstA, <span class="org-string">"Instance-ClassA1"</span>.encode(<span class="org-string">'utf-8'</span>))
+&gt;&gt;&gt; ctypes.string_at(lib.testlib_InterfaceClass_getName(hinstA))
+b<span class="org-string">'Instance-ClassA1'</span>
+
+&gt;&gt;&gt; lib.testlib_InterfaceClass_setName(hinstB, <span class="org-string">"Instance-B1"</span>.encode(<span class="org-string">'utf-8'</span>))
+&gt;&gt;&gt; ctypes.string_at(lib.testlib_InterfaceClass_getName(hinstB))
+b<span class="org-string">'Instance-B1'</span>
+
+</pre>
+</div>
+
+<p>
+Load C-functions wrappers for the InterfaceClass destructor and
+dispose both instances hinstA and hinstB: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-python"><span class="org-comment-delimiter"># </span><span class="org-comment">Destructor function:</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">void testlib_InterfaceClass_delete(InterfaceClass* hinst)</span>
+&gt;&gt;&gt; <span class="org-variable-name">lib.testlib_InterfaceClass_delete.argtypes</span> = [ ctypes.c_void_p ]
+&gt;&gt;&gt; <span class="org-variable-name">lib.testlib_InterfaceClass_delete.restype</span>  = <span class="org-constant">None</span>
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">Dispose class hinstA, delete this object </span>
+&gt;&gt;&gt; lib.testlib_InterfaceClass_delete(hinstA)
+ [INFO] ImplementationA <span class="org-variable-name">deleted</span> =&gt; <span class="org-variable-name">name</span> = Instance-ClassA1 ; <span class="org-builtin">type</span> = ImplementationA
+
+&gt;&gt;&gt; lib.testlib_InterfaceClass_delete(hinstB)
+ [INFO] ImplementationB <span class="org-variable-name">deleted</span> =&gt; <span class="org-variable-name">name</span> = Instance-B1 ; <span class="org-builtin">type</span> = ImplementationB
+</pre>
+</div>
+</div>
+</div>
+
+
+
+<div id="outline-container-org4213688" class="outline-4">
+<h4 id="org4213688"><span class="section-number-4">1.2.12</span> View symbols exported by the DLL</h4>
+<div class="outline-text-4" id="text-1-2-12">
 <p>
 <b>Location of dumpbin tool</b>
 </p>
@@ -1645,13 +2103,13 @@ It is possible to demangle those symbols with the tool - <a href="https://demang
 </div>
 </div>
 
-<div id="outline-container-org9b2b47d" class="outline-3">
-<h3 id="org9b2b47d"><span class="section-number-3">1.3</span> <span class="todo TODO">TODO</span> Shared Libraries on Linux</h3>
+<div id="outline-container-orgff08d12" class="outline-3">
+<h3 id="orgff08d12"><span class="section-number-3">1.3</span> <span class="todo TODO">TODO</span> Shared Libraries on Linux</h3>
 </div>
 </div>
 </div>
 <div id="postamble" class="status">
-<p class="date">Created: 2018-12-16 Sun 23:51</p>
+<p class="date">Created: 2018-12-17 Mon 08:34</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
 </body>
