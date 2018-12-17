@@ -250,7 +250,6 @@ from C programs or foreign function interfaces.
 
 
 
-
 *** Non-polymorphic Class - SampleClass 
 
   + File: *libtest.hpp* => Class declaration. 
@@ -534,5 +533,122 @@ program using Mingw/GCC against this DLL built with MSVC.
       return hinst->getName();
   }
 #+END_SRC
+*** DLL startup function DLLMain 
 
+When a Windows shared library is loaded at compile-time or at runtime
+by some process, the function DLLMain is always invoked, it is similar
+to the function main() from an executable. 
+
+Note: logging statements with printf, std::cout, std::cerr will not
+printed if the DLL is loaded by some non-console program, a program
+compiled to the _window subsystem_. Therefore, the easiest way to log is
+to use the OutputDebugString function which output can viewed by the
+DebugView sysinternal tool. 
+
+
+ + File: *libtest.cpp* => DLL main function. 
+
+#+BEGIN_SRC cpp 
+  /** - DLL Entry point - main function of DLL which is executed when
+      the DLL is loaded by some process.
+   ,*/
+  extern "C" __declspec(dllexport)
+  BOOL APIENTRY DllMain (HINSTANCE hInst, DWORD reason, LPVOID lpReserved)
+  {
+     std::string text =
+             std::string("DLL Loaded into the process => PID = ")
+             + std::to_string(::GetCurrentProcessId());
+     WindbgTrace(text);
+     DbgTrace(text);	   	
+      switch (reason)
+      {
+      case DLL_PROCESS_ATTACH:
+          WindbgTrace("DLL attached to process");
+          DbgTrace("DLL attached to process.");			
+        break;
+      case DLL_PROCESS_DETACH:
+          WindbgTrace("=> DLL detached.");
+          DbgTrace("=> DLL attached");
+        break;
+      case DLL_THREAD_ATTACH:
+          WindbgTrace("DLL attached to thread");
+          DbgTrace("DLL detached to thread.");
+          break;
+      case DLL_THREAD_DETACH:
+          WindbgTrace("DLL detached from thread");
+          DbgTrace("DLL detached from thread.");
+        break;
+      }
+
+    return TRUE;
+  }
+#+END_SRC
+
+Another more portable way to peform some way action when the DLL is
+loaded by a process or unloaded is to use a static object. The startup
+task is executed int the object's constructor and the finalization
+task, which happens when the process ends, is executed at object's
+destructor. 
+
+ + File: *libtest.cpp* => Static Object for replacing DLLMain 
+
+The class _StaticObject and a static instance of it is defined within
+an anonymous namespace to make them private to the compilation unit
+libtest.cpp and not allow them to be used from anywhere else. 
+
+#+BEGIN_SRC cpp 
+  // Class private to this compilation unit - cannot be accessed from
+  // any other file
+  namespace {
+     class _StaticObject{		
+     public:
+         using Action = std::function<void ()>;
+         Action m_end;
+
+         _StaticObject(Action init, Action end)
+                 :  m_end(end)
+         {
+                 init();
+         }
+         ~_StaticObject(){ m_end(); }
+     };
+
+     // Static object for replacing DLLMain 
+     auto initDLL = _StaticObject(
+        []{
+              std::cout << " [StaticObject] => Initialize DLL"
+                         << std::endl;						
+        },
+        []{	
+             std::cout << " [StaticObject] => Shutdown DLL"
+                       << std::endl;								
+        });
+  }
+#+END_SRC
+*** DLL entry point for run32dll.exe 
+
+This function is a DLL entry point for the Windows program
+rundll32.exe which can execute this function with: 
+
+#+BEGIN_SRC cpp 
+ $ rundll32.exe testlib.dll,entryPoint1
+ $ rundll32.exe testlib.dll,entryPoint1 arg0 arg1 arg2 ... argn 
+#+END_SRC
+
+When the DLL testlib.dll is run with run32dll calling the function
+entryPoint1, it will display a message box. 
+
+Note: It is an optional function which could be used for installing
+the DLL in the system or creating some entry in Windows' registry. 
+
+ + File: *libtest.cpp*
+
+#+BEGIN_SRC cpp 
+  extern "C" __declspec(dllexport)
+  void entryPoint1(HWND hwn, HINSTANCE hinst, LPSTR cmdLine, int nCmdShow){  
+       DbgDisp(cmdLine);
+       OutputDebugString("Rudll32 called entryPoint1()");
+       MessageBoxA(NULL, "DLL ENTRY POINT", "Entry point 1", 0);
+  }
+#+END_SRC
 ** Shared Libraries on Linux 
