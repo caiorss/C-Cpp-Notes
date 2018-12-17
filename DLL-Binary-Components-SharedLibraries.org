@@ -62,40 +62,33 @@ Sample Client C++ Program:
 
  + File: [[file:dll-shared-library/example-windows1/client1.cpp][file:dll-shared-library/example-windows1/client1.cpp]]  
 
- *Compile the DLL libtest.dll and client program with MSVC*
+ *Compile the DLL libtest.dll and client program with MSVC* 
 
-Shared Library
+Shared Library 
 
-#+BEGIN_SRC cpp
+#+BEGIN_SRC cpp 
  $ cl.exe testlib.cpp /EHsc /LD /nologo user32.lib
 #+END_SRC
 
 C++ Client program (client code)
 
-#+BEGIN_SRC cpp
+#+BEGIN_SRC cpp 
  $ cl.exe /EHsc client.cpp /Fe:out.exe testlib.lib && out.exe
 #+END_SRC
 
- *Compile the DLL libtest.dll and client program with Mingw/GCC*
+ *Compile the DLL libtest.dll and client program with Mingw/GCC* 
 
-Shared Library
+Shared Library 
 
-#+BEGIN_SRC cpp
+#+BEGIN_SRC cpp 
  $ g++ testlib.cpp -o testlib.dll -g -shared -std=c++14 -Wall
 #+END_SRC
 
-C++ Client program
+C++ Client program 
 
-#+BEGIN_SRC cpp
+#+BEGIN_SRC cpp 
  $ g++ client.cpp -o client.exe -g -std=c++14 testlib.dll -Wall
 #+END_SRC
-
- *Compile the client program with MingW/GCC*
-
-#+BEGIN_SRC cpp
-
-#+END_SRC
-
 
 *** Header macros 
 
@@ -686,4 +679,251 @@ the DLL in the system or creating some entry in Windows' registry.
        MessageBoxA(NULL, "DLL ENTRY POINT", "Entry point 1", 0);
   }
 #+END_SRC
+*** C++ Client program - client1.cpp 
+
+ + File: [[file:dll-shared-library/example-windows1/client1.cpp][file:dll-shared-library/example-windows1/client1.cpp]]  
+
+ *File client1.cpp*
+
+Includes: 
+
+ + Note: (#include "testlib.hpp") a header file between quotes,
+   indicates to the compiler that the header is in the same directory
+   as the source file client1.cpp.
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <ostream>
+  #include <vector>
+  #include <string>
+
+  #include "testlib.hpp"
+#+END_SRC
+
+Declaration of functions with C-linkages not declarated in the header
+testlib.hpp
+
+#+BEGIN_SRC cpp 
+  extern "C" hVectorD testlib_vectorD_make0(size_t n, double);
+  extern "C" hVectorD testlib_vectorD_make1(size_t n, double array []);
+  extern "C" void testlib_vectorD_delete(hVectorD hv);
+#+END_SRC
+
+Main function - Experiment 1 and Experiment 2:
+
+#+BEGIN_SRC cpp 
+  #ifndef DISABLE
+  std::cout << "\n=== EXPERIMENT 1 ===> Import C++ functions from DLL" << std::endl;
+
+  DbgTrace("Main process starts here.");
+  std::vector<double> xs{1.0, 2.0, 3.0, 4.0, 5.0};
+  std::cout << " => Linalg::norm(xs) " << Linalg::norm(xs) << std::endl;
+  std::cout << "=> xs = "; Linalg::printVector(std::cout, xs); std::cout << std::endl;
+
+  std::cout << "=== EXPERIMENT 2 ===> Import class from DLL" << std::endl;
+  auto cls = SampleClass("Dummy");
+  cls.set(100);
+  std::cout << "cls.getName() = " << cls.getName() << std::endl;
+  std::cout << "    cls.get() = " << cls.get() << std::endl;
+  #endif // -- eof DISABLE flag
+#+END_SRC
+
+Main Function - Experiment 3 
+
+#+BEGIN_SRC cpp
+  //=========>> Load functions and classes using C-interface ==============//
+
+  std::cout << "\n== EPERIMENT 3 ===> Import C-functions from DLL - C-interface" << std::endl;
+
+  double arr [] = {1, 2, 3, 4, 5};
+  hVectorD v1 = testlib_vectorD_make1(5, arr);
+  testlib_vectorD_Linalg_printVector("v1", v1);
+  std::cout << "norm(v1) = " << testlib_vectorD_Linalg_norm(v1) << std::endl;
+
+  testlib_vectorD_delete(v1);
+#+END_SRC
+
+Main Functions - Experiment 4 
+
+#+BEGIN_SRC cpp 
+  std::cout << "\n== EPERIMENT 4 ===> Non-polymorphic class with C-interface " << std::endl;
+
+  hSampleClass hcls = testlib_SampleClass_make1("[EXPERIMENT4]ClassHandle-OOP-C-API");
+  std::cout << "[EXPERIMENT 4] hcls.getName() = " << testlib_SampleClass_getName(hcls) << std::endl;
+  testlib_SampleClass_set(hcls, 100);
+  std::cout << "[EXPERIMENT 4] hcls.get()     = " << testlib_SampleClass_get(hcls) << std::endl;
+  testlib_SampleClass_set(hcls, 200);
+  std::cout << "[EXPERIMENT 4] hcls.get()     = " << testlib_SampleClass_get(hcls) << std::endl;
+
+  testlib_SampleClass_delete(hcls);	
+#+END_SRC
+
+Main Functions - Experiment 5 
+
+#+BEGIN_SRC cpp 
+  std::cout << "\n== EPERIMENT 5 ===> Load polymorphic classes from DLL " << std::endl;
+
+  InterfaceClass* hinstA = teslib_InterfaceClass_factory("ImplementationA");
+  InterfaceClass* hinstB = teslib_InterfaceClass_factory("ImplementationB");
+
+  std::cout << " => hinstA->getID() = " << hinstA->getID() << std::endl;
+  std::cout << " => hinstA->getID() = " << hinstB->getID() << std::endl;
+  hinstA->setName("ClassA-implA");
+  hinstB->setName("ClassB-implB");
+  std::cout << " => hinstA->getName() = " << hinstA->getID() << std::endl;
+  std::cout << " => hinstB->getName() = " << hinstB->getID() << std::endl;
+
+  // Note: If delete is used directly to delete hinstA and hinstB,
+  // a segmentatin fault will happen whenc compiling with Mingw/GCC
+  testlib_InterfaceClass_delete(hinstA);
+  testlib_InterfaceClass_delete(hinstB);
+
+  std::cout << " [INFO] After deleting instances" << std::endl;
+
+  DbgTrace("Program ended OK.");
+#+END_SRC
+
+ *Compile and run client code with MSVC*
+
+Note: Both the DLL and the client code are compiled with MSVC-2017 64
+bits target.
+
+#+BEGIN_SRC sh 
+  $ cl.exe /EHsc client.cpp /nologo /Fe:client1.exe testlib.lib && client1.exe
+
+  # Output: 
+  client.cpp
+     Creating library client1.lib and object client1.exp
+   [StaticObject] => Initialize DLL
+  testlib.cpp:39: <DllMain> DLL Loaded into the process => PID = 1112
+  testlib.cpp:45: <DllMain> DLL attached to process.
+
+  === EXPERIMENT 1 ===> Import C++ functions from DLL
+  client.cpp:33: <main> Main process starts here.
+   => Linalg::norm(xs) 7.4162
+  => xs = [5]( 1, 2, 3, 4, 5,  )
+  === EXPERIMENT 2 ===> Import class from DLL
+   Instance created with name = Dummy
+   Counter set to value = 100
+  cls.getName() = Dummy
+      cls.get() = 100
+
+  == EPERIMENT 3 ===> Import C-functions from DLL - C-interface
+  v1 = [5]( 1, 2, 3, 4, 5,  )
+  norm(v1) = 7.4162
+
+  == EPERIMENT 4 ===> Non-polymorphic class with C-interface 
+   Instance created with name = [EXPERIMENT4]ClassHandle-OOP-C-API
+  [EXPERIMENT 4] hcls.getName() = [EXPERIMENT4]ClassHandle-OOP-C-API
+   Counter set to value = 100
+  [EXPERIMENT 4] hcls.get()     = 100
+   Counter set to value = 200
+  [EXPERIMENT 4] hcls.get()     = 200
+  testlib.cpp:159: <SampleClass::~SampleClass> SampleClass => name = [EXPERIMENT4]ClassHandle-OOP-C-API deleted
+
+  == EPERIMENT 5 ===> Load polymorphic classes from DLL 
+   => hinstA->getID() = ImplementationA
+   => hinstA->getID() = ImplementationB
+   => hinstA->getName() = ImplementationA
+   => hinstB->getName() = ImplementationB
+   [INFO] ImplementationA deleted => name = ClassA-implA ; type = ImplementationA
+   [INFO] ImplementationB deleted => name = ClassB-implB ; type = ImplementationB
+   [INFO] After deleting instances
+  client.cpp:87: <main> Program ended OK.
+  testlib.cpp:159: <SampleClass::~SampleClass> SampleClass => name = Dummy deleted
+  testlib.cpp:39: <DllMain> DLL Loaded into the process => PID = 1112
+  testlib.cpp:49: <DllMain> => DLL attached
+   [StaticObject] => Shutdown DLL
+
+#+END_SRC
+
+ *[FAILURE] ABI - Issue - Compile with Mingw client1.cpp against testlib.dll built with MSVC*
+
+The client code is compiled with Mingw and the library was built with
+MSVC-2017 for 64 bits target.
+
+Build and run client [FAILURE]:
+
+#+BEGIN_SRC cpp 
+  $ g++ client1.cpp -g -o client1-gcc.exe -std=c++14 testlib.dll  && client1-gcc.exe
+  C:\Users\archbox\AppData\Local\Temp\cckNg9eZ.o: In function `main':
+  client1.cpp:35: undefined reference to `Linalg::norm(std::vector<double, std::allocator<double> > const&)'
+  client1.cpp:36: undefined reference to `Linalg::printVector(std::ostream&, std::vector<double, std::allocator<double> >&)'
+  client1.cpp:39: undefined reference to `SampleClass::SampleClass(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&)'
+  client1.cpp:40: undefined reference to `SampleClass::set(int)'
+  client1.cpp:41: undefined reference to `SampleClass::getName[abi:cxx11]() const'
+  client1.cpp:42: undefined reference to `SampleClass::get()'
+  client1.cpp:39: undefined reference to `SampleClass::~SampleClass()'
+  client1.cpp:39: undefined reference to `SampleClass::~SampleClass()'
+  collect2.exe: error: ld returned 1 exit status
+  Compilation exited abnormally with code 1 at Sun Dec 16 17:41:47
+#+END_SRC
+
+The compilation fails because C++ does not have a standard and stable
+ABI - Application Binary Interface, as a result, it is not possible to
+use an object-code (here - any type of compiled code) built by a
+different compiler than the current one. The ABI comprises the name
+mangling schema or name decoration schema which is compiler-dependent,
+padding, class memory layout and so on. In addition to ABI issues, the
+STL - Standard Template Library implementations may not be compatible
+and also not be the same across different compilers. 
+
+The only way to ensure that a DLL can work with all possible compilers
+is to use a functions with C-linkage (extern "C") with opaque pointers
+(void*) for passing around classes and wrapped STL containers. Classes
+can be used by different compilers, only if they are interface classes
+(classes with only pure virtual functions) containing only
+C-compatible types in the declaration. 
+
+
+ *Compile with Mingw client1.cpp against testlib.dll built with MSVC*
+
+The compilation works when compiling with the custom flag -DDISABLE.
+The directive _#ifndef DISABLE ... #endif_ removes all usages of the
+namespace Linalg and the class SampleClass. This flag makes main the
+function use only functions with C-linkage and the interface class
+InterfaceClass.
+
+#+BEGIN_SRC cpp 
+$ g++ client.cpp -g -o client-gcc.exe -std=c++14 testlib.dll -DDISABLE   && client-gcc.exe
+
+   [StaticObject] => Initialize DLL
+  testlib.cpp:39: <DllMain> DLL Loaded into the process => PID = 5724
+  testlib.cpp:45: <DllMain> DLL attached to process.
+
+  == EPERIMENT 3 ===> Import C-functions from DLL - C-interface
+  v1 = [5]( 1, 2, 3, 4, 5,  )
+  norm(v1) = 7.4162
+
+  == EPERIMENT 4 ===> Non-polymorphic class with C-interface 
+   Instance created with name = [EXPERIMENT4]ClassHandle-OOP-C-API
+  [EXPERIMENT 4] hcls.getName() = [EXPERIMENT4]ClassHandle-OOP-C-API
+   Counter set to value = 100
+  [EXPERIMENT 4] hcls.get()     = 100
+   Counter set to value = 200
+  [EXPERIMENT 4] hcls.get()     = 200
+  testlib.cpp:159: <SampleClass::~SampleClass> SampleClass => name = [EXPERIMENT4]ClassHandle-OOP-C-API deleted
+
+  == EPERIMENT 5 ===> Load polymorphic classes from DLL 
+   => hinstA->getID() = ImplementationA
+   => hinstA->getID() = ImplementationB
+   => hinstA->getName() = ImplementationA
+   => hinstB->getName() = ImplementationB
+   [INFO] ImplementationA deleted => name = ClassA-implA ; type = ImplementationA
+   [INFO] ImplementationB deleted => name = ClassB-implB ; type = ImplementationB
+   [INFO] After deleting instances
+  client.cpp:87: <main> Program ended OK.
+  testlib.cpp:39: <DllMain> DLL Loaded into the process => PID = 5724
+  testlib.cpp:49: <DllMain> => DLL attached
+   [StaticObject] => Shutdown DLL
+#+END_SRC
+
+
+
+
+
+
+
+
+
 ** Shared Libraries on Linux 
