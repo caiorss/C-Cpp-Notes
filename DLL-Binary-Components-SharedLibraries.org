@@ -44,9 +44,89 @@ library; in C# C-functions can be consumed using the P-invoke API and
 in Java it is possible to use C-functions from shared libraries using
 the JNI (Java Native Interface) or JNA, which is easier to use.
 
+
 Note: 
  + Shared libraries are specific to a particular operating system and
    are not part of C++ standard.
+
+Use Cases and advantages: 
+
+ + Multiple programs can reuse the same library reducing disk space. 
+
+ + Faster compilation once the shared library is compiled.
+
+ + Changes in the library such as security fixes, updates and new
+   features may not require client programs recompilation if the ABI is
+   not broken.
+
+ + _Better for security updates_. For instance, if a program is
+   statically compiled with open-ssl library, a program
+   recompilation would be required to update the library to a new
+   version with security fixes for some vulnerability. It could even
+   be a greater security problem and waste of space, if all
+   application depending on open-ssl were statically liked with this
+   library. If a program uses the open-sll shared library, the library
+   can be updated just by replacing a file and the program it will not
+   need to be recompiled as long as there are no ABI breaking changes.
+
+ + _Plugin system_ => The main program can contain an interface class
+   called IInterface and load its implementations from shared
+   libraries plugins. The implementation classes provided by the
+   plugins or shared library files allow the program to be updated and
+   extended at runtime without recompilation.
+
+ + _Cross language interoperability_ => Functions using C-linkage can be
+   called from any high level programming language with foreign
+   function interface such as Python with ctypes library. C++
+   functions and classes cannot be called due to name mangling and
+   compiler ABI issues. The workaround to this problem is to create a
+   C-interface or functions with C-linkage for classes, functions and
+   namespaces. Instances of a class can be passed around as opaque
+   pointers (void*). 
+
+Problems: 
+
+ + Due to C++ lack of standard _ABI Application Binary Interface_,
+   classes, STL containers, functions without C-linkage and namespaces
+   may not be reusable with a client program compiled with different
+   compiler than used to build the library. However, even in this
+   case, there is still the benefit of faster compilation time if the
+   shared library and the client application are part of the same
+   project.
+   + TL;DR => Classes, STL and functions without C-linkage of shared
+     library cannot be used with a different compiler than the one
+     used to build the DLL.
+
+ + Cross-compiling interoperability - The only way to ensure that a
+   shared library can work with all compilers is by using a functions
+   with C-linkage (functions with extern "C") annotation and creating
+   C-linkage functions wrappers to classes, STL containers and
+   classes.
+
+ + Classes can be made compatible among different compilers by using
+   an interface class, a class with only pure virtual member
+   functions, using only compatible types in the methods signature or
+   declaration, therefore it cannot use STL container types such as
+   std::string or std::vector. However, each implementation of an
+   interface class can use STL containers internally. 
+
+
+ *MSDN Documentation*
+
+ + [[https://docs.microsoft.com/en-us/cpp/build/exporting-cpp-functions-for-use-in-c-language-executables?view=vs-2017][Exporting C++ Functions for Use in C-Language Executables]]
+
+ + [[https://docs.microsoft.com/en-us/cpp/build/exporting-c-functions-for-use-in-c-or-cpp-language-executables?view=vs-2017][Exporting C Functions for Use in C or C++ Language Executables]]
+
+
+ *Further Reading*
+
+ + [[http://moppi.inside.org/demopaja/sdk_help/dll_functions.html][Creating the DLL functions]]
+
+ + [[https://www.codeproject.com/Articles/28969/%2FArticles%2F28969%2FHowTo-Export-C-classes-from-a-DLL][HowTo: Export C++ classes from a DLL - CodeProject]]
+ 
+ + [[http://gernotklingler.com/blog/creating-using-shared-libraries-different-compilers-different-operating-systems/][Creating and using shared libraries with different compilers on different operating systems - Gernot.Klingler]]
+
+ + [[http://bigbang.waterlin.org/bang/using-python-ctypes-to-link-cpp-library/][The Big Bang on Reading Busy » Blog Archive » Using Python ctypes to link C/C++ library]]
 
 ** Example 1 - Shared Library libtest.dll - DLLs on Windows
 *** Overview 
@@ -277,7 +357,6 @@ from C programs or foreign function interfaces.
     ... ... ...     ... ... ...     ... ... ... 
 
 #+END_SRC
-
 
 
 
@@ -920,7 +999,6 @@ $ g++ client.cpp -g -o client-gcc.exe -std=c++14 testlib.dll -DDISABLE   && clie
   testlib.cpp:49: <DllMain> => DLL attached
    [StaticObject] => Shutdown DLL
 #+END_SRC
-
 
 
 
