@@ -281,7 +281,6 @@ from C programs or foreign function interfaces.
 
 
 
-
 *** Non-polymorphic Class - SampleClass 
 
   + File: *testlib.hpp* => Class declaration. 
@@ -928,5 +927,139 @@ $ g++ client.cpp -g -o client-gcc.exe -std=c++14 testlib.dll -DDISABLE   && clie
 
 
 
+*** View symbols exported by the DLL 
+
+ *Location of dumpbin tool*
+
+The symbols exported by the DLL can viewed with the dumpbin tool
+available from the MSVC developer console.
+
+#+BEGIN_SRC sh 
+  $ where dumpbin.exe
+  C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Tools\MSVC\14.12.25827\bin\Hostx64\x64\dumpbin.exe
+#+END_SRC
+
+ *Show DLL exported symbols*
+
+#+BEGIN_SRC sh 
+ $ dumpbin.exe /exports testlib.dll 
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC txt 
+  Microsoft (R) COFF/PE Dumper Version 14.12.25835.0
+  Copyright (C) Microsoft Corporation.  All rights reserved.
+
+
+  Dump of file testlib.dll
+
+  File Type: DLL
+
+    Section contains the following exports for testlib.dll
+
+      00000000 characteristics
+      FFFFFFFF time date stamp
+          0.00 version
+             1 ordinal base
+            31 number of functions
+            31 number of names
+
+      ordinal hint RVA      name
+
+            1    0 00005C50 ??0SampleClass@@QEAA@AEBV0@@Z
+            2    1 00001650 ??0SampleClass@@QEAA@AEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z
+            3    2 000015E0 ??0SampleClass@@QEAA@XZ
+            4    3 000016E0 ??1SampleClass@@QEAA@XZ
+            5    4 00007280 ??4SampleClass@@QEAAAEAV0@AEBV0@@Z
+            6    5 00001880 ?get@SampleClass@@QEAAHXZ
+            7    6 00001830 ?getName@SampleClass@@QEBA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@XZ
+            8    7 00001370 ?linTransform@Linalg@@YA?AV?$vector@NV?$allocator@N@std@@@std@@NNAEAV23@@Z
+            9    8 000012D0 ?norm@Linalg@@YANAEBV?$vector@NV?$allocator@N@std@@@std@@@Z
+           10    9 00001480 ?printVector@Linalg@@YAAEAV?$basic_ostream@DU?$char_traits@D@std@@@std@@AEAV23@AEAV?$vector@NV?$allocator@N@std@@@3@@Z
+           11    A 000018A0 ?set@SampleClass@@QEAAXH@Z
+           12    B 00001D50 DllMain
+           13    C 00002720 entryPoint1
+           14    D 00002800 main
+           15    E 00001B10 teslib_InterfaceClass_factory
+           16    F 00001C60 testlib_InterfaceClass_delete
+           17   10 00001CC0 testlib_InterfaceClass_getID
+           18   11 00001D20 testlib_InterfaceClass_getName
+           19   12 00001CF0 testlib_InterfaceClass_setName
+           20   13 00001A10 testlib_SampleClass_delete
+           21   14 00001A60 testlib_SampleClass_get
+           22   15 00001AB0 testlib_SampleClass_getName
+           23   16 00001900 testlib_SampleClass_make0
+           24   17 00001950 testlib_SampleClass_make1
+           25   18 00001A80 testlib_SampleClass_set
+           26   19 00001560 testlib_vectorD_Linalg_norm
+           27   1A 00001580 testlib_vectorD_Linalg_printVector
+           28   1B 000026D0 testlib_vectorD_delete
+           29   1C 00002590 testlib_vectorD_make0
+           30   1D 00002610 testlib_vectorD_make1
+           31   1E 00002690 testlib_vectorD_set
+
+    Summary
+
+          3000 .data
+          4000 .pdata
+         18000 .rdata
+          1000 .reloc
+         2F000 .text
+#+END_SRC
+
+Note that: 
+
+ +  Functions with C-linkage are not mangled, their symbols match
+   their names, for instance:
+
+#+BEGIN_SRC sh 
+    15    E 00001B10 teslib_InterfaceClass_factory
+   16    F 00001C60 testlib_InterfaceClass_delete
+   17   10 00001CC0 testlib_InterfaceClass_getID
+   18   11 00001D20 testlib_InterfaceClass_getName
+   19   12 00001CF0 testlib_InterfaceClass_setName
+   20   13 00001A10 testlib_SampleClass_delete
+   21   14 00001A60 testlib_SampleClass_get
+   22   15 00001AB0 testlib_SampleClass_getName
+#+END_SRC
+
+ + Functions, member functions, namespaces and everything without
+   C-linkage are mangled, the compiler generate an unique name for the
+   generated symbols: 
+
+#+BEGIN_SRC sh 
+   1    0 00005C50 ??0SampleClass@@QEAA@AEBV0@@Z
+   2    1 00001650 ??0SampleClass@@QEAA@AEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z
+   3    2 000015E0 ??0SampleClass@@QEAA@XZ
+   4    3 000016E0 ??1SampleClass@@QEAA@XZ
+   5    4 00007280 ??4SampleClass@@QEAAAEAV0@AEBV0@@Z
+   6    5 00001880 ?get@SampleClass@@QEAAHXZ
+   7    6 00001830 ?getName@SampleClass@@QEBA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@XZ
+   8    7 00001370 ?linTransform@Linalg@@YA?AV?$vector@NV?$allocator@N@std@@@std@@NNAEAV23@@Z
+   9    8 000012D0 ?norm@Linalg@@YANAEBV?$vector@NV?$allocator@N@std@@@std@@@Z
+  10    9 00001480 ?printVector@Linalg@@YAAEAV?$basic_ostream@DU?$char_traits@D@std@@@std@@AEAV23@AEAV?$vector@NV?$allocator@N@std@@@3@@Z
+  11    A 000018A0 ?set@SampleClass@@QEAAXH@Z
+#+END_SRC
+
+It is possible to demangle those symbols with the tool - https://demangler.com/
+
+ + Symbol: ??0SampleClass@@QEAA@AEBV0@@Z demangled:
+
+#+BEGIN_SRC sh
+  public: __cdecl SampleClass::SampleClass(class SampleClass const & __ptr64) __ptr64
+#+END_SRC
+
+ + Symbol: ?get@SampleClass@@QEAAHXZ demangled:
+
+#+BEGIN_SRC sh
+  public: int __cdecl SampleClass::get(void) __ptr64
+#+END_SRC
+
+ + Symbol: ?linTransform@Linalg@@YA?AV?$vector@NV?$allocator@N@std@@@std@@NNAEAV23@@Z demangled:
+
+#+BEGIN_SRC cpp 
+  class std::vector<double,class std::allocator<double> > __cdecl Linalg::linTransform(double,double,class std::vector<double,class std::allocator<double> > & __ptr64)
+#+END_SRC
 
 ** TODO Shared Libraries on Linux 
