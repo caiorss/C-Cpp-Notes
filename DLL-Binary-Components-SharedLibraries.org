@@ -142,6 +142,10 @@ Sample Client C++ Program:
 
  + File: [[file:src/dlls/example-windows1/client1.cpp][file:src/dlls/example-windows1/client1.cpp]]  
 
+Sample Python 3 Client code: (Python3 module wrapper library)
+
+ + File: [[file:src/dlls/example-windows1/testlib.py][file:src/dlls/example-windows1/testlib.py]]
+
 GIST - Better for online view: 
 
  + [[https://gist.github.com/caiorss/2bba4c50866d9467aaa8c7792b337f71][Gisthub]]
@@ -1005,7 +1009,7 @@ $ g++ client.cpp -g -o client-gcc.exe -std=c++14 testlib.dll -DDISABLE   && clie
 
 
 
-*** Python Client Code 
+*** Load DLL in Python3 REPL 
 
 Functions with C-linkage can be called by Python using the ctypes
 library. The following code presents how it can be done: 
@@ -1257,6 +1261,258 @@ Exit python3 REPL:
     [StaticObject] => Shutdown DLL
 #+END_SRC
 
+*** Python 3 Client Code - Wrapper Module 
+
+All the boilerplate code required to load the shared library
+testlib.dll can be eliminated by crafting a python module file and
+wrapper classes.
+
+Source:
+ + File: [[file:src/dlls/example-windows1/testlib.py][file:src/dlls/example-windows1/testlib.py]]
+ + Gist: [[https://gist.github.com/caiorss/2bba4c50866d9467aaa8c7792b337f71][Gisthub]]
+
+
+ *Module Initialization:*
+
+ + File: testlib.py
+
+The function _config initializes the wrapper module, loading the DLL -
+share library testlib.dll into the current Python3 interpreter process
+and setting up the C-functions (functions exported with C-linkage,
+without name mangling) exported by the library.
+
+#+BEGIN_SRC python 
+  import ctypes
+
+  # Library handler 
+  _lib = ctypes.cdll.LoadLibrary("testlib.dll")
+
+  # Startup ctypes FFI - Foreign Function Interface 
+  def _config():
+      print("Intializing library")
+      # ======= std::vector<double> and Linalg:: namespace ==========##
+
+      # hVectorD testlib_vectorD_make0(size_t n, double x)
+      _lib.testlib_vectorD_make0.argtypes = [ctypes.c_int, ctypes.c_double]
+      _lib.testlib_vectorD_make0.restype  = ctypes.c_void_p
+
+      # hVectorD testlib_vectorD_make1(size_t n, double array [])
+      _lib.testlib_vectorD_make1.argtypes = [ctypes.c_int, ctypes.POINTER(ctypes.c_double)]
+      _lib.testlib_vectorD_make1.restype  = ctypes.c_void_p    
+
+      # void testlib_vectorD_Linalg_printVector(const char* name, hVectorD hv)
+      _lib.testlib_vectorD_Linalg_printVector.argtypes = [ctypes.POINTER(ctypes.c_char), ctypes.c_void_p ]
+      _lib.testlib_vectorD_Linalg_printVector.restype = None
+       ... ....    ... ....    ... ....    ... ....    ... ....    ... .... 
+
+  # Initializae module.
+  _config()
+#+END_SRC
+
+The class VectorD is a wrapper class for the STL class
+std::vector<double> and the namespace Linalg containing linear algebra
+functions. 
+
+#+BEGIN_SRC python 
+  class VectorD:
+      def __init__(self, handle):
+          self.hnd = ctypes.c_void_p(handle)
+          self.name = "std::vector<double> vx"
+
+      @classmethod
+      def fromValue(cls, size, x):
+          return VectorD(_lib.testlib_vectorD_make0(size, x))
+
+      @classmethod
+      def fromArray(cls, array):
+          carray_size_n = ctypes.c_double * len(array)
+          return VectorD(_lib.testlib_vectorD_make1(len(array), carray_size_n(*array)))
+
+      # Destructor 
+      def __del__(self):
+          print(" [TRACE] - Vector disposed - C++ Destructor invoked Ok.")
+          _lib.testlib_vectorD_delete(self.hnd)
+
+      def setName(self, name):
+          self.name = name
+
+      # Display vector 
+      def disp(self):
+          _lib.testlib_vectorD_Linalg_printVector(self.name.encode('utf-8'), self.hnd)
+
+      # Set element at nth position 
+      def set(self, idx, x):
+          _lib.testlib_vectorD_set(self.hnd, idx, x)
+
+      def norm(self):
+          return _lib.testlib_vectorD_Linalg_norm(self.hnd)
+#+END_SRC
+
+The class CPPInterfaceClass is a wrapper for the C++ interface class
+InterfaceClass exported by the DLL. The python wrapper class contains
+factory methods .factory, .makeA for loading the implementation class
+ImplementationA and the method .makeB for loading the implementation
+ImplementationB. 
+
+#+BEGIN_SRC python 
+  # Proxy for C++ Interface class in the shared library 
+  class CPPInterfaceClass:
+      # Constructor 
+      def __init__(self, handle):
+          self.hnd = ctypes.c_void_p(handle)
+
+      # Destructor 
+      def __del__(self):
+          # Call C++ destructor
+          # print(" [__del__] => self.hnd = " + str(self.hnd))
+          _lib.testlib_InterfaceClass_delete(self.hnd)
+
+      @classmethod
+      def factory(cls, classID):
+          return CPPInterfaceClass(_lib.teslib_InterfaceClass_factory(classID.encode('utf-8')))
+
+      @classmethod
+      def makeA(cls):              
+          "Instantiate the class ImplementationA from the DLL."
+          return CPPInterfaceClass.factory("ImplementationA")
+
+      @classmethod
+      def makeB(cls):              
+          "Instantiate the class ImplementationB from the DLL."
+          return CPPInterfaceClass.factory("ImplementationB")
+
+      def getType(self):
+          return ctypes.string_at(_lib.testlib_InterfaceClass_getID(self.hnd)).decode('utf-8')
+
+      def getName(self):
+          return ctypes.string_at(_lib.testlib_InterfaceClass_getName(self.hnd)).decode('utf-8')
+
+      def setName(self, name):
+          _lib.testlib_InterfaceClass_setName(self.hnd, name.encode('utf-8'))
+
+      # String representation 
+      def __str__(self):
+          s   = "CInterfaceClass ; type = " + self.getType()
+          s +=  " - name =  " + self.getName() + "\n"
+          return s
+
+      # Make class printable in the REPL
+      def __repr__(self):
+          return self.__str__()    
+#+END_SRC
+
+Usage in Python3 REPL:
+
+ + Import module 
+
+#+BEGIN_SRC python 
+  $ C:/Users/archbox/Miniconda3/pkgs/python-3.6.5-h0c2934d_0/python
+  Python 3.6.5 |Anaconda, Inc.| (default, Mar 29 2018, 13:32:41) [MSC v.1900 64 bit (AMD64)] on win32
+  Type "help", "copyright", "credits" or "license" for more information.
+  >>>
+
+  >>> from testlib import VectorD
+   [StaticObject] => Initialize DLL
+  testlib.cpp:39: <DllMain> DLL Loaded into the process => PID = 5776
+  testlib.cpp:45: <DllMain> DLL attached to process.
+  Intializing library
+  Library initialized OK.
+
+  >>> from testlib import CPPInterfaceClass
+#+END_SRC
+
+ + Testing class VectorD - wrapper for std::vector<double> 
+
+#+BEGIN_SRC python
+  >>> v1 = VectorD.fromValue(5, 3.0)
+  >>> v1.disp()
+  std::vector<double> vx = [5]( 3, 3, 3, 3, 3,  )
+
+  >>> v1.setName("v1")
+  >>> v1.disp()
+  v1 = [5]( 3, 3, 3, 3, 3,  )
+
+  >>> v1.norm()
+  6.708203932499369
+
+  >>> v1.set(0, 5)
+  >>> v1.set(1, 4.5)
+  >>> v1.set(2, 9.8)
+  >>> v1.set(3, 18.4)
+
+  >>> v1.disp()
+  v1 = [5]( 5, 4.5, 9.8, 18.4, 3,  )
+  >>>
+  >>> v1.norm()
+  22.10995251012539
+
+  >>> v1 = 100
+   [TRACE] - Vector disposed - C++ Destructor invoked Ok.
+
+  >>> v2 = VectorD.fromArray([4.0, 10.25, 9.6, 3, 10, 6, 15])
+  >>> v2.disp()
+  std::vector<doubl> vx = [7]( 4, 10.25, 9.6, 3, 10, 6, 15,  )
+
+  >>> v2.norm()
+  24.15
+
+  >>> v2.set(0, 100)
+  >>> v2.set(1, 200)
+
+  >>> v2.disp()
+  std::vector<double> vx = [7]( 100, 200, 9.6, 3, 10, 6, 15,  )
+
+  >>> v2.norm()
+  224.63784186997523
+  >>>
+
+#+END_SRC
+
+ + Testing class CPPInterfaceClass, proxy for C++ classes
+   InterfaceClass, ImplementationA and ImplementationB.
+
+#+BEGIN_SRC python 
+   >>> from testlib import CPPInterfaceClass
+
+   # ======== Load ImplementationA  ============== # 
+   #
+   >>> a = CPPInterfaceClass.makeA()
+   >>> a
+   CInterfaceClass ; type = ImplementationA - name =  Unammed-A
+
+   >>> a.getType()
+   'ImplementationA'
+   >>> a.getName()
+   'Unammed-A'
+   >>> a.setName("Instance-of-ImplA")
+   >>> a
+   CInterfaceClass ; type = ImplementationA - name =  Instance-of-ImplA
+
+   # ======== Load ImplementationB  ============== # 
+   #
+   >>> b = CPPInterfaceClass.makeB()
+   >>> b
+   CInterfaceClass ; type = ImplementationB - name =  Unammed-B
+
+   >>> b.setName("Instance-of-class-B")
+   >>> b.getName()
+   'Instance-of-class-B'
+   >>>
+   >>> b.getType()
+   'ImplementationB'
+
+#+END_SRC
+
+ + Exit REPL. 
+
+#+BEGIN_SRC python 
+  >>> exit()
+   [TRACE] - Vector disposed - C++ Destructor invoked Ok.
+   [INFO] ImplementationB deleted => name = Instance-of-class-B ; type = ImplementationB
+  testlib.cpp:39: <DllMain> DLL Loaded into the process => PID = 5776
+  testlib.cpp:49: <DllMain> => DLL attached
+   [StaticObject] => Shutdown DLL
+#+END_SRC
 *** View symbols exported by the DLL 
 
  *Location of dumpbin tool*
