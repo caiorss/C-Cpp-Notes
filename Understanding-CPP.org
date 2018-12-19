@@ -2518,6 +2518,153 @@ char*) or a C-null terminated character array.
    literal1 literal 2 world  C++  strings : No such file or directory
   >> 
 #+END_SRC
+*** C++14 String literals and C++11 Raw string literals 
+
+ *C++14 String literals* 
+
+In C++, it is not possible to concatenate or compare string literals
+directly using only operators without any function such as
+strcmp. Example CLING REPL:
+
+Documentation: [[https://en.cppreference.com/w/cpp/string/basic_string/operator""s][operator""s - cppreference.com]]
+
+#+BEGIN_SRC cpp 
+   $ ~/opt/cling_2018-09-16_fedora27/bin/cling -std=c++17
+
+   #include <iostream>
+   #include <string>
+
+   [cling]$ std::string s = "concatenate " + "string"
+   input_line_8:2:33: error: invalid operands to binary expression ('const char *' and 'const char *')
+    std::string s = "concatenate " + "string"
+                    ~~~~~~~~~~~~~~ ^ ~~~~~~~~
+   [cling]$ 
+
+   [cling]$ "hello" == "hello"
+   input_line_15:2:10: warning: result of comparison against a string literal is unspecified
+         (use strncmp instead) [-Wstring-compare]
+    "hello" == "hello"
+    ~~~~~~~ ^
+#+END_SRC
+
+C++14 provides string literal suffix operator (s) which can simplify
+string concatenation and comparison: 
+
+#+BEGIN_SRC cpp 
+   $ ~/opt/cling_2018-09-16_fedora27/bin/cling -std=c++17
+   #include <iostream>
+   #include <string>
+   using namespace std::string_literals;
+
+   [cling]$ auto a_std_string = "this is an std::string object"s
+   "this is an std::string object"
+
+   [cling]$ typeid(a_std_string) == typeid(std::string)
+   (bool) true
+
+   // Instead of: 
+   [cling]$ s = std::string("concatenate ") + "string"
+   "concatenate string"
+
+   // The string literal operator (s) makes this code shorter:
+   [cling]$ auto s2 = "concatenate "s + "string"
+   "concatenate string"
+#+END_SRC
+
+String literal comparison can be peformed in two ways, one is using
+the function strcmp and other one is by wrapping the first literal
+with the constructor std::string(const char*). The last form of
+comparison can be simplified using the suffix operator (s):
+
+#+BEGIN_SRC cpp 
+  #include <cstring>
+
+  const char* str1 = "c++ ASM";
+  const char* str2 = "Fortran";
+
+  [cling]$ std::string("c++ ASM") == str1
+  (bool) true
+
+  [cling]$ std::string("c++ ASM") == str2
+  (bool) false
+
+  // === Shorter alternative ===========//
+  [cling]$ "c++ ASM"s == str1
+  (bool) true
+  [cling]$ "c++ ASM"s == str2
+  (bool) false
+  [cling]$ 
+#+END_SRC
+
+ *C++11 Raw string literals*
+
+Raw string literals allows writing multi line strings, regular
+expressions (regex) without boilerplate and not escaped strings with
+backward slashes such as Windows paths.
+
+Form: 
+
+#+BEGIN_SRC cpp 
+  R"(<some string ...>)"
+#+END_SRC
+
+Example: 
+
+ + file: string-literal.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+
+  int main()
+  {
+       using namespace std::string_literals;
+       std::cout << std::boolalpha;
+       std::cerr << std::boolalpha;
+       // Raw string literals does not need escaping. 
+       std::string raw1 = R"(C:\Users\nobody\tests\path)";	
+       auto raw2 = R"(C:\Users\nobody\tests\path)"s;
+
+       const char* raw3 = R"(
+  This is a multiline 
+  string
+  path = C:\Users\somebody\else\docs
+  End line \\\\
+      )";
+       std::cout << "raw 1 = " << raw1 << std::endl;		
+       std::cout << "raw 2 = "	<< raw2 << std::endl;
+       std::cout << "raw 3 = " << raw3 << std::endl;
+       std::cout << "typeid(raw2) == typeid(std::string) ? "
+                         << (typeid(raw2) == typeid(std::string))
+                         << std::endl;
+
+       return EXIT_SUCCESS;
+  }
+
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC sh 
+   $ clang++ -std=c++1z -g -Wall -Wextra string-literals.cpp -o string-literals.bin 
+   $ ./string-literals.bin
+   raw 1 = C:\Users\nobody\tests\path
+   raw 2 = C:\Users\nobody\tests\path
+   raw 3 = 
+      This is a multiline 
+      string
+      path = C:\Users\somebody\else\docs
+   End line \\\\
+
+   typeid(raw2) == typeid(std::string) ? true
+#+END_SRC
+
+Without the raw string literal operator the Windows path raw1 would
+have to be written in following way. 
+
+#+BEGIN_SRC cpp
+   std::string raw1 = "C:\\Users\\nobody\\tests\\path";	
+#+END_SRC
 
 *** Numerical Parsers Functions (C++11)
 
@@ -3468,6 +3615,7 @@ Testing:
   >> parseCSVRowGeneric<std::string>(lineD, ':')
   { "Apple", "oranges", "juice", "rice" }
 #+END_SRC
+
 ** C++11 - Uniform Initialization
 
 The C++11 uniform initialization feature allows classes, STL
