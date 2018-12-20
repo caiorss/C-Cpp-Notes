@@ -1,0 +1,263 @@
+#+INCLUDE: theme/style.org 
+#+TITLE: CPP / C++ - Embed Resources Into Executables 
+#+DESCRIPTION: cpp/c++ code examples and demonstrations.
+#+STARTUP: content 
+
+
+* Add resources to executable 
+** Overview 
+
+Sometimes it is necessary to embed resource such as icons, images,
+texts or even arbitrary binary data into executables. There several
+approaches for acomplishing this:
+
+ + *Windows:*
+
+   + Create a resource script, for instance resource.rc, and compile
+     the resource to object code with the MSVC resource compiler.
+     *rc.exe* or GCC/Mingw resource compiler, windres.exe. Then build the
+     executable by linking the application object code with the
+     compiled resource.
+
+   + Functions: FindResource, LoadResource, SizeofResource,
+     LockResource
+
+   + Icon: On Windows it is the only way to add an inco to an
+     executable.
+
+ + *Unix-like:*  
+   + objcopy tool.
+   + ld (GNU ld linker)
+
+   + Icon: Native executables for MacOSX, Linux and BSD don't support
+     embedded icon as Windows.
+
+ + *Portable*
+
+   + *Base 64 encoding* - Initialize some string global variable with
+     the resource encoded as base64 string. When the resource is
+     needed, the program decode the global variable from base64 to a
+     byte stream, byte array, string or file.
+
+   + *Byte array encoding* - The resource is turned into a C++ source
+     code containing the resource encoded as a byte-array. The source
+     is then compiled to object code and added to the application at
+     linking time. This technique is better implemented with an custom
+     external code generator or off-the-shelf tool such as:
+
+     + _image-magick_ -> Can convert images into a header files
+       containing the image bytes.
+       + $ convert image.png image1.h
+
+     + _xdd - utility_
+       + $ xxd file.png -i
+       + $ xxd file.png -i > resourcedata.hpp
+
+** Windows 
+*** Documentation 
+
+Application: 
+ 
+ + [[http://www.angusj.com/resourcehacker/][Resource Hacker]] - Resource compiler and decompiler.
+
+MSDN Documentation
+
+ + [[https://docs.microsoft.com/en-us/windows/desktop/menurc/user-defined-resource][User-Defined Resource]]
+ + [[https://docs.microsoft.com/en-us/windows/desktop/menurc/versioninfo-resource][VERSIONINFO resource - Windows applications | Microsoft Docs]]
+ + [[https://docs.microsoft.com/en-us/windows/desktop/menurc/using-rc-the-rc-command-line-][Using RC (The RC Command Line) - Windows applications | Microsoft Docs]]
+ + [[https://docs.microsoft.com/en-us/windows/desktop/api/winbase/nf-winbase-findresourcea][FindResourceA function | Microsoft Docs]]
+ + [[https://docs.microsoft.com/en-us/windows/desktop/api/winbase/nf-winbase-enumresourcelanguagesa][EnumResourceLanguagesA function | Microsoft Docs]]
+ + [[https://docs.microsoft.com/en-us/windows/desktop/Intl/language-identifier-constants-and-strings][Language Identifier Constants and Strings - Windows applications | Microsoft Docs]]
+*** Build executable with icon
+
+Files in the directory: 
+ + main.cpp
+ + icon.rs 
+ + monitor1.ico
+
+
+File: main.cpp - main application. 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <cstdio>
+
+  #include <windows.h>
+
+  int main(){
+      std::cout << "Started" << std::endl;
+
+      std::cout << "\nType RETURN to exit." << std::endl;
+      std::cin.get();	
+      return 0;
+  }
+
+#+END_SRC
+
+File: icon.rs  - Resource script 
+
+#+BEGIN_SRC txt 
+  id ICON "monitor1.ico"
+#+END_SRC
+
+ *Building with MSVC (VC++)*
+
+#+BEGIN_SRC sh 
+  # Compile resource => Generate icon.res 
+  $ rc /r icon.rc
+
+  # Compile file and add resource icon => Generate app-msvc.exe     
+  $ cl /EHsc /nologo resource.cpp icon.res /Fe:app-msvc.exe     
+#+END_SRC
+
+ *Building with Mingw/GCC* 
+
+#+BEGIN_SRC sh 
+  # Compile resource
+  $ windres icon.rc -O coff -o icon.rs     
+    
+  # Link resource and application => Generate app-gcc.exe 
+  $ g++ resource.cpp icon.res -o app-gcc.exe -std=c++14        
+#+END_SRC
+
+** Embed Resource with xxd tool (Byte-array)
+
+Example: The U-nix tool xxd can generate C-code for embedding
+resources in native applications. Example: embed a text file
+protocols.txt  
+
+Run: 
+
+#+BEGIN_SRC sh
+  $ xxd -i protocols.txt 
+#+END_SRC
+
+It will print to the screen the following code containing the file
+encoded as byte array:
+
+#+BEGIN_SRC cpp 
+  unsigned char protocols_txt[] = {
+    0x23, 0x20, 0x2f, 0x65, 0x74, 0x63, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f,
+    0x63, 0x6f, 0x6c, 0x73, 0x3a, 0x0a, 0x23, 0x20, 0x24, 0x49, 0x64, 0x3a,
+    0x20, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x73, 0x2c, 0x76,
+   ... ...  ... ...  ... ...  ... ...  ... ...  ... ...   
+    0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x5b, 0x49, 0x41,
+    0x4e, 0x41, 0x5d, 0x0a
+  };
+  unsigned int protocols_txt_len = 6568;
+#+END_SRC
+
+The generated header can be used to embed the file into the
+application:
+
+#+BEGIN_SRC sh 
+ $ xxd -i protocols.txt > program_asset.h
+
+ # Compile header containing resource to object-code 
+ $ g++ -c program_asset.h -o program_asset.o
+
+ # Link and generate the application with embedded resource 
+ $ g++ main.o file1.o file2.o program_asset.o -o program.exe 
+#+END_SRC
+
+** Base 64 Implementations 
+
+Taken from: https://stackoverflow.com/questions/342409
+
+ *Base-64 Encoding* 
+
+#+BEGIN_SRC cpp 
+  include <stdint.h>
+  #include <stdlib.h>
+
+  static char encoding_table[] = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',
+                                  'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
+                                  'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X',
+                                  'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f',
+                                  'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n',
+                                  'o', 'p', 'q', 'r', 's', 't', 'u', 'v',
+                                  'w', 'x', 'y', 'z', '0', '1', '2', '3',
+                                  '4', '5', '6', '7', '8', '9', '+', '/'};
+  static char *decoding_table = NULL;
+  static int mod_table[] = {0, 2, 1};
+
+
+  char *base64_encode(const unsigned char *data,
+                      size_t input_length,
+                      size_t *output_length) {
+
+      ,*output_length = 4 * ((input_length + 2) / 3);
+
+      char *encoded_data = malloc(*output_length);
+      if (encoded_data == NULL) return NULL;
+
+      for (int i = 0, j = 0; i < input_length;) {
+
+          uint32_t octet_a = i < input_length ? (unsigned char)data[i++] : 0;
+          uint32_t octet_b = i < input_length ? (unsigned char)data[i++] : 0;
+          uint32_t octet_c = i < input_length ? (unsigned char)data[i++] : 0;
+
+          uint32_t triple = (octet_a << 0x10) + (octet_b << 0x08) + octet_c;
+
+          encoded_data[j++] = encoding_table[(triple >> 3 * 6) & 0x3F];
+          encoded_data[j++] = encoding_table[(triple >> 2 * 6) & 0x3F];
+          encoded_data[j++] = encoding_table[(triple >> 1 * 6) & 0x3F];
+          encoded_data[j++] = encoding_table[(triple >> 0 * 6) & 0x3F];
+      }
+
+      for (int i = 0; i < mod_table[input_length % 3]; i++)
+          encoded_data[*output_length - 1 - i] = '=';
+
+      return encoded_data;
+  }
+#+END_SRC
+
+ *Base-64 Decoding* 
+
+#+BEGIN_SRC cpp 
+  unsigned char *base64_decode(const char *data,
+                               size_t input_length,
+                               size_t *output_length) {
+      if (decoding_table == NULL) build_decoding_table();
+
+      if (input_length % 4 != 0) return NULL;
+
+      ,*output_length = input_length / 4 * 3;
+      if (data[input_length - 1] == '=') (*output_length)--;
+      if (data[input_length - 2] == '=') (*output_length)--;
+
+      unsigned char *decoded_data = malloc(*output_length);
+      if (decoded_data == NULL) return NULL;
+
+      for (int i = 0, j = 0; i < input_length;) {
+
+          uint32_t sextet_a = data[i] == '=' ? 0 & i++ : decoding_table[data[i++]];
+          uint32_t sextet_b = data[i] == '=' ? 0 & i++ : decoding_table[data[i++]];
+          uint32_t sextet_c = data[i] == '=' ? 0 & i++ : decoding_table[data[i++]];
+          uint32_t sextet_d = data[i] == '=' ? 0 & i++ : decoding_table[data[i++]];
+
+          uint32_t triple = (sextet_a << 3 * 6)
+          + (sextet_b << 2 * 6)
+          + (sextet_c << 1 * 6)
+          + (sextet_d << 0 * 6);
+
+          if (j < *output_length) decoded_data[j++] = (triple >> 2 * 8) & 0xFF;
+          if (j < *output_length) decoded_data[j++] = (triple >> 1 * 8) & 0xFF;
+          if (j < *output_length) decoded_data[j++] = (triple >> 0 * 8) & 0xFF;
+      }
+
+      return decoded_data;
+  }
+
+
+  void build_decoding_table() {
+      decoding_table = malloc(256);
+      for (int i = 0; i < 64; i++)
+          decoding_table[(unsigned char) encoding_table[i]] = i;
+  }
+
+
+  void base64_cleanup() {
+      free(decoding_table);
+  }
+#+END_SRC
