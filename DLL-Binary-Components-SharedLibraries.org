@@ -169,7 +169,7 @@ C++ Client program (client code)
 Shared Library 
 
 #+BEGIN_SRC cpp 
- $ g++ testlib.cpp -o testlib.dll -g -shared -std=c++14 -Wall
+ $ g++ testlib.cpp -o testlib.dll -g -fvisibility=hidden -shared -std=c++14 -Wall
 #+END_SRC
 
 C++ Client program 
@@ -189,25 +189,116 @@ Sources:
 The header files uses the following macros to reduce the boilerplate
 necessary to export the library functions and classes. 
 
- + file: libstes.hpp => Macros for exporting functions and classes. 
+ + file: testlib.hpp => Macros for exporting functions and classes. 
 
-#+BEGIN_SRC cpp
-  #ifndef _WIN32
-    // If not compiled for Windows, remove declspec directive.
-    #define __declspec(param)  
-  #endif 
 
-  #define EXPORT_CPP 	__declspec(dllexport)
- 
-  #ifdef __cplusplus
-    // Indicat that a given symbol/function has C-linkage and
-    // does not have name mangling. 
-    #define EXPORT_C extern "C" __declspec(dllexport)
+ *Macro: EXPORT_CPP*
+
+#+BEGIN_SRC cpp 
+  /** Macro EXPORT_CPP makes a symbol visible. */
+  #if defined(_WIN32)
+    #define EXPORT_CPP __declspec(dllexport)
   #else
-    // If a C-compiler uses this header, remove 'extern "C"'
-    #define EXPORT_C  __declspec(dllexport)
+    #define EXPORT_CPP __attribute__ ((visibility ("default")))
+    // If not compiled on Windows, remove declspec compiler extension.
+    #ifndef __declspec
+      // For GCC only - make exported symbol visible symbol 
+      #define __declspec(param) __attribute__ ((visibility ("default")))
+    #endif
   #endif 
 #+END_SRC
+
+The macro EXPORT_CPP annotates the symbol as visible by expanding to:
+
+#+BEGIN_SRC cpp 
+    // On Windows EXPORT_CPP becomes 
+    __declspec(dllexport)
+
+    // On Unix-like OSes, Linux, BSD, OSX ... 
+     __attribute__ ((visibility ("default")))
+#+END_SRC
+
+So a function _int SomeFunction(double x, double y)_ becomes:
+
+#+BEGIN_SRC cpp 
+    // Makes this symbol visible (exported) in the library (DLL)
+    EXPORT_CPP int SomeFunction(double , double);
+
+   // On Windows: 
+   __declspec(dllexport) int SomeFunction(double , double);
+
+   // On Unix-like operating systems or Linux: 
+   __attribute__ ((visibility ("default"))) int SomeFunction(double , double);
+#+END_SRC
+
+
+ *Macro EXPORT_C:*
+
+#+BEGIN_SRC cpp 
+  /* Macro EXPORT_C is used for exporting symbol with C-linkage, it
+   ,* means, without name mangling */
+  #ifdef __cplusplus
+    // extern "C" - Indicates that a given symbol/function has C-linkage and
+    // does not have name mangling.
+    // 
+    // On Linux EXPORT_C becomes
+    //  => extern "C" __attribute__ ((visibility ("default")))
+    // 
+    // On Windows EXPORT_C becomes 
+    //  => extern "C" __declspec(dllexport)
+    #define EXPORT_C extern "C" EXPORT_CPP
+  #else
+    // If a C-compiler uses this header, remove 'extern "C"'
+    #define EXPORT_C  EXPORT_CPP
+  #endif 
+#+END_SRC
+
+Export symbols with C-linkage, it means that the function is exported
+without name decoration or _name mangling_. The function symbol matches
+exactly its name. Functions with C-linkage can be called by C-code;
+C++ code compiled with other compilers without ABI issues and foreign
+function interfaces of scripting languages such as Python Ctypes or C#
+Pinvoke. Note: If a function is defined with C-linkage, it can only use
+C-compatible types. So, it is no possible to define functions with
+C-linkage with overload, default parameter or non C-compatible
+arguments.
+
+ + On Windows, this macro is expanded to:
+
+#+BEGIN_SRC cpp 
+   EXPORT_C int functionWith_C_linkage(MyClass* pointerToClass, int x, double z);
+
+   // On Windows it becomes: 
+   extern "C" __declspec(dllexport)  int functionWith_C_linkage(MyClass* pointerToClass, int x, double z);
+
+   // This function could also be declared as:
+   extern "C" __declspec(dllexport) 
+   int functionWith_C_linkage(MyClass* pointerToClass, int x, double z);
+#+END_SRC
+
+ + On Unix-like OSes or linux, the macro EXPORT_C expands to: 
+
+#+BEGIN_SRC cpp 
+   EXPORT_C int functionWith_C_linkage(MyClass* pointerToClass, int x, double z);
+
+   // On Linux, it becomes:
+   extern "C" __attribute__ ((visibility ("default"))) int functionWith_C_linkage(MyClass* pointerToClass, int x, double z);
+
+   // This function could also be declared as:
+   extern "C" __attribute__ ((visibility ("default"))) 
+   int functionWith_C_linkage(MyClass* pointerToClass, int x, double z);
+#+END_SRC
+
+On Unix-like operating system (GCC or Clang compilers), all
+functions in an object-code (aka compiled code) becomes visible by
+default what can lead to undefined behavior when there are name
+clashes due to repeated symbols. With appropriate compiler options
+such as -fvisibility=hidden, the symbols can be made private by
+default as happens in Windows where is necessary to annotate the
+symbol as visible explicitly with __declspec(dllexport). On Unix-like
+OSes for GCC and Clang compiler the annotation for making the symbol
+visible is ~__attribute__ ((visibility ("default")))~. This statement
+has no effect if the appropriate compiler flags are not set.
 
 *** Namespace Linalg 
 
@@ -227,33 +318,24 @@ compiler extension ~__declspec(dllexport)~ before the function declaration.
  + Interface => File: *testlib.hpp*
 
 #+BEGIN_SRC cpp 
-  /** The macro __cplusplus is used for allowing this 
-   ,* header to be used from 'C'. If a C compiler is used
-   ,* all definitions inside this #ifdef are discarded.
-   ,*/
-  #ifdef __cplusplus
-  namespace Linalg {
-          EXPORT_CPP double norm(const std::vector<double>& xs);
+   #ifdef __cplusplus
 
-          EXPORT_CPP std::vector<double> linTransform(
-                  double a,
-                  double b,
-                  std::vector<double>& xs
-                  );
+   namespace Linalg {
+           EXPORT_CPP
+           double norm(const std::vector<double>& xs);
 
-          EXPORT_CPP
-          std::ostream&
-          printVector(std::ostream& os, std::vector<double>& xs);	
-  }
-  #endif 
-#+END_SRC
+           EXPORT_CPP std::vector<double>
+           linTransform(
+                   double a,
+                   double b,
+                   std::vector<double>& xs
+                   );
 
-The macro ~EXPORT_CPP~ expands to: 
-
-#+BEGIN_SRC cpp
-  EXPORT_CPP double norm(const std::vector<double>& xs);
-  // Macro EXPORT_CPP expansion 
-  __declspec(dllexport) double norm(const std::vector<double>& xs);
+           EXPORT_CPP
+           std::ostream&
+           printVector(std::ostream& os, std::vector<double>& xs);	
+   }
+   #endif 
 #+END_SRC
 
 The compiler directives *#ifdef __cplusplus ... #endif* are used for
@@ -261,26 +343,36 @@ disabling this code block when the header is used by a C-compiler as
 the C-language does not support classes, namespaces and many other C++
 features. 
 
- + Implementation => file: *testlib.cpp*
+ + file: *testlib.cpp* - Implementation 
 
 #+BEGIN_SRC cpp 
    // Linear algebra tools 
-   namespace Linalg{
-        __declspec(dllexport)
-        double norm(const std::vector<double>& xs){
-           double sum = 0.0;
-           for(const auto& x : xs) sum += x * x;
-               return std::sqrt(sum);
-        }
+    namespace Linalg{
+            EXPORT_CPP 
+             double norm(const std::vector<double>& xs){
+                   double sum = 0.0;
+                   for(const auto& x : xs) sum += x * x;
+                   return std::sqrt(sum);
+           }
 
-         __declspec(dllexport)
-        std::vector<double>
-        linTransform(double a, double b, std::vector<double>& xs){
-            std::vector<double> out(xs.size());
-            ... ... .... 
-        }
+           EXPORT_CPP
+           std::vector<double>
+           linTransform(double a, double b, std::vector<double>& xs){
+                   std::vector<double> out(xs.size());
+                   for(size_t i = 0; i < xs.size(); i++){		
+                           out[i] = a * xs[i] + b;
+                   }
+                   return out;
+           }
 
-       ... ... 
+           EXPORT_CPP
+           std::ostream&
+           printVector(std::ostream& os, std::vector<double>& xs){
+                   os << "[" << xs.size() << "]( ";
+                   for(const auto&  x: xs)
+                           os << x << ", ";
+                   return os << " )";
+           }	
    }
 #+END_SRC
 
@@ -296,34 +388,19 @@ language.
 
 #+BEGIN_SRC cpp 
   // ======= C-interface for Linalg namespace =========//
-  /* ----- C-Wrappers for Linalg namespace ---- */
 
   /** Handle or opaque pointer for std::vector<double> */
   typedef void* hVectorD;
 
-  extern "C"  __declspec(dllexport)
+  /* ----- C-Wrappers for Linalg namespace ---- */
+
+  EXPORT_C 
   double testlib_vectorD_Linalg_norm(hVectorD hv);
 
-  extern "C"  __declspec(dllexport)
+  EXPORT_C 
   void testlib_vectorD_Linalg_printVector(const char* name, hVectorD hv);
+
 #+END_SRC
-
-The *extern "C"* statements are necessary to compile the functions with
-_C-linkage_, it means without _name mangling_ (aka name decoration). In
-every C program, the function symbols are generally the same as their
-names. However, as C++ supports templates and function overloading,
-many functions can have the same, with different type signatures,
-C++ compiler mangles or decorates function names with a different
-schema to make the symbol unique. 
-
-Functions with C-linkage, can only use C-compatible types or PODs
-types (Plain Old Data). Therefore, they cannot use STL container,
-std::vector, std::string and so on. 
-
-The statement ~__declspec(dllexport)~ is necessary to make annotated
-functions' symbols visible. On Unix-like systems and Linux, it is not
-necessary as it is MSVC (cl.exe) compiler extension. 
-
 
  + File: *testlib.cpp* => C-interface function implementations. 
 
@@ -333,36 +410,47 @@ accross a DLL functions with C-linkage and use std::vector<double>
 from C programs or foreign function interfaces. 
 
 #+BEGIN_SRC cpp 
+  //=========== C-wrappers ---------------///
   // Handler for double vector 
   using hVectorD = void*;
   using pVectorD = std::vector<double>*;
 
   /** C-wrapper for vector<double> constructor */
-  extern "C" __declspec(dllexport)
-  hVectorD
-  testlib_vectorD_make0(size_t n, double x){
-     return new std::vector<double>(n, x);
+  EXPORT_C  
+  hVectorD testlib_vectorD_make0(size_t n, double x){
+      return new std::vector<double>(n, x);
   }
-    ... ... ...     ... ... ...     ... ... ... 
+
+  /** C-wrapper for range constructor */
+  EXPORT_C
+  hVectorD testlib_vectorD_make1(size_t n, double array []){
+      return new std::vector<double>(array, array + n);
+  }
+
+  /** C-wrapper for setting elements of vector<double> */
+  EXPORT_C 
+  void testlib_vectorD_set(hVectorD hv, size_t n, double x){
+     reinterpret_cast<pVectorD>(hv)->operator[](n) = x;
+  }
 
   /** C-wrapper for vector<double> destructor */
-  extern "C" __declspec(dllexport)
-  void
-  testlib_vectorD_delete(hVectorD hv){
-    delete reinterpret_cast<pVectorD>(hv);
+  EXPORT_C void testlib_vectorD_delete(hVectorD hv){
+      delete reinterpret_cast<pVectorD>(hv);
   }
 
   /** C-wrapepr for Linalg::norm function */
-  extern "C" __declspec(dllexport)
-  double
-  testlib_vectorD_Linalg_norm(hVectorD hv){
-     return Linalg::norm(*reinterpret_cast<pVectorD>(hv));
+  EXPORT_C 
+  double testlib_vectorD_Linalg_norm(hVectorD hv){
+      return Linalg::norm(*reinterpret_cast<pVectorD>(hv));
   }
-    ... ... ...     ... ... ...     ... ... ... 
 
+  EXPORT_C 
+  void testlib_vectorD_Linalg_printVector(const char* name, hVectorD hv){
+      std::cout << name << " = ";
+      Linalg::printVector(std::cout, *reinterpret_cast<pVectorD>(hv));
+      std::cout << std::endl;
+  }
 #+END_SRC
-
-
 
 *** Non-polymorphic Class - SampleClass 
 
@@ -382,9 +470,10 @@ pointers (void* pointers).
 
 #+BEGIN_SRC cpp 
   // ======= Non-polymorphic class exported by DLL =========//
+
   #ifdef __cplusplus
   // Non-polymorphic class 
-  class __declspec(dllexport) SampleClass{
+  class EXPORT_CPP SampleClass{
   public:
           SampleClass();
           SampleClass(const std::string& name);	
@@ -398,6 +487,7 @@ pointers (void* pointers).
   };
   #endif 
 #+END_SRC
+
 
  + File: *testlib.cpp* => Class implementation. 
 
@@ -467,35 +557,37 @@ pointers (void* pointers).
  + File: *testlib.cpp* => Functions implementation. 
 
 #+BEGIN_SRC cpp 
+  /* ----- C-Wrappers for SampleClass namespace ---- */
+
   using hSampleClass = void*;
 
   /** Nullable constructor zero-arg constructor */
-  extern "C" __declspec(dllexport)
+  EXPORT_C 
   hSampleClass
-  testlib_SampleClass_make0(){
-     return new SampleClass();
-  }
+  testlib_SampleClass_make0();
 
   /** Other constructor */
-  extern "C" __declspec(dllexport)
-  hSampleClass
-  testlib_SampleClass_make1(const char* name){
-     return new SampleClass(name);
-  }
+  EXPORT_C hSampleClass testlib_SampleClass_make1(const char* name);
 
   /** Destructor */
-  extern "C" __declspec(dllexport)
+  EXPORT_C
   void
-  testlib_SampleClass_delete(hSampleClass hnd){
-     delete reinterpret_cast<SampleClass*>(hnd);
-  }
+  testlib_SampleClass_delete(hSampleClass hnd);
 
   /** Wrapper for get method */
-  extern "C" __declspec(dllexport)
+  EXPORT_C
   int
-  testlib_SampleClass_get(hSampleClass hnd){
-     return reinterpret_cast<SampleClass*>(hnd)->get();
-  }
+  testlib_SampleClass_get(hSampleClass hnd);
+
+  /** Wrapper for set method */
+  EXPORT_C
+  void
+  testlib_SampleClass_set(hSampleClass hnd, int n);
+
+  EXPORT_C
+  const char*
+  testlib_SampleClass_getName(hSampleClass hnd);
+
 #+END_SRC
 
 *** Polymorphic class InterfaceClass 
@@ -663,46 +755,52 @@ DebugView sysinternal tool.
  + File: *testlib.cpp* => DLL main function. 
 
 #+BEGIN_SRC cpp 
-  /** - DLL Entry point - main function of DLL which is executed when
-      the DLL is loaded by some process.
-   ,*/
-  extern "C" __declspec(dllexport)
-  BOOL APIENTRY DllMain (HINSTANCE hInst, DWORD reason, LPVOID lpReserved)
-  {
-     std::string text =
-             std::string("DLL Loaded into the process => PID = ")
-             + std::to_string(::GetCurrentProcessId());
-     WindbgTrace(text);
-     DbgTrace(text);	   	
-      switch (reason)
-      {
-      case DLL_PROCESS_ATTACH:
-          WindbgTrace("DLL attached to process");
-          DbgTrace("DLL attached to process.");			
-        break;
-      case DLL_PROCESS_DETACH:
-          WindbgTrace("=> DLL detached.");
-          DbgTrace("=> DLL attached");
-        break;
-      case DLL_THREAD_ATTACH:
-          WindbgTrace("DLL attached to thread");
-          DbgTrace("DLL detached to thread.");
-          break;
-      case DLL_THREAD_DETACH:
-          WindbgTrace("DLL detached from thread");
-          DbgTrace("DLL detached from thread.");
-        break;
-      }
+   /** - DLL Entry point - main function of DLL which is executed when 
+       the DLL is loaded by some process. 
+    */
+   #if defined(_WIN32)
+   extern "C" __declspec(dllexport)
+   BOOL APIENTRY DllMain (HINSTANCE hInst, DWORD reason, LPVOID lpReserved)
+   {
+       std::string text =
+               std::string("DLL Loaded into the process => PID = ")
+               + std::to_string(::GetCurrentProcessId());
+       WindbgTrace(text);
+       DbgTrace(text);
 
-    return TRUE;
-  }
+       switch (reason)
+       {
+       case DLL_PROCESS_ATTACH:
+           WindbgTrace("DLL attached to process");
+           DbgTrace("DLL attached to process.");			
+         break;
+       case DLL_PROCESS_DETACH:
+            WindbgTrace("=> DLL detached.");
+            DbgTrace("=> DLL attached");
+         break;
+       case DLL_THREAD_ATTACH:
+           WindbgTrace("DLL attached to thread");
+           DbgTrace("DLL detached to thread.");
+         break;
+       case DLL_THREAD_DETACH:
+           WindbgTrace("DLL detached from thread");
+           DbgTrace("DLL detached from thread.");
+         break;
+       }
+
+     return TRUE;
+   }
+   #endif 
 #+END_SRC
+
 
 Another more portable way to peform some way action when the DLL is
 loaded by a process or unloaded is to use a static object. The startup
 task is executed int the object's constructor and the finalization
 task, which happens when the process ends, is executed at object's
-destructor. 
+destructor. This approach may a better replacement for DLLMain
+function, which is specific for Windows, as this technique works both
+on Windows and any other Unix-like operating system. 
 
  + File: *testlib.cpp* => Static Object for replacing DLLMain 
 
@@ -758,12 +856,14 @@ the DLL in the system or creating some entry in Windows' registry.
  + File: *testlib.cpp*
 
 #+BEGIN_SRC cpp 
+  #if defined(_WIN32)
   extern "C" __declspec(dllexport)
   void entryPoint1(HWND hwn, HINSTANCE hinst, LPSTR cmdLine, int nCmdShow){  
        DbgDisp(cmdLine);
        OutputDebugString("Rudll32 called entryPoint1()");
        MessageBoxA(NULL, "DLL ENTRY POINT", "Entry point 1", 0);
   }
+  #endif 
 #+END_SRC
 *** C++ Client program - client1.cpp 
 
@@ -819,7 +919,7 @@ Main Function - Experiment 3
 #+BEGIN_SRC cpp
   //=========>> Load functions and classes using C-interface ==============//
 
-  std::cout << "\n== EPERIMENT 3 ===> Import C-functions from DLL - C-interface" << std::endl;
+  std::cout << "\n== EXPERIMENT 3 ===> Import C-functions from DLL - C-interface" << std::endl;
 
   double arr [] = {1, 2, 3, 4, 5};
   hVectorD v1 = testlib_vectorD_make1(5, arr);
@@ -832,7 +932,7 @@ Main Function - Experiment 3
 Main Functions - Experiment 4 
 
 #+BEGIN_SRC cpp 
-  std::cout << "\n== EPERIMENT 4 ===> Non-polymorphic class with C-interface " << std::endl;
+  std::cout << "\n== EXPERIMENT 4 ===> Non-polymorphic class with C-interface " << std::endl;
 
   hSampleClass hcls = testlib_SampleClass_make1("[EXPERIMENT4]ClassHandle-OOP-C-API");
   std::cout << "[EXPERIMENT 4] hcls.getName() = " << testlib_SampleClass_getName(hcls) << std::endl;
@@ -847,7 +947,7 @@ Main Functions - Experiment 4
 Main Functions - Experiment 5 
 
 #+BEGIN_SRC cpp 
-  std::cout << "\n== EPERIMENT 5 ===> Load polymorphic classes from DLL " << std::endl;
+  std::cout << "\n== EXPERIMENT 5 ===> Load polymorphic classes from DLL " << std::endl;
 
   InterfaceClass* hinstA = teslib_InterfaceClass_factory("ImplementationA");
   InterfaceClass* hinstB = teslib_InterfaceClass_factory("ImplementationB");
@@ -894,11 +994,11 @@ bits target.
   cls.getName() = Dummy
       cls.get() = 100
 
-  == EPERIMENT 3 ===> Import C-functions from DLL - C-interface
+  == EXPERIMENT 3 ===> Import C-functions from DLL - C-interface
   v1 = [5]( 1, 2, 3, 4, 5,  )
   norm(v1) = 7.4162
 
-  == EPERIMENT 4 ===> Non-polymorphic class with C-interface 
+  == EXPERIMENT 4 ===> Non-polymorphic class with C-interface 
    Instance created with name = [EXPERIMENT4]ClassHandle-OOP-C-API
   [EXPERIMENT 4] hcls.getName() = [EXPERIMENT4]ClassHandle-OOP-C-API
    Counter set to value = 100
@@ -907,7 +1007,7 @@ bits target.
   [EXPERIMENT 4] hcls.get()     = 200
   testlib.cpp:159: <SampleClass::~SampleClass> SampleClass => name = [EXPERIMENT4]ClassHandle-OOP-C-API deleted
 
-  == EPERIMENT 5 ===> Load polymorphic classes from DLL 
+  == EXPERIMENT 5 ===> Load polymorphic classes from DLL 
    => hinstA->getID() = ImplementationA
    => hinstA->getID() = ImplementationB
    => hinstA->getName() = ImplementationA
@@ -977,11 +1077,11 @@ $ g++ client.cpp -g -o client-gcc.exe -std=c++14 testlib.dll -DDISABLE   && clie
   testlib.cpp:39: <DllMain> DLL Loaded into the process => PID = 5724
   testlib.cpp:45: <DllMain> DLL attached to process.
 
-  == EPERIMENT 3 ===> Import C-functions from DLL - C-interface
+  == EXPERIMENT 3 ===> Import C-functions from DLL - C-interface
   v1 = [5]( 1, 2, 3, 4, 5,  )
   norm(v1) = 7.4162
 
-  == EPERIMENT 4 ===> Non-polymorphic class with C-interface 
+  == EXPERIMENT 4 ===> Non-polymorphic class with C-interface 
    Instance created with name = [EXPERIMENT4]ClassHandle-OOP-C-API
   [EXPERIMENT 4] hcls.getName() = [EXPERIMENT4]ClassHandle-OOP-C-API
    Counter set to value = 100
@@ -990,7 +1090,7 @@ $ g++ client.cpp -g -o client-gcc.exe -std=c++14 testlib.dll -DDISABLE   && clie
   [EXPERIMENT 4] hcls.get()     = 200
   testlib.cpp:159: <SampleClass::~SampleClass> SampleClass => name = [EXPERIMENT4]ClassHandle-OOP-C-API deleted
 
-  == EPERIMENT 5 ===> Load polymorphic classes from DLL 
+  == EXPERIMENT 5 ===> Load polymorphic classes from DLL 
    => hinstA->getID() = ImplementationA
    => hinstA->getID() = ImplementationB
    => hinstA->getName() = ImplementationA
@@ -1003,8 +1103,6 @@ $ g++ client.cpp -g -o client-gcc.exe -std=c++14 testlib.dll -DDISABLE   && clie
   testlib.cpp:49: <DllMain> => DLL attached
    [StaticObject] => Shutdown DLL
 #+END_SRC
-
-
 
 
 
