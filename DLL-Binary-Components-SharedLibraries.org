@@ -161,7 +161,7 @@ Shared Library
 C++ Client program (client code)
 
 #+BEGIN_SRC cpp 
- $ cl.exe /EHsc client.cpp /Fe:out.exe testlib.lib && out.exe
+ $ cl.exe /EHsc client1.cpp /Fe:client1.exe testlib.lib && out.exe
 #+END_SRC
 
  *Compile the DLL libtest.dll and client program with Mingw/GCC* 
@@ -176,6 +176,132 @@ C++ Client program
 
 #+BEGIN_SRC cpp 
  $ g++ client.cpp -o client.exe -g -std=c++14 testlib.dll -Wall
+#+END_SRC
+
+ *Compile and run from GIST* 
+
+Clone the GIST ([[https://gist.github.com/caiorss/2bba4c50866d9467aaa8c7792b337f71][Gisthub]]).
+
+#+BEGIN_SRC sh 
+  # Clone GIST: 
+  $ git clone https://gist.github.com/caiorss/2bba4c50866d9467aaa8c7792b337f71 dllex1
+  Cloning into 'dllex1'...
+  remote: Enumerating objects: 66, done.
+  remote: Counting objects: 100% (66/66), done.
+  remote: Compressing objects: 100% (47/47), done.
+  remote: Total 66 (delta 36), reused 45 (delta 19), pack-reused 0
+  Unpacking objects: 100% (66/66), done.
+
+  # Enter directory containing sources
+  $ cd dllex1/
+
+  $ tree .
+  .
+  ├── build.bat
+  ├── client1.cpp
+  ├── CMakeLists.txt
+  ├── Makefile
+  ├── pywrapper.py
+  ├── testlib.cpp
+  └── testlib.hpp
+
+  0 directories, 7 files
+
+#+END_SRC
+
+Build shared library on Linux.
+
+ + For Linux, build DLL and client code with make linux.
+
+#+BEGIN_SRC sh 
+   $ make linux
+   echo "Build shared library"
+   Build shared library
+   g++ testlib.cpp -o libtestlib.so  -std=c++14 -fPIC -shared -Wall
+   echo "Build client code 1"
+   Build client code 1
+   g++ client1.cpp -o client1.bin -std=c++14 libtestlib.so 
+
+   $ file libtestlib.so 
+   libtestlib.so: ELF 64-bit LSB shared object, x86-64, version 1 (SYSV), 
+   dynamically linked, BuildID[sha1]=52a16d16991d7aa71763140e97a1422c1387711d, not stripped
+
+   $ file client1.bin 
+   client1.bin: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked, 
+   interpreter /lib64/ld-linux-x86-64.so.2, 
+   for GNU/Linux 3.2.0, BuildID[sha1]=1a4885e112f72372cfd66816a564f49a24110c50, not stripped
+
+#+END_SRC
+
+Build shared library on Windows: 
+  
+ + Just run the batch script build-windows.bat or double click at it.
+
+#+BEGIN_SRC bat 
+  $ build-windows.bat
+  **********************************************************************
+  ** Visual Studio 2017 Developer Command Prompt v15.5.6
+  ** Copyright (c) 2017 Microsoft Corporation
+  **********************************************************************
+  [vcvarsall.bat] Environment initialized for: 'x64'
+  testlib.cpp
+     Creating library testlib.lib and object testlib.exp
+  Microsoft (R) C/C++ Optimizing Compiler Version 19.12.25835 for x64
+  Copyright (C) Microsoft Corporation.  All rights reserved.
+
+  client1.cpp
+  Microsoft (R) Incremental Linker Version 14.12.25835.0
+  Copyright (C) Microsoft Corporation.  All rights reserved.
+
+  /out:client1.exe
+  client1.obj
+  testlib.lib
+     Creating library client1.lib and object client1.exp
+   [StaticObject] => Initialize DLL
+  testlib.cpp:48: <DllMain> DLL Loaded into the process => PID = 1240
+  testlib.cpp:54: <DllMain> DLL attached to process.
+
+  === EXPERIMENT 1 ===> Import C++ functions from DLL
+  client1.cpp:38: <main> Main process starts here.
+   => Linalg::norm(xs) 7.4162
+  => xs = [5]( 1, 2, 3, 4, 5,  )
+  === EXPERIMENT 2 ===> Import class from DLL
+   Instance created with name = Dummy
+
+   .. ... ...  .. ... ...  .. ... ...  .. ... ... 
+#+END_SRC
+
+
+Run C++ client code:
+
+#+BEGIN_SRC sh 
+  $ ./client1.bin 
+   [StaticObject] => Initialize DLL
+
+  === EXPERIMENT 1 ===> Import C++ functions from DLL
+  client1.cpp:38: <main> Main process starts here.
+   => Linalg::norm(xs) 7.4162
+  => xs = [5]( 1, 2, 3, 4, 5,  )
+  === EXPERIMENT 2 ===> Import class from DLL
+   Instance created with name = Dummy
+   Counter set to value = 100
+  cls.getName() = Dummy
+      cls.get() = 100
+
+  ... ... ... 
+#+END_SRC
+
+Run Python client code:
+
+#+BEGIN_SRC cpp 
+  $ make py
+  python3 pywrapper.py
+   [INFO] libpath = libtestlib.so
+   [StaticObject] => Initialize DLL
+  Intializing library
+  Library initialized OK.
+
+   .. ... ... ... 
 #+END_SRC
 
 *** Header macros 
@@ -1103,7 +1229,6 @@ $ g++ client.cpp -g -o client-gcc.exe -std=c++14 testlib.dll -DDISABLE   && clie
   testlib.cpp:49: <DllMain> => DLL attached
    [StaticObject] => Shutdown DLL
 #+END_SRC
-
 
 *** Load DLL in Python3 REPL 
 
