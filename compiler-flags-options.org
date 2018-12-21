@@ -353,8 +353,230 @@ References:
 
   + 
 ** CMake Building Script Reference 
-*** Command Line Options 
-**** Show system information 
+*** Build some project 
+
+A project using Cmake as building system contains a build script at
+top level directory named CMakeLists.txt. To build a project with
+CMake, it is necessary to consider that CMake, is not a building
+system and does not build anything. Actually, Cmake generates building
+scripts for the platform preferred building scripts. For instance, on
+Linux, it can generate Makefile, Eclipse Makefiles; on Windows it can
+generate MSBuild scripts, NMake (Windows SDK's make) and so on.
+
+ + Check all possible building system for which CMake can generate
+   build scripts.
+   + Command: $ *cmake -G*
+
+#+BEGIN_SRC sh 
+   # Running on Windows 10 
+   $ cmake -G
+   CMake Error: No generator specified for -G
+
+   Generators
+     Visual Studio 15 2017 [arch] = Generates Visual Studio 2017 project files.
+                                    Optional [arch] can be "Win64" or "ARM".
+     Visual Studio 14 2015 [arch] = Generates Visual Studio 2015 project files.
+                                    Optional [arch] can be "Win64" or "ARM".
+     Visual Studio 12 2013 [arch] = Generates Visual Studio 2013 project files.
+                                    Optional [arch] can be "Win64" or "ARM".
+     Visual Studio 11 2012 [arch] = Generates Visual Studio 2012 project files.
+                                    Optional [arch] can be "Win64" or "ARM".
+     Visual Studio 10 2010 [arch] = Generates Visual Studio 2010 project files.
+                                    Optional [arch] can be "Win64" or "IA64".
+     Visual Studio 9 2008 [arch]  = Generates Visual Studio 2008 project files.
+                                    Optional [arch] can be "Win64" or "IA64".
+     Borland Makefiles            = Generates Borland makefiles.
+     NMake Makefiles              = Generates NMake makefiles.
+     NMake Makefiles JOM          = Generates JOM makefiles.
+     Green Hills MULTI            = Generates Green Hills MULTI files
+                                    (experimental, work-in-progress).
+     MSYS Makefiles               = Generates MSYS makefiles.
+     MinGW Makefiles              = Generates a make file for use with
+                                    mingw32-make.
+     Unix Makefiles               = Generates standard UNIX makefiles.
+     Ninja                        = Generates build.ninja files.
+     Watcom WMake                 = Generates Watcom WMake makefiles.
+     CodeBlocks - MinGW Makefiles = Generates CodeBlocks project files.
+     CodeBlocks - NMake Makefiles = Generates CodeBlocks project files.
+     CodeBlocks - NMake Makefiles JOM
+                                  = Generates CodeBlocks project files.
+     CodeBlocks - Ninja           = Generates CodeBlocks project files.
+     CodeBlocks - Unix Makefiles  = Generates CodeBlocks project files.
+     CodeLite - MinGW Makefiles   = Generates CodeLite project files.
+     CodeLite - NMake Makefiles   = Generates CodeLite project files.
+     CodeLite - Ninja             = Generates CodeLite project files.
+     CodeLite - Unix Makefiles    = Generates CodeLite project files.
+     Sublime Text 2 - MinGW Makefiles
+                                  = Generates Sublime Text 2 project files.
+     Sublime Text 2 - NMake Makefiles
+                                  = Generates Sublime Text 2 project files.
+     Sublime Text 2 - Ninja       = Generates Sublime Text 2 project files.
+     Sublime Text 2 - Unix Makefiles
+                                  = Generates Sublime Text 2 project files.
+     Kate - MinGW Makefiles       = Generates Kate project files.
+     Kate - NMake Makefiles       = Generates Kate project files.
+     Kate - Ninja                 = Generates Kate project files.
+     Kate - Unix Makefiles        = Generates Kate project files.
+     Eclipse CDT4 - NMake Makefiles
+                                  = Generates Eclipse CDT 4.0 project files.
+     Eclipse CDT4 - MinGW Makefiles
+                                  = Generates Eclipse CDT 4.0 project files.
+     Eclipse CDT4 - Ninja         = Generates Eclipse CDT 4.0 project files.
+     Eclipse CDT4 - Unix Makefiles= Generates Eclipse CDT 4.0 project files.
+#+END_SRC
+
+ *STEP 1: Generate Building Script*
+
+Project directory listing:
+
+#+BEGIN_SRC sh 
+  $ tree .
+  .
+  ├── build.bat
+  ├── client1.cpp
+  ├── CMakeLists.txt
+  ├── Makefile
+  ├── pywrapper.py
+  ├── testlib.cpp
+  └── testlib.hpp
+#+END_SRC
+
+ *Generate building scripts for platform-preferred building system:*
+
+ + $ cmake -H<SOURCE> -B<BUILD>
+   + <SOURCE> => Source directory where all *.cpp, *.hpp code. In this
+     case it is (.) dot, current directory. If the directory was
+     ./src, the command would be -Hsrc or -H./src
+   + <BUILD> => Compilation output, directory where are all building
+     scripts. 
+
+Command output on Windows 10 - MSVC 2017. Note: It will set VC++ for
+32 bits target, not 64 bits.
+
+#+BEGIN_SRC sh 
+  $ cmake -H. -Bbuild
+  -- Building for: Visual Studio 15 2017
+  -- The C compiler identification is MSVC 19.16.27025.1
+  -- The CXX compiler identification is MSVC 19.16.27025.1  
+  ... ...   ... ...   ... ...   ... ...   ... ... 
+  -- Configuring done
+  -- Generating done
+  -- Build files have been written to: C:/Users/archbox/Desktop/experiments/dll/build
+#+END_SRC
+
+Command output on Linux: 
+
+#+BEGIN_SRC sh 
+  $ cmake -H. -Bbuild
+  -- The C compiler identification is GNU 8.2.1
+  -- The CXX compiler identification is GNU 8.2.1
+  -- Check for working C compiler: /usr/lib64/ccache/cc
+  -- Check for working C compiler: /usr/lib64/ccache/cc -- works
+  ... ...   ... ...   ... ...   ... ...   ... ... 
+   [INFO] Libtest location is at: libtest_location-NOTFOUND
+  -- Configuring done
+  -- Generating done
+  -- Build files have been written to: /home/archbox/root-scripts/gist/build
+
+  # List ./build directory 
+  $ tree -L 1 build
+  build
+  ├── CMakeCache.txt
+  ├── CMakeFiles
+  ├── cmake_install.cmake
+  └── Makefile
+
+  1 directory, 3 files
+#+END_SRC
+
+  *Generate specific building script:*
+
+ + $ cmake -H<SOURCE> -B<BUILD> -G <BUILD-SYSTEM>
+   + <SOURCE> => Source directory where all *.cpp, *.hpp code. In this
+     case it is (.) dot, current directory. If the directory was
+     ./src, the command would be -Hsrc or -H./src
+   + <BUILD> => Compilation output, directory where are all building
+     scripts.
+   + <BUILD-SYSTEM> => All available build system can be listed with $ cmake -G.
+
+#+BEGIN_SRC sh 
+  # Generate MSbuild building scripts for 64 bits target 
+  $ cmake -H. -Bbuild -G " Visual Studio 15 2017 Win64"
+#+END_SRC
+
+ *STEP 2: Compile the project invoking the generated building scripts*
+
+Invoke the building scripts indirectly using CMake:
+
+ + $ cmake --build <BUILD>
+   + <BUILD> Is the build directory generated at step 1. 
+
+#+BEGIN_SRC sh 
+  $ cmake --build build
+  # OR
+  $ cmake --build build --config Debug 
+  # OR
+  $ cmake --build build --config Release
+#+END_SRC
+
+Invoke the building script directly, call the building tool:
+ + This building method depends on the current building system.
+
+For MSBuild, the compilation becomes:
+
+#+BEGIN_SRC sh
+  $ MSBuild build\testlib.vcxproj
+
+  Microsoft (R) Build Engine version 15.5.180.51428 for .NET Framework
+  Copyright (C) Microsoft Corporation. All rights reserved.
+
+  Build started 12/21/2018 12:49:38 PM.
+  Project "C:\Users\archbox\Desktop\experiments\dll\build\testlib.vcxproj" on node 1 (default targets).
+  Project "C:\Users\archbox\Desktop\experiments\dll\build\testlib.vcxproj" (1) is building "C:\Users\archbox\ Desktop\experiments\dll\build\ZERO_CHECK.vcxproj" (2) on node 1 (default targets).
+  ... ... ... ... ... ... ... ... ... ... ... ... ... ... 
+  testlib.vcxproj -> C:\Users\archbox\Desktop\experiments\dll\build\Debug\testlib.dll
+  FinalizeBuildStatus:
+    Deleting file "testlib.dir\Debug\testlib.tlog\unsuccessfulbuild".
+    Touching "testlib.dir\Debug\testlib.tlog\testlib.lastbuildstate".
+  Done Building Project "C:\Users\archbox\Desktop\experiments\dll\build\testlib.vcxproj" (default targets).
+#+END_SRC
+
+For Linux or Unix GNU-Make, the compilation becomes:
+
+#+BEGIN_SRC sh 
+   $ cd build
+
+   $ make
+   /usr/bin/cmake -H/home/archbox/root-scripts/gist -B/home/archbox/root-scripts/gist/build --check-build-system CMakeFiles/Makefile.cmake 0
+   /usr/bin/cmake -E cmake_progress_start /home/archbox/root-scripts/gist/build/CMakeFiles /home/archbox/root-scripts/gist/build/CMakeFiles/progress.marks
+   make -f CMakeFiles/Makefile2 all
+   make[1]: Entering directory '/home/archbox/root-scripts/gist/build'
+   make -f CMakeFiles/testlib.dir/build.make CMakeFiles/testlib.dir/depend
+   make[2]: Entering directory '/home/archbox/root-scripts/gist/build'
+   ... ... ... ... ... ... ... ... ... ... ... ... 
+   [100%] Built target client1-executable
+   make[1]: Leaving directory '/home/archbox/root-scripts/gist/build'
+   /usr/bin/cmake -E cmake_progress_start /home/archbox/root-scripts/gist/build/CMakeFiles 0  
+
+
+  # Built executables: 
+  #--------------------------------
+  $ file libtestlib.so 
+  libtestlib.so: ELF 64-bit LSB shared object, x86-64, version 1 (SYSV), dynamically 
+  linked, BuildID[sha1]=ce79ed7580a16cbc27bf113a2967eb1d66f496a3, not stripped
+
+  $ file client1-executable.bin 
+  client1-executable.bin: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, 
+  for GNU/Linux 3.2.0, BuildID[sha1]=8103d822a6d58497b63346dfcc1f7375599114f7, not stripped
+#+END_SRC
+
+Or just in a single step: 
+
+#+BEGIN_SRC sh 
+  $ cd build && make && cd ..
+#+END_SRC
+
+*** Show system information 
 
 #+BEGIN_SRC sh  
   cmake --sytem-information 
@@ -485,3 +707,4 @@ Windows.
     message("Running Mingw/GCC maybe on Windows")
   endif()
 #+END_SRC
+
