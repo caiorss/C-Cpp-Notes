@@ -128,7 +128,7 @@ Problems:
 
  + [[http://bigbang.waterlin.org/bang/using-python-ctypes-to-link-cpp-library/][The Big Bang on Reading Busy » Blog Archive » Using Python ctypes to link C/C++ library]]
 
-** Example 1 - Shared Library libtest.dll - DLLs on Windows
+** Example 1 - Cross platform Shared Library
 *** Overview 
 
  *Source:*
@@ -1366,13 +1366,13 @@ testlib.dll can be eliminated by crafting a python module file and
 wrapper classes.
 
 Source:
- + File: [[file:src/dlls/example-windows1/testlib.py][file:src/dlls/example-windows1/testlib.py]]
+ + File: [[file:src/dlls/example-windows1/pywrapper.py][file:src/dlls/example-windows1/pywrapper.py]]
  + Gist: [[https://gist.github.com/caiorss/2bba4c50866d9467aaa8c7792b337f71][Gisthub]]
 
 
  *Module Initialization:*
 
- + File: testlib.py
+ + File: pywrapper.py
 
 The function _config initializes the wrapper module, loading the DLL -
 share library testlib.dll into the current Python3 interpreter process
@@ -1382,14 +1382,28 @@ without name mangling) exported by the library.
 #+BEGIN_SRC python 
   import ctypes
 
-  # Library handler 
-  _lib = ctypes.cdll.LoadLibrary("testlib.dll")
+  def _getSharedLibrary(libname):
+      import sys
+      import os
+      libfile = libname 
+      if sys.platform == "linux" or sys.platform == "linux2":
+          libfile = "lib" + libname + ".so"
+      elif sys.platform == "darwin":
+          libfile =  libname + ".dylyb"
+      elif  sys.platform == "win32":
+          libfile = libname + ".dll"
+      libpath = os.path.join(os.path.dirname(__file__), libfile)
+      print(" [INFO] libpath = " + libpath)
+      return libpath
+
+  # _lib = ctypes.cdll.LoadLibrary("testlib")
+  _lib = ctypes.cdll.LoadLibrary(_getSharedLibrary("testlib"))
 
   # Startup ctypes FFI - Foreign Function Interface 
   def _config():
       print("Intializing library")
       # ======= std::vector<double> and Linalg:: namespace ==========##
-
+    
       # hVectorD testlib_vectorD_make0(size_t n, double x)
       _lib.testlib_vectorD_make0.argtypes = [ctypes.c_int, ctypes.c_double]
       _lib.testlib_vectorD_make0.restype  = ctypes.c_void_p
@@ -1398,12 +1412,6 @@ without name mangling) exported by the library.
       _lib.testlib_vectorD_make1.argtypes = [ctypes.c_int, ctypes.POINTER(ctypes.c_double)]
       _lib.testlib_vectorD_make1.restype  = ctypes.c_void_p    
 
-      # void testlib_vectorD_Linalg_printVector(const char* name, hVectorD hv)
-      _lib.testlib_vectorD_Linalg_printVector.argtypes = [ctypes.POINTER(ctypes.c_char), ctypes.c_void_p ]
-      _lib.testlib_vectorD_Linalg_printVector.restype = None
-       ... ....    ... ....    ... ....    ... ....    ... ....    ... .... 
-
-  # Initializae module.
   _config()
 #+END_SRC
 
@@ -1499,7 +1507,41 @@ ImplementationB.
           return self.__str__()    
 #+END_SRC
 
-Usage in Python3 REPL:
+Function test1() runs an example code:
+
+#+BEGIN_SRC python 
+  def test1():
+      print("\n ========  Test 1 - std::vector<double> wrapper and Linalg module ======")
+      v1 = VectorD.fromValue(4, 3.5)
+      print(" [*]=> Before changing std::vector<double> object")
+      v1.disp()
+      print("v1.norm() = " + str(v1.norm()))
+      print()
+      print(" [*]=> After changing std::vector<double> object")
+      v1.set(0, 5); v1.set(1, 2.6); v1.set(2, 9.81); v1.set(3, 3.76)
+      v1.disp()
+      print("v1.norm() " + str(v1.norm()))
+      print()
+
+      print("\n ========  Interface class 'InterfaceClass' ======")
+      clsA = CPPInterfaceClass.makeA()
+      print("clsA = " + str(clsA))
+      print("clsA.getType() = " + clsA.getType())
+
+      clsB = CPPInterfaceClass.makeB()
+      print("clsB = " + str(clsB))
+      print("clsB.getType() = " + clsB.getType())    
+
+  if __name__ == "__main__":    
+      test1()
+
+#+END_SRC
+
+ *Usage in Python3 REPL:*
+
+This step assumes that the shared library file (testlib.dll on Windows
+or libtestlib.so on Unix-like OS or Linux) is in the same directory as
+the python script pywrapper.py.
 
  + Import module 
 
