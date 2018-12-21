@@ -1105,8 +1105,6 @@ $ g++ client.cpp -g -o client-gcc.exe -std=c++14 testlib.dll -DDISABLE   && clie
 #+END_SRC
 
 
-
-
 *** Load DLL in Python3 REPL 
 
 Functions with C-linkage can be called by Python using the ctypes
@@ -1653,7 +1651,8 @@ the python script pywrapper.py.
   testlib.cpp:49: <DllMain> => DLL attached
    [StaticObject] => Shutdown DLL
 #+END_SRC
-*** View symbols exported by the DLL 
+*** View symbols exported by the shared library 
+**** View exported symbols on Windows (dumpbin)
 
  *Location of dumpbin tool*
 
@@ -1786,6 +1785,90 @@ It is possible to demangle those symbols with the tool - https://demangler.com/
 
 #+BEGIN_SRC cpp 
   class std::vector<double,class std::allocator<double> > __cdecl Linalg::linTransform(double,double,class std::vector<double,class std::allocator<double> > & __ptr64)
+#+END_SRC
+
+**** View exports symbols on Unix-like OSes (nm)
+
+View exported symbols with nm:
+
+ + Note that only functions annotated with extern "C" such as
+   _teslib_InterfaceClass_factory_ are not mangled. 
+
+#+BEGIN_SRC sh 
+  $ nm -D libtestlib.so 
+
+  000000000020a3d8 B __bss_start
+                   U __cxa_atexit
+                   w __cxa_finalize
+                   U __cxa_pure_virtual
+  000000000020a3d8 D _edata
+  000000000020a440 B _end
+  000000000000710c T _fini
+                   w __gmon_start__
+  ... ...   ... ...   ... ...   ... ...   ... ... 
+  0000000000005512 T teslib_InterfaceClass_factory
+  0000000000005629 T testlib_InterfaceClass_delete
+  0000000000005656 T testlib_InterfaceClass_getID
+  00000000000056a8 T testlib_InterfaceClass_getName
+  0000000000005677 T testlib_InterfaceClass_setName
+  000000000000545c T testlib_SampleClass_delete
+  000000000000548f T testlib_SampleClass_get
+  00000000000054cc T testlib_SampleClass_getName
+   
+  ... ... ... ...   ... ... ... ... 
+
+  0000000000005076 T _ZN11SampleClassC2ERKNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE
+  0000000000005106 T _ZN11SampleClassC2Ev
+  0000000000005196 T _ZN11SampleClassD1Ev
+
+#+END_SRC
+
+View exported symbols demangled (without name mangling):
+
+#+BEGIN_SRC sh 
+   $ nm -CD libtestlib.so 
+   000000000020a3d8 B __bss_start
+                    U __cxa_atexit
+                    w __cxa_finalize
+
+    ... ... ...  ... ... ...  ... ... ...  ... ... ... 
+
+   0000000000004fe7 T testlib_vectorD_Linalg_norm
+   000000000000500f T testlib_vectorD_Linalg_printVector
+   0000000000004e52 T testlib_vectorD_make0
+   0000000000004ee2 T testlib_vectorD_make1
+   0000000000004f80 T testlib_vectorD_set
+                    U _Unwind_Resume
+                    U operator delete(void*)
+                    U operator delete(void*, unsigned long)
+   00000000000052fe T SampleClass::get()
+   0000000000005310 T SampleClass::set(int)
+
+    ...  ...  ...  ...  ...  ...  ... 
+
+   00000000000070ac W double* std::__copy_move<false, true, std::random_access_iterator_tag>::__copy_m<double>(double const*, double const*, double*)
+   0000000000006cfe W void std::_Destroy_aux<true>::__destroy<double*>(double*, double*)
+   0000000000006c74 W std::_Vector_base<double, std::allocator<double> >::_M_allocate(unsigned long)
+   0000000000006a44 W std::_Vector_base<double, std::allocator<double> >::_Vector_impl::_Vector_impl(std::allocator<double> const&)
+   0000000000006a44 W std::_Vector_base<double, std::allocator<double> >::_Vector_impl::_Vector_impl(std::allocator<double> const&)
+   000000000000681a W std::_Vector_base<double, std::allocator<double> >::_Vector_impl::~_Vector_impl()
+   000000000000681a W std::_Vector_base<double, std::allocator<double> >::_Vector_impl::~_Vector_impl()
+   0000000000006ae8 W std::_Vector_base<double, std::allocator<double> >::_M_deallocate(double*, unsigned long)
+   0000000000006a8e W std::_Vector_base<double, std::allocator<double> >::_M_create_storage(unsigned long)
+   0000000000006926 W std::_Vector_base<double, std::allocator<double> >::_M_get_Tp_allocator()
+   0000000000006836 W std::_Vector_base<double, std::allocator<double> >::_Vector_base(unsigned long, std::allocator<double> const&)
+   00000000000069d2 W std::_Vector_base<double, std::allocator<double> >::_Vector_base(std::allocator<double> const&)
+   0000000000006836 W std::_Vector_base<double, std::allocator<double> >::_Vector_base(unsigned long, std::allocator<double> const&)
+   00000000000069d2 W std::_Vector_base<double, std::allocator<double> >::_Vector_base(std::allocator<double> const&)
+
+  ... ... ... ... ... 
+
+  0000000000006706 W std::function<void ()>::function(std::function<void ()> const&)
+  0000000000006706 W std::function<void ()>::function(std::function<void ()> const&)
+  00000000000062b2 W std::function<void ()>::~function()
+  00000000000062b2 W std::function<void ()>::~function()
+                   U std::ios_base::Init::Init()
+                   U std::ios_base::Init::~Init()
 #+END_SRC
 
 ** TODO Shared Libraries on Linux 
