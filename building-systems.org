@@ -1,0 +1,616 @@
+#+INCLUDE: theme/style.org 
+#+TITLE: CPP / C++ - Building Systems and Build Automation 
+#+DESCRIPTION: cpp/c++ code examples and demonstrations.
+#+STARTUP: content 
+
+- [[wiki:index][Index]]
+
+* Building Systems and Build Automation 
+* CMake - Reference Card
+** Build some project with CMAKE 
+
+A project using Cmake as building system contains a build script at
+top level directory named CMakeLists.txt. To build a project with
+CMake, it is necessary to consider that CMake, is not a building
+system and does not build anything. Actually, Cmake generates building
+scripts for the platform preferred building scripts. For instance, on
+Linux, it can generate Makefile, Eclipse Makefiles; on Windows it can
+generate MSBuild scripts, NMake (Windows SDK's make) and so on.
+
+ + Check all possible building system for which CMake can generate
+   build scripts.
+   + Command: $ *cmake -G*
+
+#+BEGIN_SRC sh 
+   # Running on Windows 10 
+   $ cmake -G
+   CMake Error: No generator specified for -G
+
+   Generators
+     Visual Studio 15 2017 [arch] = Generates Visual Studio 2017 project files.
+                                    Optional [arch] can be "Win64" or "ARM".
+     Visual Studio 14 2015 [arch] = Generates Visual Studio 2015 project files.
+                                    Optional [arch] can be "Win64" or "ARM".
+     Visual Studio 12 2013 [arch] = Generates Visual Studio 2013 project files.
+                                    Optional [arch] can be "Win64" or "ARM".
+     Visual Studio 11 2012 [arch] = Generates Visual Studio 2012 project files.
+                                    Optional [arch] can be "Win64" or "ARM".
+     Visual Studio 10 2010 [arch] = Generates Visual Studio 2010 project files.
+                                    Optional [arch] can be "Win64" or "IA64".
+     Visual Studio 9 2008 [arch]  = Generates Visual Studio 2008 project files.
+                                    Optional [arch] can be "Win64" or "IA64".
+     Borland Makefiles            = Generates Borland makefiles.
+     NMake Makefiles              = Generates NMake makefiles.
+     NMake Makefiles JOM          = Generates JOM makefiles.
+     Green Hills MULTI            = Generates Green Hills MULTI files
+                                    (experimental, work-in-progress).
+     MSYS Makefiles               = Generates MSYS makefiles.
+     MinGW Makefiles              = Generates a make file for use with
+                                    mingw32-make.
+     Unix Makefiles               = Generates standard UNIX makefiles.
+     Ninja                        = Generates build.ninja files.
+     Watcom WMake                 = Generates Watcom WMake makefiles.
+     CodeBlocks - MinGW Makefiles = Generates CodeBlocks project files.
+     CodeBlocks - NMake Makefiles = Generates CodeBlocks project files.
+     CodeBlocks - NMake Makefiles JOM
+                                  = Generates CodeBlocks project files.
+     CodeBlocks - Ninja           = Generates CodeBlocks project files.
+     CodeBlocks - Unix Makefiles  = Generates CodeBlocks project files.
+     CodeLite - MinGW Makefiles   = Generates CodeLite project files.
+     CodeLite - NMake Makefiles   = Generates CodeLite project files.
+     CodeLite - Ninja             = Generates CodeLite project files.
+     CodeLite - Unix Makefiles    = Generates CodeLite project files.
+     Sublime Text 2 - MinGW Makefiles
+                                  = Generates Sublime Text 2 project files.
+     Sublime Text 2 - NMake Makefiles
+                                  = Generates Sublime Text 2 project files.
+     Sublime Text 2 - Ninja       = Generates Sublime Text 2 project files.
+     Sublime Text 2 - Unix Makefiles
+                                  = Generates Sublime Text 2 project files.
+     Kate - MinGW Makefiles       = Generates Kate project files.
+     Kate - NMake Makefiles       = Generates Kate project files.
+     Kate - Ninja                 = Generates Kate project files.
+     Kate - Unix Makefiles        = Generates Kate project files.
+     Eclipse CDT4 - NMake Makefiles
+                                  = Generates Eclipse CDT 4.0 project files.
+     Eclipse CDT4 - MinGW Makefiles
+                                  = Generates Eclipse CDT 4.0 project files.
+     Eclipse CDT4 - Ninja         = Generates Eclipse CDT 4.0 project files.
+     Eclipse CDT4 - Unix Makefiles= Generates Eclipse CDT 4.0 project files.
+#+END_SRC
+
+ *STEP 1: Generate Building Script*
+
+Project directory listing:
+
+#+BEGIN_SRC sh 
+  $ tree .
+  .
+  ├── build.bat
+  ├── client1.cpp
+  ├── CMakeLists.txt
+  ├── Makefile
+  ├── pywrapper.py
+  ├── testlib.cpp
+  └── testlib.hpp
+#+END_SRC
+
+ *Generate building scripts for platform-preferred building system:*
+
+ + $ cmake -H<SOURCE> -B<BUILD>
+   + <SOURCE> => Source directory where all *.cpp, *.hpp code. In this
+     case it is (.) dot, current directory. If the directory was
+     ./src, the command would be -Hsrc or -H./src
+   + <BUILD> => Compilation output, directory where are all building
+     scripts. 
+
+Command output on Windows 10 - MSVC 2017. Note: It will set VC++ for
+32 bits target, not 64 bits.
+
+#+BEGIN_SRC sh 
+  $ cmake -H. -Bbuild
+  -- Building for: Visual Studio 15 2017
+  -- The C compiler identification is MSVC 19.16.27025.1
+  -- The CXX compiler identification is MSVC 19.16.27025.1  
+  ... ...   ... ...   ... ...   ... ...   ... ... 
+  -- Configuring done
+  -- Generating done
+  -- Build files have been written to: C:/Users/archbox/Desktop/experiments/dll/build
+#+END_SRC
+
+Command output on Linux: 
+
+#+BEGIN_SRC sh 
+  $ cmake -H. -Bbuild
+  -- The C compiler identification is GNU 8.2.1
+  -- The CXX compiler identification is GNU 8.2.1
+  -- Check for working C compiler: /usr/lib64/ccache/cc
+  -- Check for working C compiler: /usr/lib64/ccache/cc -- works
+  ... ...   ... ...   ... ...   ... ...   ... ... 
+   [INFO] Libtest location is at: libtest_location-NOTFOUND
+  -- Configuring done
+  -- Generating done
+  -- Build files have been written to: /home/archbox/root-scripts/gist/build
+
+  # List ./build directory 
+  $ tree -L 1 build
+  build
+  ├── CMakeCache.txt
+  ├── CMakeFiles
+  ├── cmake_install.cmake
+  └── Makefile
+
+  1 directory, 3 files
+#+END_SRC
+
+  *Generate building script for specific building system:*
+
+ + $ cmake -H<SOURCE> -B<BUILD> -G <BUILD-SYSTEM>
+   + <SOURCE> => Source directory where all *.cpp, *.hpp code. In this
+     case it is (.) dot, current directory. If the directory was
+     ./src, the command would be -Hsrc or -H./src
+   + <BUILD> => Compilation output, directory where are all building
+     scripts.
+   + <BUILD-SYSTEM> => All available build system can be listed with $ cmake -G.
+
+#+BEGIN_SRC sh 
+ # Generate MSbuild building scripts for 32 bits target 
+  $ cmake -H. -Bbuild -G "Visual Studio 15 2017"
+
+  # Generate MSbuild building scripts for 64 bits target 
+  $ cmake -H. -Bbuild -G "Visual Studio 15 2017 Win64"
+#+END_SRC
+
+ *Generate building script with debug symbols enabled:*
+
+It automatically adds the debugging flags (/Zi) for VC++ Microsoft
+Visual C++ Compiler which necessary for debugging a program with GDB,
+LLDB or WinDBG. 
+
+ + Add the flag *-DCMAKE_BUILD_TYPE=DEBUG*
+
+#+BEGIN_SRC sh 
+  # Example 1:
+  $ cmake -H. -Bbuild -DCMAKE_BUILD_TYPE=DEBUG
+
+  # Example 2:
+  $ cmake -H. -Bbuild -DCMAKE_BUILD_TYPE=RELEASE
+
+  # Example 3: 
+  cmake -H. -Bbuild -DCMAKE_BUILD_TYPE=DEBUG -G "Visual Studio 15 2017 Win64"
+
+  # Example 4: 
+  cmake -H. -Bbuild -DCMAKE_BUILD_TYPE=DEBUG -G "Visual Studio 15 2017 Win64"
+
+  # Example 5: 
+  cmake -H. -Bbuild -DCMAKE_BUILD_TYPE=RELEASE -G "Visual Studio 15 2017 Win64"
+#+END_SRC
+
+
+ *STEP 2: Compile the project invoking the generated building scripts*
+
+Invoke the building scripts indirectly using CMake:
+
+ + $ cmake --build <BUILD>
+   + <BUILD> Is the build directory generated at step 1. 
+
+#+BEGIN_SRC sh 
+  $ cmake --build build
+  # OR
+  $ cmake --build build --config Debug 
+  # OR
+  $ cmake --build build --config Release
+#+END_SRC
+
+Invoke the building script directly, call the building tool:
+ + This building method depends on the current building system.
+
+For MSBuild, the compilation becomes:
+
+#+BEGIN_SRC sh
+  $ MSBuild build\testlib.vcxproj
+
+  Microsoft (R) Build Engine version 15.5.180.51428 for .NET Framework
+  Copyright (C) Microsoft Corporation. All rights reserved.
+
+  Build started 12/21/2018 12:49:38 PM.
+  Project "C:\Users\archbox\Desktop\experiments\dll\build\testlib.vcxproj" on node 1 (default targets).
+  Project "C:\Users\archbox\Desktop\experiments\dll\build\testlib.vcxproj" (1) is building "C:\Users\archbox\ Desktop\experiments\dll\build\ZERO_CHECK.vcxproj" (2) on node 1 (default targets).
+  ... ... ... ... ... ... ... ... ... ... ... ... ... ... 
+  testlib.vcxproj -> C:\Users\archbox\Desktop\experiments\dll\build\Debug\testlib.dll
+  FinalizeBuildStatus:
+    Deleting file "testlib.dir\Debug\testlib.tlog\unsuccessfulbuild".
+    Touching "testlib.dir\Debug\testlib.tlog\testlib.lastbuildstate".
+  Done Building Project "C:\Users\archbox\Desktop\experiments\dll\build\testlib.vcxproj" (default targets).
+#+END_SRC
+
+For Linux or Unix GNU-Make, the compilation becomes:
+
+#+BEGIN_SRC sh 
+   $ cd build
+
+   $ make
+   /usr/bin/cmake -H/home/archbox/root-scripts/gist -B/home/archbox/root-scripts/gist/build --check-build-system CMakeFiles/Makefile.cmake 0
+   /usr/bin/cmake -E cmake_progress_start /home/archbox/root-scripts/gist/build/CMakeFiles /home/archbox/root-scripts/gist/build/CMakeFiles/progress.marks
+   make -f CMakeFiles/Makefile2 all
+   make[1]: Entering directory '/home/archbox/root-scripts/gist/build'
+   make -f CMakeFiles/testlib.dir/build.make CMakeFiles/testlib.dir/depend
+   make[2]: Entering directory '/home/archbox/root-scripts/gist/build'
+   ... ... ... ... ... ... ... ... ... ... ... ... 
+   [100%] Built target client1-executable
+   make[1]: Leaving directory '/home/archbox/root-scripts/gist/build'
+   /usr/bin/cmake -E cmake_progress_start /home/archbox/root-scripts/gist/build/CMakeFiles 0  
+
+
+  # Built executables: 
+  #--------------------------------
+  $ file libtestlib.so 
+  libtestlib.so: ELF 64-bit LSB shared object, x86-64, version 1 (SYSV), dynamically 
+  linked, BuildID[sha1]=ce79ed7580a16cbc27bf113a2967eb1d66f496a3, not stripped
+
+  $ file client1-executable.bin 
+  client1-executable.bin: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, 
+  for GNU/Linux 3.2.0, BuildID[sha1]=8103d822a6d58497b63346dfcc1f7375599114f7, not stripped
+#+END_SRC
+
+Or just in a single step: 
+
+#+BEGIN_SRC sh 
+  $ cd build && make && cd ..
+#+END_SRC
+
+** Show system information 
+
+#+BEGIN_SRC sh  
+  cmake --sytem-information 
+#+END_SRC 
+
+Output on Linux: 
+
+#+BEGIN_SRC sh 
+   Avoid ctest truncation of output: CTEST_FULL_OUTPUT
+   ========================================================
+   === MAIN VARIABLES
+   ========================================================
+   CMAKE_STATIC_LIBRARY_PREFIX == "lib"
+   CMAKE_STATIC_LIBRARY_SUFFIX == ".a"
+   CMAKE_SHARED_LIBRARY_PREFIX == "lib"
+   CMAKE_SHARED_LIBRARY_SUFFIX == ".so"
+   CMAKE_SHARED_MODULE_PREFIX == "lib"
+   CMAKE_SHARED_MODULE_SUFFIX == ".so"
+
+
+   CMAKE_DL_LIBS == "dl"
+   CMAKE_LIBRARY_PATH_FLAG == "-L"
+   CMAKE_LINK_LIBRARY_FLAG == "-l"
+   CMAKE_SKIP_RPATH == "NO"
+   CMAKE_SYSTEM_INFO_FILE == "Platform/Linux"
+   CMAKE_SYSTEM_NAME == "Linux"
+   CMAKE_SYSTEM == "Linux-4.18.18-200.fc28.x86_64"
+   CMAKE_CXX_COMPILER == "/usr/lib64/ccache/c++"
+   CMAKE_C_COMPILER == "/usr/lib64/ccache/cc"
+   CMAKE_COMPILER_IS_GNUCC == "1"
+   CMAKE_COMPILER_IS_GNUCXX == "1"
+
+   // C shared library flag
+   CMAKE_SHARED_LIBRARY_C_FLAGS == "-fPIC"
+   CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS == "-shared"
+   CMAKE_SHARED_LIBRARY_LINK_FLAGS == ""
+   ... ...    ... ...    ... ...    ... ...    ... ... 
+#+END_SRC
+
+** Show all modules 
+
+#+BEGIN_SRC sh 
+  $ cmake --help-module-list
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC text 
+  AddFileDependencies
+  AndroidTestUtilities
+  BundleUtilities
+  CMakeAddFortranSubdirectory
+  CMakeBackwardCompatibilityCXX
+  CMakeDependentOption
+  CMakeDetermineVSServicePack
+  CMakeExpandImportedTargets
+  CMakeFindDependencyMacro
+  CMakeFindFrameworks
+  CMakeFindPackageMode
+  CMakeForceCompiler
+  CMakeGraphVizOptions
+
+  ... ... ... ... ... ... 
+
+  FindLAPACK
+  FindLATEX
+  FindLTTngUST
+  FindLibArchive
+  FindLibLZMA
+  FindLibXml2
+  FindLibXslt
+  FindLua
+  FindLua50
+  FindLua51
+  FindMFC
+  FindMPEG
+  FindMPEG2
+  FindMPI
+  FindMatlab
+  FindMotif
+  FindOpenACC
+
+  ... ... ... ... ... ... ... ... 
+
+#+END_SRC
+
+** SNIPPET - Common Variables 
+*** CMAKE_CURRENT_LIST_DIR - Directory where is CMakeLists.txt 
+
+Prints the directory where CMAkeLists.
+
+#+BEGIN_SRC cmake 
+  message(" [INFO] CMakeLists.txt is in the directory ${CMAKE_CURRENT_LIST_DIR}")
+#+END_SRC
+
+*** CMAKE_CXX_STANDARD - Set C++ Standard
+
+The variable ~CMAKE_CXX_STANDARD~ sets the project current C++
+standard. This variable can be set to 98 (for C++98); 11 (C++11); 14
+(C++14); 17 (C++17) and 20 (C++20 - experimental yet.)
+
+ + Documentation: [[https://cmake.org/cmake/help/latest/prop_tgt/CXX_STANDARD.html#prop_tgt:CXX_STANDARD][CXX_STANDARD — CMake 3.13.2 Documentation]] 
+
+Example: Set project to compile with C++11 ISO standard.
+
+#+BEGIN_SRC cmake 
+  set(CMAKE_CXX_STANDARD 11)
+#+END_SRC
+
+Usage: (File CMAKELists.txt)
+
+#+BEGIN_SRC cmake 
+  cmake_minimum_required(VERSION 3.9)
+  project(MY_PROJECT_NAME)
+
+  set(CMAKE_CXX_STANDARD 17)
+  ... ... .... .... 
+#+END_SRC
+
+*** CMAKE_BUILD_TYPE - Set default building type to DEBUG 
+
+In the debug building type optimization flags are disabled and flags
+for generating debugging symbols are enabled, for GGC or GCC/Mingw and
+Clang the (-g) is automatically added and for MSVC, aka VC++ (cl.exe),
+the flag /Zi is also passed to the compiler. The default building type
+can be set to DEBUG with the following code.
+
+#+BEGIN_SRC cmake 
+  # Set default building type to debug if it was not set
+  # in command line with -DCMAKE_BUILD_TYPE=release
+  if(NOT DEFINED CMAKE_BUILD_TYPE OR CMAKE_BUILD_TYPE MATCHES "")
+    set(CMAKE_BUILD_TYPE  debug)
+  endif()
+#+END_SRC
+
+The building type can be changed by running cmake with the flag
+ (-DCMAKE_BUILD_TYPE=release). Example: 
+
+#+BEGIN_SRC sh 
+ $ cmake -H. -Bbuild -DCMAKE_BUILD_TYPE=DEBUG -G "Visual Studio 15 2017 Win64"
+#+END_SRC
+
+Note: CMake is not case sensitive, so it does not matter using
+'release' or RELEASE; if or IF; endif or ENDIF and so on. 
+
+*** CMAKE_CXX_FLAGS - Compiler flags 
+
+The globals compiler flags used to build all targets can be extended
+by setting the variable CMAKE_CXX_FLAGS. However, as the compiler
+flags depends on the compiler, the custom settings may not be portable
+if one uses a different compiler, for instance the (-g) flag used to
+generate debug symbols with GCC or Clang does not work with MSVC
+(visual c++ compiler, vc++) as it uses the flag /Zi for generating
+debugging symbols.
+
+Example 1: 
+
+#+BEGIN_SRC cmake
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}"  "-std=c++17 -g -Wall -Wextra -pendantic -O0" )
+#+END_SRC
+
+Example 2 (better):
+
+#+BEGIN_SRC cmake
+  if(NOT MSVC)
+     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}"  "-std=c++17 -g -Wall -Wextra -pendantic -O0" )
+  endif()
+#+END_SRC
+** SNIPPET - Detect Operating System 
+
+Check whether current OS is Microsft Windows NT:
+
+#+BEGIN_SRC cmake
+  if(WIN32)
+    # actions ... 
+    message("Compiling for Windows NT")
+  else()
+    # else actions .... ...
+  endif()
+#+END_SRC
+
+Check whether current OS is a Unix-like operating system (Linux, BSD,
+MacOSX, Android and so on): 
+
+#+BEGIN_SRC cmake 
+  if(UNIX)
+    # actions ... 
+    message("Running on Unix-like OS")
+  endif()  
+#+END_SRC
+
+Check if current OS is MacOSX:
+
+#+BEGIN_SRC cmake 
+  if(APPLE)
+    # actions ... 
+    message("Running on Unix-like OS")
+  endif()  
+#+END_SRC
+
+Check if current OS is Linux:
+
+#+BEGIN_SRC cmake 
+  if(LINUX)
+    # actions ... 
+    message("Running on Unix-like OS")
+  endif()  
+#+END_SRC
+
+Check if current OS is UNIX, but not MacOSX:
+
+#+BEGIN_SRC cmake
+  if(UNIX AND NOT APPLE)
+    # actions ... 
+    message("Running on Unix-like OS")
+  endif()  
+#+END_SRC
+
+** SNIPPET - Detect Compiler 
+
+ *MSVC*
+
+Check if current compiler is MSVC - Microsft - Visual C/C++ Compiler
+(Visual C++, vc++ for short):
+
+#+BEGIN_SRC cmake 
+  if(MSVC)
+    message(STATUS << "Running MSVC")
+  endif()
+#+END_SRC
+
+ *MSVC for 32 bits target*
+
+Detect MSVC set up for 32 bits target (buids 32 bits binaries):
+
+#+BEGIN_SRC cmake 
+  if(MSVC AND NOT CMAKE_CL_64)
+    message(" [INFO] Building for 32 bits Windows target.")
+  endif()
+#+END_SRC
+
+ *MSVC for 64 bits target*
+
+#+BEGIN_SRC cmake 
+  if(MSVC AND CMAKE_CL_64)
+    message(" [INFO] Building for 64 bits Windows target.")
+  endif()
+#+END_SRC
+
+ *Mingw* 
+
+Check if current compiler is GCC/Mingw, GCC compiler ported to
+Windows.
+
+#+BEGIN_SRC cmake
+  if(MSVC)
+    message("Running Mingw/GCC maybe on Windows")
+  endif()
+#+END_SRC
+
+** SNIPPET - Copy some target binaries to a directory
+
+This piece of code copies the target binaries (compiled code) to a
+directory relative to project's root directory where is CMakeLists.txt 
+
+Targets:
+
+#+BEGIN_SRC cmake 
+  # TARGET: testlib Shared library => Builds liblinalg.so on Unix or
+  # linalg.dll on Windows.
+  add_library(linalg SHARED  src/testlib.cpp)
+
+  # TARGET: app Executable => Builds 'app' on Unix-like Oses and
+  # unix.exe on Windows.
+  add_executable(app src/main/main-app.cpp src/main/file1.cpp src/main/file2.cpp)
+#+END_SRC
+
+Copy target files to top level directory where is CMakeLists.txt 
+
+#+BEGIN_SRC cmake
+  # If not set the install directory, attemp set the install directory
+  # CMAKE_INSTALL_PREFIX to the directory ./bin 
+  if(NOT DEFINED CMAKE_INSTALL_PREFIX OR CMAKE_INSTALL_PREFIX MATCHES "")
+    set(CMAKE_INSTALL_PREFIX  "./bin")
+  endif()
+
+  message(" [INFO] CMakeLists.txt is in the directory ${CMAKE_CURRENT_LIST_DIR}")
+
+  # Copy targets to ./ - Directory where is this file CMakeLists.txt (project top level dir)
+  install(TARGETS app linalg DESTINATION  ${CMAKE_CURRENT_LIST_DIR})
+#+END_SRC
+
+This target can be run with: 
+
+ + STEP 1: Set CMake building system or the project type with -G.
+
+#+BEGIN_SRC sh 
+ $ cd project-directory 
+
+ #===> Set build system 
+ # -H<SOURCE> -B<COMPILATION-OUTPUT> -G <BUILDING-SYSTEM>
+ $ cmake -H. -G "Unix Makefiles" -Bbuild 
+#+END_SRC
+ 
+ + STEP 2: Run targets 
+
+#+BEGIN_SRC sh 
+ #===> Run all targets [all default.]
+ $ cmake --build build --target all 
+
+ #===> Run target install and copy the binaries to ./bin 
+ $ cmake --build build --target install 
+#+END_SRC
+
+
+
+
+
+
+
+
+** SNIPPET - Create target to run compiled executable 
+
+The piece following piece of code runs an executable target after it
+is built in a similar way to a command $ make run. 
+
+#+BEGIN_SRC cmake 
+  cmake_minimum_required(VERSION 3.9)
+
+   ... ...  ... ...  ... ...
+
+  # TARGET: myapplication 
+  add_executable(myapplication src/main.cpp src/code1.cpp code2.cpp ...)
+
+  # TARGET: run -> Runs the executable myapplication 
+  # On Unix-like Oses, it runs  /<build-directory>/myapplication 
+  # On Windows: it runs  <build-directory>/myapplication.exe 
+  add_custom_target(run
+      COMMAND myapplication
+      DEPENDS myapplication
+      WORKING_DIRECTORY ${CMAKE_PROJECT_DIR}
+  )
+#+END_SRC
+
+After the building system is set and output directory ./build, run:
+
+#+BEGIN_SRC sh 
+   #===> Run all targets [all default.]
+   $ cmake --build build --target run
+#+END_SRC
+
+
+
+
