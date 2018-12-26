@@ -148,19 +148,32 @@ Makefile rules:
 
 Typical CMake Variables:
 
-| Variable               | Compiler flags | Description                                         |
-|                        | affected       |                                                     |
-|------------------------+----------------+-----------------------------------------------------|
-| *Compiler*               |                |                                                     |
-| CMAKE_CXX_STANDARD     | -std=c++11     | Set the C++ standard used for compoling all sources |
-| CMAKE_CXX_FLAGS        | -              | Additional compiler flags for all targets.          |
-| CMAKE_BUILD_TYPE       |                | Set whether build type is release or debug          |
-|                        |                |                                                     |
-| *Location*               |                |                                                     |
-| CMAKE_BINARY_DIR       |                |                                                     |
-| CMAKE_CURRENT_LIST_DIR |                | Get location of current CMakeLists.txt file.        |
-| CMAKE_INSTALL_PREFIX   |                | Location where targets will be installed            |
-|                        |                |                                                     |
+|--------------------------+----------------+-----------------------------------------------------------|
+| Variable                 | Compiler flags | Description                                               |
+|                          | affected       |                                                           |
+|--------------------------+----------------+-----------------------------------------------------------|
+| *Misc*                     |                |                                                           |
+| PROJECT_NAME             | -              | Sets project name.                                        |
+|                          |                |                                                           |
+| *Compiler*                 |                |                                                           |
+|                          |                |                                                           |
+| CMAKE_CXX_STANDARD       | -std=c++11     | Set the C++ standard used for compoling all sources       |
+| CMAKE_CXX_FLAGS          | -              | Additional compiler flags for all targets.                |
+| CMAKE_BUILD_TYPE         |                | Set whether build type is release or debug                |
+|                          |                |                                                           |
+| *Location*                 |                |                                                           |
+| CMAKE_BINARY_DIR         |                |                                                           |
+| CMAKE_CURRENT_LIST_DIR   |                | Get location of current CMakeLists.txt file.              |
+| CMAKE_INSTALL_PREFIX     |                | Location where targets will be installed (target _install_) |
+| CMAKE_CURRENT_BINARY_DIR |                |                                                           |
+|                          |                |                                                           |
+|--------------------------+----------------+-----------------------------------------------------------|
+
+Notes: 
+
+ + The default value of the variable CMAKE_INSTALL_PREFIX are:
+   + Windows:        C:/Program Files/${PROJECT_NAME}
+   + Unix-like OS:   /usr/local
 
 ** Build a project from command line.
 
@@ -791,7 +804,7 @@ message to the user.
   endif()
   ... ... 
 #+END_SRC
-** SNIPPET - Set target subsystem - Win32 API Specific
+** SNIPPET - Set target subsystem: console/window - Win32 API Specific
 
 Set target subsystem. 
 
@@ -810,6 +823,50 @@ Taken from:
  + [[https://gitlab.kitware.com/cmake/community/wikis/doc/cmake/recipe/VSConfigSpecificSettings][Vsconfigspecificsettings · Wiki · CMake / Community · GitLab]]
  + [[https://developercommunity.visualstudio.com/content/problem/46678/cmake-set-subsystem-to-console.html][cmake: Set subsystem to console - Developer Community]]
  + [[https://stackoverflow.com/questions/33873735/correctly-set-visual-studio-linker-flag-subsystem-in-cmake][c++ - Correctly set Visual Studio linker flag /SUBSYSTEM in CMAKE - Stack Overflow]]
+** SNIPPET - Copy a target file whenever it is recompiled
 
- 
+Example:  Copy a shared library to project root directory ./
+whenever it is rebuilt. 
 
+ + Set the shared library target. (libtestlib.so on Unix or testlib.dll
+   on Windows)
+
+#+BEGIN_SRC cmake 
+  add_library( testlib  SHARED  ./testlib.cpp)
+  set_target_properties(testlib PROPERTIES CXX_VISIBILITY_PRESET hidden)
+#+END_SRC
+
+ + Automatically copy to root directory the generated shared library
+   binary to root directory on every recompilation of the target
+   testlib. 
+
+#+BEGIN_SRC cmake
+  add_custom_command(TARGET testlib POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy 
+    $<TARGET_FILE:testlib>                     # Source    
+    ${CMAKE_CURRENT_SOURCE_DIR}/libtest.so     # Destination, file or directory 
+    # OR: ${CMAKE_CURRENT_SOURCE_DIR}/         # Directory destination. 
+  )
+#+END_SRC
+
+Test this post-build target: 
+
+#+BEGIN_SRC sh 
+  # Generate cache directory containing building scripts or project files 
+  # specifics for some building systems
+  $ cmake -H. -Bcache -G "CHOOSE SYSTEM>"
+
+  # Run all targets  [Default]
+  $ cmake --build cache --target
+  $ cmake --build cache --target all 
+
+  # Run target 'testlib'. 
+  $ cmake --build cache --target testlib 
+#+END_SRC
+
+After the target is recompiled, the shared library is copied to the
+current directory (project top-level directory ./).
+
+References: 
+ + https://stackoverflow.com/questions/31277186
+ + https://stackoverflow.com/questions/15694347/
