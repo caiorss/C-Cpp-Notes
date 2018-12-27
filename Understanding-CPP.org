@@ -10125,6 +10125,120 @@ Dynamic casting references:
   >> 
 #+END_SRC
 
+** Friend Functions 
+
+A friend function is a function that can access the private and
+protected member variables or member functions (methods) of some
+class. There are lots of controversies about friend function over
+breaking of encapsulation, however there are legitimate cases for
+their usage such as serialization. 
+
+Features: 
+
+  + A friend function to some class has access to private and
+    protected member variables and functions of that class.
+
+  + F.F. can be friend to multiple classes via function overloading.
+
+  + F.F. are not member functions or part of any class.
+
+ *Example:*
+
+Class: ClassA 
+
+#+BEGIN_SRC cpp 
+  class ClassA{
+  private:
+       std::string m_id;
+       double m_x, m_y;
+       void describe() const {
+          std::cout << "This is the class: ClassA" << std::endl;
+       }	
+  public:
+      ClassA(const std::string& id, double x, double y):
+         m_id(id), m_x(x), m_y(y)
+      {
+      }
+      double GetX() const { return m_x; }
+      double GetY() const { return m_y; }	
+      friend void showClassInfo(ClassA const& obj);
+  }
+#+END_SRC
+
+Class: ClassB.
+
+#+BEGIN_SRC cpp 
+  class ClassB{
+  private:
+       std::string  m_id;
+       int m_a, m_b, m_c;
+  public:
+      ClassB(std::string const& id, int a, int b, int c):
+              m_id(id), m_a(a), m_b(b), m_c(c)
+      {		
+      }
+      friend void showClassInfo(ClassB const& obj);
+  };
+
+#+END_SRC
+
+Friend Implementation:
+
+#+BEGIN_SRC cpp 
+  void showClassInfo(ClassA const& obj){
+       std::cout << "ClassA Information." << "\n";
+       std::cout << "  id = "    << obj.m_id
+                 << " ; x = " << obj.m_x
+                 << " ; y =  " << obj.m_y
+                 << "\n";
+       obj.describe();
+  }
+
+  void showClassInfo(ClassB const& obj){
+      std::cout << "ClassB Information." << "\n";
+      std::cout << " id = " << obj.m_id
+                << " ; a = " << obj.m_a
+                << " ; b = " << obj.m_b
+                << " ; c = " << obj.m_c
+                << "\n";
+  }
+#+END_SRC
+
+ROOT REPL Testing: 
+
+#+BEGIN_SRC cpp 
+   >> ClassA clsA{"objectA", 203.67, 9.345};
+   >> ClassB clsB{"objB", 20, 824, 561};
+
+   >> clsA.m_x
+   ROOT_prompt_8:1:6: error: 'm_x' is a private member of 'ClassA'
+   clsA.m_x
+        ^
+   input_line_17:5:9: note: declared private here
+           double m_x, m_y;
+                  ^
+
+   >> showClassInfo(clsA)
+   ClassA Information.
+     id = objectA ; x = 203.67 ; y =  9.345
+   This is the class: ClassA
+
+
+   >> showClassInfo(clsB)
+   ClassB Information.
+    id = objB ; a = 20 ; b = 824 ; c = 561
+#+END_SRC
+
+
+Further Reading: 
+
+ + Example - Usage of friend function for serialization:
+   + https://perso.telecom-paristech.fr/elc/software/jsonserial.pdf
+   + https://web.archive.org/web/20181227170325/https://perso.telecom-paristech.fr/elc/software/jsonserial.pdf
+
+ + [[https://www.ibm.com/support/knowledgecenter/en/ssw_ibm_i_73/rzarg/cplr042.htm][IBM Knowledge Center - Friends (C++ only)]]
+
+ + [[http://www.cs.fsu.edu/~jestes/cop3330/notes/overload.html][Operator Overloads]]
 ** Namespaces
 *** Summary 
 
