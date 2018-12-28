@@ -11434,6 +11434,191 @@ Running:
 
 #+END_SRC
 
+** C++17 File system library 
+
+The C++17 File system library, based on Boost file systems, provides
+platform-agnostic file system operation such as listing directories,
+checking file permissions, creating directories, copying files and so
+on.
+
+ *Small example about the library functionality*
+
+Source: 
+ + File: [[file:src/cpp17/cpp17-filesys1.cpp][file:src/cpp17/cpp17-filesys1.cpp]]
+ + GIST: [[https://gist.github.com/caiorss/440dbcfadee02c2a81f925fa31078bbe][cpp17-filesys1.cpp]]
+
+Compiling and running: 
+  + Note: it is necessary to link against stdc++fs.
+ 
+#+BEGIN_SRC sh 
+  $ g++ cpp17-filesys.cpp -o cpp17-filesys.bin -std=c++1z -O3 -Wall -Wextra -lstdc++fs  
+  $ ./cpp17-filesys.bin
+#+END_SRC
+
+Used headers and namespaces: 
+
+#+BEGIN_SRC cpp
+  #include <iostream>
+  #include <string>
+  #include <iterator>
+  #include <iomanip>
+
+  // C++17 - Requires compiler linking flag: -lstdc++fs on CLang or GCC.
+  #include <filesystem>
+
+  namespace fs = std::filesystem;
+#+END_SRC
+
+Helper template function for applying a function to the first N
+entries.
+
+#+BEGIN_SRC cpp 
+   /** Iterate over first N entries of a file system iterator. */
+   template<typename Range, typename Function>
+   auto dotimes(size_t n, Range&& iterable, Function fun){
+           size_t i = 0;
+           auto it = fs::begin(iterable);
+           auto end = fs::end(iterable);
+           while(i < n && it != end ){
+                   fun(it);
+                   ++it;
+                   i++;
+           }
+   }
+#+END_SRC
+
+ *Main Function* 
+
+ + Experiment 1: 
+
+#+BEGIN_SRC cpp 
+    std::cout << std::boolalpha;
+    std::cout << "\n EXPERIMENT 1 ===== Checking files in the system." << std::endl;
+    fs::path p1 = "/etc/iscsi/initiatorname.iscsi";
+    std::cout << "          p1 = " << p1 << std::endl;
+    std::cout << "p1.string()  = " << p1.string() << std::endl;
+    std::cout << "p1 ? exists  = " << fs::exists(p1) << std::endl;
+    std::cout << "p1 ? is File = " << fs::is_regular_file(p1) << std::endl;
+    std::cout << "p1 ? is Dir  = " << fs::is_directory(p1) << std::endl;
+
+    fs::path p2 = "/boot";
+    std::cout << "          p2 = " << p2 << std::endl;
+    std::cout << "p2.string()  = " << p2.string() << std::endl;
+    std::cout << "p2 ? exists  = " << fs::exists(p2) << std::endl;
+    std::cout << "p2 ? is File = " << fs::is_regular_file(p2) << std::endl;
+    std::cout << "p2 ? is Dir  = " << fs::is_directory(p2) << std::endl;
+
+    fs::path p3 = "/boot/does/not/exist";
+    std::cout << "          p3 = " << p3 << std::endl;
+    std::cout << "p3.string()  = " << p3.string() << std::endl;
+    std::cout << "p3 ? exists  = " << fs::exists(p3) << std::endl;
+    std::cout << "p3 ? is File = " << fs::is_regular_file(p3) << std::endl;
+    std::cout << "p3 ? is Dir  = " << fs::is_directory(p3) << std::endl;
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC sh 
+   EXPERIMENT 1 ===== Checking files in the system.
+            p1 = "/etc/iscsi/initiatorname.iscsi"
+  p1.string()  = /etc/iscsi/initiatorname.iscsi
+  p1 ? exists  = true
+  p1 ? is File = true
+  p1 ? is Dir  = false
+            p2 = "/boot"
+  p2.string()  = /boot
+  p2 ? exists  = true
+  p2 ? is File = false
+  p2 ? is Dir  = true
+            p3 = "/boot/does/not/exist"
+  p3.string()  = /boot/does/not/exist
+  p3 ? exists  = false
+  p3 ? is File = false
+  p3 ? is Dir  = false
+
+#+END_SRC
+
+ + Experiment 2: 
+
+#+BEGIN_SRC cpp 
+   std::cout << "\n EXPERIMENT 2 ===== Listing directory /etc =====" << std::endl;
+   // Show first 10 files of directory /etc 
+   dotimes(10, fs::directory_iterator("/etc"),
+               [](auto p){
+                   auto path = p->path();
+                   std::cout << std::left
+                             << std::setw(0) << path.filename().string()
+                             << " " << std::setw(35)
+                             << std::right << std::setw(40) << path
+                             << std::endl;				
+               });
+#+END_SRC
+
+Output:
+
+#+BEGIN_SRC sh 
+    EXPERIMENT 2 ===== Listing directory /etc =====
+   chkconfig.d                       "/etc/chkconfig.d"
+   DIR_COLORS.lightbgcolor           "/etc/DIR_COLORS.lightbgcolor"
+   crypttab                          "/etc/crypttab"
+   iscsi                             "/etc/iscsi"
+   depmod.d                          "/etc/depmod.d"
+   vbox                              "/etc/vbox"
+   rhashrc                           "/etc/rhashrc"
+   issue.net                         "/etc/issue.net"
+   java                              "/etc/java"
+   authselect                        "/etc/authselect"
+#+END_SRC
+
+ + Experiment 3: 
+
+#+BEGIN_SRC cpp 
+   std::cout << "\n EXPERIMENT 3 = Listing directory /etc (recursive) =====" << std::endl;
+   dotimes(20, fs::recursive_directory_iterator("/etc/"),
+                   [](auto p){
+                       std::cout << std::right
+                                 << std::setw(10)  << fs::is_directory(p->path())
+                                 << std::setw(10)  << fs::is_regular_file(p->path())
+                                 << std::setw(10)  << fs::is_symlink(p->path())
+                                 << std::setw(10)  << " "
+                                 << std::setw(5)   << std::left << p->path()					  
+                                 << std::endl;
+                   });
+#+END_SRC
+
+Output: 
+
+ + 1st colum  => Directory
+ + 2nd column => File
+ + 3rd column => Symbolic link
+ + 4th column => Absolute file path.
+
+#+BEGIN_SRC sh 
+   EXPERIMENT 3 = Listing directory /etc (recursive) =====
+        true     false     false          "/etc/chkconfig.d"
+       false      true     false          "/etc/DIR_COLORS.lightbgcolor"
+       false      true     false          "/etc/crypttab"
+        true     false     false          "/etc/iscsi"
+       false      true     false          "/etc/iscsi/iscsid.conf"
+       false      true     false          "/etc/iscsi/initiatorname.iscsi"
+        true     false     false          "/etc/depmod.d"
+        true     false     false          "/etc/vbox"
+       false      true     false          "/etc/vbox/vbox.cfg"
+       false      true     false          "/etc/rhashrc"
+       false      true      true          "/etc/issue.net"
+        true     false     false          "/etc/java"
+       false      true     false          "/etc/java/font.properties"
+       false      true     false          "/etc/java/java.conf"
+#+END_SRC
+
+
+Documentation: 
+
+ + [[https://en.cppreference.com/w/cpp/filesystem][Filesystem library - cppreference.com]]
+ + [[http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/p0218r1.html][C++17 Filesystem -]]
+ + [[https://www.boost.org/doc/libs/1_69_0/libs/filesystem/doc/tutorial.html][Boost Filesystem Tutorial]] (Note: it is not the std::filesystem
+   library, but its predecessor, however it is worth reading it.)
+
 ** Pointer to Function or Function Pointer  
 *** Overview 
 
