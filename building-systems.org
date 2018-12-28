@@ -353,6 +353,81 @@ instance: Code Blocks.
   1 directory, 4 files
 #+END_SRC
 
+** Additional Target Configuration 
+
+CMake can set up a compilation target in compiler-agnostic manner:
+
+ + Executable target defintion => Builds a *.exe on Windows.
+
+#+BEGIN_SRC cmake  
+   add_executable(SampleApp main.cpp sourc1.cpp source2.cpp)
+#+END_SRC
+
+ + Compiler defintions.
+   + It is the same as compiling with GCC with command line option
+     -D{DEFINITION}={VALUE} or compiling with MSVC VC++ with the
+     command line option /D{DEFINITION}={VALUE} which becomes #define
+     {DEFINITION} {VALUE} in the code.
+   + Docs: [[https://cmake.org/cmake/help/latest/command/target_compile_definitions.html][target_compile_definitions — CMake 3.13.2 Documentation]]
+
+#+BEGIN_SRC cmake 
+    target_compile_definitions(SampleApp PRIVATE  
+       VERBOSITY=100  # Same as #define VERBOSITY 100 
+       Optimize       # Same as -DOptimize or #define Optimize
+       foo=bar 
+      )
+   # In a single line 
+    target_compile_definitions(SampleApp PRIVATE VERBOSITY=100 Optimize foo=bar)
+#+END_SRC
+
+ + Additional include directories containing header files. Similar to
+   command line option -I with GCC.
+   + [[https://cmake.org/cmake/help/v3.0/command/target_include_directories.html][target_include_directories — CMake 3.0.2 Documentation]]
+
+#+BEGIN_SRC cmake 
+  # Similar to: g++ main.cpp src1.cpp ... -o app.bin -Isrc/include1 -I/home/user/include
+  target_include_directories(SampleApp PUBLIC src/include1 /home/usr/include)
+#+END_SRC
+
+
+ + Libraries that the executable will link against.
+   + It can be: shared libraries installed on the system or either
+     shared or static libraries in the current project.
+
+#+BEGIN_SRC cmake  
+   # Project shared library SampleSharedLib.so (Linux, Unix) or 
+   # SampleSharedLib.dll on Windows. 
+   add_library(SampleSharedLib SHARED  lib1.cpp lib2.cpp lib3.cpp)
+
+   # Project static library 
+   add_library(StaticLibrary STATIC lib1.cpp lib2.cpp lib3.cpp)
+
+   target_link_libraries(SampleApp  
+           GL blas opencv  # System installed libraries 
+           SampleSharedLib # Project shared library 
+           StaticLibrary   # Project static library 
+   )
+#+END_SRC
+
+  + Set target properties:
+
+#+BEGIN_SRC cmake 
+ set_target_properties(SampleApp PROPERTIES 
+     {PROPERTY1} {VALUE1}
+     {PROPERTY2} {VALUE2}
+     ... .... ... ... 
+     {PROPERTYN} {VALUEN}
+  )
+#+END_SRC
+
+Add file extension .bin to Unix executable (note: on Unix-like OSes,
+executables does not have extension like in Windows):
+
+#+BEGIN_SRC cmake 
+ if(UNIX)
+    set_target_properties(SampleApp PROPERTIES SUFFIX ".bin")
+  endif()
+#+END_SRC
 
 ** CMake Map 
 
