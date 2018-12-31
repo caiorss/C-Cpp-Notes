@@ -1776,6 +1776,292 @@ the python script pywrapper.py.
   testlib.cpp:49: <DllMain> => DLL attached
    [StaticObject] => Shutdown DLL
 #+END_SRC
+
+*** CSharp Client Code - PInvoke 
+
+The services provided by the DLL can be consumed from C# or any other
+.NET language via Pinvoke-API which is the Foreign-Function Interface
+of .NET platform. The Pinvoke API can import C-function or C++
+demangled functions exported with extern "C". 
+
+C++ classes, namespaces and functions without C-linkage (extern "C")
+cannot be loaded directly by P-Invoke or any other Foreign
+Function-Interface as C++ does not define a standard and ABI -
+Application Binary Interface, every compiler has its own name mangling
+schema, padding bytes and class memory layout for non-POD (Plain-Old
+data) types. A workaround to call C++ from an FFI is to defined
+C-interface comprised of functions with C-linkage and opaque pointers
+(void*) for passing class instances around or invoking C++ functions.
+
+ File: [[https://gist.github.com/caiorss/2bba4c50866d9467aaa8c7792b337f71#file-client-csharp-cs][client-sharp.cs]]
+
+Compiling and running:
+
+#+BEGIN_SRC sh 
+  $ csc.exe client-csharp.cs && client-csharp.exe
+#+END_SRC
+
+Wrapper for class std::vector<double> and namespace Linalg.
+
+#+BEGIN_SRC cpp
+   class VectorD{
+           // Constructor Function:
+           // hVectorD testlib_vectorD_make0(size_t n, double x)
+           // void* testlib_vectorD_make0(size_t n, double x)
+           [DllImport("testlib.dll")]
+           public static extern
+           IntPtr testlib_vectorD_make0(int size, double x);
+
+           [DllImport("testlib.dll")]
+           public static extern
+           IntPtr testlib_vectorD_make1(int n, double[] x);
+
+           // Destructor function:
+           // void testlib_vectorD_delete(hVectorD hv)
+           // void testlib_vectorD_delete(void* hv)
+           [DllImport("testlib.dll")]
+           public static extern
+           IntPtr testlib_vectorD_delete(IntPtr hv);
+
+           // void testlib_vectorD_Linalg_printVector(const char* name, hVectorD hv)
+           // void testlib_vectorD_Linalg_printVector(const char* name, vector* hv)
+           [DllImport("testlib.dll")]
+           public static extern
+           void testlib_vectorD_Linalg_printVector(string name, IntPtr hv);
+
+           // double testlib_vectorD_Linalg_norm(hVectorD hv)
+           // double testlib_vectorD_Linalg_norm(void* hv)
+           [DllImport("testlib.dll")]
+           public static extern
+           double testlib_vectorD_Linalg_norm(IntPtr hv);
+
+           // void testlib_vectorD_set(hVectorD hv, size_t n, double x)
+           // void testlib_vectorD_set(void* hv, size_t n, double x)
+           [DllImport("testlib.dll")]
+           public static extern
+           void testlib_vectorD_set(IntPtr hv, int n, double x);
+
+           // ------------ Objet Oriented Wrapper --------//
+
+           // Hadle 
+           private IntPtr m_handle;
+
+           public VectorD(int size, double x){
+                   m_handle = testlib_vectorD_make0(size, x);
+           }
+           public VectorD(double[] array){
+                   m_handle = testlib_vectorD_make1(array.Length, array);
+           }        
+           // Finalized destructor 
+           ~VectorD(){
+                   testlib_vectorD_delete(m_handle);
+           }
+           public void print(string name = "std::vector<double>"){
+                   testlib_vectorD_Linalg_printVector(name, m_handle);
+           }
+           public void set(int n, double x){
+                   testlib_vectorD_set(m_handle, n, x);
+           }
+           public double norm(){
+                   return testlib_vectorD_Linalg_norm(m_handle);
+           }
+   }
+#+END_SRC
+
+Wrapper for C++ interface class 'InterfaceClass' and its
+implementations, class ImplementationA and ImplementationB:
+
+#+BEGIN_SRC cpp 
+   class CPPInterfaceClass{
+           // Handle type => Opaque pointer for InterfaceClass instances.
+           // using HInterf = IntPtr;
+
+           // Factory function for loading functions from this interface.
+           //-----------------------------------------------------------
+           // InterfaceClass* teslib_InterfaceClass_factory(const char* class_id)
+           // void** teslib_InterfaceClass_factory(const char* class_id)
+           [DllImport("testlib.dll")]
+           private static extern
+           IntPtr teslib_InterfaceClass_factory(string class_id);
+
+           // void testlib_InterfaceClass_delete(InterfaceClass* hinst)
+           // void testlib_InterfaceClass_delete(void*)
+           [DllImport("testlib.dll")]
+           private static extern
+           void testlib_InterfaceClass_delete(IntPtr hinst);
+
+           // char* testlib_InterfaceClass_getID(InterfaceClass* hinst)
+           [DllImport("testlib.dll")]        
+           private static extern IntPtr testlib_InterfaceClass_getID(IntPtr hinst);
+
+           // void testlib_InterfaceClass_setName(InterfaceClass* hinst, const char* name)
+           // Note: Charset.UNICODE does not work as it is UTF16 (Wide Unicode), not UTF-8
+           // which is the C++ default unicode type.
+           [DllImport("testlib.dll", CharSet = CharSet.Ansi)]
+           private static extern
+           void testlib_InterfaceClass_setName(IntPtr hinst, string name);
+
+           // char* testlib_InterfaceClass_getName(InterfaceClass* hinst)
+           [DllImport("testlib.dll")]
+           private static extern
+           IntPtr testlib_InterfaceClass_getName(IntPtr hinst);
+
+           private IntPtr m_handle;
+
+           private CPPInterfaceClass(IntPtr handle){
+                   m_handle = handle;
+           }
+
+           ~CPPInterfaceClass(){
+                   testlib_InterfaceClass_delete(m_handle);
+           }
+
+           /** Creates an instance of the the C++ implementation ImplementationA (class) from the 
+            * C++ interface: 'InterfaceClass' 
+            */
+           public static CPPInterfaceClass ImplementationA(){
+                   return new CPPInterfaceClass(teslib_InterfaceClass_factory("ImplementationA"));
+           }
+           /** Creates an instance of the C++ implementationa ImplementationB (class) */
+           public static CPPInterfaceClass ImplementationB(){
+                   return new CPPInterfaceClass(teslib_InterfaceClass_factory("ImplementationB"));
+           }
+
+           // Get type of the wrapped C++ class 
+           public string GetID(){
+                   IntPtr p = testlib_InterfaceClass_getID(m_handle);
+                   return Marshal.PtrToStringAnsi(p);
+           }
+
+           // Get/Set name of current instance 
+           public string Name
+           {
+                   get{
+                           IntPtr p = testlib_InterfaceClass_getName(m_handle);
+                           return Marshal.PtrToStringAnsi(p);
+                   }
+                   set{
+                           testlib_InterfaceClass_setName(m_handle, value);
+                   }
+           }
+   }
+#+END_SRC
+
+ + Main function - Experiment 1: 
+
+#+BEGIN_SRC cpp 
+  Console.WriteLine(" ===== EXPERIMENT 1 = Using C-functions directly ==");
+  Console.WriteLine(" [CSharp] Loading Native DLL C++ Shared Library");                
+  IntPtr vectorObject = VectorD.testlib_vectorD_make0(5, 3.0);
+  Console.WriteLine(" [CSharp] Opaque pointer = ", vectorObject.ToString());
+  VectorD.testlib_vectorD_Linalg_printVector("vectorX", vectorObject);
+
+
+  double x = VectorD.testlib_vectorD_Linalg_norm(vectorObject);
+  Console.WriteLine(" [CSharp] Vector norm = " + x.ToString());
+
+  Console.WriteLine(" [CSharp] End application");
+  VectorD.testlib_vectorD_delete(vectorObject);
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC text 
+  ===== EXPERIMENT 1 = Using C-functions directly ==
+   [CSharp] Loading Native DLL C++ Shared Library
+   [StaticObject] => Initialize DLL
+  testlib.cpp:48: <DllMain> DLL Loaded into the process => PID = 1320
+  testlib.cpp:54: <DllMain> DLL attached to process.
+   [CSharp] Opaque pointer = 
+  vectorX = [5]( 3, 3, 3, 3, 3,  )
+   [CSharp] Vector norm = 6.70820393249937
+   [CSharp] End application
+#+END_SRC
+
+ + Main function - Experiment 2:
+
+#+BEGIN_SRC cpp 
+    Console.WriteLine(" ===== EXPERIMENT 2 = Using OOP wrapper for std::vector ===");
+    Console.WriteLine(" ==> Before changing vector");
+    VectorD v1 = new VectorD(10, 3.5);
+    v1.print();
+    v1.print("vector_v1");
+    Console.WriteLine("v1.norm() = " + v1.norm().ToString());
+
+    Console.WriteLine(" ==> After changing vector");
+    v1.set(1, 10.0); v1.set(2, 5.53); v1.set(3, 8.96);
+    v1.set(4, -10.34); v1.set(8, 80.54);
+    v1.print("v1_changed");
+
+    Console.WriteLine(" ==> Creating Vector from Array");
+
+    VectorD v2 = new VectorD(new double[] {4.5, -8.84, 78.23, 652.3, 34.56, 45.12});
+    v2.print("v2");
+    Console.WriteLine("v2.norm() = " + v2.norm().ToString());
+#+END_SRC
+
+
+Output: 
+
+#+BEGIN_SRC text 
+   ===== EXPERIMENT 2 = Using OOP wrapper for std::vector ===
+   ==> Before changing vector
+  std::vector<double> = [10]( 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5,  )
+  vector_v1 = [10]( 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5,  )
+  v1.norm() = 11.0679718105893
+   ==> After changing vector
+  v1_changed = [10]( 3.5, 10, 5.53, 8.96, -10.34, 3.5, 3.5, 3.5, 80.54, 3.5,  )
+   ==> Creating Vector from Array
+  v2 = [6]( 4.5, -8.84, 78.23, 652.3, 34.56, 45.12,  )
+  v2.norm() = 659.502711518307
+#+END_SRC
+
+ + Main function - Experiment 3:
+
+#+BEGIN_SRC cpp 
+    Console.WriteLine(" ===== EXPERIMENT 3 = OOP wrapper for InterfaceClass  ===");
+    CPPInterfaceClass instA = CPPInterfaceClass.ImplementationA();
+    CPPInterfaceClass instB = CPPInterfaceClass.ImplementationB();
+
+    // Console.WriteLine("instA.Name = " + instA.Name);
+    Console.WriteLine("instA.GetID() = " + instA.GetID());
+    Console.WriteLine("instB.GetID() = " + instB.GetID());
+
+    Console.WriteLine(" **=> Before changing");
+    Console.WriteLine("instA.Name = " + instA.Name);
+    Console.WriteLine("instB.Name = " + instB.Name);
+    Console.WriteLine("\n **=> Before changing");
+    instA.Name = "Instance-of-ImplA";
+    instB.Name = "Instance-of-ImplB";
+    Console.WriteLine("instA.Name = " + instA.Name);
+    Console.WriteLine("instB.Name = " + instB.Name);
+
+    Console.WriteLine(" ===== END  ===========================");
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC text 
+    ===== EXPERIMENT 3 = OOP wrapper for InterfaceClass  ===
+   instA.GetID() = ImplementationA
+   instB.GetID() = ImplementationB
+    **=> Before changing
+   instA.Name = Unammed-A
+   instB.Name = Unammed-B
+
+    **=> Before changing
+   instA.Name = Instance-of-ImplA
+   instB.Name = Instance-of-ImplB
+    ===== END  ===========================
+   testlib.cpp:48: <DllMain> DLL Loaded into the process => PID = 1320
+   testlib.cpp:62: <DllMain> DLL detached to thread.
+    [INFO] ImplementationB deleted => name = Instance-of-ImplB ; type = ImplementationB
+    [INFO] ImplementationA deleted => name = Instance-of-ImplA ; type = ImplementationA
+   testlib.cpp:48: <DllMain> DLL Loaded into the process => PID = 1320
+   testlib.cpp:58: <DllMain> => DLL attached
+    [StaticObject] => Shutdown DLL
+#+END_SRC
+
 *** View symbols exported by the shared library 
 **** View exported symbols on Windows (dumpbin)
 
