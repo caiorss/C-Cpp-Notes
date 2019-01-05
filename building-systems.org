@@ -365,7 +365,7 @@ CMake can set up a compilation target in compiler-agnostic manner:
    add_executable(SampleApp main.cpp sourc1.cpp source2.cpp)
 #+END_SRC
 
- *Set target defines #define*
+ *Set target defines #define or -D<DEFINITION>=VALUE or /D<DEFINTION>=<VALUE>*
 
  + Compiler defintions. => Defines.
    + It is the same as compiling with GCC with command line option
@@ -378,7 +378,7 @@ CMake can set up a compilation target in compiler-agnostic manner:
     target_compile_definitions(SampleApp PRIVATE  
        VERBOSITY=100  # Same as #define VERBOSITY 100 
        Optimize       # Same as -DOptimize or #define Optimize
-       foo=bar 
+       foo=bar        # Same as -Dfoo=bar on (GGCC or Clang) or /Dfoo=bar on MSVC
       )
    # In a single line 
     target_compile_definitions(SampleApp PRIVATE VERBOSITY=100 Optimize foo=bar)
@@ -476,7 +476,7 @@ name to AddinExtesion.xll.
     PREFIX       ""  
 
     # Change file name without changing prefix or extension (suffix)
-    OUTPUTNAME  "AddinExtension"
+    OUTPUT_NAME  "AddinExtension"
 
     # Change file extension 
     SUFFIX      ".xll"    
@@ -494,22 +494,21 @@ The target properties could also be set individually:
 #+BEGIN_SRC cmake 
   add_library(WrapperLibrary SHARED src1.cpp src2.cpp ... srcN.cpp)
   # ... omit configuration ... # 
-  set_target_properties(WrapperLibrary PROPERTIES PREFIX     "")
-  set_target_properties(WrapperLibrary PROPERTIES OUTPUTNAME "AddinExtension")
-  set_target_properties(WrapperLibrary PROPERTIES SUFFIX     ".xll")  
+  set_target_properties(WrapperLibrary PROPERTIES PREFIX      "")
+  set_target_properties(WrapperLibrary PROPERTIES OUTPUT_NAME "AddinExtension")
+  set_target_properties(WrapperLibrary PROPERTIES SUFFIX      ".xll")  
 #+END_SRC
-
 
  *Add more targets* 
 
-A CMake project can generate multiple executables, static libraries or
-shared libraries. 
+A CMake project can have multiple targets, generating executables,
+static libraries or shared libraries.
 
 #+BEGIN_SRC cmake 
-  add_executable(DocGenerator src/docgen/main.cpp src/docge/src2.cpp ...)
+  add_executable(DocGenerator src/docgen/main.cpp src/docgen/src2.cpp ...)
   # ... configuration of DocGenerator
 
-  add_executable(Diplay src/docgen/main.cpp src/docge/src2.cpp ...)
+  add_executable(Display src/docgen/main.cpp src/docge/src2.cpp ...)
   
   add_library(libCommon SHARED src/lib/src1.cpp src/lib/src2.cpp ...)
 
@@ -519,12 +518,21 @@ shared libraries.
 
  *To avoid* 
 
- + Note: It should avoided CMake commands which affects all targets,
-   for instance, include_directories(dir1 dir2 ...) will add those
-   include directories to all targets regardless if they need them or
-   not. It is better to use the command target_include_directories as
-   it affects just a single target. The same said for the command
+ + *Commands which affects all targets*: for instance,
+   include_directories(dir1 dir2 ...) will add those include
+   directories to all targets regardless if they need them or not. It
+   is better to use the command target_include_directories as it
+   affects just a single target. The same said for the command
    link_directories().
+
+ + *Non portable compiler settings.* Example: Compiler flags such as
+   -D{KEY}=VALUE, used by GCC and Clang, or /D{KEY}=VALUE, used by
+   MSVC (VC++) are non portable accross different compilers. To
+   overcome this, CMake provides many commands with an unified
+   interface to many compilers and build-systems, such as
+   _target_compile_definitions_ that allows setting defines in a
+   compiler agnostic manner.
+
 
 ** Executable Target with resource icon (Windows only)
 
@@ -1202,7 +1210,6 @@ This target can be run with:
  $ cmake --build build --target install 
 #+END_SRC
 
-
 ** SNIPPET - Create target to run compiled executable 
 
 The piece following piece of code runs an executable target after it
@@ -1232,7 +1239,6 @@ After the building system is set and output directory ./build, run:
    #===> Run all targets [all default.]
    $ cmake --build build --target run
 #+END_SRC
-
 
 ** SNIPPET - Issue an error if condition is not met 
 
