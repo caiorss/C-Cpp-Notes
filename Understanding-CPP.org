@@ -9091,6 +9091,126 @@ Explicitly calling operator function:
    v1 + v2 = Vector2D{ x = 8 ;  y = 11 } 
 #+END_SRC
 
+*** Example: Arithmetic friend function operator overloading 
+
+Operators can also be defined as class friend-functions, in this case
+the opertor is just a ordinary function, however with access to class
+privage member variable and memebr functions.
+
+Source: 
+ + File: [[file:src/operator-overloading3.cpp][file:src/operator-overloading3.cpp]]
+ + Online Compiler: https://rextester.com/ABWWL87635
+
+Class declaration: (It should be in header file Vector2D.hpp)
+
+#+BEGIN_SRC cpp 
+  class Vector2D{
+  private:
+     double m_x, m_y;
+  public:
+     Vector2D();
+     Vector2D(double x, double y);
+     double X() const;
+     double Y() const;	
+     friend std::ostream& operator<<(std::ostream& os, const Vector2D& vec);
+     friend Vector2D operator+ (const Vector2D& lhs, const Vector2D& rhs);
+
+     /** C++11 Notation */
+     friend auto operator- (Vector2D const& lhs, Vector2D const& rhs) -> Vector2D;
+     friend auto operator-(const Vector2D& lhs) -> Vector2D;
+
+     friend Vector2D operator*(double k, const Vector2D& rhs);
+     friend Vector2D operator*(const Vector2D& rhs, double k);
+     friend auto operator/(const Vector2D& lhs, double k) -> Vector2D;
+  };
+#+END_SRC
+
+Class implementation: (It should be in header file Vector2D.cpp)
+
+ + Constructors and member functions:
+
+#+BEGIN_SRC cpp 
+  Vector2D::Vector2D(): m_x(0.0), m_y(0.0)
+  {
+  }
+
+  Vector2D::Vector2D(double x, double y): m_x(x), m_y(y)
+  {
+  }
+  double Vector2D::X() const {
+      return this->m_x;
+  }
+
+  double Vector2D::Y() const {
+      return this->m_y;
+  }
+#+END_SRC
+
+
+ + Some class operators functions:
+   + Note: They are not member functions (methods).
+
+#+BEGIN_SRC cpp 
+  std::ostream& operator<<(std::ostream& os, const Vector2D& vec)
+  {
+       return os << "Vector2D{ x = " << vec.m_x << " ; "
+                 << " y = " << vec.m_y << " } ";
+  }
+
+  Vector2D operator+ (const Vector2D& lhs, const Vector2D& rhs)
+  {
+       return Vector2D(lhs.m_x + rhs.m_x, lhs.m_y + rhs.m_y);
+  }
+
+  auto operator- (Vector2D const& lhs, Vector2D const& rhs) -> Vector2D
+  {
+       return Vector2D(lhs.m_x - rhs.m_x, lhs.m_y - rhs.m_y);
+  }
+
+      . .. ... ... .. 
+
+  Vector2D operator*(double k, const Vector2D& rhs)
+  {
+       return {k * rhs.m_x, k * rhs.m_y};
+  }
+
+  Vector2D operator*(const Vector2D& rhs, double k)
+  {
+       return {k * rhs.m_x, k * rhs.m_y};
+  }
+#+END_SRC
+
+REPL Testing: 
+
+#+BEGIN_SRC cpp 
+  >> .L operator-overloading3.cpp 
+
+  >> Vector2D v1{3, 5};
+  >> v1.X()
+  (double) 3.0000000
+
+  >> v1.Y()
+  (double) 5.0000000
+
+  >> (v1 * 4).X()
+  (double) 12.000000
+
+  >> (v1 * 4).Y()
+  (double) 20.000000
+
+  >> Vector2D v2{5, 6}
+  (Vector2D &) @0x7f181a05b020
+
+  >> v = v1 + v2
+  (Vector2D &) @0x7f181a05b030
+
+  >> v.X()
+  (double) 8.0000000
+
+  >> v.Y()
+  (double) 11.000000
+#+END_SRC
+
 *** References 
 
  *C++ ISO Standard - Language Specification:*
@@ -9104,7 +9224,6 @@ Explicitly calling operator function:
  *Further Reading* 
 
  + [[http://www.modernescpp.com/index.php/c-core-guidelines-rules-for-overloading-and-overload-operators][C++ Core Guidelines: Rules for Overloading and Overload Operators]] 
-
 ** TODO OOP Multiple Inheritance
 *** Ambiguity resolution 
 
