@@ -8759,14 +8759,108 @@ functions and define "functors" - function-objects.
 
  *Pointer Operarators*
 
-| Name                    | Operator | Usage         | Member function signature            |
-|                         |          |               | for class C and RHS type R           |
-|-------------------------+----------+---------------+--------------------------------------|
-| Subscript, array index  | []       | Object[Index] | X C::operator[] (const Index& index) |
-| Indirection - deference | *        | *Object       | X C::operator*()                     |
-| Address or reference    | &        | &Object       | X* C::operator&()                    |
-|                         |          |               |                                      |
-|-------------------------+----------+---------------+--------------------------------------|
+| Name                            | Operator  | Usage                     | Member function signature            |
+|                                 |           |                           | for class C and RHS type R           |
+|---------------------------------+-----------+---------------------------+--------------------------------------|
+| Subscript, array index          | []        | Object[Index]             | X C::operator[] (const Index& index) |
+| Indirection - deference         | *         | *Object                   | X C::operator*()                     |
+| Class member access operator    | ->        | pointerToOjbect->Member() |                                      |
+| Address or reference            | &         | &Object                   | X* C::operator&()                    |
+| Heap allocation - single object | new       | C* ptr = new C;           |                                      |
+| Heap allocation - array         | new []    | C* ptr = new C[10];       |                                      |
+| Delete operator                 | delete    | delete ptr;               |                                      |
+| Delete array operator           | delete [] | delete [] ptr;            |                                      |
+|---------------------------------+-----------+---------------------------+--------------------------------------|
+
+*** Arithmetic member function operator overloading  
+
+Source:
+ + File: [[file:src/operator-overload1.cpp][file:src/operator-overload1.cpp]]
+ + Online compiler: https://rextester.com/QVFZX23695
+
+Class Complex declaration (file: Complex.hpp):
+
+#+BEGIN_SRC cpp 
+  /** Complex number */
+  class Complex{
+  private:
+       double m_real, m_imag;
+  public:
+       /** Make class printable */
+       friend std::ostream& operator<<(std::ostream&, const Complex&);	
+
+       /** Constructors */
+       Complex();
+       Complex(double real, double imag);
+       /** Named constructor */
+       static Complex fromReal(double real);
+       static Complex fromImag(double imag);
+
+       double Real() const;
+       double Imag() const;
+
+       Complex operator-();
+       Complex operator+(const Complex& rhs);
+       Complex operator-(const Complex& rhs);
+       Complex operator*(const Complex& rhs);
+       Complex operator/(const Complex& rhs);
+
+       Complex operator+(double d);
+       Complex operator-(double d);
+       Complex operator*(double scale);
+       Complex operator/(double factor);
+  };
+#+END_SRC
+
+Class Complex implementation (file: Complex.cpp):
+
+ + Arithmetic operator overloading definitions for Complex as operator
+   explicit argument:
+
+#+BEGIN_SRC cpp 
+  Complex Complex::operator-(){
+       return {-m_real, -m_imag};
+  }
+
+  Complex Complex::operator+(const Complex& rhs)
+  {
+       const auto& self = *this;
+       return {self.m_real + rhs.m_real, self.m_imag + rhs.m_imag };
+  }
+
+  Complex Complex::operator-(const Complex& rhs)
+  {
+       const auto& self = *this;
+       // (x1 + j . y1)(x2 + j . y2) = x1.x2 + j( -y1.y2 )
+       return Complex{self.m_real - rhs.m_real, self.m_imag - rhs.m_imag };
+  }
+
+ Complex Complex::operator*(const Complex& rhs)
+  {
+      return Complex{
+          m_real * rhs.m_real - m_imag * rhs.m_imag,
+          m_real * rhs.m_imag + m_imag * rhs.m_real
+                  };
+  }
+#+END_SRC
+
+ + Arithmetic operator overloading definitions for double as explicit
+   argument. 
+
+#+BEGIN_SRC cpp 
+  Complex Complex::operator+(double d){
+       return Complex{m_real + d, m_imag + d};
+  }
+  Complex Complex::operator-(double d){
+       return Complex{m_real - d, m_imag - d};
+  }
+  Complex Complex::operator*(double scale){
+       return {this->m_real * scale, this->m_imag *  scale};
+  }
+  Complex Complex::operator/(double factor){
+       return Complex(this->m_real / factor, this->m_imag / factor);
+  }
+#+END_SRC
 
 *** References 
 
@@ -8774,7 +8868,7 @@ functions and define "functors" - function-objects.
 
  + [[https://en.cppreference.com/w/cpp/language/operator_incdec][Increment/decrement operators]]
 
- + 
+ + Overloading - <http://eel.is/c++draft/over.oper>
 
  + 
 ** TODO OOP Multiple Inheritance
