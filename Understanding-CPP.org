@@ -8772,7 +8772,7 @@ functions and define "functors" - function-objects.
 | Delete array operator           | delete [] | delete [] ptr;            |                                      |
 |---------------------------------+-----------+---------------------------+--------------------------------------|
 
-*** Arithmetic member function operator overloading  
+*** Example: Arithmetic member function operator overloading  
 
 Source:
  + File: [[file:src/operator-overload1.cpp][file:src/operator-overload1.cpp]]
@@ -8926,6 +8926,170 @@ Member function operator overloading is not symmetric:
   ^
 #+END_SRC
 
+*** Example: Arithmetic free-function function operator overloading
+
+Operators can also be defined as ordinary functions (aka free
+functions), or non-member and non-friend function, it means without
+access to private members.
+
+Source:
+ + File: [[file:src/operator-overload2.cpp][file:src/operator-overload2.cpp]]
+ + Online Compiler: https://rextester.com/UBME18391
+
+Syntax for non-friend free-function operator overloading: 
+
+ + Unary operator 
+
+#+BEGIN_SRC cpp
+   RETURN_TYPE operator <<UNARY-OPERATOR>>(const LSH& lhs);
+   // Or, C++11 syntax 
+   auto operator <<UNARY-OPERATOR>>(const LSH& lhs) -> RETURN_TYPE;
+
+   // Example: Invert vector 
+   Vector3D operator-(const Vector3D& lhs);
+   auto operator-(const Vector3D& lhs) -> Vector3D;
+#+END_SRC
+
+ + Binary operator 
+
+#+BEGIN_SRC cpp 
+   RETURN_TYPE operator <<BINARY-OPERATOR>>(const LSH& lhs, const RHS& rhs);
+   // Or, C++11 flavor: 
+   auto operator <<BINARY-OPERATOR>>(const LSH& lhs, const RHS& rhs) -> RETURN_TYPE;
+
+   // Example: 
+   Vector3D operator+(const Vector3D& lhs, double rhs);
+   auto operator+(const Vector3D& lhs, double rhs) -> Vector3D;
+#+END_SRC
+
+
+Declaration (It should be Vector2D.hpp)
+
+#+BEGIN_SRC cpp 
+  /** A struct is just a class with everything public by default. */
+  struct Vector2D{
+      double x, y;
+      Vector2D();
+      Vector2D(double x, double y);
+  };
+
+  std::ostream& operator<<(std::ostream& os, const Vector2D& vec);
+  Vector2D operator+ (const Vector2D& lhs, const Vector2D& rhs);
+
+  /** C++11 Notation */
+  auto operator- (Vector2D const& lhs, Vector2D const& rhs) -> Vector2D;
+  auto operator-(const Vector2D& lhs) -> Vector2D;
+
+  Vector2D operator*(double k, const Vector2D& rhs);
+  Vector2D operator*(const Vector2D& rhs, double k);
+
+  auto operator/(const Vector2D& lhs, double k) -> Vector2D;
+#+END_SRC
+
+Implementation (It should be Vector2D.cpp)
+
+ + Constructors:
+
+#+BEGIN_SRC cpp 
+  Vector2D::Vector2D(): x(0.0), y(0.0)
+  {
+  }
+
+  Vector2D::Vector2D(double x, double y): x(x), y(y)
+  {
+  }
+#+END_SRC
+
+ + Operators as free-functions:
+
+#+BEGIN_SRC cpp 
+  std::ostream& operator<<(std::ostream& os, const Vector2D& vec)
+  {
+      return os << "Vector2D{ x = " << vec.x << " ; "
+                << " y = " << vec.y << " } ";
+  }
+
+  Vector2D operator+ (const Vector2D& lhs, const Vector2D& rhs)
+  {
+      return Vector2D(lhs.x + rhs.x, lhs.y + rhs.y);
+  }
+
+  auto operator- (Vector2D const& lhs, Vector2D const& rhs) -> Vector2D
+  {
+      return Vector2D(lhs.x - rhs.x, lhs.y - rhs.y);
+  }
+    ... .... ... ... 
+
+  // Symmetric operator 
+
+  Vector2D operator*(const Vector2D& rhs, double k)
+  {
+      return {k * rhs.x, k * rhs.y};
+  }
+
+  auto operator/(const Vector2D& lhs, double k) -> Vector2D
+  {
+     return {lhs.x / k, lhs.y / k};
+  }
+#+END_SRC
+
+ *REPL Test:*
+
+Load file in the CERN's ROOT REPL.
+
+#+BEGIN_SRC cpp 
+  >> .L operator-overload2.cpp
+
+  >> Vector2D v1{3, 5};
+  >> Vector2D v2{5, 6};
+
+  >> std::cout << "v1 = " << v1 << std::endl;
+  v1 = Vector2D{ x = 3 ;  y = 5 } 
+  >> std::cout << "v2 = " << v2 << std::endl;
+  v2 = Vector2D{ x = 5 ;  y = 6 } 
+#+END_SRC
+
+Test operator overloading:
+
+#+BEGIN_SRC cpp 
+  >> auto v = v1 + v2
+  (Vector2D &) @0x7fb99c26d030
+
+  >> v.x
+  (double) 8.0000000
+
+  >> v.y
+  (double) 11.000000
+
+  >> std::cout << "v1 + v2 = " << v << std::endl;
+  v1 + v2 = Vector2D{ x = 8 ;  y = 11 } 
+#+END_SRC
+
+Test symmetry:
+
+#+BEGIN_SRC cpp 
+>> std::cout << " v1 * 5 = " << v1 * 5 << std::endl;
+ v1 * 5 = Vector2D{ x = 15 ;  y = 25 } 
+
+>> std::cout << " 5 * v1 = " <<  5 * v1 << std::endl;
+ 5 * v1 = Vector2D{ x = 15 ;  y = 25 } 
+#+END_SRC
+
+Explicitly calling operator function: 
+
+#+BEGIN_SRC cpp 
+  >> std::cout << " v1 * 5 = " <<  operator*(v1, 5) << std::endl;
+   v1 * 5 = Vector2D{ x = 15 ;  y = 25 } 
+
+  >> std::cout << " 5 * v1 = " <<  operator*(5, v1) << std::endl;
+   5 * v1 = Vector2D{ x = 15 ;  y = 25 } 
+
+  >> std::cout << " v1 + v2 = " <<  v1 + v2 << std::endl;
+   v1 + v2 = Vector2D{ x = 8 ;  y = 11 } 
+
+  >> std::cout << " v1 + v2 = " << operator+(v1, v2) << std::endl;
+   v1 + v2 = Vector2D{ x = 8 ;  y = 11 } 
+#+END_SRC
 
 *** References 
 
@@ -8935,7 +9099,12 @@ Member function operator overloading is not symmetric:
 
  + Overloading - <http://eel.is/c++draft/over.oper>
 
- + 
+ + https://isocpp.org/wiki/faq/operator-overloading  
+
+ *Further Reading* 
+
+ + [[http://www.modernescpp.com/index.php/c-core-guidelines-rules-for-overloading-and-overload-operators][C++ Core Guidelines: Rules for Overloading and Overload Operators]] 
+
 ** TODO OOP Multiple Inheritance
 *** Ambiguity resolution 
 
