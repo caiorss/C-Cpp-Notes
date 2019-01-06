@@ -8862,6 +8862,71 @@ Class Complex implementation (file: Complex.cpp):
   }
 #+END_SRC
 
+ *Test in CERN's ROOT REPL:*
+
+Load file and instantiate some variables:
+
+#+BEGIN_SRC cpp 
+  >> .L operator-overload1.cpp 
+
+  >> Complex c1;
+
+  >> Complex c2{2, 5}
+  (Complex &) @0x7f4088144020
+
+  >> Complex c3{3, 4}
+  (Complex &) @0x7f4088144030
+#+END_SRC
+
+Test operators: 
+
+#+BEGIN_SRC cpp 
+  >> std::cout << "c1 + c2 + c3 = " << (c1 + c2 + c3) << std::endl;
+  c1 + c2 + c3 = Complex{ 5 + 9j }
+
+  >> std::cout << c2 + c3 << std::endl;
+  Complex{ 5 + 9j }
+
+  >> std::cout << c3 + c2 << std::endl;
+  Complex{ 5 + 9j }
+#+END_SRC
+
+Call operator explicitly:
+
+ * c2 + c3 = c2.operator+()(c3)
+ * c3 + c2 = c3.operator+()(c2)
+
+#+BEGIN_SRC cpp 
+  // c2 + c3 = c2.operator+(c3) 
+  >> std::cout << c2.operator+(c3) << std::endl;
+  Complex{ 5 + 9j }
+
+  // c3 + c2 = c2.operator+(c3)
+  >> std::cout << c3.operator+(c2) << std::endl;
+  Complex{ 5 + 9j }
+#+END_SRC
+
+Member function operator overloading is not symmetric:
+ + c2 + 10 = c2.operator+(10) => OK.
+ + 10 + c2 = 10.operator+(c2) ?? => Compile-time ERROR!
+
+#+BEGIN_SRC cpp 
+  >> std::cout << "c2 + 10 = " << c2 + 10 << std::endl;
+  c2 + 10 = Complex{ 12 + 15j }
+  >> 
+
+  // ERROR!!!
+  > std::cout << "10 + c2 = " << 10 + c2 << std::endl;
+  ROOT_prompt_17:1:33: error: invalid operands to binary expression ('int' and 'Complex')
+  std::cout << "10 + c2 = " << 10 + c2 << std::endl;
+                               ~~ ^ ~~
+  /home/archbox/opt/root/include/TString.h:531:1: note: candidate function not viable: no known conversion from 'Complex' to
+        'const TString' for 2nd argument
+  operator+(T i, const TString &s)
+  ^
+#+END_SRC
+
+
 *** References 
 
  *C++ ISO Standard - Language Specification:*
