@@ -3678,17 +3678,35 @@ methods calls performance overhead is not acceptable, is to use
 generic programming or templates which doesn't have runtime cost since
 the methods to be called are resolved at compile-time.
 
-Note: 
- + The annotation *virtual* - means that the method (member function)
-   can be overriden by the derived class. Methods in the base class
-   not annotated as virtual cannot be overriden in the derived
-   classes. Unlike Java, C++ methods are not virtual by default. 
+An interface class should: 
+ + be on the header file _IStack.hpp_ or any other header file. It does
+   not eed any implementation .cpp file.
+ + not contain any member variable
+ + any concrete methods (non pure virtual member functions)
+ + contain only virtual member function (abstract methods). 
 
- + The annotation (=0) - means a pure virtual member function, aka
-   pure virtual function which is an _abstract method_, method without
-   implementation. 
+Applications: 
 
- *Example*: Interface Class Declaration: 
+ + _Use multiple implementations_
+   + An interface class allows a client code that refers only to
+     interface and no concrete implementation to use multiple
+     implementations to swap and replace them at runtime.
+
+ + _Avoid diamond problem_
+   + Most programming languages avoid the diamond problem caused by
+     multiple inheritance by allowing a class to inherit multiple
+     interfaces and only one class or abstract class.
+
+ + _Plugins systems_
+   + A software can have its functionality extended at runtime by
+     dynamically loading plugins. An application can load shared
+     libraries (plugins) at runtime using the operating system APIs,
+     LoadLibrary on Windows and dlopen on *Nix systems (Linux, MacOSX,
+     BSD...). For instance, the plugins class1.dll (class Class1),
+     class2.dll (class Class2) and so on, contain classes implementing
+     a common interface class.   
+
+ *Interface Class Declaration:*
 
 #+BEGIN_SRC cpp 
   class IStack{
@@ -3700,6 +3718,17 @@ Note:
       virtual double peek()         const = 0;
   };
 #+END_SRC
+
+Note: 
+
+ + The annotation *virtual* - means that the method (member function)
+   can be overriden by the derived class. Methods in the base class
+   not annotated as virtual cannot be overriden in the derived
+   classes. Unlike Java, C++ methods are not virtual by default. 
+
+ + The annotation (=0) - means a pure virtual member function, aka
+   pure virtual function which is an _abstract method_, method without
+   implementation. 
 
 Or: 
 
@@ -3724,6 +3753,69 @@ Or using C++ auto keyword for functions:
       virtual auto peek() const   -> double = 0;
   };
 #+END_SRC
+
+*** Known Uses 
+
+The Windows API - *COM (Component Object Model)* architechture.  In this
+architechture the interface IUnknown allows a client code to query the
+interfaces that an object implements at runtime. The architechutre
+requires that all interfaces and COM - classes to implement the
+interface IUnknown and the client code to communicate with classes
+only using standard COM interfaces and querying interfaces at runtime.
+
+ *Windows API COM Interfaces*: 
+
+ + IUnknown
+   + Base interface required to be implemented by all interfaces and
+     concrete COM classes. 
+
+#+BEGIN_SRC cpp 
+  interface IUnknown {
+    virtual HRESULT __stdcall QueryInterface (REFIID riid, void **ppvObject) = 0;
+    virtual ULONG   AddRef () = 0;
+    virtual ULONG   Release () = 0;
+  };
+#+END_SRC
+
+ + Interface IDispatch
+   + Allows querying which methods a class implements and calling
+     class methods at runtime without knowing them at compile-time.
+
+#+BEGIN_SRC cpp 
+  class IDispatch : public IUnknown {
+    public:
+
+    /** Checks whether if the object can provide a type library. */
+    virtual HRESULT GetTypeInfoCount(/* [OUT] */ unsigned int * pctinfo) = 0;
+
+    /** Get the type library */
+    virtual HRESULT GetTypeInfo( /* [IN] */  unsigned int  iTInfo,
+                                 /* [OUT] */ LCID          lcid,
+                                 /* [IN] */  ITypeInfo**  ppTInfo
+                                ) = 0;
+    /** Find the numeric ID of some object's method or property */                            
+    virtual HRESULT GetIDsOfNames( /* [IN] */  REFIID        riid,
+                                   /* [IN] */  OLECHAR**     rgszNames,
+                                   /* [IN] */  unsigned int  cNames,
+                                   /* [IN] */  LCID          lcid,
+                                   /* [OUT] */ DISPID*       rgDispId
+                                 ) = 0;
+
+    /** Call a property or method. */
+    virtual HRESULT Invoke(            DISPID          dispIdMember,
+                           /* [IN] */  REFIID          riid,
+                           /* [IN] */  LCID            lcid,
+                           /* [IN] */  WORD            wFlags,
+                           /* [IN] */  DISPPARAMS *    pDispParams,
+                           /* [IN] */  VARIANT *       pVarResult,
+                           /* [IN] */  EXCEPINFO *     pExcepInfo,
+                           /* [OUT] */ unsigned int *  puArgErr
+                          ) = 0;
+  };
+#+END_SRC
+
+
+
 *** Example 
 
  *Complete Code Example*
