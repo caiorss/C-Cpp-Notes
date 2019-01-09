@@ -1614,7 +1614,7 @@ References:
  + https://stackoverflow.com/questions/31277186
  + https://stackoverflow.com/questions/15694347/
 * Vcpkg package manager 
-** Windows Intallation 
+** Windows Vcpkg Intallation 
 
 Assumption: Visual studio development tools are already installed.
 
@@ -1664,7 +1664,7 @@ Assumption: Visual studio development tools are already installed.
   zlib:x86-windows                                   1.2.11-3         A compression library
 #+END_SRC
 
-** Linux Installation
+** Linux Vcpkg Installation
 
 1 Create install directory 
   + In this instruction: VCPKG will be installed at directory
@@ -1758,6 +1758,308 @@ from any directory.
 
    ... ...  ... ...  ... ...  ... ...  ... ...  ... ...  ... ... 
 
+#+END_SRC
+** Removing package 
+
+#+BEGIN_SRC sh 
+  $ vcpkg.exe remove libjpeg-turbo:x86-windows
+  Your feedback is important to improve Vcpkg! Please take 3 minutes to complete our survey by running: vcpkg contact --survey
+  The following packages will be removed:
+      libjpeg-turbo:x86-windows
+  Removing package libjpeg-turbo:x86-windows...
+  Removing package libjpeg-turbo:x86-windows... done
+  Purging package libjpeg-turbo:x86-windows...
+  Purging package libjpeg-turbo:x86-windows... done
+#+END_SRC
+
+** Example: Project with OpenGL + FreeGLUT 
+
+GIST: [[https://gist.github.com/caiorss/4e36d7423cfd456f39c26ba476873a3c][Cmake C++ project with VCPKG package manager and OpengGL/FreeGlut]]
+
+File: *CMakeLists.txt*
+
+#+BEGIN_SRC cmake 
+  cmake_minimum_required(VERSION 3.9)
+
+  if(DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
+    set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+      CACHE STRING "")
+      message(" [INFO] VCPKG CMAKE_TOOLCHAIN_FILE = ${CMAKE_TOOLCHAIN_FILE}")
+  endif()
+
+  #========== Global Configurations =============#
+  #----------------------------------------------#
+  project(OpengGL_Widnows)
+  set(CMAKE_CXX_STANDARD 17)     
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+
+  find_package(OpenGL REQUIRED)
+  find_package(GLUT REQUIRED)
+  find_package(GLU  REQUIRED)
+
+  #========== Targets Configurations ============#
+
+  # Build an executable (Unix-like OSes generates ./openglDemo1, on
+  # Windows ./opengDemo1.exe)
+  # ..........................................
+  add_executable(openglDemo1 opengl1.cpp)
+  target_link_libraries(openglDemo1 PRIVATE GLUT::GLUT)
+
+  if(UNIX)
+    target_link_libraries(openglDemo1 PRIVATE GL)
+  endif()
+
+  # Add extension .bin to executable name to make it easier
+  # to identify that the binary file is an executable.
+  # So, it turns  openglDemo1 becomes openglDemo1.bin 
+  if(UNIX)
+    set_target_properties(openglDemo1 PROPERTIES SUFFIX ".bin")
+  endif()
+
+  # Add target to run executable 
+  add_custom_target(run-ex1
+      COMMAND openglDemo1 
+      DEPENDS openglDemo1 
+      WORKING_DIRECTORY ${CMAKE_PROJECT_DIR}
+  )
+
+  # It installs (copies) the target files to a path relative to CMAKE_INSTALL_PREFIX
+  # So, it will copy the built files to ${CMAKE_INSTALL_PREFIX}/out
+  message(" Freeglut DLL = ${GLUT_RUNTIME_LIBRARY} ${FREEGLUT_DYNAMIC}
+  ") install(TARGETS openglDemo1 DESTINATION out) install(FILES
+  "${CMAKE_CURRENT_BINARY_DIR}/freeglut.dll" DESTINATION out)
+#+END_SRC
+
+File: *opengl1.cpp*
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #if defined(_WIN32)
+    #include <windows.h>
+  #endif 
+  #include <GL/gl.h>
+  #include <GL/glu.h>
+  #include <GL/glut.h>
+
+  void renderFunction();
+
+  int main(int argc, char ** argv){
+
+      std::cerr << "[INFO] Starting OpenGL main loop." << std::endl;
+	
+      glutInit(&argc, argv);  
+      glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB);
+      glutInitWindowSize(500, 500);
+      glutCreateWindow("Window 1");
+      // Display Callback Function 
+      glutDisplayFunc(&renderFunction);
+      // Start main loop 
+      glutMainLoop();
+      std::cerr << "[INFO] Exit OpenGL main loop." << std::endl;
+      return 0;
+  }
+
+  void renderFunction(){
+          std::cerr << "[INFO] Running loop." << std::endl;
+      // Clear the current output buffer
+      glClear(GL_COLOR_BUFFER_BIT);   
+
+      // Rotate 10 degrees counterclockwise around z axis
+      glRotated(10, 0, 0, 1);
+
+      // Set the current color (RGB) drawing to blue
+      glColor3f(0.0, 0.0, 1.0);
+
+      // Start polygon 
+      glBegin(GL_POLYGON);
+      glVertex3f(-0.5, -0.5, 0);
+      glVertex3f( 0.5, -0.5, 0);
+      glVertex3f( 0.5,  0.5, 0);
+      glVertex3f(-0.5,  0.5, 0);
+      // End polygon 
+      glEnd();
+
+      glFlush();
+  }
+
+#+END_SRC
+
+Install FreeGlut library: 
+
+Search FreeGlut library: 
+
+#+BEGIN_SRC sh 
+   $ vcpkg search freeglut
+
+   freeglut             3.0.0-5          Open source implementation of GLUT with source and binary backwards compatibil...
+
+   If your library is not listed, please open an issue at and/or consider making a pull request:
+       https://github.com/Microsoft/vcpkg/issues
+#+END_SRC
+
+Install FreeGlut Library:
+
+ + $ vcpkg install freeglut:x64-Windows
+   + Install library compiled for 64 bits target. 
+
+ + $ vcpkg install freeglut:x86-Windows
+   + Install library compiled for x86 bits target. 
+
+#+BEGIN_SRC sh 
+  $ vcpkg install freeglut:x64-Windows
+
+  The following packages will be built and installed:
+      freeglut[core]:x64-windows
+  Starting package 1/1: freeglut:x64-windows
+  Building package freeglut[core]:x64-windows...
+  A suitable version of git was not found (required v2.20.0). Downloading portable git v2.20.0...
+  Downloading git...
+    https://github.com/git-for-windows/git/releases/download/v2.20.0.windows.1/PortableGit-2.20.0-32-bit.7z.exe -> C:\vcpkg\downloads\PortableGit-2.20.0-32-bit.7z.exe
+  Extracting git...
+  A suitable version of 7zip was not found (required v18.1.0). Downloading portable 7zip v18.1.0...
+  Downloading 7zip...
+    https://www.nuget.org/api/v2/package/7-Zip.CommandLine/18.1.0 -> C:\vcpkg\downloads\7-zip.commandline.18.1.0.nupkg
+  Extracting 7zip...
+  A suitable version of nuget was not found (required v4.6.2). Downloading portable nuget v4.6.2...
+  Downloading nuget...
+    https://dist.nuget.org/win-x86-commandline/v4.6.2/nuget.exe -> C:\vcpkg\downloads\nuget.exe
+  -- Downloading http://downloads.sourceforge.net/project/freeglut/freeglut/3.0.0/freeglut-3.0.0.tar.gz...
+  -- Extracting source C:/vcpkg/downloads/freeglut-3.0.0.tar.gz
+  -- Configuring x64-windows
+  -- Building x64-windows-dbg
+  -- Building x64-windows-rel
+  -- Performing post-build validation
+  -- Performing post-build validation done
+  Building package freeglut[core]:x64-windows... done
+  Installing package freeglut[core]:x64-windows...
+  Installing package freeglut[core]:x64-windows... done
+  Elapsed time for package freeglut:x64-windows: 2.215 min
+
+  Total elapsed time: 2.215 min
+
+  The package freeglut is compatible with built-in CMake targets:
+
+      find_package(GLUT REQUIRED)
+      target_link_libraries(main PRIVATE GLUT::GLUT)
+#+END_SRC
+
+Clone the GIST for avoiding crating the sources manually: 
+
+#+BEGIN_SRC sh 
+  $ git clone https://gist.github.com/caiorss/4e36d7423cfd456f39c26ba476873a3c opengl-cmake-demo
+  Cloning into 'opengl-cmake-demo'...
+  remote: Enumerating objects: 4, done.
+  remote: Counting objects: 100% (4/4), done.
+  remote: Compressing objects: 100% (4/4), done.
+  Unpacking objects: 100% (4/4), done.
+  remote: Total 4 (delta 0), reused 0 (delta 0), pack-reused 0
+
+  $ cd opengl-cmake-demo\
+
+  $ dir
+   Volume in drive C has no label.
+   Volume Serial Number is 
+
+   Directory of C:\Users\archbox\Desktop\opengl-cmake-demo
+
+  01/08/2019  05:57 PM    <DIR>          .
+  01/08/2019  05:57 PM    <DIR>          ..
+  01/08/2019  05:57 PM             1,630 CMakeLists.txt
+  01/08/2019  05:57 PM             1,188 opengl1.cpp
+                 2 File(s)          2,818 bytes
+                 2 Dir(s)   1,157,586,944 bytes free
+
+#+END_SRC
+
+Perform CMake configuration step generating building scripts:
+
+#+BEGIN_SRC sh 
+    $ cmake -H. -Bbuild -G "Visual Studio 15 2017 Win64" -DCMAKE_INSTALL_PREFIX=.
+     [INFO] VCPKG CMAKE_TOOLCHAIN_FILE = C:\vcpkg/scripts/buildsystems/vcpkg.cmake
+    -- The C compiler identification is MSVC 19.16.27025.1
+    -- The CXX compiler identification is MSVC 19.16.27025.1
+     ... ...  ... ...  ... ...  ... ...  ... ...  ... ...  ... ... 
+    -- Detecting CXX compiler ABI info - done
+    -- Detecting CXX compile features
+    -- Detecting CXX compile features - done
+    -- Found OpenGL: opengl32
+    -- Found GLUT: C:/vcpkg/installed/x64-windows/debug/lib/freeglut.lib
+    -- WARNING: you are using the obsolete 'GLU' package, please use 'OpenGL' instead
+     Freeglut DLL =
+    -- Configuring done
+    -- Generating done
+    -- Build files have been written to: C:/Users/archbox/Desktop/opengl-cmake-demo/build
+#+END_SRC
+
+Build all targets: 
+
+ + $ cmake --build build --config debug
+ + $ cmake --build build --config release 
+ 
+#+BEGIN_SRC sh 
+  $ cmake --build build --config debug
+
+  Microsoft (R) Build Engine version 15.9.21+g9802d43bc3 for .NET Framework
+  Copyright (C) Microsoft Corporation. All rights reserved.
+
+  Build started 1/8/2019 6:02:01 PM.
+  Project "C:\Users\archbox\Desktop\opengl-cmake-demo\build\ALL_BUILD.vcxproj" on node 1 (default targets).
+  Project "C:\Users\archbox\Desktop\opengl-cmake-demo\build\ALL_BUILD.vcxproj" (1) is building "C:\Users\archbox\Desktop\opengl-cmake-demo\buil d\ZERO_CHECK.vcxproj" (2) on node 1 (default targets).
+
+   .. .. .   ... .. .   ... .. .   ... .. .   ... .. .   ... .. .   ... .. .   ... .. .   ... .. . 
+
+  ClCompile:
+    C:\Program Files (x86)\Microsoft Visual Studio\2017\Enterprise\VC\Tools\MSVC\14.16.27023\bin\HostX86\x64\CL.exe /c /I"C:\vcpkg\installed\x6
+    4-windows\include" /Zi /W3 /WX- /diagnostics:classic /Od /Ob0 /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\"Debug\"" /D _MBCS /Gm- /EHsc /RTC1 /M
+    Dd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /GR /std:c++17 /Fo"openglDemo1.dir\Debug\\" /Fd"openglDemo1.dir\Debug\vc141.pdb" /Gd
+     /TP /errorReport:queue "C:\Users\archbox\Desktop\opengl-cmake-demo\opengl1.cpp"
+    Microsoft (R) C/C++ Optimizing Compiler Version 19.16.27025.1 for x64
+    opengl1.cpp
+    Copyright (C) Microsoft Corporation.  All rights reserved.
+
+    cl /c /I"C:\vcpkg\installed\x64-windows\include" /Zi /W3 /WX- /diagnostics:classic /Od /Ob0 /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\"Debug\"
+    " /D _MBCS /Gm- /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /GR /std:c++17 /Fo"openglDemo1.dir\Debug\\" /Fd"opengl
+    Demo1.dir\Debug\vc141.pdb" /Gd /TP /errorReport:queue "C:\Users\archbox\Desktop\opengl-cmake-demo\opengl1.cpp"
+
+  Link:
+    C:\Program Files (x86)\Microsoft Visual Studio\2017\Enterprise\VC\Tools\MSVC\14.16.27023\bin\HostX86\x64\link.exe /ERRORREPORT:QUEUE /OUT:"
+    C:\Users\archbox\Desktop\opengl-cmake-demo\build\Debug\openglDemo1.exe" /INCREMENTAL /NOLOGO "C:\vcpkg\installed\x64-windows\debug\lib\free
+    glut.lib" kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /M
+    ANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/archbox/Desktop/opengl-cmake-demo/build/Debug/openglD
+    emo1.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:/Users/archbox/Desktop/opengl-cmake-demo/build/Debug/openglDemo1.li
+    b" /MACHINE:X64  /machine:x64 openglDemo1.dir\Debug\opengl1.obj
+
+  ....   ....   ....   ....   ....   ....   ....   ....   ....   ....   ....   ....   ....   ....   ....   ....   ....   .... 
+
+  Done Building Project "C:\Users\archbox\Desktop\opengl-cmake-demo\build\ALL_BUILD.vcxproj" (default targets).
+
+
+  Build succeeded.
+      0 Warning(s)
+      0 Error(s)
+
+  Time Elapsed 00:00:06.76
+#+END_SRC
+
+Run executable (target run-ex1):
+
+ + This is conveniced target was added for making easier to run the
+   executable from the terminal. It is not needed for IDEs like Visual
+   Studio, JetBrains - Clion and so on. 
+
+#+BEGIN_SRC sh 
+  $ cmake --build build --target run-ex1
+#+END_SRC
+
+
+Compile and run on Linux: 
+
+#+BEGIN_SRC sh 
+  $ vcpkg install freeglut   
+  $ git clone https://gist.github.com/caiorss/4e36d7423cfd456f39c26ba476873a3c opengl
+  $ cd opengl 
+  $ cmake -H. -Bbuild 
+  $ cmake --build build --target run-ex1 
 #+END_SRC
 
 ** Example: Project with Nana GUI Library 
@@ -2076,5 +2378,3 @@ Check shared libraries dependencies:
            libz.so.1 => /lib64/libz.so.1 (0x00007f5f70702000)
            libXau.so.6 => /lib64/libXau.so.6 (0x00007f5f704fe000)
 #+END_SRC
-
-
