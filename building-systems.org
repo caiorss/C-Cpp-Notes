@@ -1613,3 +1613,362 @@ current directory (project top-level directory ./).
 References: 
  + https://stackoverflow.com/questions/31277186
  + https://stackoverflow.com/questions/15694347/
+* Vcpkg package manager 
+** Linux Installation
+
+1 Create install directory 
+  + In this instruction: VCPKG will be installed at directory
+    $HOME/opt/vcpkg or ~/home/<<MY-USER>/opt/vcpkg/~
+
+#+BEGIN_SRC sh 
+  $ mkdir -p ~/opt && cd ~/opt
+#+END_SRC
+
+2 Download and compile VCPKG 
+
+#+BEGIN_SRC sh 
+  $ git clone https://github.com/Microsoft/vcpkg
+  $ cd vcpkg/
+  $ sh bootstrap-vcpkg.sh 
+#+END_SRC
+
+#+RESULTS:
+
+3 Run VCPKG:
+
+#+BEGIN_SRC sh 
+  $ ./vcpkg
+  Commands:
+    vcpkg search [pat]              Search for packages available to be built
+    vcpkg install <pkg>...          Install a package
+    vcpkg remove <pkg>...           Uninstall a package
+    vcpkg remove --outdated         Uninstall all out-of-date packages
+    vcpkg list                      List installed packages
+    vcpkg update                    Display list of packages for updating
+
+    ... ... ... ... ... ....   ... . .. ... . .. ... .. .... 
+
+  For more help (including examples) see the accompanying README.md.
+#+END_SRC
+
+4 Add VCPKG to search $PATH variable in order to be able to call it
+from any directory.
+
+ + Edit: ~/.bashrc or ~/.bash_profile and add the following code and
+   restart the REPL.
+
+#+BEGIN_SRC sh 
+  # Directory where installed VCPKG
+  export VCPKG_ROOT=$HOME/opt/vcpkg/
+
+  # Make vcpkg tool callable from anywhere 
+  export PATH=$PATH:$VCPKG_ROOT
+ #+END_SRC
+
+** Example: Project with Nana GUI Library 
+
+File: *CMakeLists.txt*
+
+#+BEGIN_SRC cmake 
+   cmake_minimum_required(VERSION 3.9)
+
+   if(DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
+     set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+       CACHE STRING "")
+       message(" [INFO] VCPKG CMAKE_TOOLCHAIN_FILE = ${CMAKE_TOOLCHAIN_FILE}")
+   endif()
+
+   #======= Global Project Configuration =========#
+
+   project(DummyProject)
+   set(CMAKE_CXX_STANDARD 17)     
+
+   #========== Targets Configurations ============#
+
+   ## ==> Target: gui1 - Executable: gui1
+
+   find_package(unofficial-nana CONFIG REQUIRED)
+   add_executable(gui1 gui1.cpp)
+   target_link_libraries(gui1 PRIVATE
+     unofficial::nana::nana fontconfig stdc++fs)
+
+   # Add target to run executable gui1 (similar to $ make run)
+   add_custom_target(run-gui1
+       COMMAND gui1
+       DEPENDS gui1
+       WORKING_DIRECTORY ${CMAKE_PROJECT_DIR}
+   )
+
+   # Install directory relative to ${CMAKE_PREFIX_PATH}
+   install(TARGETS gui1 DESTINATION ./bin)
+#+END_SRC
+
+File: *gui1.cpp*
+
+ + Note: Demo code taken from - http://nanapro.org/en-us/
+
+#+BEGIN_SRC cpp 
+  #include <nana/gui.hpp>
+  #include <nana/gui/widgets/label.hpp>
+  #include <nana/gui/widgets/button.hpp>
+
+  int main()
+  {
+      using namespace nana;
+
+      //Define a form.
+      form fm;
+      //Define a label and display a text.
+      label lab{fm, "Hello, <bold blue size=16>Nana C++ Library</>"};
+      lab.format(true);
+      //Define a button and answer the click event.
+      button btn{fm, "Quit"};
+      btn.events().click([&fm]{
+          fm.close();
+      });
+      //Layout management
+      fm.div("vert <><<><weight=80% text><>><><weight=24<><button><>><>");
+      fm["text"]<<lab;
+      fm["button"] << btn;
+      fm.collocate();
+      //Show the form
+      fm.show();
+      //Start to event loop process, it blocks until the form is closed.
+      exec();
+  }
+#+END_SRC
+
+Project directory: 
+
+#+BEGIN_SRC sh 
+  $ tree -L 1
+  .
+  ├── build
+  ├── CMakeLists.txt
+  └── gui1.cpp
+
+  1 directory, 2 files
+#+END_SRC
+
+Install Linux dependency libraries (Tested on Linux Fedora): 
+
+ + Note: Sometimes VCPKG cannot install system libraries. In this
+   case, it is necessary to use the current distribution package
+   manager. 
+
+#+BEGIN_SRC sh 
+  $ sudo dnf install libX11-devel.x86_x64
+  $ sudo dnf install libXft-devel.x86_64
+#+END_SRC
+
+ *Install package Nana with vcpkg:*
+
+#+BEGIN_SRC sh 
+  $ vcpkg install nana
+
+   ...  ...  ...  ... 
+  -- Using cached /home/archbox/opt/vcpkg/downloads/cnjinhao-nana-v1.6.2.tar.gz
+  -- Using source at /home/archbox/opt/vcpkg/buildtrees/nana/src/v1.6.2-51b575c248
+  -- Configuring x64-linux-dbg
+  -- Configuring x64-linux-rel
+  -- Building x64-linux-dbg
+  -- Building x64-linux-rel
+  -- Performing post-build validation
+  -- Performing post-build validation done
+  Building package nana[core]:x64-linux... done
+  Installing package nana[core]:x64-linux... 
+  Installing package nana[core]:x64-linux... done
+  Elapsed time for package nana:x64-linux: 1.825 min
+
+  Total elapsed time: 1.825 min
+
+  The package nana:x64-linux provides CMake targets:
+
+      find_package(unofficial-nana CONFIG REQUIRED)
+      target_link_libraries(main PRIVATE unofficial::nana::nana)
+#+END_SRC
+
+List installed packages: 
+
+#+BEGIN_SRC sh 
+   $ vcpkg list
+   boost-accumulators:x64-linux                       1.68.0           Boost accumulators module
+   boost-algorithm:x64-linux                          1.68.0           Boost algorithm module
+   boost-any:x64-linux                                1.68.0           Boost any module
+   boost-array:x64-linux                              1.68.0           Boost array module
+
+   ... ... ...   ... ... ...   ... ... ...   ... ... ...   ... ... ...   ... ... ...   ... ... ...
+  
+   gsl:x64-linux                                      2.4-3            The GNU Scientific Library is a numerical librar...
+   gtest:x64-linux                                    1.8.1-1          GoogleTest and GoogleMock testing frameworks.
+   libiconv:x64-linux                                 1.15-5           GNU Unicode text conversion
+   libjpeg-turbo:x64-linux                            1.5.3-1          libjpeg-turbo is a JPEG image codec that uses SI...
+   liblzma:x64-linux                                  5.2.4            Compression library with an API similar to that ...
+   libpng:x64-linux                                   1.6.35-1         libpng is a library implementing an interface fo...
+   nana:x64-linux                                     1.6.2            Cross-platform library for GUI programming in mo...
+   pybind11:x64-linux                                 2.2.3-1          pybind11 is a lightweight header-only library th...
+   spdlog:x64-linux                                   1.2.1            Very fast, header only, C++ logging library
+   zlib:x64-linux                                     1.2.11-3         A compression librar
+#+END_SRC
+
+Filter nana package: 
+
+#+BEGIN_SRC sh 
+   $ vcpkg list | grep nana
+   nana:x64-linux                                     1.6.2            Cross-platform library for GUI programming in mo...
+#+END_SRC
+
+ *Building with CMake Ninja or Makefile*
+
+Cmake configuration step
+
+ + Default system building system
+   + $ cmake -H. -Bbuild 
+
+ + Ninja building System:
+   + $ cmake -H. -Bbuild -G Ninja
+
+#+BEGIN_SRC sh 
+  # Install executable at (.) curret directory
+  $ cmake -H. -Bbuild -G Ninja  -DCMAKE_PREFIX_PATH=.
+
+   [INFO] VCPKG CMAKE_TOOLCHAIN_FILE = /home/archbox/opt/vcpkg/scripts/buildsystems/vcpkg.cmake
+  -- The C compiler identification is GNU 8.2.1
+  -- The CXX compiler identification is GNU 8.2.1
+  -- Check for working C compiler: /usr/lib64/ccache/cc
+
+   ... ... ... ... ... ... 
+
+  -- Found Freetype: /home/archbox/build/vcpkg/installed/x64-linux/lib/libfreetype.a (found version "2.8.1") 
+  -- Found ZLIB: /home/archbox/build/vcpkg/installed/x64-linux/debug/lib/libz.a (found version "1.2.11") 
+  -- Found PNG: /home/archbox/build/vcpkg/installed/x64-linux/share/png/../../lib/libpng16.a (found version "1.6.35") 
+  -- Found BZip2: /home/archbox/build/vcpkg/installed/x64-linux/lib/libbz2.a (found version "1.0.6") 
+  -- Looking for BZ2_bzCompressInit
+  -- Looking for BZ2_bzCompressInit - found
+  -- Looking for XOpenDisplay in /usr/lib64/libX11.so;/usr/lib64/libXext.so
+  -- Looking for XOpenDisplay in /usr/lib64/libX11.so;/usr/lib64/libXext.so - found
+
+   ... ... ... ... ... ... 
+
+  -- Looking for shmat - found
+  -- Found X11: /usr/lib64/libX11.so
+  -- Found JPEG: /home/archbox/build/vcpkg/installed/x64-linux/debug/lib/libjpeg.a  
+  -- Configuring done
+  -- Generating done
+  -- Build files have been written to: /home/archbox/root-scripts/vcpkg2/build
+#+END_SRC
+
+Build all targets: 
+
+#+BEGIN_SRC sh 
+ $ cmake --build build --target 
+#+END_SRC
+
+Build and run executable target gui1 (target: run-gui1)
+
+#+BEGIN_SRC sh 
+  $ cmake --build build --target run-gui1
+  [3/3] cd /home/archbox/root-scripts/vcpkg2/build && /home/archbox/root-scripts/vcpkg2/build/gui1
+#+END_SRC
+
+Install executable: 
+
+#+BEGIN_SRC sh 
+  $ cmake --build build --target install
+  [2/3] Install the project...
+  -- Install configuration: ""
+  -- Installing: /home/archbox/root-scripts/vcpkg2/./bin/gui1
+#+END_SRC
+
+Run installed executable at ./bin 
+
+#+BEGIN_SRC sh 
+  $ bin/gui1 
+#+END_SRC
+
+Directory after compilation: 
+
+#+BEGIN_SRC sh 
+  $ tree . -L 2
+  .
+  ├── bin
+  │   └── gui1
+  ├── build
+  │   ├── build.ninja
+  │   ├── CMakeCache.txt
+  │   ├── CMakeFiles
+  │   ├── cmake_install.cmake
+  │   ├── gui1
+  │   ├── install_manifest.txt
+  │   └── rules.ninja
+  ├── CMakeLists.txt
+  └── gui1.cpp
+
+  3 directories, 9 files
+#+END_SRC
+
+ *Analyse executable:*
+
+Check binary format 
+
+#+BEGIN_SRC sh 
+  $ file bin/gui1 
+
+  bin/gui1: ELF 64-bit LSB executable, x86-64, version 1 (GNU/Linux),
+  dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, for
+  GNU/Linux 3.2.0,
+  BuildID[sha1]=b2273c2b397213af8c8b8e8808da1ebc195d3b4d, with
+  debug_info, not stripped
+#+END_SRC
+
+Check file size 
+
+#+BEGIN_SRC sh
+  # File size 
+  $ du -h bin/gui1
+  19M	bin/gui1
+  19M	total
+#+END_SRC
+
+Remove debugging symbols 
+
+#+BEGIN_SRC sh 
+  $ strip bin/gui1 
+#+END_SRC
+
+Check file size again: 
+
+#+BEGIN_SRC sh 
+  $ du -h bin/gui1
+  3.3M	bin/gui1
+  3.3M	total
+#+END_SRC
+
+Check shared libraries dependencies:
+
+#+BEGIN_SRC sh 
+   $ ldd bin/gui1
+           linux-vdso.so.1 (0x00007fff18930000)
+           libfontconfig.so.1 => /lib64/libfontconfig.so.1 (0x00007f5f73116000)
+           libpthread.so.0 => /lib64/libpthread.so.0 (0x00007f5f72ef7000)
+           libX11.so.6 => /lib64/libX11.so.6 (0x00007f5f72bb6000)
+           libXext.so.6 => /lib64/libXext.so.6 (0x00007f5f729a4000)
+           libXft.so.2 => /lib64/libXft.so.2 (0x00007f5f7278d000)
+           libstdc++.so.6 => /lib64/libstdc++.so.6 (0x00007f5f723fa000)
+           libm.so.6 => /lib64/libm.so.6 (0x00007f5f72066000)
+           libgcc_s.so.1 => /lib64/libgcc_s.so.1 (0x00007f5f71e4e000)
+           libc.so.6 => /lib64/libc.so.6 (0x00007f5f71a8f000)
+           libfreetype.so.6 => /lib64/libfreetype.so.6 (0x00007f5f717d8000)
+           libexpat.so.1 => /lib64/libexpat.so.1 (0x00007f5f7159d000)
+           libuuid.so.1 => /lib64/libuuid.so.1 (0x00007f5f71396000)
+           /lib64/ld-linux-x86-64.so.2 (0x00007f5f7335a000)
+           libxcb.so.1 => /lib64/libxcb.so.1 (0x00007f5f7116d000)
+           libdl.so.2 => /lib64/libdl.so.2 (0x00007f5f70f69000)
+           libXrender.so.1 => /lib64/libXrender.so.1 (0x00007f5f70d5e000)
+           libbz2.so.1 => /lib64/libbz2.so.1 (0x00007f5f70b4d000)
+           libpng16.so.16 => /lib64/libpng16.so.16 (0x00007f5f70919000)
+           libz.so.1 => /lib64/libz.so.1 (0x00007f5f70702000)
+           libXau.so.6 => /lib64/libXau.so.6 (0x00007f5f704fe000)
+#+END_SRC
+
+
