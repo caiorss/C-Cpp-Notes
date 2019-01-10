@@ -767,6 +767,19 @@ Additional Reading:
  + Ben Morgan - The University of Warwick - [[https://web.archive.org/web/20190109203537/https://indico.fnal.gov/event/9717/session/38/contribution/82/material/slides/0.pdf][C++11/14/1z in CMake]]
  + [[https://foonathan.net/doc/compatibility/][Documentation of Compatibility]]
  + [[https://manpages.debian.org/stretch-backports/cmake-data/cmake-compile-features.7.en.html][Manpage - Cmake compile features]]
+ + https://community.kde.org/Guidelines_and_HOWTOs/CMake/Library
+
+Install Dependencies - Shared Libraries: 
+
+ + https://cmake.org/cmake/help/latest/command/install.html
+
+ + [[https://stackoverflow.com/questions/41175354/can-i-install-shared-imported-library][Can I install shared imported library?]]
+
+ + https://cmake.org/pipermail/cmake/2014-December/059338.html
+
+ + [[https://cmake.org/pipermail/cmake/2009-June/030205.html][Install of library sub-project prior to building application]]
+
+ + [[http://cmake.3232098.n2.nabble.com/Copying-Shared-Libraries-DLLs-Next-to-the-Executable-td7597163.html][Copying Shared Libraries (DLLs) Next to the Executable]]
 
 ** Executable Target with resource icon (Windows only)
 
@@ -1646,6 +1659,10 @@ References:
  + https://stackoverflow.com/questions/31277186
  + https://stackoverflow.com/questions/15694347/
 * Vcpkg package manager 
+** Documentation 
+
+ + VCPKG Faq: [[https://github.com/Microsoft/vcpkg/blob/master/docs/about/faq.md][Frequently Asked Questions]]
+
 ** Windows Vcpkg Intallation 
 
 Assumption: Visual studio development tools are already installed.
@@ -1802,6 +1819,228 @@ from any directory.
   Removing package libjpeg-turbo:x86-windows... done
   Purging package libjpeg-turbo:x86-windows...
   Purging package libjpeg-turbo:x86-windows... done
+#+END_SRC
+** Example: Project with spdlog and Boost Ublas 
+
+File: *CMakeLists.txt*
+
+#+BEGIN_SRC cmake 
+  cmake_minimum_required(VERSION 3.9)
+
+  if(DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
+    set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+      CACHE STRING "")
+    message(" [INFO] VCPKG CMAKE_TOOLCHAIN_FILE = ${CMAKE_TOOLCHAIN_FILE}")
+  endif()
+
+  #========== Global Configurations =============#
+  #----------------------------------------------#
+  project(SpdLogVCPKGTest)
+  set(CMAKE_CXX_STANDARD 17)     
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+
+  #========== Targets Configurations ============#
+
+  # Build an executable (Unix-like OSes generates ./AppDemo1, on
+  # Windows ./opengDemo1.exe)
+  # ..........................................
+  find_package(spdlog CONFIG REQUIRED)
+  add_executable(AppDemo1 demo.cpp)
+  target_link_libraries(AppDemo1 PRIVATE spdlog::spdlog)
+
+  # Add target to run executable 
+  add_custom_target(run-app
+    COMMAND AppDemo1 
+    DEPENDS AppDemo1 
+    WORKING_DIRECTORY ${CMAKE_PROJECT_DIR}
+    )
+
+  install(TARGETS AppDemo1 DESTINATION ./bin)
+  if(WIN32)
+    # Install DLL depedency.
+    # The only way to know the required dependencies is to
+    # take a look at the build tree directory <<BUILD-TREE>>\Debug
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/Debug/fmtd.dll
+      DESTINATION "bin")
+  endif()
+#+END_SRC
+
+File: *demo.cpp*
+
+#+BEGIN_SRC cpp
+  #include <iostream>
+  #include <spdlog/spdlog.h>
+  #include <spdlog/sinks/stdout_sinks.h>
+
+  // Headers for vectors 
+  #include <boost/numeric/ublas/vector.hpp>
+  #include <boost/numeric/ublas/io.hpp>
+
+  namespace ub = boost::numeric::ublas;
+
+  int main(){
+      auto console = spdlog::stdout_logger_mt("stdout-console");
+      console->info("Testing logging information to command line");
+
+      console->info("Welcome to spdlog version {}.{}.{} !", SPDLOG_VER_MAJOR, SPDLOG_VER_MINOR, SPDLOG_VER_PATCH);
+      console->warn("Easy padding in numbers like {:08d}", 12);
+      console->critical("Support for int: {0:d};  hex: {0:x};  oct: {0:o}; bin: {0:b}", 42);
+      console->info("Support for floats {:03.2f}", 1.23456);
+      console->info("Positional args are {1} {0}..", "too", "supported");
+      console->info("{:>8} aligned, {:<8} aligned", "right", "left");
+
+      ub::vector<double> vec1(3, 2.2) ; vec1[2] = -5.1;
+      ub::vector<double> vec2(3, -1.2); vec2[2] = 1.1;
+
+      std::cout << "Vec1 = " << vec1 << std::endl;
+      std::cout << "3.0 * Vec1 = " << 3.0 * vec1 << std::endl;
+      std::cout << "Norm1(Vec1) = " << ub::norm_1(vec1) << std::endl;
+      std::cout << "Vec2 - Vec1 = " << vec2 - vec1 << std::endl;
+
+      std::cout << "\n Enter RETURN to exit" << std::endl;
+      std::cin.get();
+      return 0;
+  }
+#+END_SRC
+
+Install Vcpkg libraries Boost Ublas and spdlog: 
+
+#+BEGIN_SRC sh 
+  # Windows installation 
+  $ vcpkg install spdlog:x64-windows
+  $ vcpkg install boost-ublas:x64-windows
+
+  # Installation on Linux, OSX, or any other Unix-like OS. 
+  $ vcpkg install spdlog
+  $ vcpkg install boost-ublas
+#+END_SRC
+
+ *Visual Studio*
+
+ + The project can be compiled, modified, debugged and managed by
+   opening it with Visual Studio as a directory or by invoking Visual
+   Studio form command developer command prompt with the following
+   command.
+
+#+BEGIN_SRC sh 
+  # devenv <PATH-TO-PROJECT DIRECTORY>
+
+  # Assumes that the current directory is the project top directory
+  $ devenv .
+#+END_SRC
+
+All CMake Targets can be viewed from the VS Solution Explorer.
+
+#+CAPTION: Visual Studio Solution Explorer - CMake Targets 
+[[file:images/solution-explorer-visual-spdlog.png][file:images/solution-explorer-visual-spdlog.png]]
+
+#+CAPTION: Running CMake project from Visual Studio.
+[[file:images/cmake-project-vs-spdlog.png][file:images/cmake-project-vs-spdlog.png]]
+
+ *Manual Compilation - CMake Configuration Step*
+
+CMake Configuration on Windows with Visual Studio building tools as backed:
+
+ + In the project directory run: 
+
+#+BEGIN_SRC sh 
+  $ cmake -H. -Bbuild -G "Visual Studio 15 2017 Win64" -DCMAKE_INSTALL_PREFIX=.
+#+END_SRC
+
+CMake Configuration on Linux using Makefiles: 
+
+#+BEGIN_SRC sh 
+  # Configuration using Makefiles 
+  $ cmake -H. -Bbuild -DCMAKE_INSTALL_PREFIX=.
+
+  # Configuration using Ninja building system 
+  $ cmake -H. -Bbuild -G Ninja -DCMAKE_INSTALL_PREFIX=.
+#+END_SRC
+
+ *Manual Compilation - CMake Building Step*
+
+Building all CMake targets (compilation targets to build executables
+and libraries):
+
+#+BEGIN_SRC sh 
+  $ cmake --build build --target 
+#+END_SRC
+
+Run install target on Windows:
+
+#+BEGIN_SRC sh 
+  $ cmake --build build --target install 
+
+    ... ... ... ... .... 
+  PrepareForBuild:
+    Creating directory "x64\Debug\INSTALL\".
+    Creating directory "x64\Debug\INSTALL\INSTALL.tlog\".
+  InitializeBuildStatus:
+    Creating "x64\Debug\INSTALL\INSTALL.tlog\unsuccessfulbuild" because "AlwaysCreate" was specified.
+  PostBuildEvent:
+    setlocal
+    "C:\Program Files\CMake\bin\cmake.exe" -DBUILD_TYPE=Debug -P cmake_install.cmake
+    if %errorlevel% neq 0 goto :cmEnd
+    :cmEnd
+    endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+    :cmErrorLevel
+    exit /b %1
+    :cmDone
+    if %errorlevel% neq 0 goto :VCEnd
+    :VCEnd
+    -- Install configuration: "Debug"
+    -- Installing: C:/Users/archbox/Desktop/spdlogtest/./bin/AppDemo1.exe
+    -- Up-to-date: C:/Users/archbox/Desktop/spdlogtest/bin/fmtd.dll
+  FinalizeBuildStatus:
+    Deleting file "x64\Debug\INSTALL\INSTALL.tlog\unsuccessfulbuild".
+    Touching "x64\Debug\INSTALL\INSTALL.tlog\INSTALL.lastbuildstate".
+  Done Building Project "C:\Users\archbox\Desktop\spdlogtest\build\install.vcxproj" (default targets).
+  Build succeeded.
+   .... ... .... ... .... ... .... ...
+#+END_SRC
+
+Run install target on Linux:
+
+#+BEGIN_SRC sh 
+  $ cmake --build build --target install
+  [2/3] Install the project...
+  -- Install configuration: ""
+  -- Installing: /home/archbox/root-scripts/spdlog/./bin/AppDemo1
+#+END_SRC
+
+Check install output on Windows:
+
+#+BEGIN_SRC sh 
+  $ ls bin
+  AppDemo1.exe*  fmtd.dll*
+#+END_SRC
+
+Check install output on Linux:
+
+#+BEGIN_SRC sh 
+  $ ls bin/
+  AppDemo1*
+#+END_SRC
+
+Run program: 
+
+#+BEGIN_SRC sh 
+   # Run on Windows
+   bin\AppDemo1.exe 
+
+   [2019-01-09 16:17:13.360] [stdout-console] [info] Testing logging information to command line
+   [2019-01-09 16:17:13.361] [stdout-console] [info] Welcome to spdlog version 1.2.0 !
+   [2019-01-09 16:17:13.361] [stdout-console] [warning] Easy padding in numbers like 00000012
+   [2019-01-09 16:17:13.361] [stdout-console] [critical] Support for int: 42;  hex: 2a;  oct: 52; bin: 101010
+   [2019-01-09 16:17:13.361] [stdout-console] [info] Support for floats 1.23
+   [2019-01-09 16:17:13.362] [stdout-console] [info] Positional args are supported too..
+   [2019-01-09 16:17:13.362] [stdout-console] [info]    right aligned, left     aligned
+   Vec1 = [3](2.2,2.2,-5.1)
+   3.0 * Vec1 = [3](6.6,6.6,-15.3)
+   Norm1(Vec1) = 9.5
+   Vec2 - Vec1 = [3](-3.4,-3.4,6.2)
+
+    Enter RETURN to exit
 #+END_SRC
 
 ** Example: Project with OpenGL + FreeGLUT 
@@ -2410,3 +2649,8 @@ Check shared libraries dependencies:
            libz.so.1 => /lib64/libz.so.1 (0x00007f5f70702000)
            libXau.so.6 => /lib64/libXau.so.6 (0x00007f5f704fe000)
 #+END_SRC
+
+
+
+
+
