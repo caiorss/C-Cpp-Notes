@@ -3840,18 +3840,32 @@ Or using C++ auto keyword for functions:
 
 *** Known Uses 
 
-The Windows API - *COM (Component Object Model)* architechture.  In this
-architechture the interface IUnknown allows a client code to query the
-interfaces that an object implements at runtime. The architechutre
-requires that all interfaces and COM - classes to implement the
-interface IUnknown and the client code to communicate with classes
-only using standard COM interfaces and querying interfaces at runtime.
+In Windows *COM (Component Object Model)* architechture, a client code
+can load classes at runtime without knowing anything about their
+implementations. All COM classes and COM intefaces are required to
+implement the interface IUnknown which allows a client code to query
+at runtime the interfaces implemented by the class and get pointers to
+those interfaces. 
+
+The COM Architechture has a plugin-system design, In-process COM
+servers which provides COM one or more COM-compatible classes are DLL
+shared libraries providing a set of standard functions. A client-code
+instantiates COM classes using the Windows API function
+[[https://docs.microsoft.com/en-us/windows/desktop/api/combaseapi/nf-combaseapi-cogetclassobject][CoGetClassObject]] that locates the shared libraries using the unique
+class ID (CLSDI) and IID (Interface Identifier) in the Windows
+registry. The CLSID is used for locating the shared library file
+(*.dll) containing COM classes and the IID is used to set the
+interface pointer returned by the function CoGetClassObject. The C++
+ABIs issues are circunvented because all COM interfaces uses only
+C-compatible types in their member functions.
 
  *Windows API COM Interfaces*: 
 
- + IUnknown
-   + Base interface required to be implemented by all interfaces and
-     concrete COM classes. 
+Interface IUnknown
+
+ + Base interface required to be implemented by all interfaces and
+   concrete COM classes.
+ + IID (Interface ID): {00000000-0000-0000-C000-000000000046}
 
 #+BEGIN_SRC cpp 
   struct IUnknown {
@@ -3861,9 +3875,11 @@ only using standard COM interfaces and querying interfaces at runtime.
   };
 #+END_SRC
 
- + Interface IDispatch
-   + Allows querying which methods a class implements and calling
-     class methods at runtime without knowing them at compile-time.
+Interface IDispatch
+
+ + Allows querying which methods a class implements and calling
+   class methods at runtime without knowing them at compile-time.
+ + IID (Interface ID): {00020400-0000-0000-C000-000000000046} 
 
 #+BEGIN_SRC cpp 
   class IDispatch : public IUnknown {
