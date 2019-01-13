@@ -826,40 +826,87 @@ Install Dependencies - Shared Libraries:
  + [[https://cmake.org/pipermail/cmake/2009-June/030205.html][Install of library sub-project prior to building application]]
 
  + [[http://cmake.3232098.n2.nabble.com/Copying-Shared-Libraries-DLLs-Next-to-the-Executable-td7597163.html][Copying Shared Libraries (DLLs) Next to the Executable]]
+** Common Variables 
+*** CMAKE_CURRENT_LIST_DIR - Directory where is CMakeLists.txt 
 
-** Executable Target with resource icon (Windows only)
-
-This section provides an example about how to add a resource icon to a
-Windows executable target.
-
-Files:
-
-| Project Item    | Description                            |   |
-|-----------------+----------------------------------------+---|
-| Application     | ProgramWithICON.exe                    |   |
-| Sources:        | src/main.cpp src/src1.cpp src/src2.cpp |   |
-| Icon            | src/programImage.ico                   |   |
-| Resource script | src/icon.rc                            |   |
-|-----------------+----------------------------------------+---|
-
-Resource file: src/icon.rc 
-
-#+BEGIN_SRC cpp
-  // Icon Resource => Compiled by Resource compiler
-  id ICON "programImage.ico"
-#+END_SRC
-
-CMakeLists.txt 
+Prints the directory where CMAkeLists.
 
 #+BEGIN_SRC cmake 
-   # .... Omit beginning and global configuration .... #
-    add_executable(ProgramWithICON src/main.cpp src/src1.cpp src/src2.cpp)
-   if(WIN32)
-      target_sources(ProgramWithICON src/icon.rc)
-   endif()
- 
-   target_include_directories(ProgramWithICON  ./includes)
-  # .... Omit additional configuration ... #
+  message(" [INFO] CMakeLists.txt is in the directory ${CMAKE_CURRENT_LIST_DIR}")
+#+END_SRC
+
+*** CMAKE_CXX_STANDARD - Set C++ Standard
+
+The variable ~CMAKE_CXX_STANDARD~ sets the project current C++
+standard. This variable can be set to 98 (for C++98); 11 (C++11); 14
+(C++14); 17 (C++17) and 20 (C++20 - experimental yet.)
+
+ + Documentation: [[https://cmake.org/cmake/help/latest/prop_tgt/CXX_STANDARD.html#prop_tgt:CXX_STANDARD][CXX_STANDARD — CMake 3.13.2 Documentation]] 
+
+Example: Set project to compile with C++11 ISO standard.
+
+#+BEGIN_SRC cmake 
+  set(CMAKE_CXX_STANDARD 11)
+#+END_SRC
+
+Usage: (File CMAKELists.txt)
+
+#+BEGIN_SRC cmake 
+  cmake_minimum_required(VERSION 3.9)
+  project(MY_PROJECT_NAME)
+
+  set(CMAKE_CXX_STANDARD 17)
+  ... ... .... .... 
+#+END_SRC
+
+*** CMAKE_BUILD_TYPE - Set default building type to DEBUG 
+
+In the debug building type optimization flags are disabled and flags
+for generating debugging symbols are enabled, for GGC or GCC/Mingw and
+Clang the (-g) is automatically added and for MSVC, aka VC++ (cl.exe),
+the flag /Zi is also passed to the compiler. The default building type
+can be set to DEBUG with the following code.
+
+#+BEGIN_SRC cmake 
+  # Set default building type to debug if it was not set
+  # in command line with -DCMAKE_BUILD_TYPE=release
+  if(NOT DEFINED CMAKE_BUILD_TYPE OR CMAKE_BUILD_TYPE MATCHES "")
+    set(CMAKE_BUILD_TYPE  debug)
+  endif()
+#+END_SRC
+
+The building type can be changed by running cmake with the flag
+ (-DCMAKE_BUILD_TYPE=release). Example: 
+
+#+BEGIN_SRC sh 
+ $ cmake -H. -Bbuild -DCMAKE_BUILD_TYPE=DEBUG -G "Visual Studio 15 2017 Win64"
+#+END_SRC
+
+Note: CMake is not case sensitive, so it does not matter using
+'release' or RELEASE; if or IF; endif or ENDIF and so on. 
+
+*** CMAKE_CXX_FLAGS - Compiler flags 
+
+The globals compiler flags used to build all targets can be extended
+by setting the variable CMAKE_CXX_FLAGS. However, as the compiler
+flags depends on the compiler, the custom settings may not be portable
+if one uses a different compiler, for instance the (-g) flag used to
+generate debug symbols with GCC or Clang does not work with MSVC
+(visual c++ compiler, vc++) as it uses the flag /Zi for generating
+debugging symbols.
+
+Example 1: 
+
+#+BEGIN_SRC cmake
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}"  "-std=c++17 -g -Wall -Wextra -pendantic -O0" )
+#+END_SRC
+
+Example 2 (better):
+
+#+BEGIN_SRC cmake
+  if(NOT MSVC)
+     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}"  "-std=c++17 -g -Wall -Wextra -pendantic -O0" )
+  endif()
 #+END_SRC
 
 ** CMake Map 
@@ -1263,7 +1310,65 @@ Output:
   ... ... ... ... ... ... ... ... 
 
 #+END_SRC
-** SNIPPET - Debug Information for diagnosing problems
+
+** Windows OS Specific Snippets
+*** Executable Target with resource icon (Windows only)
+
+This section provides an example about how to add a resource icon to a
+Windows executable target.
+
+Files:
+
+| Project Item    | Description                            |   |
+|-----------------+----------------------------------------+---|
+| Application     | ProgramWithICON.exe                    |   |
+| Sources:        | src/main.cpp src/src1.cpp src/src2.cpp |   |
+| Icon            | src/programImage.ico                   |   |
+| Resource script | src/icon.rc                            |   |
+|-----------------+----------------------------------------+---|
+
+Resource file: src/icon.rc 
+
+#+BEGIN_SRC cpp
+  // Icon Resource => Compiled by Resource compiler
+  id ICON "programImage.ico"
+#+END_SRC
+
+CMakeLists.txt 
+
+#+BEGIN_SRC cmake 
+   # .... Omit beginning and global configuration .... #
+    add_executable(ProgramWithICON src/main.cpp src/src1.cpp src/src2.cpp)
+   if(WIN32)
+      target_sources(ProgramWithICON src/icon.rc)
+   endif()
+ 
+   target_include_directories(ProgramWithICON  ./includes)
+  # .... Omit additional configuration ... #
+#+END_SRC
+*** Set target subsystem: console/window - Win32 API Specific
+
+Set target subsystem. 
+
+#+BEGIN_SRC cmake 
+  if(WIN32)
+     set_target_properties(WindowApplicationExample PROPERTIES LINK_FLAGS_DEBUG "/SUBSYSTEM:CONSOLE")
+     set_target_properties(WindowApplicationExample PROPERTIES COMPILE_DEFINITIONS_DEBUG "_CONSOLE")
+     set_target_properties(WindowApplicationExample PROPERTIES LINK_FLAGS_RELWITHDEBINFO "/SUBSYSTEM:CONSOLE")
+     set_target_properties(WindowApplicationExample PROPERTIES COMPILE_DEFINITIONS_RELWITHDEBINFO "_CONSOLE")
+     set_target_properties(WindowApplicationExample PROPERTIES LINK_FLAGS_RELEASE "/SUBSYSTEM:WINDOWS")
+     set_target_properties(WindowApplicationExample PROPERTIES LINK_FLAGS_MINSIZEREL "/SUBSYSTEM:WINDOWS")
+  endif(WIN32)
+#+END_SRC
+
+Taken from: 
+ + [[https://gitlab.kitware.com/cmake/community/wikis/doc/cmake/recipe/VSConfigSpecificSettings][Vsconfigspecificsettings · Wiki · CMake / Community · GitLab]]
+ + [[https://developercommunity.visualstudio.com/content/problem/46678/cmake-set-subsystem-to-console.html][cmake: Set subsystem to console - Developer Community]]
+ + [[https://stackoverflow.com/questions/33873735/correctly-set-visual-studio-linker-flag-subsystem-in-cmake][c++ -
+   Correctly set Visual Studio linker flag /SUBSYSTEM in CMAKE - Stack
+   Overflow]]
+** Snippets 
+*** Debug Information for diagnosing problems
 
 Informs whether the current build type is Release or Debug. Relase has
 optmization flags enabled and debugging symbols disabled. Debug
@@ -1327,282 +1432,198 @@ Putting it all together:
    message(" [INFO] CMake binary dir = ${CMAKE_BINARY_DIR}")
 #+END_SRC
 
-** SNIPPET - Common Variables 
-*** CMAKE_CURRENT_LIST_DIR - Directory where is CMakeLists.txt 
+*** Detect Operating System 
+**** Detect operating system with predefined variables  
 
-Prints the directory where CMAkeLists.
+ Check whether current OS is Microsft Windows NT:
 
-#+BEGIN_SRC cmake 
-  message(" [INFO] CMakeLists.txt is in the directory ${CMAKE_CURRENT_LIST_DIR}")
-#+END_SRC
-
-*** CMAKE_CXX_STANDARD - Set C++ Standard
-
-The variable ~CMAKE_CXX_STANDARD~ sets the project current C++
-standard. This variable can be set to 98 (for C++98); 11 (C++11); 14
-(C++14); 17 (C++17) and 20 (C++20 - experimental yet.)
-
- + Documentation: [[https://cmake.org/cmake/help/latest/prop_tgt/CXX_STANDARD.html#prop_tgt:CXX_STANDARD][CXX_STANDARD — CMake 3.13.2 Documentation]] 
-
-Example: Set project to compile with C++11 ISO standard.
-
-#+BEGIN_SRC cmake 
-  set(CMAKE_CXX_STANDARD 11)
-#+END_SRC
-
-Usage: (File CMAKELists.txt)
-
-#+BEGIN_SRC cmake 
-  cmake_minimum_required(VERSION 3.9)
-  project(MY_PROJECT_NAME)
-
-  set(CMAKE_CXX_STANDARD 17)
-  ... ... .... .... 
-#+END_SRC
-
-*** CMAKE_BUILD_TYPE - Set default building type to DEBUG 
-
-In the debug building type optimization flags are disabled and flags
-for generating debugging symbols are enabled, for GGC or GCC/Mingw and
-Clang the (-g) is automatically added and for MSVC, aka VC++ (cl.exe),
-the flag /Zi is also passed to the compiler. The default building type
-can be set to DEBUG with the following code.
-
-#+BEGIN_SRC cmake 
-  # Set default building type to debug if it was not set
-  # in command line with -DCMAKE_BUILD_TYPE=release
-  if(NOT DEFINED CMAKE_BUILD_TYPE OR CMAKE_BUILD_TYPE MATCHES "")
-    set(CMAKE_BUILD_TYPE  debug)
-  endif()
-#+END_SRC
-
-The building type can be changed by running cmake with the flag
- (-DCMAKE_BUILD_TYPE=release). Example: 
-
-#+BEGIN_SRC sh 
- $ cmake -H. -Bbuild -DCMAKE_BUILD_TYPE=DEBUG -G "Visual Studio 15 2017 Win64"
-#+END_SRC
-
-Note: CMake is not case sensitive, so it does not matter using
-'release' or RELEASE; if or IF; endif or ENDIF and so on. 
-
-*** CMAKE_CXX_FLAGS - Compiler flags 
-
-The globals compiler flags used to build all targets can be extended
-by setting the variable CMAKE_CXX_FLAGS. However, as the compiler
-flags depends on the compiler, the custom settings may not be portable
-if one uses a different compiler, for instance the (-g) flag used to
-generate debug symbols with GCC or Clang does not work with MSVC
-(visual c++ compiler, vc++) as it uses the flag /Zi for generating
-debugging symbols.
-
-Example 1: 
-
-#+BEGIN_SRC cmake
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}"  "-std=c++17 -g -Wall -Wextra -pendantic -O0" )
-#+END_SRC
-
-Example 2 (better):
-
-#+BEGIN_SRC cmake
-  if(NOT MSVC)
-     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}"  "-std=c++17 -g -Wall -Wextra -pendantic -O0" )
-  endif()
-#+END_SRC
-** SNIPPET - Detect Operating System 
-*** Detect operating system with predefined variables  
-
-Check whether current OS is Microsft Windows NT:
-
-#+BEGIN_SRC cmake
-  if(WIN32)
-    # actions ... 
-    message("Compiling for Windows NT")
-  else()
-    # else actions .... ...
-  endif()
-#+END_SRC
-
-Check whether current OS is a Unix-like operating system (Linux, BSD,
-MacOSX, Android and so on): 
-
-#+BEGIN_SRC cmake 
-  if(UNIX)
-    # actions ... 
-    message("Running on Unix-like OS")
-  endif()  
-#+END_SRC
-
-Check if current OS is MacOSX:
-
-#+BEGIN_SRC cmake 
-  if(APPLE)
-    # actions ... 
-    message("Running on Unix-like OS")
-  endif()  
-#+END_SRC
-
-Check if current OS is Linux:
-
-#+BEGIN_SRC cmake 
-  if(LINUX)
-    # actions ... 
-    message("Running on Unix-like OS")
-  endif()  
-#+END_SRC
-
-Check if current OS is UNIX, but not MacOSX:
-
-#+BEGIN_SRC cmake
-  if(UNIX AND NOT APPLE)
-    # actions ... 
-    message("Running on Unix-like OS")
-  endif()  
-#+END_SRC
-*** Detect operating system with variable CMAKE_SYSTEM_NAME
-
-Example: 
-
-#+BEGIN_SRC cmake 
-if(${CMAKE_SYSTEM_NAME} matches "linux")
-  message(" [INFO] compiling for Linux")
-elseif(${CMAKE_SYSTEM_NAME} matches "Windows")
-  message(" [INFO] compiling for Windows")
-elseif(${CMAKE_SYSTEM_NAME} matches "darwin")
-  message(" [INFO] compiling for Apple MacOSX")
-elseif(${CMAKE_SYSTEM_NAME} matches "Android")
-  message(" [INFO] compiling for Android OS.")
-else()
-  message( " [WARNING] Operating system not identified.")
-endif()
-#+END_SRC
-
-Possible Values of Variable _CMAKE_SYSTEM_NAME_
-
-#+BEGIN_SRC cmake
-  if(${CMAKE_SYSTEM_NAME} matches <<MATCHING-STRING>)
-    message(" [INFO] compiling for <<MATCHIGN-STTRING> ")
-  endif()
-#+END_SRC
-
-| Value of <<MATCHING-STRING> | Operating System              |   |
-| for _CMAKE_SYSTEM_NAME_       |                               |   |
-|-----------------------------+-------------------------------+---|
-| Windows                     | Windows                       |   |
-| Darwin                      | MacOSX                        |   |
-| BSD                         | Free BSD, OpenBDS, NetBSD ... |   |
-| FreeBSD                     |                               |   |
-| Linux                       | Linux                         |   |
-| Android                     | Android                       |   |
-|-----------------------------+-------------------------------+---|
-
-** SNIPPET - Detect Compiler 
-*** Detect compiler using predefined variables  
-
- *MSVC*
-
-Check if current compiler is MSVC - Microsft - Visual C/C++ Compiler
-(Visual C++, vc++ for short):
-
-#+BEGIN_SRC cmake 
-  if(MSVC)
-    message(STATUS << "Running MSVC")
-  endif()
-#+END_SRC
-
- *MSVC for 32 bits target*
-
-Detect MSVC set up for 32 bits target (buids 32 bits binaries):
-
-#+BEGIN_SRC cmake 
-  if(MSVC AND NOT CMAKE_CL_64)
-    message(" [INFO] Building for 32 bits Windows target.")
-  endif()
-#+END_SRC
-
- *MSVC for 64 bits target*
-
-#+BEGIN_SRC cmake 
-  if(MSVC AND CMAKE_CL_64)
-    message(" [INFO] Building for 64 bits Windows target.")
-  endif()
-#+END_SRC
-
- *Mingw* 
-
-Check if current compiler is GCC/Mingw, GCC compiler ported to
-Windows.
-
-#+BEGIN_SRC cmake
-  if(MSVC)
-    message("Running Mingw/GCC maybe on Windows")
-  endif()
-#+END_SRC
-*** Detect compiler using CMAKE_CXX_COMPILER_ID variable 
-
-The variable CMAKE_CXX_COMPILER_ID can be used for checking the
-current C++ compiler.
- + See: [[https://cmake.org/cmake/help/latest/variable/CMAKE_LANG_COMPILER_ID.html#variable:CMAKE_%253CLANG%253E_COMPILER_ID][Documentation]]
-
-#+BEGIN_SRC cmake 
-   if (${CMAKE_CXX_COMPILER_ID} matches GNU)
-     message(STATUS " [INFO] Using GCC - GNU C/C++ Compiler or MingW/GCC.")
-   elseif(${CMAKE_CXX_COMPILER_ID} matches CLANG) 
-     message(STATUS " [INFO] Using the super amazing, the finest C++ compiler: Clang++/LLVM.")
-   elseif(${CMAKE_CXX_COMPILER_ID} matches MSVC)
-     message(STATUS " [INFO] Using MSVC Windows 'Visual!!' C++ compiler")
+ #+BEGIN_SRC cmake
+   if(WIN32)
+     # actions ... 
+     message("Compiling for Windows NT")
    else()
-     message( FATAL_ERROR " [ERROR] I cannot identify CMake Configuration not set for this compiler yet.")
+     # else actions .... ...
    endif()
-#+END_SRC
+ #+END_SRC
 
-All possible values of ~CMAKE_CXX_COMPILER_ID~:
+ Check whether current OS is a Unix-like operating system (Linux, BSD,
+ MacOSX, Android and so on): 
 
-| Value of ~CMAKE_CXX_COMPILER_ID~ | Compiler                                       |
-|--------------------------------+------------------------------------------------|
-| *Most used compilers*            |                                                |
-| GNU                            | GNU Compiler Collection (gcc.gnu.org)          |
-| Clang                          | LLVM Clang (clang.llvm.org)                    |
-| MSVC                           | Microsoft Visual Studio (microsoft.com)        |
-| Intel                          | Intel Compiler (intel.com)                     |
-| PGI                            | The Portland Group (pgroup.com)                |
-| G95                            | G95 Fortran (g95.org)                          |
-| Embarcadero, Borland           | Embarcadero (embarcadero.com)                  |
-| ARMCC                          | ARM Compiler (arm.com)                         |
-|                                |                                                |
-| *Other compilers*                |                                                |
-| Absoft                         | Absoft Fortran (absoft.com)                    |
-| ADSP                           | Analog VisualDSP++ (analog.com)                |
-| AppleClang                     | Apple Clang (apple.com)                        |
-| Bruce                          | Bruce C Compiler                               |
-| CCur                           | Concurrent Fortran (ccur.com)                  |
-| Cray                           | Cray Compiler (cray.com)                       |
-| HP                             | Hewlett-Packard Compiler (hp.com)              |
-| IAR                            | IAR Systems (iar.com)                          |
-| MIPSpro                        | SGI MIPSpro (sgi.com)                          |
-| NVIDIA                         | NVIDIA CUDA Compiler (nvidia.com)              |
-| OpenWatcom                     | Open Watcom (openwatcom.org)                   |
-| Flang                          | Flang Fortran Compiler                         |
-| PathScale                      | PathScale (pathscale.com)                      |
-| SDCC                           | Small Device C Compiler (sdcc.sourceforge.net) |
-| SunPro                         | Oracle Solaris Studio (oracle.com)             |
-| TI                             | Texas Instruments (ti.com)                     |
-| TinyCC                         | Tiny C Compiler (tinycc.org)                   |
-| XL, VisualAge, zOS             | IBM XL (ibm.com)                               |
+ #+BEGIN_SRC cmake 
+   if(UNIX)
+     # actions ... 
+     message("Running on Unix-like OS")
+   endif()  
+ #+END_SRC
 
-** SNIPPET - Detect whether current build is 32 bits or 64 bits
+ Check if current OS is MacOSX:
+
+ #+BEGIN_SRC cmake 
+   if(APPLE)
+     # actions ... 
+     message("Running on Unix-like OS")
+   endif()  
+ #+END_SRC
+
+ Check if current OS is Linux:
+
+ #+BEGIN_SRC cmake 
+   if(LINUX)
+     # actions ... 
+     message("Running on Unix-like OS")
+   endif()  
+ #+END_SRC
+
+ Check if current OS is UNIX, but not MacOSX:
+
+ #+BEGIN_SRC cmake
+   if(UNIX AND NOT APPLE)
+     # actions ... 
+     message("Running on Unix-like OS")
+   endif()  
+ #+END_SRC
+**** Detect operating system with variable CMAKE_SYSTEM_NAME
+
+ Example: 
+
+ #+BEGIN_SRC cmake 
+ if(${CMAKE_SYSTEM_NAME} matches "linux")
+   message(" [INFO] compiling for Linux")
+ elseif(${CMAKE_SYSTEM_NAME} matches "Windows")
+   message(" [INFO] compiling for Windows")
+ elseif(${CMAKE_SYSTEM_NAME} matches "darwin")
+   message(" [INFO] compiling for Apple MacOSX")
+ elseif(${CMAKE_SYSTEM_NAME} matches "Android")
+   message(" [INFO] compiling for Android OS.")
+ else()
+   message( " [WARNING] Operating system not identified.")
+ endif()
+ #+END_SRC
+
+ Possible Values of Variable _CMAKE_SYSTEM_NAME_
+
+ #+BEGIN_SRC cmake
+   if(${CMAKE_SYSTEM_NAME} matches <<MATCHING-STRING>)
+     message(" [INFO] compiling for <<MATCHIGN-STTRING> ")
+   endif()
+ #+END_SRC
+
+ | Value of <<MATCHING-STRING> | Operating System              |   |
+ | for _CMAKE_SYSTEM_NAME_       |                               |   |
+ |-----------------------------+-------------------------------+---|
+ | Windows                     | Windows                       |   |
+ | Darwin                      | MacOSX                        |   |
+ | BSD                         | Free BSD, OpenBDS, NetBSD ... |   |
+ | FreeBSD                     |                               |   |
+ | Linux                       | Linux                         |   |
+ | Android                     | Android                       |   |
+ |-----------------------------+-------------------------------+---|
+*** Detect Compiler 
+**** Detect compiler using predefined variables  
+
+  *MSVC*
+
+ Check if current compiler is MSVC - Microsft - Visual C/C++ Compiler
+ (Visual C++, vc++ for short):
+
+ #+BEGIN_SRC cmake 
+   if(MSVC)
+     message(STATUS << "Running MSVC")
+   endif()
+ #+END_SRC
+
+  *MSVC for 32 bits target*
+
+ Detect MSVC set up for 32 bits target (buids 32 bits binaries):
+
+ #+BEGIN_SRC cmake 
+   if(MSVC AND NOT CMAKE_CL_64)
+     message(" [INFO] Building for 32 bits Windows target.")
+   endif()
+ #+END_SRC
+
+  *MSVC for 64 bits target*
+
+ #+BEGIN_SRC cmake 
+   if(MSVC AND CMAKE_CL_64)
+     message(" [INFO] Building for 64 bits Windows target.")
+   endif()
+ #+END_SRC
+
+  *Mingw* 
+
+ Check if current compiler is GCC/Mingw, GCC compiler ported to
+ Windows.
+
+ #+BEGIN_SRC cmake
+   if(MSVC)
+     message("Running Mingw/GCC maybe on Windows")
+   endif()
+ #+END_SRC
+**** Detect compiler using CMAKE_CXX_COMPILER_ID variable 
+
+ The variable CMAKE_CXX_COMPILER_ID can be used for checking the
+ current C++ compiler.
+  + See: [[https://cmake.org/cmake/help/latest/variable/CMAKE_LANG_COMPILER_ID.html#variable:CMAKE_%253CLANG%253E_COMPILER_ID][Documentation]]
+
+ #+BEGIN_SRC cmake 
+    if (${CMAKE_CXX_COMPILER_ID} matches GNU)
+      message(STATUS " [INFO] Using GCC - GNU C/C++ Compiler or MingW/GCC.")
+    elseif(${CMAKE_CXX_COMPILER_ID} matches CLANG) 
+      message(STATUS " [INFO] Using the super amazing, the finest C++ compiler: Clang++/LLVM.")
+    elseif(${CMAKE_CXX_COMPILER_ID} matches MSVC)
+      message(STATUS " [INFO] Using MSVC Windows 'Visual!!' C++ compiler")
+    else()
+      message( FATAL_ERROR " [ERROR] I cannot identify CMake Configuration not set for this compiler yet.")
+    endif()
+ #+END_SRC
+
+ All possible values of ~CMAKE_CXX_COMPILER_ID~:
+
+ | Value of ~CMAKE_CXX_COMPILER_ID~ | Compiler                                       |
+ |--------------------------------+------------------------------------------------|
+ | *Most used compilers*            |                                                |
+ | GNU                            | GNU Compiler Collection (gcc.gnu.org)          |
+ | Clang                          | LLVM Clang (clang.llvm.org)                    |
+ | MSVC                           | Microsoft Visual Studio (microsoft.com)        |
+ | Intel                          | Intel Compiler (intel.com)                     |
+ | PGI                            | The Portland Group (pgroup.com)                |
+ | G95                            | G95 Fortran (g95.org)                          |
+ | Embarcadero, Borland           | Embarcadero (embarcadero.com)                  |
+ | ARMCC                          | ARM Compiler (arm.com)                         |
+ |                                |                                                |
+ | *Other compilers*                |                                                |
+ | Absoft                         | Absoft Fortran (absoft.com)                    |
+ | ADSP                           | Analog VisualDSP++ (analog.com)                |
+ | AppleClang                     | Apple Clang (apple.com)                        |
+ | Bruce                          | Bruce C Compiler                               |
+ | CCur                           | Concurrent Fortran (ccur.com)                  |
+ | Cray                           | Cray Compiler (cray.com)                       |
+ | HP                             | Hewlett-Packard Compiler (hp.com)              |
+ | IAR                            | IAR Systems (iar.com)                          |
+ | MIPSpro                        | SGI MIPSpro (sgi.com)                          |
+ | NVIDIA                         | NVIDIA CUDA Compiler (nvidia.com)              |
+ | OpenWatcom                     | Open Watcom (openwatcom.org)                   |
+ | Flang                          | Flang Fortran Compiler                         |
+ | PathScale                      | PathScale (pathscale.com)                      |
+ | SDCC                           | Small Device C Compiler (sdcc.sourceforge.net) |
+ | SunPro                         | Oracle Solaris Studio (oracle.com)             |
+ | TI                             | Texas Instruments (ti.com)                     |
+ | TinyCC                         | Tiny C Compiler (tinycc.org)                   |
+ | XL, VisualAge, zOS             | IBM XL (ibm.com)                               |
+*** Detect whether current build is 32 bits or 64 bits
 
 Check whether current configuration is for 64 bits build:
 
 #+BEGIN_SRC cmake 
-  if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-      message(" [INFO] 64 bits build.")
-  else()
-     message(" [INFO] 32 bits build.")
-  endif()
+ if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+    message(" [INFO] 64 bits build.")
+ else()
+    message(" [INFO] 32 bits build.")
+ endif()
 #+END_SRC
 
-** SNIPPET - Copy some target binaries to a directory
+*** Copy some target binaries to a directory
 
 This piece of code copies the target binaries (compiled code) to a
 directory relative to project's root directory where is CMakeLists.txt 
@@ -1656,7 +1677,7 @@ This target can be run with:
  $ cmake --build build --target install 
 #+END_SRC
 
-** SNIPPET - Create target to run compiled executable 
+*** Create target to run compiled executable 
 
 The piece following piece of code runs an executable target after it
 is built in a similar way to a command $ make run. 
@@ -1686,7 +1707,7 @@ After the building system is set and output directory ./build, run:
    $ cmake --build build --target run
 #+END_SRC
 
-** SNIPPET - Issue an error if condition is not met 
+*** Issue an error if condition is not met 
 
 In this piece of code, if the compiler is not MSVC (vc++, aka cl.exe),
 CMake stops the generation of the building script showing an error
@@ -1702,26 +1723,7 @@ message to the user.
   endif()
   ... ... 
 #+END_SRC
-** SNIPPET - Set target subsystem: console/window - Win32 API Specific
-
-Set target subsystem. 
-
-#+BEGIN_SRC cmake 
-  if(WIN32)
-     set_target_properties(WindowApplicationExample PROPERTIES LINK_FLAGS_DEBUG "/SUBSYSTEM:CONSOLE")
-     set_target_properties(WindowApplicationExample PROPERTIES COMPILE_DEFINITIONS_DEBUG "_CONSOLE")
-     set_target_properties(WindowApplicationExample PROPERTIES LINK_FLAGS_RELWITHDEBINFO "/SUBSYSTEM:CONSOLE")
-     set_target_properties(WindowApplicationExample PROPERTIES COMPILE_DEFINITIONS_RELWITHDEBINFO "_CONSOLE")
-     set_target_properties(WindowApplicationExample PROPERTIES LINK_FLAGS_RELEASE "/SUBSYSTEM:WINDOWS")
-     set_target_properties(WindowApplicationExample PROPERTIES LINK_FLAGS_MINSIZEREL "/SUBSYSTEM:WINDOWS")
-  endif(WIN32)
-#+END_SRC
-
-Taken from: 
- + [[https://gitlab.kitware.com/cmake/community/wikis/doc/cmake/recipe/VSConfigSpecificSettings][Vsconfigspecificsettings · Wiki · CMake / Community · GitLab]]
- + [[https://developercommunity.visualstudio.com/content/problem/46678/cmake-set-subsystem-to-console.html][cmake: Set subsystem to console - Developer Community]]
- + [[https://stackoverflow.com/questions/33873735/correctly-set-visual-studio-linker-flag-subsystem-in-cmake][c++ - Correctly set Visual Studio linker flag /SUBSYSTEM in CMAKE - Stack Overflow]]
-** SNIPPET - Copy a target file whenever it is recompiled
+*** Copy a target file whenever it is recompiled
 
 Example:  Copy a shared library to project root directory ./
 whenever it is rebuilt. 
