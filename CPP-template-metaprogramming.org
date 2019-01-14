@@ -2453,6 +2453,429 @@ Running (ROOT/Cling REPL):
        e   16     0xbbbbed2c
 #+END_SRC
 
+** SFINAE - Substution Is Not a Failure
+*** Fundamentals 
+
+SFINAE stands for _Substition Failure Is Not An Error_. It was
+introduced by David Vandervood in book "C++ Templates: The Complete
+Guide". The SFINAE technique is peformed by adding new overload
+functions (function with same name and different type signatures) for
+preveting compilation error during the template parameter type
+substitution. When a substition failure happens, the compiler looks
+for a the next function overload, if the substition fails again and
+there are no more candidates, the compiler will generate an error.
+
+ *Example: 1*
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+
+  struct AStruct{
+     using ASubtype = int;
+  };
+
+  class AStructB{
+  public:   
+     using ASubtype = const char*;
+  };
+
+  template<typename T> void AfunctionTemplate(typename T::ASubtype value) {
+     std::cout << " Type contains ASubtype = TRUE " << std::endl;
+     std::cout << " Value = " << value << std::endl;
+  }
+       
+#+END_SRC
+
+Testing: 
+
+#+BEGIN_SRC cpp 
+  // Template substution worked. OK. 
+  >> AfunctionTemplate<AStruct>(200)
+   Type contains ASubtype = TRUE 
+   Value = 200
+
+  // Template substution worked. OK. 
+   >> AfunctionTemplate<AStructB>("PARAMETER")
+    Type contains ASubtype = TRUE 
+    Value = PARAMETER
+
+  // Template substution error. Failed. 
+  >> AfunctionTemplate(600)
+  ROOT_prompt_13:1:1: error: no matching function for call to 'AfunctionTemplate'
+  AfunctionTemplate(600)
+  ^~~~~~~~~~~~~~~~~
+  ROOT_prompt_3:1:27: note: candidate template ignored: couldn't infer template argument 'T'
+  template<typename T> void AfunctionTemplate(typename T::ASubtype value) {
+
+  // Template substution error. Failed. 
+  >> AfunctionTemplate("Hello world")
+  ROOT_prompt_14:1:1: error: no matching function for call to 'AfunctionTemplate'
+  AfunctionTemplate("Hello world")
+  ^~~~~~~~~~~~~~~~~
+  ROOT_prompt_3:1:27: note: candidate template ignored: couldn't infer template argument 'T'
+  template<typename T> void AfunctionTemplate(typename T::ASubtype value) { 
+#+END_SRC
+
+By defining a two new overload functions which can match the type
+arguments, the substition failure of the first overload function with
+the type parameters int and const char* will no longer be an error as
+the compiler will select the next two overoads. 
+
+#+BEGIN_SRC cpp 
+   // Note: This overload function is not a function template, just a free function
+   void AfunctionTemplate(int value) {
+        std::cout << " Overload 2 => [INT] Type contains ASubtype = FALSE " << std::endl;
+        std::cout << " Value = " << value << std::endl;
+   }
+
+   // Note: This overload function is not a function template, just a free function
+   void AfunctionTemplate(const char* value) {
+        std::cout << " Overload 3 => [CONST CHAR*] Type contains ASubtype = FALSE " << std::endl;
+        std::cout << " Value = " << value << std::endl;
+   }
+
+   >> AfunctionTemplate(400)
+    Overload 2 => [INT] Type contains ASubtype = FALSE 
+    Value = 400
+   >> 
+
+   // Implicit conversion 
+   >> AfunctionTemplate('x')
+    Overload 2 => [INT] Type contains ASubtype = FALSE 
+    Value = 120
+   >> 
+
+   >> AfunctionTemplate("Hello world SFINAE")
+    Overload 3 => [CONST CHAR*] Type contains ASubtype = FALSE 
+    Value = Hello world SFINAE
+#+END_SRC
+
+If there is no overload candidate matching the type argument, then the
+type substition failure will become an error:
+
+#+BEGIN_SRC cpp 
+   >> AfunctionTemplate(std::string("A std::string object"))
+
+   ROOT_prompt_31:1:1: error: no matching function for call to 'AfunctionTemplate'
+   AfunctionTemplate(std::string("A std::string object"))
+   ^~~~~~~~~~~~~~~~~
+   ROOT_prompt_16:1:6: note: candidate function not viable: no known conversion from 'std::string' (aka
+         'basic_string<char>') to 'int' for 1st argument
+   void AfunctionTemplate(int value) {
+        ^
+   ROOT_prompt_20:1:6: note: candidate function not viable: no known conversion from 'std::string' (aka
+         'basic_string<char>') to 'const char *' for 1st argument
+   void AfunctionTemplate(const char* value) {
+        ^
+   ROOT_prompt_8:1:27: note: candidate template ignored: couldn't infer template argument 'T'
+   template<typename T> void AfunctionTemplate(typename T::ASubtype value) {
+                             ^
+#+END_SRC
+
+The substition failure error can again be eliminated by defiing a new
+overload:
+
+#+BEGIN_SRC cpp 
+   template<typename T> void AfunctionTemplate(T value) {
+        std::cout << " Overload 4 => [Match Any Type] contains ASubtype = FALSE " << std::endl;
+   }
+
+   // Deduce type T as std::string 
+   >> AfunctionTemplate(std::string("A std::string object"))
+    Overload 4 => [Match Any Type] contains ASubtype = FALSE 
+   >> 
+
+   >> AfunctionTemplate<std::string>(std::string("A std::string object"))
+    Overload 4 => [Match Any Type] contains ASubtype = FALSE 
+
+   >> AfunctionTemplate<std::string>("A std::string object")
+    Overload 4 => [Match Any Type] contains ASubtype = FALSE 
+   >> 
+
+   // Deduce type std::vector<double>
+   > AfunctionTemplate(std::vector<double>{200.34, -100.6, 6.1546})
+    Overload 4 => [Match Any Type] contains ASubtype = FALSE 
+  
+   // Deduce type std::vector<double>
+   > AfunctionTemplate<std::vector<double>>({200.34, -100.6, 6.1546})
+    Overload 4 => [Match Any Type] contains ASubtype = FALSE 
+#+END_SRC
+
+ *Case 2*
+
+#+BEGIN_SRC cpp 
+  struct AStruct{
+     using ASubtype = int;
+  };
+
+  class AStructB{
+  public:   
+     using ASubtype = const char*;
+  };
+  
+  // Clever trick found at: http://cppedinburgh.uk/slides/201508-concepts-bottom-up-view.pdf
+  template<typename T, typename T::ASubtype* = nullptr> bool FunctionTest(T const& value) {
+      return true;
+  }   
+#+END_SRC
+
+Before defining the second overload function: 
+
+#+BEGIN_SRC cpp 
+  >> AStruct a;
+  >> AStructB b;
+
+  >> FunctionTest(a)
+  (bool) true
+  >> FunctionTest(b)
+  (bool) true
+
+  >> FunctionTest(100)
+  ROOT_prompt_14:1:1: error: no matching function for call to 'FunctionTest'
+  FunctionTest(100)
+  ^~~~~~~~~~~~
+  ROOT_prompt_9:1:60: note: candidate template ignored: substitution failure [with T = int]: type 'int'
+        cannot be used prior to '::' because it has no members
+  template<typename T, typename T::ASubtype* = nullptr> bool FunctionTest(...
+#+END_SRC
+
+After defining the second overload function:
+
+#+BEGIN_SRC cpp 
+  bool FunctionTest(int const& value) {
+      std::cout << " [2] Value = " << value << std::endl;
+      return false;
+  }  
+  bool FunctionTest(const char* value) {
+      std::cout << " [3] Value = " << value << std::endl;
+      return false;
+  }  
+
+  >> FunctionTest(100)
+   [2] Value = 100
+  (bool) false
+
+  >> FunctionTest("C++20")
+   [3] Value = C++20
+  (bool) false
+  >> 
+#+END_SRC
+*** Metafunction or type trait std::enable_if 
+
+The metafunction (aka type trait) std::enable_if is used for
+conditionally selectig a given overload function template from an
+overload set when the boolean argument is true or removing the
+function from the overload resolution when the boolean argument is
+false (SFINAE).
+
+ + Header: [[https://en.cppreference.com/w/cpp/header/type_traits][<type_traits>]]
+ + [[https://en.cppreference.com/w/cpp/types/enable_if][Documentation]]
+
+ *Use cases:*
+
+ + Select a given overload function when a condition is true.
+
+ + Constrain template arguments by only allowing the templated
+   function or class be used with types matching a predicate
+   metafunction. When the predicate evaluates to false, a compile-time
+   error happens.
+
+ *Definition*
+
+The metafunction or type trait std::enable_if could be defined as:
+
+ + Base template:
+
+When the flag is false, the subtype _type_ is not defined and the
+expression _enable_if<false, T>::type_ is not valid, then compiler looks
+for the next overload function matching the template type arguments.
+
+#+BEGIN_SRC cpp 
+  template<bool Flag, class T = void>
+  struct enable_if{ };
+#+END_SRC
+
+ + Paratial specialization:
+
+When the flag is true, the expression _enable_if<true, T>::type_ is
+defined and returns the type T.
+
+#+BEGIN_SRC cpp 
+  template<class T = void>
+  struct enable_if<true>
+  { 
+     using type = T;
+  };
+#+END_SRC
+
+Example: The following code has a templated function classifyType with
+two overaloads, the first overload only works with integral types
+(int, char, long, ...) and the second with float types (float, double
+and long double). If the function is used with non integral or float
+points type argument, a compilation error happens.
+
+#+BEGIN_SRC cpp :results raw code 
+   #include <iostream>
+   #include <type_traits>
+
+   // First Overload classifyType
+   /** Note: when the predicate std::is_integral<T>::value is true, 
+     * the expression: typename std::enable_if<std::is_integral<T>::value, void>::type
+     * evaluates to void. When the predicate is false  this overload 
+     * (implementation) is discarded. (SFINAE)
+     */
+   template<class T> 
+   typename std::enable_if<std::is_integral<T>::value, void>::type
+   classifyType(T value) {
+      std::cout << " Type = integral ; " << " 3 * value = " << 3 * value << std::endl;
+   }
+
+   // Second Overload of classifyType
+   template<class T> 
+   typename std::enable_if<std::is_floating_point<T>::value, void>::type
+   classifyType(T value) {
+      std::cout << " Type = floating point ; " << " 25% x value = " << 0.25 * value << std::endl;
+   }
+
+   int main(){
+     classifyType(20);
+     classifyType(100L);
+     classifyType('x');
+
+     double z = 9.34;
+     classifyType(z);
+     float x = 3.1415; 
+     classifyType(x);
+     return 0;
+   }
+#+END_SRC
+
+Output:
+
+#+BEGIN_SRC text 
+  Type = integral ;  3 * value = 60
+  Type = integral ;  3 * value = 300
+  Type = integral ;  3 * value = 360
+  Type = floating point ;  25% x value = 2.335
+  Type = floating point ;  25% x value = 0.785375
+#+END_SRC
+
+
+The templated functions could also be written as: 
+
+#+BEGIN_SRC cpp 
+   template<class T> 
+   auto classifyType(T value) 
+      -> typename std::enable_if<std::is_integral<T>::value, void>::type
+   {
+      std::cout << " Type = integral ; " << " 3 * value = " << 3 * value << std::endl;
+   }
+
+   template<class T> 
+   auto classifyType(T value) 
+     -> typename std::enable_if<std::is_floating_point<T>::value, void>::type
+   {
+      std::cout << " Type = floating point ; " << " 25% x value = " << 0.25 * value << std::endl;
+   }
+#+END_SRC
+
+The code could also be written in a another way as: 
+
+#+BEGIN_SRC cpp 
+   #include <iostream>
+   #include <type_traits>
+
+   // First Overload of classifyType 
+   // => Only works with char, int, long, unsigned, ... 
+   template<typename T>    
+   void classifyType(T value, 
+                     typename std::enable_if<std::is_integral<T>::value, void>::type* = nullptr) 
+   {
+      std::cout << " Type = integral ; " << " 3 * value = " << 3 * value << std::endl;
+   }
+
+   // Second Overload of classifyType 
+   // => Only works with float, double or long double 
+    template<typename T>    
+    void classifyType(T value, 
+                      typename std::enable_if<std::is_floating_point<T>::value, void>::type* = nullptr) 
+    {
+      std::cout << " Type = floating point ; " << " 25% x value = " << 0.25 * value << std::endl;
+    }
+#+END_SRC
+
+The metafunction std::enable_if can be removed from the function
+signature by writing the code as: 
+
+#+BEGIN_SRC cpp :results raw code 
+   // First Overload classifyType
+   template<class T, typename std::enable_if<std::is_integral<T>::value, void>::type* = nullptr> 
+   void classifyType(T value) {
+      std::cout << " Type = integral ; " << " 3 * value = " << 3 * value << std::endl;
+   }
+
+   // Second Overload of classifyType
+   template<class T, typename std::enable_if<std::is_floating_point<T>::value, void>::type* = nullptr>    
+   void classifyType(T value) {
+      std::cout << " Type = floating point ; " << " 25% x value = " << 0.25 * value << std::endl;
+   }
+#+END_SRC
+
+*** Metafunction or type trait std::enalbe_if_t 
+
+The metafunction _std::enable_if_t_ simplifies the usage of
+std::enable_if as it can be used as a dummy template argument instead
+of being used as return type. 
+
+Definition:
+
+#+BEGIN_SRC cpp 
+   template< bool B, class T = void >
+   using enable_if_t = typename enable_if<B,T>::type;
+#+END_SRC
+
+Example: 
+
+#+BEGIN_SRC cpp :results raw code 
+   #include <iostream>
+   #include <type_traits>
+
+   template< typename T, std::enable_if_t<std::is_integral<T>::value>* = nullptr>    
+   auto classifyType(T value) -> void 
+   {
+      std::cout << " Type = integral ; " << " 3 * value = " << 3 * value << std::endl;
+   }
+
+   // Second Overload of classifyType
+   template< typename T, std::enable_if_t<std::is_floating_point<T>::value>* = nullptr>    
+   auto classifyType(T value) -> void 
+   {
+      std::cout << " Type = floating point ; " << " 25% x value = " << 0.25 * value << std::endl;
+   }
+
+   int main(){
+     classifyType(20);
+     classifyType(100L);
+     classifyType('x');
+
+     double z = 9.34;
+     classifyType(z);
+     float x = 3.1415; 
+     classifyType(x);
+     return 0;
+   }
+#+END_SRC
+
+Output:
+
+#+BEGIN_SRC cpp
+  Type = integral ;  3 * value = 60
+  Type = integral ;  3 * value = 300
+  Type = integral ;  3 * value = 360
+  Type = floating point ;  25% x value = 2.335
+  Type = floating point ;  25% x value = 0.785375
+#+END_SRC
+
 ** References and Bookmarks 
 *** General  
 
