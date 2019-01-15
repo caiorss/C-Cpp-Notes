@@ -11832,6 +11832,122 @@ Output:
          z    -2.341
 #+END_SRC
 
+*** for_each and function-objects 
+
+STL "algorithms" can also be used with  callable objects
+function-objects or functors:
+
+ - vector + function-object (functor class)
+
+#+BEGIN_SRC cpp 
+    /** Functor - Function Object 
+     * Encapsulates a quadratic function. 
+     */
+    struct QuadFun{
+       double a, b, c;	
+       QuadFun(double a, double b, double c):
+           a(a), b(b), c(c)
+       {		
+       }
+       // Delegated constructor 
+       QuadFun(): QuadFun(1.0, 1.0, 1.0)
+       {		
+       }
+       double eval(double x){
+          // a * x^2 + b * x + c 
+          return a * x * x + b * x + c;
+       }
+       void operator()(double x){
+          std::cout << std::setw(10) << x
+                    << std::setw(10) << this->eval(x)
+                    << "\n";
+       }
+    };
+
+#+END_SRC
+
+Example 1:
+
+#+BEGIN_SRC cpp 
+   >> std::vector<int> v{2, 4, 56, 10, 25, 60, 10, 50, -10};
+   >> std::for_each(v.begin(), v.end(), QuadFun())
+            2         7
+            4        21
+           56      3193
+           10       111
+           25       651
+           60      3661
+           10       111
+           50      2551
+          -10        91
+#+END_SRC
+
+Example 2: 
+
+#+BEGIN_SRC cpp 
+  >> auto q = QuadFun(2, 1, 5)
+  (QuadFun &) @0x7f95a601c028
+  >> q.a
+  (double) 2.0000000
+  >> q.b
+  (double) 1.0000000
+  >> q.c
+  (double) 5.0000000
+  >> 
+
+  >> q(0)
+           0         5
+  >> q(1)
+           1         8
+  >> q(2)
+           2        15
+
+  >> q.eval(0)
+  (double) 5.0000000
+  >> q.eval(1)
+  (double) 8.0000000
+  >> q.eval(2)
+  (double) 15.000000
+
+  >> q.operator()(0)
+           0         5
+  >> q.operator()(1)
+           1         8
+  >> q.operator()(2)
+           2        15
+  >> q.operator()(3)
+           3        26
+
+
+  >> std::for_each(v.begin(), v.end(), q)
+           2        15
+           4        41
+          56      6333
+          10       215
+          25      1280
+          60      7265
+          10       215
+          50      5055
+         -10       195
+
+  >> q.a = 0
+  (double) 0.0000000
+  >> q.b = 0;
+  >> q.c = 0;
+
+  >> std::for_each(v.begin(), v.end(), q)
+           2         0
+           4         0
+          56         0
+          10         0
+          25         0
+          60         0
+          10         0
+          50         0
+         -10         0
+#+END_SRC 
+
+
 *** istream iterator 
 **** File 
 
