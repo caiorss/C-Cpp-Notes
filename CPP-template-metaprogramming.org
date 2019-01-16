@@ -2876,6 +2876,90 @@ Output:
   Type = floating point ;  25% x value = 0.785375
 #+END_SRC
 
+*** Type instrospection 
+
+ *Example 1 - Check whether type has default constructor*
+
+This example based on the book "Template the complete guide" shows a
+metafunction which can check whether a type has a default constructor,
+it means a constructor without any arguments.
+
+#+BEGIN_SRC cpp 
+   template<typename T> struct HasDefaultConstructor{
+   private:
+      /** If the expressions decltype(X()) fails,
+        *  then, the type X has no default constructor 
+        *  and SFINAE happens and this function is 
+        *  excluded from the overload resolution.
+        */
+        template<typename X, typename = decltype(X())>
+        static auto testConstructor(void*) -> char;
+
+       /** Fallback - template with dummy parameter */
+       template<typename X>
+       static auto testConstructor(...) -> long;		
+   public:
+       /* If the class has default constructor,
+        * the returned type of testConstructor<T>(nullptr)
+        * is char, otherwise, it is long.
+        */
+        static constexpr bool value
+        = std::is_same<decltype(testConstructor<T>(nullptr)), char>::value; 
+   };
+#+END_SRC
+
+Testing:
+
+#+BEGIN_SRC cpp 
+   >> HasDefaultConstructor<double>::value
+   (const bool) true
+
+   >> struct A{};
+   >> HasDefaultConstructor<A>::value
+   (const bool) true
+
+   >> struct X{ X() = delete; }
+   >> HasDefaultConstructor<X>::value
+   (const bool) false
+   >> 
+#+END_SRC
+
+ *Example 2 - Check whether type has end member function*
+
+#+BEGIN_SRC cpp
+   template<typename T> struct HasEndMemberFunction{
+   private:
+        template<typename X, typename = decltype(std::declval<X>().end())>
+        static auto check(void*) -> char;
+
+        template<typename X>
+        static auto check(...) -> long;		
+   public:
+       static constexpr bool value
+       = std::is_same<decltype(check<T>(nullptr)), char>::value; 
+   };
+#+END_SRC
+
+Testing: 
+
+#+BEGIN_SRC cpp 
+    >> HasEndMemberFunction<int>()
+    (HasEndMemberFunction<int>) @0x2d63b70
+
+    >> HasEndMemberFunction<int>::value
+    (const bool) false
+
+    >> HasEndMemberFunction<double>::value
+    (const bool) false
+
+    >> HasEndMemberFunction<std::vector<double>>::value
+    (const bool) true
+
+    >> HasEndMemberFunction<std::deque<double>>::value
+    (const bool) true
+    >> 
+#+END_SRC
+
 ** References and Bookmarks 
 *** General  
 
