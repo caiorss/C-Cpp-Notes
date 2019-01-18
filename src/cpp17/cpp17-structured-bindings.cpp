@@ -30,7 +30,7 @@ int main(){
 		std::puts("\n=== EXPERIMENT 3: Decompose: tuple - =====");
 		using DatabaseRow = std::tuple<int, std::string, double>;
 		auto database = std::vector<DatabaseRow>{
-			{100, "Fried tasty fresh bacon",   3.45},
+			{100, "Fried tasty fresh apple",   3.45},
 			{400, "Super hot toasted coffee.", 6.25},
 			{500, "Fresh Orange Juice",        4.50},
 		};
