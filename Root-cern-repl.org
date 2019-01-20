@@ -1662,6 +1662,269 @@ How to extract the shared libraries needed to run the program?
 
 #+END_SRC
 
+** Load Python3 (CPython) C-API in the REPL 
+
+Install Python 3 development libraries: (Fedora Linux)
+
+#+BEGIN_SRC sh 
+  $ sudo dnf install python3-devel.x86_64
+#+END_SRC
+
+Locate where is Python3 shared library: 
+
+#+BEGIN_SRC sh 
+  $ ldd $(which python3)
+          linux-vdso.so.1 (0x00007fff82b64000)
+          libpython3.6m.so.1.0 => /lib64/libpython3.6m.so.1.0 (0x00007fd1eb4a5000)
+          libpthread.so.0 => /lib64/libpthread.so.0 (0x00007fd1eb286000)
+          libdl.so.2 => /lib64/libdl.so.2 (0x00007fd1eb082000)
+          libutil.so.1 => /lib64/libutil.so.1 (0x00007fd1eae7f000)
+          libm.so.6 => /lib64/libm.so.6 (0x00007fd1eaaeb000)
+          libc.so.6 => /lib64/libc.so.6 (0x00007fd1ea72c000)
+          /lib64/ld-linux-x86-64.so.2 (0x00007fd1ebc04000)
+
+   $ ldd $(which python3) | grep python
+           libpython3.6m.so.1.0 => /lib64/libpython3.6m.so.1.0 (0x00007ff0015ee000)
+#+END_SRC
+
+Locate Python 3 header files: 
+
+#+BEGIN_SRC sh 
+  $ find /usr/include/ -name "Python.h"
+  /usr/include/python3.6m/Python.h
+#+END_SRC
+
+Start ROOT REPL: 
+
+#+BEGIN_SRC sh 
+  $ cern-root
+   ==> Starting root configuration from: /home/archbox/.rootalias.C
+  Current dir = /home/archbox/Documents/projects/cpp-programming.cpp/src
+  (std::basic_ostream<char, std::char_traits<char> >::__ostream_type &) @0x7fb42fc7eec0
+#+END_SRC
+
+Load the Python3 shared library and its header file: 
+
+#+BEGIN_SRC cpp
+  >> #include "python3.6m/Python.h"
+  >> #pragma cling load("/lib64/libpython3.6m.so.1.0")
+#+END_SRC
+
+Initialize Python3:
+
+#+BEGIN_SRC cpp
+  >> Py_Initialize();
+#+END_SRC
+
+Python C-API Py_GetPath():
+
+#+BEGIN_SRC cpp 
+  >> Py_GetPath()
+  (wchar_t *) @0x7fff9a144968
+
+  >> std::wcout << "path = " << Py_GetPath() << L"\n";
+  path = /usr/lib64/python36.zip:/usr/lib64/python3.6:/usr/lib64/python3.6:/usr/lib64/python3.6/lib-dynload
+  >> 
+#+END_SRC
+
+Get Version: 
+
+#+BEGIN_SRC cpp 
+  >> Py_GetVersion()
+  (const char *) "3.6.7 (default, Nov 23 2018, 12:11:28) 
+  [GCC 8.2.1 20181105 (Red Hat 8.2.1-5)]"
+#+END_SRC
+
+Get Platform: 
+
+#+BEGIN_SRC cpp
+  >> Py_GetPlatform()
+  (const char *) "linux"
+#+END_SRC
+
+Information about Python interpreter:
+
+#+BEGIN_SRC cpp 
+  >> Py_GetPrefix()
+  (wchar_t *) @0x7fff9a144968
+
+  >> std::wcout << L" => Py_GetPrefix() = " << Py_GetPrefix() << L"\n";
+   => Py_GetPrefix() = /usr
+
+  >> Py_GetProgramFullPath()
+  (wchar_t *) @0x7fff9a144968
+
+  >> std::wcout << L" => Py_GetProgramFullPath() = " << Py_GetProgramFullPath() << L"\n";
+   => Py_GetProgramFullPath() = /usr/bin/python3
+#+END_SRC
+
+Get copyright banner: 
+
+#+BEGIN_SRC cpp
+  >> Py_GetCopyright()
+  (const char *) "Copyright (c) 2001-2018 Python Software Foundation.
+  All Rights Reserved.
+
+  Copyright (c) 2000 BeOpen.com.
+  All Rights Reserved.
+
+  Copyright (c) 1995-2001 Corporation for National Research Initiatives.
+  All Rights Reserved.
+
+  Copyright (c) 1991-1995 Stichting Mathematisch Centrum, Amsterdam.
+  All Rights Reserved."
+  >> 
+#+END_SRC
+
+Python C-API PyRun_SimpleString: 
+
+#+BEGIN_SRC cpp 
+  >> PyRun_SimpleString("print(' ==>> Hello world Python3')")
+   ==>> Hello world Python3
+  (int) 0
+  >> 
+
+  >> PyRun_SimpleString("print(m.sin(m.pi))")
+  1.2246467991473532e-16
+  (int) 0
+
+  >> PyRun_SimpleString("print(m.cos(m.pi))")
+  -1.0
+  (int) 0
+
+  >> PyRun_SimpleString("print(m.exp(2.5))")
+  12.182493960703473
+  (int) 0
+
+  >> PyRun_SimpleString("print(wrong(2.5))")
+  Traceback (most recent call last):
+    File "<string>", line 1, in <module>
+  NameError: name 'wrong' is not defined
+  (int) -1
+#+END_SRC
+
+Creating primitive python float point object:
+
+#+BEGIN_SRC cpp 
+  >> PyObject* value = Py_BuildValue("f", 5.136);
+
+  >> value
+  (PyObject *) 0x7fb43059f240
+
+  >> PyObject_Print(value, stdout, 0), std::cout << std::endl;
+  5.136
+#+END_SRC
+
+Creating primitive python string object:
+
+#+BEGIN_SRC cpp 
+  >> PyObject* pystring = Py_BuildValue("s", " Python3-C++-REPL");
+
+  >> PyObject_Print(pystring, stdout, 0), std::cout << std::endl;
+  ' Python3-C++-REPL'
+#+END_SRC
+
+Importing module sys: 
+
+#+BEGIN_SRC cpp 
+  >> PyObject* msys = PyImport_ImportModule("sys")
+  (PyObject *) 0x7fb430593ef8
+
+  >> PyObject* pyver = PyObject_GetAttrString(msys, "version")
+  (PyObject *) 0x7fb4305970b0
+  >> 
+
+  >> PyObject_Print(pyver, stdout, 0), std::cout << std::endl;
+  '3.6.7 (default, Nov 23 2018, 12:11:28) \n[GCC 8.2.1 20181105 (Red Hat 8.2.1-5)]'
+  >> 
+
+
+#+END_SRC
+
+Importing module math:
+
+#+BEGIN_SRC cpp
+  // Equivalen to: import math 
+  >> PyObject* m = PyImport_ImportModule("math");
+
+  >> m
+  (PyObject *) 0x7fb41b1b79f8
+  >> 
+
+  >> PyObject_Print(m, stdout, 0), std::cout << std::endl;
+  <module 'math' from '/usr/lib64/python3.6/lib-dynload/math.cpython-36m-x86_64-linux-gnu.so'>
+#+END_SRC
+
+Get function sin from module *math*:
+
+#+BEGIN_SRC cpp
+  // Get function sin from module math 
+  >> PyObject* py_sin = PyObject_GetAttrString(m, "sin")
+  (PyObject *) 0x7fb41b1401f8
+
+  // Print string representation of function 'sin'
+  >> PyObject_Print(py_sin, stdout, 0), std::cout << std::endl;
+  <built-in function sin>
+  >> 
+#+END_SRC
+
+Call funciton 'sin':
+
+#+BEGIN_SRC cpp 
+  >> PyObject* args = Py_BuildValue("(f)", M_PI_2);
+
+  >> PyObject_Print(args, stdout, 0), std::cout << std::endl;
+  (1.5707963267948966,)
+
+  >> PyObject* result = PyEval_CallObject(py_sin, args)
+  (PyObject *) 0x7fb43059f1e0
+
+  >> PyObject_Print(result, stdout, 0), std::cout << std::endl;
+  1.0
+#+END_SRC
+
+
+Creating a dictionary object or hash table object:
+
+#+BEGIN_SRC cpp 
+  >> PyObject* dc = PyDict_New();
+
+  // Heal-allocated object.
+  >> dc
+  (PyObject *) 0x7fb41b234558
+  >> 
+ 
+  // Print the string representation of the dictionary object
+  >> PyObject_Print(dc, stdout, 0), std::cout << std::endl;
+  {}
+  >> 
+#+END_SRC
+
+
+
+References:
+ 
+ + [[https://docs.python.org/3/extending/index.html][Extending and Embedding the Python Interpreter — Python 3.7.2 documentation]]
+
+ + [[https://docs.python.org/3/c-api/structures.html][Common Object Structures — Python 3.7.2 documentation]]
+
+ + [[https://docs.scipy.org/doc/numpy/reference/c-api.types-and-structures.html][Python Types and C-Structures — NumPy v1.15 Manual]]
+
+ + [[https://docs.python.org/2.3/api/stringObjects.html][7.3.1 String Objects]]
+
+ + [[https://docs.python.org/2/c-api/code.html][Code Objects — Python 2.7.15 documentation]]
+
+ + [[https://docs.python.org/2/c-api/veryhigh.html#c.PyRun_SimpleFileExFlags][The Very High Level Layer — Python 2.7.15 documentation]]
+
+ + [[https://stackoverflow.com/questions/3789881/create-and-call-python-function-from-string-via-c-api][Create and call python function from string via C API - Stack Overflow]]
+
+ + [[https://www6.software.ibm.com/developerworks/education/l-pythonscript/l-pythonscript-ltr.pdf][Embed Python scripting in C applications]]
+
+ + [[https://stackoverflow.com/questions/4922365/python-c-api-pyeval-callfunction][Python C API: PyEval_CallFunction? - Stack Overflow]]
+
+Python (CPython) debugging with GDB:
+ + [[https://devguide.python.org/gdb/][22. gdb Support — Python Developer's Guide]]
+ + [[https://docs.microsoft.com/en-us/visualstudio/python/debugging-mixed-mode-c-cpp-python-in-visual-studio?view=vs-2017][Mixed-mode debugging for Python - Visual Studio | Microsoft Docs]]
 ** Basic Commands 
 *** Show Help 
  
