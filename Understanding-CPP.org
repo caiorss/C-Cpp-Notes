@@ -3673,6 +3673,285 @@ Testing:
   { "Apple", "oranges", "juice", "rice" }
 #+END_SRC
 
+*** C++11 Regular Expressions Regex 
+**** Overview  
+
+C++11 STL provides a regular expression library with ECMAScript
+(Javascript) engine. It makes easier to use regular expressions
+without third-party libraries.
+
+ *Documentation:*
+
+ + [[https://en.cppreference.com/w/cpp/regex][Regular expressions library - cppreference.com]]
+ + [[http://www.cplusplus.com/reference/regex/][<regex> - C++ Reference]]
+ + [[https://docs.microsoft.com/en-us/cpp/standard-library/regex?view=vs-2017][<regex> | Microsoft Docs]]
+ + [[https://www.boost.org/doc/libs/1_69_0/libs/regex/doc/html/index.html][Boost.Regex]] - predecessor of the STL regex library, so it is a
+   practical documentation of the current STL <regex> library.
+
+ *ECMAScript Regex Syntax*
+ 
+ + [[http://www.cplusplus.com/reference/regex/ECMAScript/][ECMAScript syntax - C++ Reference]]
+ + [[https://en.cppreference.com/w/cpp/regex/ecmascript][Modified ECMAScript regular expression grammar - cppreference.com]]
+ + [[https://o7planning.org/en/12219/ecmascript-regular-expressions-tutorial][ECMAScript / Javascript Regular Expressions Tutorial]]
+
+ *Engines*
+
+Regular expression grammars supported by the C++11 regex library: 
+
+ + ECMAScript ("JavaScript" is an [[https://news.ycombinator.com/item?id=8344049][Oracle inc.]] trademark) - default regex engine
+ + basic
+ + extended 
+ + awk
+ + grep
+ + egrep 
+
+ *Classes:*
+
+|------------------------+-------------------------------------------------------------------------|
+| Class                  | Description                                                             |
+|------------------------+-------------------------------------------------------------------------|
+| [[https://en.cppreference.com/w/cpp/regex/basic_regex][std::regex]]             | Regular expression object. It is the same as  [[https://en.cppreference.com/w/cpp/regex/basic_regex][std::basic_regex]]          |
+|                        |                                                                         |
+| *Regex Matching*         |                                                                         |
+|------------------------+-------------------------------------------------------------------------|
+| [[https://en.cppreference.com/w/cpp/regex/match_results][std::match]]             | Regex matching results. It is  the same as  [[https://en.cppreference.com/w/cpp/regex/match_results][std::match_results]]          |
+| std::smatch   	 | std::match_results<std::string::const_iterator>                         |
+| std::cmatch	         | ~std::match_results<const char*>~                                         |
+| std::wcmatch           | ~std::match_results<const wchar_t*>~                                      |
+| std::wsmatch	         | ~std::match_results<std::wstring::const_iterator>~                        |
+|                        |                                                                         |
+| *Iterators*              |                                                                         |
+|------------------------+-------------------------------------------------------------------------|
+| [[https://en.cppreference.com/w/cpp/regex/regex_iterator][std::regex_iterator]]<T> | Regex iterator object - provides access to regex matches.               |
+| cregex_iterator        | ~regex_iterator<const char*>~ - Specialization for type _const char*_       |
+| wcregex_iterator       | ~regex_iterator<const wchar_t*>~ - Specialization for type _const wchar_t*_ |
+| sregex_iterator        | ~regex_iterator<std::string::const_iterator>~                             |
+| wsregex_iterator       | regex_iterator<std::wstring::const_iterator>                            |
+|------------------------+-------------------------------------------------------------------------|
+
+ *Online REGEX Testers* 
+ 
+ + [[https://myregextester.com/index.php#resultstab][Myregextester.com]]
+
+ + [[https://regexr.com/][RegExr: Learn, Build, & Test RegEx]]
+
+ + https://regex101.com/
+
+**** Example 
+
+ + File: [[file:src/regex1.cpp][file:src/regex1.cpp]]
+ + Online Compiler: https://rextester.com/RKT35657
+
+Compile and run: 
+
+#+BEGIN_SRC sh  
+  $ clang++ regex1.cpp -o regex1.bin -std=c++1z -O0 -Wall && ./regex1.bin
+  $ g++ regex1.cpp -o regex1.bin -std=c++1z -O0 -Wall && ./regex1.bin
+
+  # Compilation is slow: it takes 2 seconds [Non optmized]!!
+  $ time clang++ regex1.cpp -o regex1.bin -std=c++1z -O0 -Wall
+  real	0m2.356s
+  user	0m2.200s
+  sys	0m0.112s
+
+  # Compilation time is even slower when optmized!! 6 seconds to build!
+  $ time clang++ regex1.cpp -o regex1.bin -std=c++1z -O3 -Wall
+  real	0m6.027s
+  user	0m5.584s
+  sys	0m0.107s
+#+END_SRC
+
+Macro DBG_DISP for displaying expressions: 
+
+#+BEGIN_SRC cpp 
+   #define DBG_DISP(expr)  std::cerr << __FILE__ << ":" << __LINE__ << ":" \
+           << " ; " <<  #expr << " = " << (expr)  <<  std::endl
+#+END_SRC
+
+ *Experiment 1: Match entire string*
+
+#+BEGIN_SRC cpp 
+    std::puts("\n ======== EXPERIMENT 1 === Match entire string =====");
+    std::regex numRegex("\\d+");		
+    DBG_DISP(std::regex_match("3423", numRegex));
+    DBG_DISP(std::regex_match("AAB786", numRegex));
+    DBG_DISP(std::regex_match("  9745", numRegex));
+    DBG_DISP(std::regex_match(" 634 ", numRegex));
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC text 
+    ======== EXPERIMENT 1 === Match entire string =====
+   regex1.cpp:17: ; std::regex_match("3423", numRegex) = true
+   regex1.cpp:18: ; std::regex_match("AAB786", numRegex) = false
+   regex1.cpp:19: ; std::regex_match("  9745", numRegex) = false
+   regex1.cpp:20: ; std::regex_match(" 634 ", numRegex) = false
+#+END_SRC
+
+ *Experiment 2: Check whether text has regex*
+
+#+BEGIN_SRC cpp 
+    std::puts("\n ======== EXPERIMENT 2 === Check whether text has regex =====");
+    std::regex variable("\\s?[a-zA-Z][a-zA-Z|\\d]*\\b");
+    DBG_DISP(std::regex_search("3423", variable));
+    DBG_DISP(std::regex_search("dot.com\\ -buble hello variable4561 ", variable));
+    DBG_DISP(std::regex_search("  -dot.com.buble.burst ", variable));
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC text 
+    ======== EXPERIMENT 2 === Check whether text has regex =====
+   regex1.cpp:25: ; std::regex_search("3423", variable) = false
+   regex1.cpp:26: ; std::regex_search("dot.com\\ -buble hello variable4561 ", variable) = true
+   regex1.cpp:27: ; std::regex_search("  -dot.com.buble.burst ", variable) = true
+#+END_SRC
+
+ *Experiment 3: Extract text*
+
+#+BEGIN_SRC cpp 
+   std::puts("\n ======== EXPERIMENT 3 === Extract text =====");
+   std::regex phoneRe{"phone:\\s*(\\d{8})\\s*$"};
+   std::string line;
+   std::smatch result;
+
+   line = "phone:85619751";
+   if(std::regex_search(line, result, phoneRe) && result.size() > 1)
+      std::cout << "Result1 = " << result.str(1) << "\n";
+   else
+      std::cout << "Result1 = <<NOT MATCH>>" << std::endl;
+
+   line = "phone:  65658741  ";
+   if(std::regex_search(line, result, phoneRe) && result.size() > 1)
+       std::cout << "Result2 = " << result.str(1) << "\n";
+   else
+       std::cout << "Result2 = <<NOT MATCH>>" << std::endl;
+
+   line = "phone:  756596213434";
+   if(std::regex_search(line, result, phoneRe) && result.size() > 1)
+      std::cout << "Result3 = " << result.str(1) << "\n";
+   else
+      std::cout << "Result3 = <<NOT MATCH>>" << std::endl;
+
+   line = "phone:  ABBX621";
+   if(std::regex_search(line, result, phoneRe) && result.size() > 1)
+      std::cout << "Result4 = " << result.str(1) << "\n";
+   else
+      std::cout << "Result4 = <<NOT MATCH>>" << std::endl;		
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC text 
+   ======== EXPERIMENT 3 === Extract text =====
+  Result1 = 85619751
+  Result2 = 65658741
+  Result3 = <<NOT MATCH>>
+  Result4 = <<NOT MATCH>>
+#+END_SRC
+
+ *Experiment 4-A: Finding all regex matches*
+
+#+BEGIN_SRC cpp 
+  std::puts("\n ======== EXPERIMENT 4-A === Finding all regex matches  ======");		
+  std::regex nregex("[0-9]+\\b", std::regex::ECMAScript);	
+  std::string line = " 565 923 100 -934  AABB56 0835";
+  std::sregex_iterator it_beg(line.begin(), line.end(), nregex);
+  std::sregex_iterator it_end;
+  std::cout << " Number of matches = " << std::distance(it_beg, it_end) << "\n";
+  int i = 0;
+  for(auto it  = it_beg; it != it_end; it++){ 
+     std::cout << " => x[" << i++ << "] = " << it->str() << "\n";
+  }
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC text 
+   ======== EXPERIMENT 4-A === Finding all regex matches  ======
+   Number of matches = 6
+   => x[0] = 565
+   => x[1] = 923
+   => x[2] = 100
+   => x[3] = 934
+   => x[4] = 56
+   => x[5] = 0835
+
+#+END_SRC
+
+ *Experiment 4-B: Finding all regex matches*
+
+#+BEGIN_SRC cpp 
+   std::puts("\n ======== EXPERIMENT 4-B === Finding all regex matches  ======");
+   // Matches 4 letters followed by 3 digits
+   // first capture group 4 letters set, second capture group: 3 digits set 
+   std::regex re("([A-Z]{4})([0-9]{3})");	
+   std::string line = " ABCD367 XYAZ561 baa 341 MNPQ456 ";
+   std::sregex_iterator begin(line.begin(), line.end(), re);
+   std::sregex_iterator end;
+   for(auto it  = begin; it != end; it++)
+       std::cout << " capture[0] = "   << it->str() 
+                 << " ; capture[1] = " << it->str(1)
+                 << " ; capture[2] = " << it->str(2)
+                 << "\n";
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC text 
+   ======== EXPERIMENT 4-B === Finding all regex matches  ======
+   capture[0] = ABCD367 ; capture[1] = ABCD ; capture[2] = 367
+   capture[0] = XYAZ561 ; capture[1] = XYAZ ; capture[2] = 561
+   capture[0] = MNPQ456 ; capture[1] = MNPQ ; capture[2] = 456
+#+END_SRC
+
+ *Experiment 4-C: Finding all regex matches*
+
+#+BEGIN_SRC cpp 
+   std::puts("\n ======== EXPERIMENT 4-C === Finding all regex matches range-based loop ===");
+   // Matches 4 letters followed by 3 digits
+   // first capture group 4 letters set, second capture group: 3 digits set 
+   std::regex re("([A-Z]{4})([0-9]{3})");	
+   std::string line = " ABCD367 XYAZ561 baa 341 MNPQ456 ";
+   std::smatch matches;
+   std::regex_search(line, matches, re);
+   for(const auto& m : matches )
+      std::cout << " =>>> "   << m << "\n";
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC text 
+   ======== EXPERIMENT 4-C === Finding all regex matches range-based loop ===
+   =>>> ABCD367
+   =>>> ABCD
+   =>>> 367
+#+END_SRC
+
+ *Experiment 5: Replace all matches*
+
+#+BEGIN_SRC cpp 
+   std::puts("\n ======== EXPERIMENT 5 === Replace matches  ======");
+   // Matches 4 letters followed by 3 digits
+   // first capture group 4 letters set, second capture group: 3 digits set 
+   std::regex re("([A-Z]{4})([0-9]{3})");	
+   std::string line = " ABCD367 XYAZ561 baa 341 MNPQ456 ";
+   std::string out = std::regex_replace(line, re, "{$1=$2} - ");
+   std::cout << " out = " << out << std::endl;
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC text 
+   ======== EXPERIMENT 5 === Replace matches  ======
+   out =  {ABCD=367} -  {XYAZ=561} -  baa 341 {MNPQ=456} -  
+#+END_SRC
+
+
+
+
+
 ** C++11 - Uniform Initialization
 
 The C++11 uniform initialization feature allows classes, STL
