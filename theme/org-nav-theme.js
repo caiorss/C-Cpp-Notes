@@ -59,11 +59,12 @@ var initMobileTocMenu = function(){
     var toc = document.querySelector("#table-of-contents");
     var to  = document.querySelector("#table-of-contents h2");
     
-
+	// Button top - scroll to page top 
+	//-----------------------------------------------
     var btnTop = document.createElement("button")
     btnTop.textContent     = "Top";
     btnTop.style.top       = "20px";    
-    btnTop.style.right     = "120px";   
+    btnTop.style.left      = "100px";   
     btnTop.style.position  = "fixed";
     // button.style.zIndex = 10000;
 
@@ -71,12 +72,29 @@ var initMobileTocMenu = function(){
         document.querySelector("#content").scrollTop = 0;
     });   
     toc.appendChild(btnTop);
+    
+	// Button bottom - scroll to page bottom 
+	//-------------------------------------------
+    var btnBottom = document.createElement("button")
+    btnBottom.textContent     = "Bottom";
+    btnBottom.style.top       = "20px";    
+    btnBottom.style.left      = "200px";   
+    btnBottom.style.position  = "fixed";
+    // button.style.zIndex = 10000;
 
+    btnBottom.addEventListener("click", function(){        
+        var elem =  document.querySelector("#content");
+        elem.scrollTop = elem.scrollHeight;        
+    });   
+    toc.appendChild(btnBottom);    
+    
 
+    // Button index - go to index page
+    //-------------------------------------------------
     var btnIndex = document.createElement("button")
     btnIndex.textContent     = "Index";
     btnIndex.style.top       = "20px";    
-    btnIndex.style.right     = "30px";   
+    btnIndex.style.left      = "300px";   
     btnIndex.style.position  = "fixed";
     // button.style.zIndex = 10000;
     btnIndex.addEventListener("click", function(){
@@ -87,6 +105,7 @@ var initMobileTocMenu = function(){
     
     var tocTitle = document.querySelector("#table-of-contents h2");
     tocTitle.textContent = "TOC";
+    tocTitle.style.color = "black";
 
     var tocOpened = false;
     
