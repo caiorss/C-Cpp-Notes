@@ -340,6 +340,339 @@ Compile with MSVC / VC++ on Windows:
    >>> End the program gracefully
 #+END_SRC
 
+** C++17 std::optional 
+*** Overview 
+
+The container std::optional allows expressing in a concise and
+type-safe way that a function may return nothing, the function
+parameter may be empty or that a class field may be empty as well.
+This type is a disjoint union similar to Haskell's Maybe or OCaml
+optional. A common approach used by many C++ APIs for dealing with
+empty return values is to return a pointer to the returned value and
+return null pointer when no value is found or the function retuned
+nothing. The drawback of this approach is the possibility of null
+pointer dereference which is a undefined behavior and may unexpectedly
+crash the program. In other language this common problem is known as
+the infamous null pointer exception.
+
+Documentation: 
+ + [[https://en.cppreference.com/w/cpp/utility/optional/optional][std::optional::optional - cppreference.com]]
+ + [[https://en.cppreference.com/w/cpp/utility/optional/value_or][std::optional::value_or - cppreference.com]]
+ + [[https://www.boost.org/doc/libs/1_69_0/libs/optional/doc/html/index.html][Boost.Optional]] (Predecessor of std::optional)
+
+ *Constructors:*
+
+Create empty std::optional object (default).
+
+#+BEGIN_SRC cpp 
+  std::optional<T> value;
+#+END_SRC
+
+Create an empty std::optional object  (std::nullopt) explicity: 
+
+#+BEGIN_SRC cpp 
+  std::optional<T> value = std::nullopt;
+  std::optional<T> value{std::nullopt};
+  std::optional<T> value = {}
+
+  auto value = std::optional<int> {std::nullopt};
+  auto value = std::optional<int> {};
+#+END_SRC
+
+Create a std::optional instance set to some value
+
+#+BEGIN_SRC cpp 
+  std::optional<int> value = 100;
+  std::optional<int> value{100};
+  auto value = std::optional<int> {100};
+#+END_SRC
+
+ *Check whether std::optional instance has a value or not*
+
+#+BEGIN_SRC cpp 
+  std::optional<int> x = 100;
+  if(x) 
+    std::cout << "x is NOT EMPTY x = " << x.value() << std::endl;
+  else
+    std::cout << "x is EMPTY. " << std::endl;
+#+END_SRC
+
+*** Example 
+
+Source:
+ + File: [[file:src/cpp17/optional1.cpp][file:src/cpp17/optional1.cpp]]
+ + GIST: [[https://gist.github.com/caiorss/4cae2aca1b9ad6ee315bc887e36a1938][optional1.cpp]]
+
+Headers:
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>  // std::stof 
+  #include <ostream> // operator (<<) and class ostream 
+  #include <vector>
+  #include <iomanip> // setprecision
+
+  #include <optional>
+#+END_SRC
+
+Class _Location_ contains an optional field: 
+
+#+BEGIN_SRC cpp 
+  // Class with optional field.
+  struct Location{
+       double lat;
+       double lon;
+       std::optional<std::string> name; 
+  };
+#+END_SRC
+
+Insertion operator overload to make the class Location printable: 
+
+#+BEGIN_SRC cpp 
+  // Make std::optional<Location> printable 
+  std::ostream& operator<<(std::ostream& os, const Location& x){
+       os << std::setprecision(2) << std::fixed;
+       if(x.name)
+          os << "Location("
+             << "x = " << x.lat
+             << " ; y = " << x.lon
+             << " ; name = "
+             << x.name.value() << ")";
+       else
+          os << "Location("
+             << "x = " << x.lat
+             << " ; y = " << x.lon
+             << " ; name = "
+             << "<unknown>" << ")";       
+       return os;  
+  }
+#+END_SRC
+
+Insertion operator overload (<<) for making the value
+std::optiona<double> printable:
+
+#+BEGIN_SRC cpp 
+  // Make std::optional<double> printable
+  std::ostream& operator<<(std::ostream& os, const std::optional<double>& x){
+      if(x)
+         os << "Some[Double](" << x.value() << ")";
+      else
+         os << "None[Double]";
+      return os;  
+  }
+#+END_SRC
+
+Function _parseDouble_ may return nothing if the function fails:
+
+#+BEGIN_SRC cpp 
+  std::optional<double>
+  parseDouble(const std::string& str)  
+  {
+      try{
+  	  // Return some value 
+          return std::make_optional(stod(str));
+      } catch (const std::invalid_argument& ex) {
+  	  // Return nothing 
+          return std::nullopt;
+      }
+  }
+#+END_SRC
+
+Function: getEnvVar attempts to return the value environment variable,
+if it fails returns nothing: 
+
+#+BEGIN_SRC cpp 
+  auto getEnvVar(std::string const& varname) -> std::optional<std::string>
+  {
+      if(const char* v = std::getenv(varname.c_str()))
+           // Returns some value 
+           return v;
+      else
+           // Returns nothing (same as std::nullopt)
+           return {};
+  }  
+#+END_SRC
+
+Function main: 
+
+ + Experiment 1: Print optional values 
+
+#+BEGIN_SRC cpp 
+   char endl = '\n';
+
+   std::optional<double> oa;
+   std::optional<double> ob = std::nullopt;
+   std::optional<double> oc = 10.233;
+   std::optional<double> od(1e3);
+   std::optional<double> oe {};
+
+   std::puts("==== EXPERIMENT 1 === Print optional value");
+   std::cout << "oa = " << oa << endl;
+   std::cout << "ob = " << ob << endl;
+   std::cout << "oc = " << oc << endl;
+   std::cout << "od = " << od << endl;
+   std::cout << "oe = " << oe << endl; 
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC sh 
+   ==== EXPERIMENT 1 === Print optional value
+   oa = None[Double]
+   ob = None[Double]
+   oc = Some[Double](10.233)
+   od = Some[Double](1000)
+   oe = None[Double]
+#+END_SRC
+
+
+ + Experiment 2: Reset optional values
+
+#+BEGIN_SRC sh 
+   std::puts("==== EXPERIMENT 2 === Reset optional value");
+   std::cout << "Reset variable oc " << endl;
+   oc.reset();
+   std::cout << "oc = " << oc << endl;
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC text 
+   ==== EXPERIMENT 2 === Reset optional value
+   Reset variable oc 
+   oc = None[Double]
+#+END_SRC
+
+ 
+ + Experiment 3: Check whether optional has value. (is not empty)
+
+#+BEGIN_SRC cpp 
+   std::puts("==== EXPERIMENT 3 ==== check whether optional has value. (is not empty) ====");
+   if(oc)
+      std::cout << ">> oc has a vaule" << endl;
+   else
+      std::cout << ">> oc is empty" << endl;
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC txt 
+   ==== EXPERIMENT 3 ==== check whether optional has value. (is not empty) ====
+   >> oc is empty
+#+END_SRC
+
+
+ + Experiment 4: Try to parse double. 
+
+#+BEGIN_SRC cpp 
+   std::puts("==== EXPERIMENT 4 ==== try parse double ====");      
+   std::cout << "x0 = " << parseDouble("-1.0e3") << endl;
+   std::cout << "x1 = " << parseDouble("1.351 ") << endl;
+   std::cout << "x2 = " << parseDouble("1.asdasd351 xxgh") << endl;
+   std::cout << "x4 = " << parseDouble("sad4543fgx") << endl;
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC txt 
+   ==== EXPERIMENT 4 ==== try parse double ====
+   x0 = Some[Double](-1000)
+   x1 = Some[Double](1.351)
+   x2 = Some[Double](1)
+   x4 = None[Double]
+#+END_SRC
+
+
+ + Experiment 5: Struct/class with optional field. 
+
+#+BEGIN_SRC cpp
+   std::puts("=== EXPERIMENT 5 ======== Structs/Classes with optional fields ====");
+   std::vector<Location> xs {
+       {10.31, 23.4, "Waypoint Delta"},
+       {-46.23, 145.13, "Waypoint gamma"},
+       {90.43, 100.345, std::nullopt},
+       {0, 0, {}},
+   };
+   int i = 0;
+   for(auto x: xs){
+      std::cout << "x[" << i << "]" << " = " << x << endl;
+      i++;
+   }
+#+END_SRC
+
+Output:
+
+#+BEGIN_SRC txt 
+  === EXPERIMENT 5 ======== Structs/Classes with optional fields ====
+  x[0] = Location(x = 10.31 ; y = 23.40 ; name = Waypoint Delta)
+  x[1] = Location(x = -46.23 ; y = 145.13 ; name = Waypoint gamma)
+  x[2] = Location(x = 90.43 ; y = 100.34 ; name = <unknown>)
+  x[3] = Location(x = 0.00 ; y = 0.00 ; name = <unknown>)
+
+#+END_SRC
+
+
+ + Experiment 6: Print environment variables.
+
+#+BEGIN_SRC cpp 
+    std::puts("=== EXPERIMENT 6 - Print environment variables. ===== ");
+    auto var_home =  getEnvVar("HOME");
+    if(var_home.has_value())
+        std::cout << "$HOME = " << var_home.value() << endl;
+    else
+        std::cout << "$HOME = " << "UNKNOWN" << endl;
+
+    auto var_dummy =  getEnvVar("DUMMY-VAR");
+    if(var_dummy.has_value())
+        std::cout << "$DUMMYVAR = " << var_dummy.value() << endl;
+    else
+        std::cout << "$DUMMYVAR = " << "UNKNOWN" << endl;
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC txt 
+   === EXPERIMENT 6 - Print environment variables. ===== 
+   $HOME = /home/archbox
+   $DUMMYVAR = UNKNOWN
+#+END_SRC
+
+
+ + Experiment 6: Test member function .value_or() 
+
+#+BEGIN_SRC cpp 
+     std::puts("==== EXPERIMENT 7 - Test member function .value_or() ====");
+     std::cout << "$XDG_SESSION_PATH = "
+               << getEnvVar("XDG_SESSION_PATH").value_or("<<error: not set>>") << '\n';
+     std::cout << "$HOMEX = "
+               << getEnvVar("HOMEX").value_or("<<error: not set>>") << '\n';
+
+     return 0;
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC txt 
+   === EXPERIMENT 6 - Print environment variables. ===== 
+   $HOME = /home/archbox
+   $DUMMYVAR = UNKNOWN
+   ==== EXPERIMENT 7 - Test member function .value_or() ====
+   $XDG_SESSION_PATH = <<error: not set>>
+   $HOMEX = <<error: not set>>
+#+END_SRC
+
+
+
+
+
+
+
+
+
+
+
+
+
 ** C++17 std::variant 
 
 C++17 new std::variant which comes from Boost.Variant provides a
@@ -557,7 +890,6 @@ Running:
 
 
 #+END_SRC
-
 ** C++17 File system library 
 
 The C++17 File system library, based on Boost file systems, provides
@@ -742,4 +1074,3 @@ Documentation:
  + [[http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/p0218r1.html][C++17 Filesystem -]]
  + [[https://www.boost.org/doc/libs/1_69_0/libs/filesystem/doc/tutorial.html][Boost Filesystem Tutorial]] (Note: it is not the std::filesystem
    library, but its predecessor, however it is worth reading it.)
-
