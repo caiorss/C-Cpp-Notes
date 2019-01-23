@@ -840,7 +840,6 @@ Equality Comparable
 
 
 
-
 *** NDC Conference 2017 - Sean Parent -  Better Code: Runtime Polymorphism
 
  + [[https://www.youtube.com/watch?v=QGcVXgEVMJg][Better Code: Runtime Polymorphism - Sean Parent - YouTube]]
@@ -1159,7 +1158,6 @@ functions" with templates:
    => 21
 
  #+END_SRC
-
 
 
 
@@ -1538,6 +1536,225 @@ examples that have been discussed in the literature.
 *** Ranges and Iterators for numerical problems - Karsten Ahnert @ Meeting C++ 2014
 
  + [[https://www.youtube.com/watch?v=qXdPFj-FTcA][Ranges and Iterators for numerical problems - Karsten Ahnert @ Meeting C++ 2014 - YouTube]]
+*** Guy Davidson: Standardizing a Linear Algebra Library 
+
+ + [[https://www.youtube.com/watch?v=pq4UEH-DbNs&feature=youtu.be][Guy Davidson: Standardising A Linear Algebra Library]]
+   + Time: 1 hour.
+   + See: https://groups.google.com/a/isocpp.org/forum/#!forum/sg14
+
+What to expect: 
+ 1. Representing linear equations [10-67]
+ 2. I can do better than this [69-67]
+ 3. Everything you need to know about storage [109-119]
+ 4. The upsetting story of std::complex [121-190]
+ 5. Alternative algorithms [192-210]
+ 6. Assembling the API [212-237]
+
+Goals: 
+ 1. Provide linear algebra vocabulary types
+ 2. Parameterize orthogonal aspects of implementation
+ 3. Default for 90%, customisable for power users
+ 4. Element access, matrix arithmetics, fundamental operations
+ 5. Mixed precision and mixed representation expressions 
+
+Linear algebra 101: 
+ + "The branch of mathematics concerning linear equations and linear
+   functions, and their representation through matrices and vectors
+   spaces" 
+
+ + a1 * x1 + a2 * x2 + ... an * xn = b  (Linear equation or combination)
+
+Linear algebra applications: 
+ + Solving simultaneous linear equations 
+ + Linear regression 
+ + Differential equations
+ + Physics
+ + Economics
+ + Statistics
+ + Porforlio modelling
+ + Data science (beutiful name for statistics)
+
+Operations: 
+ + Scaling: Vector or matrix multiplication by a number 
+ + Element-wise Sum, Subtraction, Multiplication or division between
+   vectors or matrices.  
+ + Vector dot product (aka inner product)
+ + Vector or matrix transpose 
+ + Matrix product
+
+The equations: 
+
+#+BEGIN_SRC text 
+  a11 * x1 + a12 * x2 = b1 
+  a21 * x2 + a21 * x2 = b2 
+#+END_SRC
+
+Can be written as _A * x = b_: 
+
+#+BEGIN_SRC text 
+  [ a11   a12 ]     [ x1 ]    [ b1 ]
+  [           ]  x  [    ]  = [    ]
+  [ a21   a22 ]     [ x2 ]    [ b2 ]
+#+END_SRC
+
+Where:
+
+#+BEGIN_SRC text 
+      [ a11   a12 ]  
+ A =  [           ]  
+      [ a21   a22 ]  
+
+ b = [ b1 b2 ]^T (transpose)
+ 
+ x = [ x1 x2 ]^T
+#+END_SRC
+
+The presenter uses linear algebra specialized for games development
+with the following optmizations: 
+ + Matrix size is known: 2 and 4 rows and columns 
+ + float - all elements are float (32 bits)
+ + *SIMD*  instruction set
+ + Cache line size (cache behavior)
+ + Dense 
+
+Prior development: 
+
+ + BLAS (Basic Linear Algebra Subprograms) - Written in Fortrain 
+   + Provides a common set of routines for linear algebra operation.
+   + There are many bindings including C-bindings and other implementation. 
+
+ + BLAS++ => 32 functions
+
+ + Boost.uBLAS - Last update at 2009 (No constexpr, no noexcept ...)
+
+ + Eigen -> Template-based library without Fortran runtime dependency
+   + Matrix and vector class templates 
+   + Dynamic or static sizes
+   + Uses expression-template technique for compile-time optmization. 
+   + Span option via Eigen::Map
+   + The API is defined by member function operators
+
+ + Dlib => Uses _expression-templates_ for compile-time optmization and
+   higher runtime performance.
+
+Example: Function of BLAS++
+
+#+BEGIN_SRC cpp 
+  void blas::axpy(int64_t n, 
+                  float alpha, 
+                  float const* x, 
+                  int64_t incx, 
+                  float* y, 
+                  int64_t incy);
+#+END_SRC
+
+Levels of BLAS API: 
+
+ * *Level 1* - contains vector operations
+   + asum  - vector 1 norm (sum)
+   + axpy  - add vectors
+   + copy  - copy vector 
+   + dot   - dot product 
+   + dotu  - dot product unconjugated 
+   + imax  - max element
+   + nrm2  - vector 2 norm 
+   + rot   - apply Givens plane rotation 
+   + rotg  - generate Givens plane rotation 
+   + rotm  - apply modified Givens plane rotation 
+   + rotmg - gwnerate modified Givens plane rotation 
+   + scal  - scale vector 
+   + swap  - swap vectors
+
+ * *Level 2* - contains matrix operations
+   + gemmm - General matrix multiplication: C = A x B + C
+   + hemm  - Hermitian matrix multiply
+   + herk  - Hermitian rank k update
+   + her2k - Hermitian rank 2k update
+   + symm  - Symmetric matrix multiply 
+   + syrk  - Symmetric rank k update 
+   + syr2k - Symmetric rank 2k update
+   + trmm  - Triangular matrix multiply
+   + trsm  - Triangular solve matrix 
+
+ *Problem of member function operators:* - [[https://youtu.be/pq4UEH-DbNs?t=1135][moment]]
+
+#+BEGIN_SRC cpp 
+  class row_vector{ 
+  public:
+    row_vector(size_t n): elements(n){ }
+    double &operator[](size_t i )       { return elems[i]; }
+    double  operator[](size_t i ) const { return elems[i]; }
+    size_t  size()                const { return elems.size(); }
+  private:
+    std::vector<float> elems;
+  };
+#+END_SRC
+
+Operator: (+)
+
+#+BEGIN_SRC cpp 
+  auto operator+(row_vector const& u, row_vector const& v) -> row_vector
+  {
+     rwo_vector sum(u.size());
+     for(size_t i = 0; i < u.size(); i++)
+       sum[i] = u[i] + v[i];
+     return sum;
+  }
+#+END_SRC
+
+Efficiency problem: [[https://youtu.be/pq4UEH-DbNs?t=1174][moment 19:34]]
+
+#+BEGIN_SRC cpp
+  auto a = row_vector(4);
+  auto b = row_vector(4);
+  auto c = row_vector(4);
+  auto d = a + b + c;
+#+END_SRC
+
+Last operation is equivalent to: 
+
+#+BEGIN_SRC cpp
+   auto d = a.operator+(b.operator+(c));
+#+END_SRC
+
+So the computation of d what would could be done in a single loop as
+d[i] = a[i] + b[i] + c[i], requires 2 loops and 2 memory allocatiuon
+due to the usage of member functions.
+
+Solutions: 
+ + Build a function (non-member function - free function) which can
+   compute d in a single loop.
+ + Expression Templates - Expression trees. (Delayed compile-time evaluation)
+
+Assembling the API: 
+ + fixed_size_matrix<float, 3, 3>
+ + matrix_ops<fixed_size_matrix, 3, 3>>
+ + template<typename REP> class matrix;
+ + template<typename REP> class row_vector;
+ + template<typename REP> class column_vector;
+
+Objects: 
+ + matrix
+ + row_ector
+ + column_vector
+ + matrix_ops
+ + fiexed_size_matrix
+ + dynamic_size_matrix
+ + matrix_view 
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
 
 ** C++ Binary Components + ABI + Reflection 
 *** CPPCON 2016 - C++14 Reflections Without Macros, Markup nor External Tooling :reflection:metaprogramming:templates:
