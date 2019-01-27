@@ -277,7 +277,7 @@ Note: To run the process input/output in another terminal use:
   >>> c  
 #+END_SRC
 
-** Example and work flow 
+** Example and workflow 
 
 Compile program with Debug Symbols:
 
@@ -920,14 +920,549 @@ Show local variables:
           Inferior 1 [process 22370] will be detached.
 #+END_SRC
 
+** Examples by task 
+*** Print/List function source code 
+
+Print code of function _main_ 
+
+#+BEGIN_SRC cpp 
+  (gdb) list main
+  242			DBG_TRACE("Registered static objects OK.");
+  243			TypeDB::func("functionTest1", functionTest1);
+  244			TypeDB::classn<CashFlow>("CashFlow");
+  245		});
+  246	
+  247	int main(){
+  248	
+  249		// TypeDB::func("functionTest1", functionTest1);
+  250		// TypeDB::classn<CashFlow>("CashFlow");	
+  251		
+#+END_SRC
+
+Print code of function: ~typedb_call_function_void~
+
+#+BEGIN_SRC cpp 
+    (gdb) list typedb_call_function_void
+    370		return new std::any(pFunc->call(*args));
+    371	}
+    372	
+    373	extern "C"
+    374	auto typedb_call_function_void(const char* name, HArgTuple hArgs) -> void 
+    375	{
+    376		auto args = reinterpret_cast<ArgTuple*>(hArgs);
+    377		std::cerr << " [INFO] Enter function = typedb_call_function_void " << std::endl;
+    378		TypeDB::FactoryMap& db = TypeDB::getDatabase();
+    379	
+    (gdb) 
+#+END_SRC
+*** Print memory address as c-string 
+
+Print the memory address 0x7ffff7e7ad14 (heap) as string: 
+
+#+BEGIN_SRC cpp 
+  (gdb) p /s  (const char*) 0x7ffff7e7ad14 
+  $13 = 0x7ffff7e7ad14 "Some C++ is not bad at all"
+  (gdb)
+#+END_SRC
+
+Or: 
+
+#+BEGIN_SRC cpp 
+  (gdb) x /s 0x7ffff7e7ad14
+  0x7ffff7e7ad14:	"Some C++ is not bad at all"
+  (gdb) 
+#+END_SRC
+
+*** Current function arguments 
+
+Show current function arguments: 
+ 
+ + $ info args
+ + $ i args 
+
+Function being debugged: 
+
+#+BEGIN_SRC cpp 
+  extern "C"
+  auto VariantArgs_add_cchar(ArgTuple* ptr, const char* text) -> void
+  {
+     // auto ptr = reinterpret_cast<ArgTuple*>(hnd);
+     ptr->push_back(text);
+  }
+#+END_SRC
+
+At some break point set to this function:
+
+#+BEGIN_SRC sh 
+  (gdb) n
+  Single stepping until exit from function PyEval_EvalFrameEx,
+  which has no line number information.
+
+  Breakpoint 2, VariantArgs_add_cchar (ptr=0x5555557e67e0, text=0x7ffff7e7ad14 "Some C++ is not bad at all") at init.cpp:342
+  342		ptr->push_back(text);
+
+#+END_SRC
+
+Run the folloing commands: 
+
+#+BEGIN_SRC sh 
+   (gdb) info args
+   ptr = 0x5555557e67e0
+   text = 0x7ffff7e7ad14 "Some C++ is not bad at all"
+
+   (gdb) i args
+   ptr = 0x5555557e67e0
+   text = 0x7ffff7e7ad14 "Some C++ is not bad at all"
+   (gdb)
+
+#+END_SRC
+
+Print details of argument ptr: 
+
+#+BEGIN_SRC cpp 
+   gdb) p *ptr
+   $9 = std::vector of length 2, capacity 3 = {std::any containing int = {
+       [contained value] = 3
+     }, std::any containing double = {
+       [contained value] = 15.68
+     }}
+   (gdb) p ptr->operator[](0)
+   $10 = std::any containing int = {
+     [contained value] = 3
+   }
+
+   (gdb) p ptr->operator[](1)
+   $11 = std::any containing double = {
+     [contained value] = 15.68
+   }
+
+   (gdb) p ptr->operator[](2)
+   $12 = Python Exception <class 'RuntimeError'> Cannot locate object file for block.: 
+   Python Exception <class 'RuntimeError'> Cannot locate object file for block.: 
+   {
+     _M_manager = 0x5b64015a64360159, 
+     _M_storage = {
+       _M_ptr = 0x15c64015a643601, 
+       _M_buffer = {
+         __data = "\001\066dZ\001d\\\001", 
+         __align = {<No data fields>}
+       }
+     }
+   }
+   (gdb) 
+#+END_SRC
+
+*** Show information about signals 
+
+ + $ i signals 
+ + $ info signals 
+
+#+BEGIN_SRC sh 
+   (gdb) i signals
+   Signal        Stop	Print	Pass to program	Description
+
+   SIGHUP        Yes	Yes	Yes		Hangup
+   SIGINT        Yes	Yes	No		Interrupt
+   SIGQUIT       Yes	Yes	Yes		Quit
+   SIGILL        Yes	Yes	Yes		Illegal instruction
+   SIGTRAP       Yes	Yes	No		Trace/breakpoint trap
+   SIGABRT       Yes	Yes	Yes		Aborted
+   SIGEMT        Yes	Yes	Yes		Emulation trap
+   SIGFPE        Yes	Yes	Yes		Arithmetic exception
+   SIGKILL       Yes	Yes	Yes		Killed
+   SIGBUS        Yes	Yes	Yes		Bus error
+   SIGSEGV       Yes	Yes	Yes		Segmentation fault
+   SIGTTOU       Yes	Yes	Yes		Stopped (tty output)
+   SIGIO         No	No	Yes		I/O possible
+   ...   ...   ...   ...   ...   ...   ...   ...   ... 
+
+   SIG126        Yes	Yes	Yes		Real-time event 126
+   SIG127        Yes	Yes	Yes		Real-time event 127
+   SIGINFO       Yes	Yes	Yes		Information request
+   EXC_BAD_ACCESS Yes	Yes	Yes		Could not access memory
+   EXC_BAD_INSTRUCTION Yes	Yes	Yes		Illegal instruction/operand
+   EXC_ARITHMETIC Yes	Yes	Yes		Arithmetic exception
+   EXC_EMULATION Yes	Yes	Yes		Emulation instruction
+   EXC_SOFTWARE  Yes	Yes	Yes		Software generated exception
+   EXC_BREAKPOINT Yes	Yes	Yes		Breakpoint
+   SIGLIBRT      No	No	Yes		librt internal signal
+#+END_SRC
+
+*** List shared libraries loaded into current process 
+
+  + $ i share
+  + $ info share 
+
+#+BEGIN_SRC sh 
+  gdb) i share
+  From                To                  Syms Read   Shared Object Library
+  0x00007ffff7dd6f60  0x00007ffff7df5080  Yes         /lib64/ld-linux-x86-64.so.2
+  0x00007ffff79d15d0  0x00007ffff7b15a60  Yes (*)     /lib64/libpython2.7.so.1.0
+  0x00007ffff7776be0  0x00007ffff77848b1  Yes         /lib64/libpthread.so.0
+  0x00007ffff756dee0  0x00007ffff756ebbe  Yes         /lib64/libdl.so.2
+  0x00007ffff736ae80  0x00007ffff736b7a8  Yes         /lib64/libutil.so.1
+  0x00007ffff6fe19f0  0x00007ffff7093e6a  Yes         /lib64/libm.so.6
+  0x00007ffff6c383a0  0x00007ffff6d7f11f  Yes         /lib64/libc.so.6
+  0x00007ffff6a12ab0  0x00007ffff6a143f9  Yes (*)     /usr/lib64/python2.7/lib-dynload/_localemodule.so
+  0x00007fffeeb67260  0x00007fffeeb74b23  Yes (*)     /usr/lib64/python2.7/lib-dynload/_ctypes.so
+  0x00007fffee958810  0x00007fffee95d29a  Yes (*)     /lib64/libffi.so.6
+  0x00007fffee74d970  0x00007fffee75291d  Yes (*)     /usr/lib64/python2.7/lib-dynload/_struct.so
+  0x00007fffee539520  0x00007fffee542b2e  Yes         typesdb.so
+  0x00007fffee21d590  0x00007fffee2d391e  Yes         /lib64/libstdc++.so.6
+  0x00007fffedf7bad0  0x00007fffedf8c6f5  Yes         /lib64/libgcc_s.so.1
+  (*): Shared library is missing debugging information.
+  (gdb) 
+#+END_SRC
+*** Execute shell command 
+
+Execute: $ uname -r 
+ + show Linux, BSD or MacOSX kernel version. 
+
+#+BEGIN_SRC sh 
+   (gdb) shell uname -r
+   4.19.16-200.fc28.x86_64
+   (gdb) 
+#+END_SRC
+
+
+Execute: $ ls 
+ + List directory 
+
+#+BEGIN_SRC sh 
+  (gdb) shell ls
+  core.11767  init.bin  script.gdb  typeInfo.cpp
+  gdb.txt     init.cpp  test1.py	  typesdb.so
+  (gdb) 
+#+END_SRC
+
+*** Install Debugging Symbols on Linux 
+
+Debuggers are not only useful for monitoring and debugging of
+applications written in C, C++ or native programs. They can also tap
+into any process, regardless the programming language that the program
+was written, therefore a debugger can tap into applications built with
+python, java, ruby, C# - CSharp and so on. 
+
+Despite the debuggers ability to instrospect any process, it is
+necessary to have the debugging symbols of the process being debugged,
+otherwise it will not be possible to set breakpoints by function name
+or see the current location of the source code being executed. On
+Linux this issue can be solved by installing packages with debugging
+symbols. 
+
+ *Example: Install debugging symbols on Fedora/Linux*
+
+ + Install Python2 debugging symbols on Fedora.
+
+#+BEGIN_SRC sh 
+  $ sudo dnf debuginfo-install python2-2.7.15-4.fc28.x86_64
+
+  $ sudo dnf debuginfo-install python2-2.7.15-4.fc28.x86_64
+  [sudo] password for archbox: 
+  enabling updates-debuginfo repository
+  enabling fedora-debuginfo repository
+  enabling rpmfusion-free-updates-debuginfo repository
+  enabling rpmfusion-free-debuginfo repository
+  enabling rpmfusion-nonfree-updates-debuginfo repository
+  enabling rpmfusion-nonfree-debuginfo repository
+  Fedora 28 - x86_64 - Updates - Debug            246 kB/s |  15 MB     01:00    
+  RPM Fusion for Fedora 28 - Free - Updates Debug 497 kB/s | 760 kB     00:01    
+  RPM Fusion for Fedora 28 - Nonfree - Updates De  14 kB/s |  61 kB     00:04    
+  Last metadata expiration check: 0:00:01 ago on Sun 27 Jan 2019 12:15:07 AM -03.
+  Dependencies resolved.
+  ================================================================================
+   Package                Arch      Version            Repository            Size
+  ================================================================================
+  Installing:
+   python2-debuginfo      x86_64    2.7.15-4.fc28      updates-debuginfo    6.5 M
+  Installing weak dependencies:
+   python2-debugsource    x86_64    2.7.15-4.fc28      updates-debuginfo    2.3 M
+  ... ....  ... ....  ... ....  ... ....  ... ....  ... ....
+#+END_SRC
+
+
+ + Install Pythhon3 debuging symbols on Fedora.
+
+#+BEGIN_SRC sh 
+  $ sudo dnf debuginfo-install python3-3.6.8-1.fc28.x86_64
+#+END_SRC
+
+*** Using GDB to monitor Python interpreter 
+
+ *Example: Using GDB for monitoring the execution of Python2*
+
+ + Example GDB + Python2 
+
+Start the GDB session. 
+
+#+BEGIN_SRC sh 
+  $ gdb --silent --args python test1.py 
+  Reading symbols from python...Reading symbols from /usr/lib/debug/usr/bin/python2.7-2.7.15-4.fc28.x86_64.debug...done.
+  done.
+#+END_SRC
+
+Set session configuration:
+
+#+BEGIN_SRC sh 
+  (gdb) set logging on
+  Copying output to gdb.txt.
+  (gdb) set breakpoint pending on
+  (gdb) set pagination off
+  (gdb) set confirm off
+  (gdb) set print pretty on 
+#+END_SRC
+
+Set break point at main() function:
+
+#+BEGIN_SRC sh 
+  (gdb) b main
+  Breakpoint 1 at 0x810: file /usr/src/debug/python2-2.7.15-4.fc28.x86_64/Modules/python.c, line 11.
+#+END_SRC
+
+Start running the process:
+
+#+BEGIN_SRC sh 
+  (gdb) r
+  Starting program: /usr/bin/python test1.py
+  [Thread debugging using libthread_db enabled]
+  Using host libthread_db library "/lib64/libthread_db.so.1".
+
+  Breakpoint 1, main (argc=2, argv=0x7fffffffd2b8) at /usr/src/debug/python2-2.7.15-4.fc28.x86_64/Modules/python.c:11
+  11	{
+  (gdb) 
+#+END_SRC
+
+Show information about current context: 
+
+#+BEGIN_SRC sh 
+  (gdb) where
+  #0  main (argc=2, argv=0x7fffffffd2b8) at /usr/src/debug/python2-2.7.15-4.fc28.x86_64/Modules/python.c:11
+
+  (gdb) list
+  6	#include <fenv.h>
+  7	#endif
+  8	
+  9	int
+  10	main(int argc, char **argv)
+  11	{
+  12		/* 754 requires that FP exceptions run in "no stop" mode by default,
+  13		 * and until C vendors implement C99's ways to control FP exceptions,
+  14		 * Python requires non-stop mode.  Alas, some platforms enable FP
+  15		 * exceptions by default.  Here we disable them.
+  (gdb) 
+#+END_SRC
+
+Print current function arguments: 
+
+#+BEGIN_SRC sh 
+   # $ info args 
+   (gdb) i args
+   argc = 2
+   argv = 0x7fffffffd2b8
+
+   (gdb) p argc
+   $1 = 2
+
+   (gdb) p argv
+   $2 = (char **) 0x7fffffffd2b8
+
+   (gdb) p argv[0]
+   $3 = 0x7fffffffd67c "/usr/bin/python"
+
+   (gdb) p argv[1]
+   $4 = 0x7fffffffd68c "test1.py"
+   (gdb) 
+#+END_SRC
+
+Next step - command next or n:
+
+#+BEGIN_SRC sh 
+  (gdb) n
+  20		return Py_Main(argc, argv);
+
+  (gdb) n
+  0x00005555555547f0 in Py_Main@plt ()
+  (gdb) i locals
+  No symbol table info available.
+
+  (gdb) n
+  Single stepping until exit from function Py_Main@plt,
+  which has no line number information.
+  Py_Main () at /usr/src/debug/python2-2.7.15-4.fc28.x86_64/Modules/main.c:245
+  245	{
+
+
+  (gdb) list
+  240	
+  241	/* Main program */
+  242	
+  243	int
+  244	Py_Main(int argc, char **argv)
+  245	{
+  246	    int c;
+  247	    int sts;
+  248	    char *command = NULL;
+  249	    char *filename = NULL;
+  (gdb) 
+#+END_SRC
+
+Show function Py_Main arguments:
+ + $ i args 
+
+#+BEGIN_SRC sh 
+  (gdb) i args
+  argc = 2
+  argv = 0x7fffffffd2b8
+
+  (gdb) p argv[0]
+  $5 = 0x7fffffffd67c "/usr/bin/python"
+
+  (gdb) p argv[1]
+  $6 = 0x7fffffffd68c "test1.py"
+  (gdb) 
+#+END_SRC
+
+Show local variables inside Py_Main: 
+ + $ i locals
+ + $ info locals 
+
+#+BEGIN_SRC sh 
+  # $ info locals 
+  (gdb) i locals
+
+  c = <optimized out>
+  sts = <optimized out>
+  command = <optimized out>
+  filename = <optimized out>
+  module = <optimized out>
+  fp = <optimized out>
+  p = <optimized out>
+  unbuffered = <optimized out>
+  skipfirstline = <optimized out>
+  stdin_is_interactive = <optimized out>
+  help = <optimized out>
+  version = <optimized out>
+  saw_unbuffered_flag = <optimized out>
+  cf = {
+    cf_flags = 0
+  }
+  (gdb) 
+#+END_SRC
+
+Execute and print variables: 
+
+#+BEGIN_SRC sh 
+  (gdb) n
+  251	    FILE *fp = stdin;
+
+  (gdb) n
+  273	    while ((c = _PyOS_GetOpt(argc, argv, PROGRAM_OPTS)) != EOF) {
+
+  (gdb) p fp
+  $8 = (FILE *) 0x7ffff6fd0a00 <_IO_2_1_stdin_>
+
+  (gdb) n
+  290	    if (!Py_HashRandomizationFlag &&
+  (gdb) p Py_HashRandomizationFlag 
+  $9 = 0
+
+  (gdb) p !Py_HashRandomizationFlag 
+  $10 = 1
+  (gdb) 
+
+#+END_SRC
+
+Delete all breaking points: 
+
+#+BEGIN_SRC sh 
+  (gdb) delete 
+  (gdb) i b
+  No breakpoints or watchpoints.
+  (gdb)
+#+END_SRC
+
+Set new breakpoint at function PyEval_EvalFrameEx
+
+#+BEGIN_SRC sh 
+  (gdb) b PyEval_EvalFrameEx
+  Breakpoint 6 at 0x7ffff7af6780: file /usr/src/debug/python2-2.7.15-4.fc28.x86_64/Python/ceval.c, line 761.
+#+END_SRC
+
+
+Restart process: the process restarts and runs until the first
+breakpoint. 
+
+#+BEGIN_SRC sh 
+   (gdb) r
+   Starting program: /usr/bin/python test1.py
+   [Thread debugging using libthread_db enabled]
+   Using host libthread_db library "/lib64/libthread_db.so.1".
+
+   Breakpoint 6, PyEval_EvalFrameEx (f=f@entry=Frame 0x7ffff7f6d050, for file /usr/lib64/python2.7/site.py, line 59, in <module> (), throwflag=throwflag@entry=0) at /usr/src/debug/python2-2.7.15-4.fc28.x86_64/Python/ceval.c:761
+   761	{
+   (gdb) 
+#+END_SRC
+
+List source code at current function:
+
+#+BEGIN_SRC sh 
+   (gdb) list
+
+   756	    return PyEval_EvalFrameEx(f, 0);
+   757	}
+   758	
+   759	PyObject *
+   760	PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
+   761	{
+   762	#ifdef DYNAMIC_EXECUTION_PROFILE
+   763	    #undef USE_COMPUTED_GOTOS
+   764	#endif
+   765	#ifdef HAVE_COMPUTED_GOTOS
+   (gdb) 
+
+#+END_SRC
+
+Keep tracing the execution: 
+
+#+BEGIN_SRC sh 
+  (gdb) n
+  1249	        opcode = NEXTOP();
+
+  (gdb) n
+  1252	        if (HAS_ARG(opcode))
+
+  (gdb) p opcode
+  $21 = 100
+  (gdb) n
+  1253	            oparg = NEXTARG();
+
+  (gdb) n
+  1281	        switch (opcode) {
+
+  (gdb) p oparg
+  $22 = <optimized out>
+
+  (gdb) n
+  1311	            x = GETITEM(consts, oparg);
+
+  (gdb) n
+  1313	            PUSH(x);
+
+  (gdb) n
+  1314	            FAST_DISPATCH();
+
+  (gdb) p x
+  $23 = "Append module search paths for third-party packages to sys.path.... ... .."
+  (gdb) 
+  .. ... .. ... .. ... .. ... .. ... 
+
+#+END_SRC
+
 ** Extensions and scripts 
 
  + [[http://man7.org/linux/man-pages/man5/gdbinit.5.html][gdbinit]] - GDB Initialization script.
 
- + https://github.com/gdbinit/gdbinit
-   + Gdbinit for OS X, iOS and others - x86, x86_64 and ARM https://reverse.put.as
-
- + https://github.com/pwndbg/pwndbg
+ + https://github.com/pwndbg/pwndbg 
    + Site: http://pwndbg.com/
    + "pwndbg (/poʊndbæg/) is a GDB plug-in that makes debugging with GDB
      suck less, with a focus on features needed by low-level software
@@ -940,7 +1475,7 @@ Show local variables:
    + Enhance the display of gdb: colorize and display disassembly
      codes, registers, memory information during debugging. Add
      commands to support debugging and exploit development (for a full
-     list of commands use peda help):
+     list of commands use peda help): 
 
  + https://github.com/gdbinit/gdbinit
    + Gdbinit for OS X, iOS and others - x86, x86_64 and ARM https://reverse.put.as
@@ -973,9 +1508,9 @@ Show local variables:
 
  + [[https://sourceware.org/gdb/onlinedocs/gdb/Dump_002fRestore-Files.html][Debugging with GDB: Dump/Restore Files]]
 
- +
+ + 
 
- +
+ + 
 *** Bookmarks and further reading
 
  + [[https://www.recurse.com/blog/5-learning-c-with-gdb][Learning C with gdb - Blog - Recurse Center]]
@@ -1064,7 +1599,6 @@ Show local variables:
  + http://csapp.cs.cmu.edu/public/docs/gdbnotes-ia32.pdf
 
  + [[https://cs.baylor.edu/~donahoo/tools/gdb/gdb.html][Debugging with GDB]]
-
 * WindBG - Windows Debugger 
 ** Overview 
 
