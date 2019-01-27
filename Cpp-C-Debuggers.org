@@ -1458,6 +1458,247 @@ Keep tracing the execution:
 
 #+END_SRC
 
+** Session automation with command files
+
+Configuring GDB and setting all breakpoints on every GDB session can
+be cumbersome and annoying. The GDB debugging session can be automated
+with GDB command files or script files.
+
+Example:
+
+File: *script.gdb* 
+
+#+BEGIN_SRC sh 
+  $ cat script.gdb 
+  set logging on
+  set breakpoint pending on
+
+  # program/executable to be run 
+  exec-file python
+
+  # Set source directory to current directory 
+  dir .
+
+  # Load symbols from shared library 
+  # file typesdb.so 
+
+  # Set breakpoint at main 
+  b main
+  # --- Breakpoint at functions loaded from
+  # shared library typesdb.so 
+  b VariantArgs_add_int
+  b VariantArgs_add_cchar
+  b typedb_call_function_void
+
+  # Run executable with some arguments
+  # It is similar to run:
+  # $ gdb --args python -i test1.py 
+  run -i test1.py
+#+END_SRC
+
+This GDB script is used for debugging the typesdb.so shared library
+loaded dynamically by the python interpreter. 
+
+ *File parts:*
+
+ + Sets the executable/program/application to be debugged: 
+
+#+BEGIN_SRC sh 
+ exec-file python
+#+END_SRC
+
+ + Set breakpoints 
+
+The breakpoints can be lines, functions or class methods (member
+functions):
+
+#+BEGIN_SRC sh 
+  # Set breakpoint at main 
+  b main
+  # --- Breakpoint at functions loaded from
+  # shared library typesdb.so 
+  b VariantArgs_add_int
+  b VariantArgs_add_cchar
+  b typedb_call_function_void
+#+END_SRC
+
+The break points could also be set as: 
+
+#+BEGIN_SRC sh 
+  b 200                          # set breakpoint at line 200 
+  b MyClass::SomeMemberFunction  # set B.P. at some class method 
+#+END_SRC
+
+ + Run executable and start debugging:  
+
+This command will run: python -i test1.py that loads the shared
+library typesdb.so into the Python process. The library is loaded
+using Python ctypes library. 
+
+#+BEGIN_SRC sh 
+  run -i test1.py
+#+END_SRC
+
+ *Testing the file on GDB*
+
+ + $ source <GDB-COMMAND-FILE>
+
+#+BEGIN_SRC sh 
+ $ gdb --silent 
+
+ (gdb) source script.gdb 
+
+ No symbol table is loaded.  Use the "file" command.
+ Breakpoint 1 (main) pending.
+ No symbol table is loaded.  Use the "file" command.
+ Breakpoint 2 (VariantArgs_add_int) pending.
+ No symbol table is loaded.  Use the "file" command.
+ Breakpoint 3 (VariantArgs_add_cchar) pending.
+ No symbol table is loaded.  Use the "file" command.
+ Breakpoint 4 (typedb_call_function_void) pending.
+ [Thread debugging using libthread_db enabled]
+ Using host libthread_db library "/lib64/libthread_db.so.1".
+ init.cpp:242: [TRACE] Registered static objects OK.
+ init.cpp:159: [TRACE]  <C++> CashFlow class created. OK.
+  [INFO] address of ArgTuple = 555555824ba0
+
+ Breakpoint 2, VariantArgs_add_int (ptr=0x555555824ba0, x=3) at init.cpp:328
+ 328		ptr->push_back(x);
+ Missing separate debuginfos, use: dnf debuginfo-install ncurses-libs-6.1-5.20180224.fc28.x86_64 readline-7.0-11.fc28.x86_64
+ (gdb) 
+#+END_SRC
+
+List source at current break point: 
+
+#+BEGIN_SRC sh 
+  (gdb) list
+  323	
+  324	extern "C"
+  325	auto VariantArgs_add_int(ArgTuple* ptr, int x) -> void
+  326	{
+  327		// auto ptr = reinterpret_cast<ArgTuple*>(hnd);
+  328		ptr->push_back(x);
+  329	}
+  330	
+  331	extern "C"
+  332	auto VariantArgs_add_double(ArgTuple* ptr, double x) -> void
+  (gdb) 
+
+#+END_SRC
+
+Print function arguments: 
+
+#+BEGIN_SRC sh 
+    (gdb) i args
+    ptr = 0x555555824ba0
+    x = 3
+    (gdb) 
+
+   (gdb) p *ptr
+   $3 = std::vector of length 0, capacity 3
+
+   (gdb) n
+   329	}
+
+   (gdb) p *ptr
+   $4 = std::vector of length 1, capacity 3 = {std::any containing int = {
+       [contained value] = 3
+     }}
+   (gdb) 
+
+   (gdb) p ptr->operator[](0)
+   $6 = std::any containing int = {
+     [contained value] = 3
+   }
+#+END_SRC
+
+Continue until next break point: 
+
+#+BEGIN_SRC sh 
+  (gdb) c
+  Continuing.
+
+  Breakpoint 3, VariantArgs_add_cchar (ptr=0x555555824ba0, text=0x7ffff7e7ae54 "Some C++ is not bad at all") at init.cpp:342
+  342		ptr->push_back(text);
+  (gdb) 
+#+END_SRC
+
+Print function arguments: 
+
+#+BEGIN_SRC sh 
+  (gdb) i args
+  name = 0x7ffff7e1b4ec "functionTest1"
+  args = 0x555555824ba0
+
+  (gdb) p *args
+  $7 = std::vector of length 3, capacity 3 = {std::any containing int = {
+      [contained value] = 3
+    }, std::any containing double = {
+      [contained value] = 15.68
+    }, std::any containing const char * = {
+      [contained value] = 0x7ffff7e7ae54 "\377\177"
+    }}
+  (gdb) 
+#+END_SRC
+
+Print components of args (std::vector<std::any>)
+
+#+BEGIN_SRC sh 
+   (gdb) p args->operator[](0)
+   $10 = std::any containing int = {
+     [contained value] = 3
+   }
+
+   (gdb) p args->operator[](1)
+   $11 = std::any containing double = {
+     [contained value] = 15.68
+   }
+
+   (gdb) p args->operator[](2)
+   $12 = std::any containing const char * = {
+     [contained value] = 0x7ffff7e7ae54 "\377\177"
+   }
+   (gdb) 
+
+   (gdb) p (*args)[0]
+   $14 = std::any containing int = {
+     [contained value] = 3
+   }
+
+   (gdb) p (*args)[1]
+   $15 = std::any containing double = {
+     [contained value] = 15.68
+   }
+
+   (gdb) p (*args)[2]
+   $16 = std::any containing const char * = {
+     [contained value] = 0x7ffff7e7ae54 "\377\177"
+   }
+#+END_SRC
+
+Display local variables: 
+
+#+BEGIN_SRC sh 
+  (gdb) i locals
+
+  db = std::map with 2 elements = {
+    ["CashFlow"] = std::unique_ptr<Type> = {
+      get() = 0x5555558503d0
+    },
+    ["functionTest1"] = std::unique_ptr<Type> = {
+      get() = 0x55555584d4e0
+    }
+  }
+  it = {
+    first = "functionTest1",
+    second = std::unique_ptr<Type> = {
+      get() = 0x55555584d4e0
+    }
+  }
+  pFunc = 0xe5ebd5af422c7900
+  (gdb) 
+#+END_SRC
+
 ** Extensions and scripts 
 
  + [[http://man7.org/linux/man-pages/man5/gdbinit.5.html][gdbinit]] - GDB Initialization script.
