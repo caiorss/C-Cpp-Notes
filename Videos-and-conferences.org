@@ -348,6 +348,42 @@ members functions results in a compile-time error.
 
  * [[https://www.youtube.com/watch?v=Ehdl6j3Ace4&index=8&list=PLTEcWGdSiQenl4YRPvSqW7UPC6SiGNN7e][Dive into C++14 - <3> - Generic "unique resource" wrapper]]
 
+*** CppCon 2017: Bryce Adelstein Lelbach "C++17 Features (part 1 of 2)" :nvidia:
+
+ + [[https://www.youtube.com/watch?v=fI2xiUqqH3Q][CppCon 2017: Bryce Adelstein Lelbach “C++17 Features (part 1 of 2)” - YouTube]]
+   + The feature set for the C++17 release is set, and the release of
+     the standard is just around the corner. In this session, we'll
+     discuss all the new C++ features in C++17 and how they'll change
+     the way we write C++ software. We'll explore the new standard in
+     breath, not width, covering a cornucopia of core language and
+     library features and fixes:
+   + Language Changes (part 1):
+     + Structured bindings
+     + Selection statements with initializers
+     + Compile-time conditional statments
+     + Fold expressions
+     + Class template deduction
+     + auto non-type template parameters
+     + inline variables
+     + constexpr lambdas
+     + Unary static_assert
+     + Guaranteed copy elision
+     + Nested namespace definitions
+     + Preprocessor predicate for header testing
+   + Library Changes (part 2):
+     + string_view
+     + optional
+     + variant
+     + any
+     + Parallel algorithms
+     + Filesystem support
+     + Polymorphic allocators and memory resources
+     + Aligned new
+     + Improved insertion and splicing for associative containers
+     + Math special functions
+     + Variable templates for metafunctions
+     + Boolean logic metafunctions
+
 ** Misc 
 *** Bjarne Stroustrup - The Essence of C++
 
@@ -835,7 +871,6 @@ Equality Comparable
  + https://quuxplusone.github.io/blog/2018/03/27/string-view-is-a-borrowed-type
 
 
-
 *** NDC Conference 2017 - Sean Parent -  Better Code: Runtime Polymorphism
 
  + [[https://www.youtube.com/watch?v=QGcVXgEVMJg][Better Code: Runtime Polymorphism - Sean Parent - YouTube]]
@@ -979,6 +1014,567 @@ Equality Comparable
      will explore the feasibility of building classes from composable
      pieces, some concrete proof of concepts as well as the library
      infrastructure needed for this task." 
+
+*** CppCon 2018: Mateusz Pusz "Effective replacement of dynamic polymorphism with std::variant" :cpp17:hpc:hft:best:
+
+ + [[https://www.youtube.com/watch?v=gKbORJtnVu8][CppCon 2018: Mateusz Pusz “Effective replacement of dynamic polymorphism with std::variant” - YouTube]]
+   + This short talk presents how easy it is to replace some cases of
+     dynamic polymorphism with std::variant. During the lecture, we
+     will analyze and compare 2 implementations of the same simple
+     Finite State Machine. It turns up that variant-based code is not
+     only much faster but also it gives us the opportunity to define
+     our interfaces and program flow much better. The talk will end up
+     with the discussion of pros and cons of each approach and will
+     try to give guidelines on when to use them.
+   + *Domain:* Capital Markets - HFT - High Frequency Trading that
+     requires super fast low latency applications.
+
+ *Latency*
+
+ + _Time required to perform some action_ or to produce some result.
+ + Measured in units of time like hours, minutes, seconds, nanoseconds
+   or clock periods. 
+ 
+ *Low Latency* 
+
+ + In capital markets (HFT - High Frequency Trading, makert-makers or
+   arbitrage operations), the use of algorithm trading to _react ot maker_
+   _events faster than the competion to increase profitability of trades_
+
+ + Many use case where _predictability of latency message delivery is_
+   _just as important_, if not more than _achieving low average latency_.
+
+
+ *How not to develop software that have predictable performance?* 
+
+ + In Low Latency system we car a lot about *WCET* - [W]orst [C]ase  [E]xecution [T]ime.
+ 
+ + In order to limit *WCET* we should _limit the usage of specific C++_
+    _language features._
+   * C++ tools that trade performance for usability (e.g
+     std::shared_ptr, std::function)
+   * Throwing exception on likely code path.
+   * *Dynamic Polymorphism* (focus)
+   * Inheritance
+   * RTTI - Runtime Type Information
+   * *Dynamic Memory Allocation* (focus)
+
+ *How?* 
+
+Typical case of dynamic polymorphism:
+
+ + Class hierachy:
+
+#+BEGIN_SRC cpp 
+  class base: noncopiable {
+  public:
+    virtual ~base() = default;
+    virtual void foo() = 0;
+  };
+
+  class x: public base {
+  public:
+    void foo() override;
+  };
+
+  class y: public base {
+  public:
+   void foo() override;
+  }
+#+END_SRC
+
+ + Dynamic polymorphism:
+   + My observation ==> Ability of the client code to use derived
+     classes as it was the base class without any knowledge of the
+     derived class being used. The client code can also use any
+     instance of a derived class as it was an instance of the base
+     class. 
+   + My observation ==> Problem: The dynamic polymorphism incurs on a
+     run-time overhead since virtual methods are resolved at runtime
+     rather than at compile-time which cannot be acceptable in some
+     domains such as real time systems or low latency systems.
+
+#+BEGIN_SRC cpp 
+   std::unique_ptr<base> b = std::make_unique<x>();
+   b->foo();
+
+  void ClientCode(Base& object){
+    // use object without nknowing its type 
+    object->foo();
+  }
+  // The client code can work with any implementation without 
+  // knowing anything about it. 
+  ClientCode(*b);
+#+END_SRC
+
+ *Alternative Presented: std::variant (from C++17 or Boost.Variant)*
+
+#+BEGIN_SRC cpp 
+  struct x { void foo(); }
+  // Or: --------------- 
+  class x {
+   public: 
+     void foo(); 
+  }
+
+  struct y { void foo(); };
+
+  // Or => A struct is class with everything public by default.
+  class y { 
+   public:
+     void foo(); 
+  };
+
+ std::variant<x, y> b;
+ std::visit([](auto&& v) {  v.foo(); }, b);
+
+#+END_SRC
+
+Benefits: 
+ + shorter
+ + faster
+ + value semantics
+ + works on unrelated classes
+ + more flexible thanks to duck typing (template metaprogramming +
+   type erasure => It still uses inheritance internally.)
+
+ *Finite State Machine* 
+
+ + Abstract machine that can be in exactly one of a finite number of
+   states at any given time. -- Wikipedia.
+   + My observation => Applications: parsers, electronic circuits,
+     network protocols, embedded systems, industrial automation and
+     game artificial intelligency,  
+
+ + State changes to another in a respose to some external inputs
+   called events. (Mealy's state machine model.)
+
+ + The change from one state another is called transition.
+
+#+BEGIN_SRC text 
+                                   +
+                                   | Initial state
+                                   |
+                                   |
+                                   |
+                            +------v----------+
+     +----------------------+   state_idle    |
+     |                      |                 <-----------------+
+     |                      +-------+------+--+                 |
+     |timeout                       |      ^                    |
+     |[ n < n_max]    connect       |      |                    |
+     |                  +-----------+      |timeout             |
+     |                  |                  |[ n = n_max ]       | disconnected
+     |                  |                  |                    |
+     |         +--------v-------------+    |                    |
+     |         |                      +----+                    |
+    ++---------> state_connecting     |                         |
+               |                      |                         |
+               +--------------+-------+                         |
+                              |                                 |
+                              |                      +----------+------------+
+                              |   connected          |                       |
+                              +---------------------->    state_connected    |
+                                                     |                       |
+                                                     +-----------------------+
+#+END_SRC
+
+ *Implementation with single dynamic dispatch* 
+
+ + Problem: Slow due to the usage of virtual meber functions. 
+
+#+BEGIN_SRC cpp 
+  template<typename Event>
+  class state: noncopyable {
+  public:
+          virtual ~state() = default;
+          virtual std::unique_ptr<state> on_event(Event) = 0;
+  };
+
+  template<typename Event>
+  class fsm {
+          std::unique_ptr<state<Event>> state_;
+  public:
+          explicit fsm(std::unique_ptr<state<Event> state)
+                  : state_(std::move(state)) { }
+
+          void dispatch(Event e)
+          {
+                  auto new_state = state_->on_event(e);
+                  if (new_state)
+                          state_ = std::move(new_state);
+          }
+  };
+#+END_SRC
+
+ *Connection FSM*
+
+#+BEGIN_SRC cpp 
+  class connection_fsm: public fsm<event> {
+  public:
+          connection_fsm():
+                  fsm<event>(std::make_unique<state_idle>()){ }
+  };
+
+  using s = state<fent>;
+
+  class state_idle final : public s {
+  public:
+          std::unique_ptr<s> on_event(event e) override;
+  };
+
+  class state_connecting final : public s {
+          static constexpr int n_max = 3;
+          int n = 0;
+  public:
+          std::unique_ptr<s> on_event(event s) override;
+  };
+
+  class state_connected final : public s {
+  public:
+          std::unique_ptr<s> on_event(event s) override;
+  }
+#+END_SRC
+
+Member function implementations: 
+
+#+BEGIN_SRC cpp 
+  std::unique_ptr<s> state_idle::on_event(event e)
+  {
+          if(e == event::connect)
+                  return std::make_unique<state_connecting>();
+          return nullptr;
+  }
+
+  std::unique_ptr<s> state_connecting::one_vent(event e)
+  {
+          switch(e){
+          case event::connected:
+                  return std::make_unique<state_connected>();
+          case event::timeout:
+                  return (++n < n_max) ? nullptr : std::make_unique<state_idle>();
+          default:
+                  return nullptr;
+          }
+  }
+
+  std::unique_ptr<s> state_connected::one_vent(event e)
+  {
+          if(e == event::disconnect)
+                  return std::make_unique<state_idle>();
+          return nullptr;
+  }
+#+END_SRC
+
+The transitions can be tested with C++17 fold expressions which allows
+template types parameter packs to be expanded without recursion. 
+
+#+BEGIN_SRC cpp 
+  template<typename Fsm, typename ... Events>
+  void dispatch(Fsm& fsm, Events... events)
+  {
+          (fsm.dispatch(events), ... );
+  }
+#+END_SRC
+
+Simple message flow: 
+
+#+BEGIN_SRC cpp 
+  connection_fsm fsm; 
+  dispatch(fsm , event::conect, event::timeout, event::connected, event::disconnect);
+#+END_SRC
+
+Problems:
+ + Open to new alternatives:
+   + new derived types may be added by client codes at any point of
+     time (long after base class implementation is finished)
+ + Closed to new operations:
+   + clients cannot add new operations to dynamic dispatch
+ + Multi-level
+   + many levels of inheritance possible
+
+
+ *Double dispatch* - aka visitor pattern 
+
+#+BEGIN_SRC cpp 
+  template<typename State>
+  struct event : private noncopyable {
+          virtual ~event() = default;
+          virtual std::unique_ptr<State> dispatch(State& s) const = 0;	
+  };
+
+  template<typename State, typename Event>
+  class fms{
+          std::unique_ptr<State> state_;
+  public:
+          explicit fsm(std::unique_ptr<State> state): state_(std::move(state)) {}
+
+          void dispatch(const Event& e)
+          {
+                  auto new_state = e.dispatch(*state_);
+                  if(new_state)
+                          state_ = std::move(new_state);
+          }
+  };
+#+END_SRC
+
+Events: 
+
+#+BEGIN_SRC cpp 
+  struct event_connect final : public event<state> {
+          std::unque_ptr<state> dispatch(state& s) const override { return s.on_event(*this); }
+          // ... 
+  };
+
+  struct event_connected final : public event<state> {
+          std::unque_ptr<state> dispatch(state& s) const override { return s.on_event(*this); }
+          // ... 
+  };
+
+  struct event_disconnect final : public event<state> {
+          std::unque_ptr<state> dispatch(state& s) const override { return s.on_event(*this); }
+          // ... 
+  };
+
+  struct event_timeout final : public event<state> {
+          std::unque_ptr<state> dispatch(state& s) const override { return s.on_event(*this); }
+          // ... 
+  };
+
+#+END_SRC
+
+State: 
+
+#+BEGIN_SRC cpp 
+
+  // Note: It is private inheritance
+  class state : noncopyable {
+  public:
+          virtual ~state() = default;
+          virtual std::unique_ptr<state> onv_vent(const event_connect&)	  { return nullptr; }
+          virtual std::unique_ptr<state> onv_vent(const event_connected&)	  { return nullptr; }
+          virtual std::unique_ptr<state> onv_vent(const event_disconnect&)  { return nullptr; }
+          virtual std::unique_ptr<state> onv_vent(const event_timeout&)	  { return nullptr; }
+	
+  };
+
+  class state_idle final : public state {
+  public:
+          using state::on_event;
+          std::unique_ptr<state> on_event(event_connect const& e) override
+          {
+                  return std::make_unique<state_connecting>(std::string(e.address()));
+          }
+  };
+#+END_SRC
+
+ *Simplification with CRTP - Curiously Recurring Template Pattern*
+
+#+BEGIN_SRC cpp 
+  template<typename State>
+  struct event : private noncopyable {
+          virtual ~event() = default;
+          virtual std::unique_ptr<State> dispatch(State& s) const = 0;
+  };
+
+  template<typename Child>
+  struct event_crtp : event<state> {
+          std::unique_ptr<state> dispatch(state& s) const override
+          {
+                  return s.on_event(*static_cast<const Child*>(this));
+          }
+  };
+
+  struct event_connect final: public event_cretp<event_connect> {
+          explicit event_connect9std::string_view address: address_(address){ }
+          std::string_view address() const { return address_; }
+  private:
+          std::string_view address_;
+  };
+
+  struct event_conencted    final: publidc event_crtp<event_connected>    { };
+  struct event_disconnected final: publidc event_crtp<event_disconnected> { };
+  struct event_timeout      final: publidc event_crtp<event_timeout>      { };
+#+END_SRC
+
+Transitions: 
+
+#+BEGIN_SRC cpp 
+  std::unique_ptr<state>
+  state_idle::on_event(event_connect const& e)
+  {
+          return std::make_unique<state_connecting>(std::string{e.address()});
+  }
+
+  std::unique_ptr<state>
+  state_connecting::on_event(event_connect const& e)
+  {
+          return std::make_unique<state_conected>();
+  }
+
+  std::unique_ptr<state>
+  state_connecting::on_event(event_timeout const& e)
+  {
+          return ++n < n_make ?  nullptr : std::make_unique<state_idle>();
+  }
+
+  std::unique_ptr<state>
+  state_connected::on_event(event_timeout const& e)
+  {
+          return std::make_unique<state_idle>();
+  }
+#+END_SRC
+
+Testing transitions: 
+
+#+BEGIN_SRC cpp 
+  template<typename Fsm, typename..Events>
+  void dispatch(Fsm& fsm, Events const& ... events)
+  {
+          (fsm.dispatch(&events), ...);
+  }
+
+  dispatch(fms,
+           std::make_unique<event_connect>("taint-it.eu"),
+           std::make_unique<event_timeout>(),
+           std::make_unique<event_connected>(),
+           std::make_unique<event_disconnect>()):
+#+END_SRC
+
+Summary:
+ + Closed to new alternatives
+   + one class of fixed at design time and cannot be extended by
+     clients
+ + closed to new operations
+   + clients cannot add new operations to dynamic dispatch
+ + Multi-level
+   + many levels of inheritance possible
+ + Object Oriented
+   + whole framework is based on objects 
+
+ *std::variant<Types ...>*
+
+#+BEGIN_SRC cpp 
+   template<class ... types>
+   class variant;
+#+END_SRC
+
+ + Represents a type-safe union
+ + At any given point in time eith
+   + Holds a value of one of its alternative types
+   + Is in special *valueless_by_exception_state*  (reached if  an
+     exception is thrown during contained value initialization or
+     assingment).
+
+C++ Standard requirements of the type std:;variant<Types ...>
+ + Not allowed to allocate dynamic memory.
+ + Not permitted ot hold references, arrays, or void.
+ + Empty variants are *ill-formed* (std::variant<std::monostate> can be
+   used instaed)
+ + Permitted to _hold the same type more than once_, and to hold
+   different cv-qualified versions of the same type.
+ + _Default-initialized variant_ holds a value of its first alternatives
+   unless that alternative is not default-constructible.
+
+Dyamic Dispatch using the index member function: (slower and less performant)
+
+#+BEGIN_SRC cpp 
+  void print(std:;variant<int, double, X> const& v)
+  {
+          switch(v.index())
+          {
+          case 0: std:;cout << "   int: " << std::get<0>(v) << '\n'; break;
+          case 1: std:;cout << "double: " << std::get<1>(v) << '\n'; break;
+          case 2: std:;cout << "     X: " << std::get<2>(v).x << std::get<2>(v).y << '\n'; break;
+          }
+  }
+#+END_SRC
+
+Static dispatching with visitor struct: (faster and more performant,
+similar to functional-languages pattern matching.)
+
+#+BEGIN_SRC cpp 
+  struct visitor {
+          void operator()(int v)     const  { std::cout << "   int: " << v << '\n'; }
+          void operator()(double v)   const { std::cout << "double: " << v << '\n'; }
+          void operator()(X const& v) const { std::cout << "     X: " << v.x << v.y << '\n'; }
+  };
+
+  void print(std::variant<int, double, X> const& v){ std::visit(visitor{{}, x}); }  
+#+END_SRC
+
+Transitions: 
+
+#+BEGIN_SRC cpp 
+  struct transitions {
+          std::optional<state>
+          operator()(state_idle&, event_connect const& e)
+          {
+                  return state_connecting{std::string(e.address;)}:
+          }
+
+          std::optiona<state>
+          operator()(state_connecting&, event_connected const& e)
+          {
+                  return state_connected{};
+          }
+
+          std::optiona<state>
+          operator()(state_connecting&, event_timeout const&)
+          {
+                  return ++s.n < state_connecting::n_max ?
+                                             std::nullopt : optional<state>(state_idle{});
+          }
+
+          // Default case 
+          template<typename State, typename Event>
+          std::optional<state>
+          operator()(State&, Event const&) const
+          {
+                  return std::nullopt;
+          }
+  };
+#+END_SRC
+
+FSM Engine: 
+
+#+BEGIN_SRC cpp 
+  template<typename StateVariant, typename EventVariant, typename Transitions>
+  class fsm{
+       StateVariant state_;
+  public:
+       void dispatch(EventVariant const& event)
+      {
+          std::optional<StateVariant> new_state = std::visit(Transitions{}, state_, event);
+          if(new_state)
+             state_ = *std::move(new_state);		
+      }
+  };
+
+  using connection_fsm = fsm<state, event, transitions>;
+#+END_SRC
+
+Testing transitions: 
+
+#+BEGIN_SRC cpp 
+  template<typename Fsm, typename ...Event>
+  void dispatch(Fms& fms, Events&& ... event)
+  {
+          // Perfect forwarding (Events&&) is an universal reference, not a
+          // R-value reference. 
+          (fsm.dispatch(std::forward<Event>(events)), ...);
+  }
+
+  dispatch(
+          fsm,
+          event_connect{"tain-it.eu"};
+          event_timeout{},
+          event_connected{},
+          event_disconnected{}
+          );
+
+#+END_SRC
+
 
 ** Functional
 *** CppCon 2015: Stephan T. Lavavej "functional: What's New, And Proper Usage"
@@ -1462,7 +2058,7 @@ functions" with templates:
        * Compiler with non cryptic error messages like Clang++.
        * Enforce as much correctness as possible at compile-time in
          order to catch bugs earlier before runtime and deployment.
-** High Performance Computing for Math 
+** High Performance Computing and Math 
 *** CPPCON 2016: Klaus Iglberger "The Blaze High Performance Math Library"
 
  - [[https://www.youtube.com/watch?v=w-Y22KrMgFE][CppCon 2016: Klaus Iglberger “The Blaze High Performance Math Library" - YouTube]]
@@ -2069,6 +2665,204 @@ is set to std::allocator by default.
      std::vector<int, std::allocator<int>> v;
    }
 #+END_SRC
+*** Meeting C++ 20018: Andrea Weis - Taming dynamic memory - An Introduction to Custom Allocators :BMW_AG:real_time:embedded:
+
+ + [[https://www.youtube.com/watch?v=R3cBbvIFqFk&feature=youtu.be][Taming dynamic memory - Andreas Weis - Meeting C++ 2018 - YouTube]]
+
+Overview: 
+ + What's wrong with global new and delete?
+ + Local allocators
+ + Alternative allocation strategies
+ + Allocator support in C++ 
+
+Memory Model:  
+ + My observation: The computer memory can be regarded as a giant
+   collection of of byte cells where every byte has an unique address.
+   The memory is byte-addressable.
+
+Allocators: 
+
+Problems with default allocator: [[https://youtu.be/R3cBbvIFqFk?t=290][at 4:50]] 
+
+ + Complex runtime behavior
+   + What is the maximum memory usage?
+   + What is the wors-case execution time for an allocation or deallocation?
+ + Shared global state
+   + Reasoning about allocator behavior requires global knowledge of
+     the whole program.
+   + The singular resource global allocator is a potential
+     bottleneck. 
+
+ *C++ Standard Library Memory Allocators*
+
+ + [[https://en.cppreference.com/w/cpp/memory/allocator][std::allocator - cppreference.com]]
+
+ + [[https://en.cppreference.com/w/cpp/memory/monotonic_buffer_resource/monotonic_buffer_resource][std::pmr::monotonic_buffer_resource::monotonic_buffer_resource - cppreference.com]]
+
+ + [[https://en.cppreference.com/w/cpp/memory][Dynamic memory management - cppreference.com]]
+
+ + [[https://en.cppreference.com/w/cpp/memory/c][C memory management library - cppreference.com]]
+
+ *Dynamic Memory Allocation in Embedded or Real Time Systems*
+
+My observation: ([[https://youtu.be/R3cBbvIFqFk?t=411][at 6:51]]) Performance is not the only problem to worry about. In
+_real time systems_ like car's computer notwork (CAN Network) or the
+ABS - Anti Lock Braking System, a major concern is predictability as
+everything in those systems must fulfill _real-time guarantees_ meeting
+time deadlines. This is the reason why dynamic memory allocation is
+not allowed in _real time systems_ or _embedded systems_.
+
+See: 
+ + https://en.wikipedia.org/wiki/Anti-lock_braking_system
+ + [[https://www.win.tue.nl/~johanl/educ/RTcourse/RT-course-OOTIs-Introduction.pdf][Design of Real Time Software - Reinder J. Bril]]
+ + [[https://web.archive.org/web/20190127183522/https://www.win.tue.nl/~johanl/educ/RTcourse/RT-course-OOTIs-Introduction.pdf][Web Archive: Design of Real Time Software - Reinder J. Bril]] 
+
+
+ *Monotonic Allocator* [[https://youtu.be/R3cBbvIFqFk?t=582][9:42]] 
+
+The worst and simplest memory allocator found in the C++ ISO standard. 
+
+Intial Allocator State: 
+ + The base and free pointer points to the beggining of the free
+   portion of the memory. 
+
+#+BEGIN_SRC text 
+     Memory Buffer with N-bytes: Each cell is a byte 
+
+        | Base Pointer = AddrInit
+        | Free Pointer = AddrInit                   
+       \ /
+      b0    b1   b2  b4   b4    b5            b[N-1]
+     +----+----+----+----+----+----+          +----+
+     |    |    |    |    |    |    | ... ...  |    |
+     +----+----+----+----+----+----+          +----+
+       |                                         |
+       |                                         |
+    Intial memory address                  End memory address   
+    AddrInit                               AddEnd 
+#+END_SRC
+
+Allocator state after memory allocation: 
+
+ + Allocator 
+
+#+BEGIN_SRC cpp 
+  // Allocates 3 bytes, returning a pointer to the first byte 
+  // and advancing the free pointer 3 bytes.
+  // -------------------------------------------------
+  //  => free_pointer = free_pointer + 3 
+  //  => free_pointer = addrInit + 3 
+  auto p1 = monot.allocate(3);
+
+  // => free_pointer = free_pointer + 2
+  // => free_pointer = addrInit + 5 
+  auto p2 = monot.allocate(2);
+
+  // => free_pointer = free_pointer + 4
+  // => free_pointer = addrInit + 9
+  auto p3 = monot.allocate(4);
+#+END_SRC
+
+ + Allocator state 
+
+#+BEGIN_SRC text 
+       | Base Pointer = AddrInit               | Free Pointer = AddrInit                   
+       |                                       | 
+      \ /                                     \ /
+      b0    b1   b2  b4   b4    b5   b6   b7   b8    b9  b10       b[N-1]
+     +----+----+----+----+----+----+----+----+----+----+----+     +----
+     | p1 | p1 | p1 | p2 | p2 | p3 | p3 | p3 | p3 |    |    | ... |    |
+     +----+----+----+----+----+----+----+----+----+----+----+     +----+
+       |                                                            |
+       |                                                            |
+    Intial memory address                                   End memory address   
+    AddrInit                                                   AddrEnd 
+#+END_SRC
+
+ After deallocation: 
+
+#+BEGIN_SRC cpp 
+  monot.deallocate(p2);
+#+END_SRC
+
+ + Allocator state after deallocation:
+   + The memory allocated to p2 is released, but this memory block
+     cannot be reused. It is a waste of memory and it is not possible
+     to get the memory back. [[https://youtu.be/R3cBbvIFqFk?t=665][at 11:06]] 
+
+#+BEGIN_SRC text 
+       | Base Pointer = AddrInit               | Free Pointer = AddrInit                   
+       |                                       | 
+      \ /                                     \ /
+      b0    b1   b2  b4   b4    b5   b6   b7   b8    b9  b10       b[N-1]
+     +----+----+----+----+----+----+----+----+----+----+----+     +----
+     | p1 | p1 | p1 |    |    | p3 | p3 | p3 | p3 |    |    | ... |    |
+     +----+----+----+----+----+----+----+----+----+----+----+     +----+
+       |                                                            |
+       |                                                            |
+    Intial memory address                                  End memory address   
+    AddrInit                                                   AddrEnd 
+#+END_SRC
+
+ *Properties of Monotonic Allocator:* [[https://youtu.be/R3cBbvIFqFk?t=774][at 12:54]]
+
+ + Deterministic Runtime Cost 
+ + Extremely Efficient 
+ + No memory fragmentation - the memory block is a single memory block.
+ + Easy to implement
+ + Trivial to make thread-safe
+
+But:
+ + Memory can only be recalimed all at once through an explicit
+   release call. 
+
+ *Where is this actually useful ?*
+
+ + Frames in a video game
+ + Handling of a single event in an event-driven system (such as an
+   web server)
+ + Cyclic execution in a real-time system [[https://youtu.be/R3cBbvIFqFk][at 14:41]]
+   + Design patter where there is a big loop that executes a sequence
+     of actions. A clean state is reached after each loop iteration.  
+ + Containers that are initialized but not changed after 
+ + static state - Objects will never be destroyed. 
+
+ *C++ Memory Resources* 
+
+ * std::pmr::memory_resource
+   + Abstract class for all wrapped resources that can be wrapped in a
+     std::pmr::polymorphic_allocator.
+
+ * std::pmr::new_delete_resource()
+   + Global allocator
+
+ * std::pmr::monotonic_buffer_resource
+   + Monotonic Allocator
+
+ * std::pmr::unsychronized_pool_resource
+   + Synchronized resource / multipool
+
+ * std::pmr::null_memory_resource()
+   + Allocation always fails.
+*** CppCon 2015: Andrei Alexandrescu "std::allocator..."
+
+ + [[https://www.youtube.com/watch?v=LIb3L4vKZ7U][CppCon 2015: Andrei Alexandrescu “std::allocator...” - YouTube]]
+   + "std::allocator has an inglorious past, murky present, and
+     cheerless future. STL introduced allocators as a stop gap for the
+     now antiquated segmented memory models of the 1990s. Their design
+     was limited and in many ways wasn't even aiming at helping
+     allocation that much. Because allocators were there, they simply
+     continued being there, up to the point they became impossible to
+     either uproot or make work, in spite of valiant effort spent by
+     the community. But this talk aims at spending less time on poking
+     criticism at std::allocator and more on actually defining
+     allocator APIs that work. Scalable, high-performance memory
+     allocation is a topic of increasing importance in today's
+     demanding applications. For such, std::allocator simply doesn't
+     work. This talk discusses the full design of a memory allocator
+     created from first principles. It is generic, componentized, and
+     composable for supporting application-specific allocation
+     patterns." 
 
 ** C++ Binary Components + ABI + Reflection 
 *** CPPCON 2016 - C++14 Reflections Without Macros, Markup nor External Tooling :reflection:metaprogramming:templates:
