@@ -12,6 +12,10 @@ upload:
 code:
 	cp -r -v src dist/
 
+# Update html pages images 
+image:
+	cp -r -v images dist/
+
 clean:
 	scala -save build.scala -clean
 
