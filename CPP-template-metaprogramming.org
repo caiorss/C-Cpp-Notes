@@ -2879,8 +2879,7 @@ Output:
 #+END_SRC
 
 *** Type instrospection 
-
- *Example 1 - Check whether type has default constructor*
+**** Example 1 - Check whether type has default constructor
 
 This example based on the book "Template the complete guide" shows a
 metafunction which can check whether a type has a default constructor,
@@ -2925,8 +2924,7 @@ Testing:
    (const bool) false
    >> 
 #+END_SRC
-
- *Example 2 - Check whether type has end member function*
+**** Example 2 - Check whether type has .end() member function
 
 #+BEGIN_SRC cpp
    template<typename T> struct HasEndMemberFunction{
@@ -2961,6 +2959,58 @@ Testing:
     (const bool) true
     >> 
 #+END_SRC
+**** Example 3 - Check whether type is printable 
+
+This metafunction checks whether type is printable, in other words,
+whether it can be printed with (<<) operator: 
+
+ + File: [[file:src/sfinae_is_printable.cpp][file:src/sfinae_is_printable.cpp]]
+ + Online Compiler: https://rextester.com/GMK72456 
+
+#+BEGIN_SRC cpp 
+  /**  @brief Checks whether type is printable, or supports the
+   ,*   insertion operator (<<).  @details This metafunction tests
+   ,*   whether type supports the operator (<<) or std::ostream&
+   ,*   operator<<(std::ostream& os, const RHS& rhs)
+   ,* 
+   ,*   @tparam - Any type, int, char, class, std::string, std::vector ... 
+   ,*/
+  template<typename T>
+  struct IsPrintable{
+      template<typename X, typename = decltype(std::cout << std::declval<X>())>
+      static auto check(void*) -> char;
+
+      template<typename X>
+      static auto check(...) -> long;  
+
+      static constexpr bool value =
+        std::is_same<decltype(check<T>(nullptr)), char>::value; 
+  };
+
+#+END_SRC
+
+Main function: 
+
+#+BEGIN_SRC cpp 
+   std::cout << std::boolalpha;
+   std::cout << "        IsPrintable<int> = " << IsPrintable<int>::value << "\n";
+   std::cout << "IsPrintable<std::string> = " << IsPrintable<std::string>::value << "\n";
+   std::cout << "  IsPrintable<SomeClass> = " << IsPrintable<SomeClass>::value << "\n";
+   std::cout << "      IsPrintable<Point> = " << IsPrintable<Point>::value << "\n";
+#+END_SRC
+
+Testing: 
+
+#+BEGIN_SRC sh 
+  $ clang++ sfinae_is_printable.cpp -o sfinae_is_printable.bin -std=c++1z -g -O0 -Wall && ./sfinae_is_printable.bin
+
+          IsPrintable<int> = true
+  IsPrintable<std::string> = true
+    IsPrintable<SomeClass> = false
+        IsPrintable<Point> = true
+#+END_SRC
+
+
 
 ** References and Bookmarks 
 *** General  
