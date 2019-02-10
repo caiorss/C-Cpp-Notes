@@ -128,7 +128,7 @@ Problems:
 
  + [[http://bigbang.waterlin.org/bang/using-python-ctypes-to-link-cpp-library/][The Big Bang on Reading Busy » Blog Archive » Using Python ctypes to link C/C++ library]]
 
-** Example 1 - Cross platform Shared Library
+** Cross platform Shared Library
 *** Overview 
 
  *Source:*
@@ -2282,4 +2282,183 @@ View exported symbols demangled (without name mangling):
                    U std::ios_base::Init::~Init()
 #+END_SRC
 
-** TODO Shared Libraries on Linux 
+** Return string from a C++ function to Python Ctypes
+
+Example: Create a function with C linkage or C-API which returns a
+dynamically allocated string to the caller. 
+
+ + Source:  [[https://gist.github.com/caiorss/fc0e628daf7bbb4e8484491856a07c38][Gist with all files]] 
+
+Build shared library - DLL (cstr.so):
+
+#+BEGIN_SRC sh 
+ $ clang++ cstr.cpp -o cstr.so -std=c++1z -O0 -g -shared -fPIC -std=c++1z 
+#+END_SRC
+
+ *File cstr.cpp* 
+
+Headers: 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+  #include <sstream>
+  #include <cstring>     // std::strncpy
+  #include <cmath>
+
+  #if defined(_WIN32)
+    //  MS-Windows 
+    #define EXPORT_C  extern "C" __declexpec(dllexport)
+  #else
+    // Unix
+    #define EXPORT_C  extern "C" 
+  #endif 
+
+#+END_SRC
+
+Function - version A: 
+
+#+BEGIN_SRC cpp 
+
+  /** Design 1: Buffer allocated by the caller.
+   ,* @param[in]     x            Float point number 
+   ,* @param[in,out] buffer       Buffer allocated by the caller. 
+   ,* @param[in]     buffer_size  Size of buffer allocated by the caller in bytes.
+   ,* @return                     Size of copied array.
+   ,*/
+  EXPORT_C size_t 
+  square_root_as_stringA(double x, char* buffer, size_t buffer_size)
+  {
+       std::string ss;
+       ss = ss + "The square root of x = " + std::to_string(x)
+               + " is equal to " + std::to_string(sqrt(x));
+       std::strncpy(buffer, ss.data(), buffer_size);
+       return ss.size();
+  }
+
+#+END_SRC
+
+Function - version B: 
+
+#+BEGIN_SRC cpp 
+  /** Design 2: Buffer allocated by the caller. If the buffer is null, the function 
+   ,*            returns the required buffer size.
+   ,* @param[in]     x            Float point number 
+   ,* @param[in,out] buffer       Buffer allocated by the caller. 
+   ,* @param[in]     buffer_size  Size of buffer allocated by the caller in bytes.
+   ,* @return                     Size of copied array or required buffer size.                                
+   ,*/
+  EXPORT_C size_t 
+  square_root_as_stringB(double x, char* buffer, size_t buffer_size)
+  {
+       std::string ss;
+       ss = ss + "The square root of x = " + std::to_string(x)
+               + " is equal to " + std::to_string(sqrt(x));
+       if(buffer == nullptr)
+               return ss.size();
+       std::strncpy(buffer, ss.data() /* const char* */, buffer_size);
+       return ss.size();
+  }
+#+END_SRC
+
+Function - version C:
+
+#+BEGIN_SRC cpp 
+  /** Design3: Buffer allocated by callee (this code) and released by the
+   ,* caller. */
+  EXPORT_C char* 
+  square_root_as_stringC(double x){
+       std::string ss;
+       ss = ss + "The square root of x = " + std::to_string(x)
+               + " is equal to " + std::to_string(sqrt(x));
+       return strdup(ss.data());
+  }
+
+  EXPORT_C void 
+  cstring_delete(char* pCstring)
+  {
+      std::cout << " [INFO] C-string deleted, memory released. OK." << "\n";
+      std::free(pCstring);
+  }
+#+END_SRC
+
+ *file: cstrp.py* (Python Wrapepr)
+
+Initial configuration: 
+
+#+BEGIN_SRC python 
+  import ctypes 
+
+  CString   = ctypes.POINTER(ctypes.c_char)
+  STDString = ctypes.c_void_p 
+  CVoid     = None 
+  dll = ctypes.cdll.LoadLibrary("cstr.so")
+#+END_SRC
+
+Wrapper for function A:
+
+#+BEGIN_SRC python 
+  print("\n EXPERIMENT1 => Call square_root_as_stringA")
+  print("=============================================")
+  dll.square_root_as_stringA.argtypes = [ ctypes.c_double,
+                                          CString,
+                                          ctypes.c_size_t ]
+  dll.square_root_as_stringA.restype  = ctypes.c_size_t
+
+  buf_size = 1024 # 1 Kbyte = 1024 bytes
+  buf      = ctypes.create_string_buffer(buf_size)
+  n_read   = dll.square_root_as_stringA(100.45, buf, buf_size)
+
+  print("Size = ", n_read, " ; RESULT = ", buf.value)
+#+END_SRC
+
+Wrapper for function B:
+
+#+BEGIN_SRC python 
+  print("\n EXPERIMENT 2 => Call square_root_as_stringB")
+  print("=============================================")
+  dll.square_root_as_stringB.argtypes = [ ctypes.c_double,
+                                          CString,
+                                          ctypes.c_size_t ]
+  dll.square_root_as_stringB.restype  = ctypes.c_size_t
+
+  x = 200.45
+  required_size = dll.square_root_as_stringB(x, ctypes.c_char_p(0), 0)
+  buf           = ctypes.create_string_buffer(required_size)
+  dll.square_root_as_stringB(x, buf, required_size)
+  print(" RESULT = ", buf.value)
+#+END_SRC
+
+Wrapper for function C: 
+
+#+BEGIN_SRC python  
+  print("\n EXPERIMENT 3 => Call square_root_as_stringC")
+  print("=============================================")
+
+  dll.square_root_as_stringC.argtypes = [ ctypes.c_double ]
+  dll.square_root_as_stringC.restype  = ctypes.c_char_p
+
+  dll.cstring_delete.argtypes = [ ctypes.c_char_p ]
+  dll.cstring_delete.restype  = CVoid
+
+  hCString = dll.square_root_as_stringC(167.42)
+  print(" RESULT = ", hCString)
+#+END_SRC
+
+ *Program output* 
+
+#+BEGIN_SRC sh 
+  $ python3 cstr.py 
+
+   EXPERIMENT1 => Call square_root_as_stringA
+  =============================================
+  Size =  55  ; RESULT =  b'The square root of x = 100.450000 is equal to 10.022475'
+
+   EXPERIMENT 2 => Call square_root_as_stringB
+  =============================================
+   RESULT =  b'The square root of x = 200.450000 is equal to 14.158037'
+
+   EXPERIMENT 3 => Call square_root_as_stringC
+  =============================================
+   RESULT =  b'The square root of x = 167.420000 is equal to 12.939088'
+#+END_SRC
