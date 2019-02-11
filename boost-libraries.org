@@ -14,8 +14,15 @@ fprintf) and less intrusive and verbose than the C++ (<<) insertion
 operator. 
 
  + Documentation: [[https://www.boost.org/doc/libs/1_69_0/libs/format/doc/format.html][Boost format]]
+ + Header: <boost/format.hpp>
+ + Functions:
+   + boost::str
+   + boost::format
 
 Using the library: 
+ + As the library is a header-only library as almost all boost
+   libraries. All what is needed to use it is just include the
+   following header.
 
 #+BEGIN_SRC cpp 
   #include <boost/format.hpp>
@@ -82,6 +89,143 @@ Example 3.B:
  >> result2
  (std::string &) "operation = sin - z = 1.5708 sin(1.5708) = 1"
 #+END_SRC
+** Boost Lexical_cast 
+
+Boost lexical cast is header-only library for converting from
+built-int types to string and from string to built-in types. 
+
+ + Documentation: [[https://www.boost.org/doc/libs/1_69_0/doc/html/boost_lexical_cast.html#boost_lexical_cast.motivation][Boost Lexical Cast]] 
+ + Header: <boost/format.hpp>
+ + Functions:
+   + boost::lexical_cast 
+
+Example: 
+
+ + *Headers and namespace:*
+
+#+BEGIN_SRC cpp 
+  #include <boost/lexical_cast.hpp>
+
+  // Namespace alias 
+  namespace b = boost;
+#+END_SRC
+
+ *Basic conversions:*
+
+#+BEGIN_SRC cpp 
+  >> b::lexical_cast<int>("456")
+  (int) 456
+
+  >> b::lexical_cast<double>(".4615e3")
+  (double) 461.50000
+
+  >> b::lexical_cast<double>("inf")
+  (double) inf
+
+  >> b::lexical_cast<long double>("34e5")
+  (long double) 3400000.0L
+  >> 
+
+  >> b::lexical_cast<double>("inf error")
+  Error in <TRint::HandleTermInput()>: 
+  boost::exception_detail::clone_impl<boost::exception_detail::error_info_injector<boost::bad_lexical_cast> > 
+   caught: bad lexical cast: source type value could not be interpreted as target
+
+  >> b::lexical_cast<double>(" asdsas ")
+  Error in <TRint::HandleTermInput()>: 
+  boost::exception_detail::clone_impl<boost::exception_detail::error_info_injector<boost::bad_lexical_cast> > 
+  caught: bad lexical cast: source type value could not be interpreted as target
+    >> 
+
+  >> b::lexical_cast<long double>(" 100 ")
+  Error in <TRint::HandleTermInput()>: 
+   boost::exception_detail::clone_impl<boost::exception_detail::error_info_injector<boost::bad_lexical_cast> > 
+   caught: bad lexical cast: source type value could not be interpreted as target
+  >> 
+#+END_SRC
+
+ *Catch exceptions:*
+
+#+BEGIN_SRC cpp 
+  #include <cmath> 
+
+  void PrintSquareRoot(const char* number_str){
+       try {
+          double x = boost::lexical_cast<double>(number_str);
+          std::cout << "x = " << x
+                    << " ; sqrt(x) = " << std::sqrt(x)
+                    << "\n";
+       } catch(boost::bad_lexical_cast const& ex)
+       {
+          std::cerr << " [ERROR] " << ex.what() << "\n";
+       }
+  }
+#+END_SRC
+
+Testing: 
+
+#+BEGIN_SRC cpp 
+  >> PrintSquareRoot("34.34")
+  x = 34.34 ; sqrt(x) = 5.86003
+
+  >> PrintSquareRoot("-125.0")
+  x = -125 ; sqrt(x) = -nan
+
+  >> PrintSquareRoot("-12dsad 5.0")
+   [ERROR] bad lexical cast: source type value could not be interpreted as target
+
+  >> PrintSquareRoot(" ")
+
+  >> PrintSquareRoot(" 100 ")
+   [ERROR] bad lexical cast: source type value could not be interpreted as target
+  >> 
+#+END_SRC
+
+ *Function try_lexical_convert* 
+
+Convert from string to built-in type without exceptions. 
+
+Pseudo-signature: 
+ + Returns true if succeed to convert source type to target type and
+   then sets the result variable. Otherwise, the function returns
+   false. 
+
+#+BEGIN_SRC cpp 
+  namespace boost::conversion 
+  {
+    template<typename Target, typename Source>
+    bool try_lexical_convert(Source const& arg, Targe& result);
+  }
+#+END_SRC
+
+Testing: 
+
+#+BEGIN_SRC cpp 
+  >> double z = 0.0
+  (double) 0.0000000
+
+  >> boost::conversion::try_lexical_convert("200.34", z)
+  (bool) true
+  >> z
+  (double) 200.34000
+
+  >> boost::conversion::try_lexical_convert("200 error .34", z)
+  (bool) false
+  >> z
+  (double) 200.00000
+
+  >> boost::conversion::try_lexical_convert("not-a-number", z)
+  (bool) false
+  >> z
+  (double) 0.0000000
+#+END_SRC
+
+
+
+
+
+
+
 
 
 
