@@ -712,14 +712,166 @@ Split string:
   >> split_vector
   (std::vector<std::string> &) { " -100.23 ", " 577.15 ", " 99.34 ", " 1003.5" }
 #+END_SRC
+** Boost Lambda 
 
+ + Documentation: [[https://www.boost.org/doc/libs/1_69_0/doc/html/lambda.html#introduction][Boost.Lambda]]
 
+Notes: 
 
+boost::bind from Boost.Lambda is already in C++ standard since C++11
+and the placeholders, _1, _2 are in the namespace
+std::placeholders. 
 
+STL lambda placeholders does not support arithmetic expressions like
+boost lambda placeholders. For instance, the following code generates
+a lambda expression shown after it.
+ 
+#+CAPTION: Boost lambda placeholder 
+#+BEGIN_SRC cpp 
+  3.0 * boost::lambda::_1 + 10.0
+#+END_SRC
 
+Equivalent lambda expression (lambda object):
 
+#+CAPTION: Equivalent C++11 lambda function. 
+#+BEGIN_SRC cpp 
+  [](double x){ return 3.0 * x + 10.0}
+#+END_SRC
 
+ *Examples:*
+ 
+Headers: 
 
+#+BEGIN_SRC cpp 
+   #include <boost/lambda/lambda.hpp>
+   #include <boost/lambda/loops.hpp>
 
+   #include <iostream>
+   #include <string>
+   #include <algorithm>
+#+END_SRC
 
+Namespace alias: 
+
+#+BEGIN_SRC cpp 
+  namespace bl = boost::lambda;
+#+END_SRC
+
+Creating a function of one argument:
+
+#+BEGIN_SRC cpp 
+  >> auto funOf1Arg = 10.0 * bl::_1 - 20.0;
+
+  >> funOf1Arg(20)
+  (double) 180.00000
+
+  >> funOf1Arg(6.7)
+  (double) 47.000000
+  > 
+#+END_SRC
+
+Creating a function of two arguments: 
+
+#+BEGIN_SRC cpp 
+  >> auto funOf2ArgsA = 10.0 * bl::_1 + 6 * bl::_2 - 20;
+
+  >> funOf2ArgsA(3, 4)
+  (double) 34.000000
+
+  >> funOf2ArgsA(5, 1)
+  (double) 36.000000
+
+ 
+  >> auto funOf2 = std::cout << " x = " << bl::_1 << " ; y = " << bl::_2 << "\n";
+
+  >> funOf2(100, "hello");
+   x = 100 ; y = hello
+
+  >> funOf2('z', "hello");
+  z ; y = hello
+#+END_SRC
+
+Lambda placeholder and STL "algorithms":
+
+ + Algorithm std::for_each 
+
+#+BEGIN_SRC cpp 
+   auto xs = std::vector<int>{100, 200, 50, -70, 80, 45};
+
+   >> std::for_each(xs.begin(), xs.end(), std::cout << bl::_1 << "\n");
+   100
+   200
+   50
+   -70
+   80
+   45
+   >> 
+
+   // Increase at 25%
+   >> std::for_each(xs.begin(), xs.end(), std::cout << 1.25 * bl::_1 << "\n");
+   125
+   250
+   62.5
+   -87.5
+   100
+   56.25
+   >> 
+
+   >> xs
+   (std::vector<int> &) { 100, 200, 50, -70, 80, 45 }
+   >> 
+
+   >> std::for_each(xs.begin(), xs.end(), std::cout << 1.25 * bl::_1 + 10.0 << "\n");
+   135
+   260
+   72.5
+   -77.5
+   110
+   66.25
+   >> 
+ #+END_SRC
+
+ + Algorithm std::transform 
+
+#+BEGIN_SRC cpp 
+  >> std::vector<double> out(xs.size());
+
+  >> out
+  (std::vector<double> &) { 0.0000000, 0.0000000, 0.0000000, 0.0000000, 0.0000000, 0.0000000 }
+
+  >> std::transform(xs.begin(), xs.end(), out.begin(), bl::_1 * 3.0 + 100);
+  >> out
+  (std::vector<double> &) { 400.00000, 700.00000, 250.00000, -110.00000, 340.00000, 235.00000 }
+
+  // Divide every element of xs by 100.0 and insert it at vector out. 
+  >> std::transform(xs.begin(), xs.end(), out.begin(), bl::_1 / 100.0);
+  >> out
+  (std::vector<double> &) { 1.0000000, 2.0000000, 0.50000000, -0.70000000, 0.80000000, 0.45000000 }
+#+END_SRC
+
+ *Lambda expressions for control structures*
+
+#+BEGIN_SRC cpp 
+  >> std::vector<int> yds{200, 40, 5, 9, 20, 40, 90, 35};
+
+  >> std::for_each(yds.begin(), yds.end(), bl::if_then( bl::_1 > 25, std::cout << bl::_1 << "\n"));
+  200
+  40
+  40
+  90
+  35
+
+  {
+  std::for_each(yds.begin(), yds.end(), 
+                bl::if_then( bl::_1 > 25, std::cout << 4.5 * bl::_1 - 20.0 << "\n")
+               );
+
+  }
+  // Output: 
+  880
+  160
+  160
+  385
+  137.5
+#+END_SRC
 
