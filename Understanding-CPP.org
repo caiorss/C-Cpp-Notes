@@ -648,6 +648,319 @@
 
   - Note: The type char can be understood as an 8-bits integer. 
 
+** Modern C++ Style 
+
+Modern C++ code style based on C++11 and C++ core guidelines: 
+
+ *Miscellaneous*  
+ 
+ + Prefer usign _nullptr_ instead of 0 or NULL for null pointer.
+
+ + Prefer _enum classes_ (scoped enums) instead of the old C-enums as
+   the old enums are non strongly typed and prone to name clashes.
+
+ + Prefer defining type alias with "using" keyword instead of
+   "typedef".
+
+ + In order to avoid unecessary copies, pass large objects by
+   reference, const reference or by pointer instead of passing them by
+   value.
+
+ + Prefer using C++ string (std::string or std::wstring) to C-string
+   const char*, char* and so on.
+
+ + Use standard STL containers std::vector, std::deque, std::map,
+   std::unordered_map instead of custom non-standard containers.
+
+ + Instead of using heap-allocated arrays _(A* pArray = new A[10];)_
+   when the array size is not known at compile-time, use std::vector
+   (most likely), std::deque, std::list or any other STL container for
+   avoiding accidental memory leaks and boilerplate memory management
+   code. Note: std::vector already wraps a heap-allocated C-array.
+
+#+CAPTION: Prefer type aliases with 'using' instead 'typedef'
+#+BEGIN_SRC cpp 
+  // Avoid 
+  typedef double Speed;
+  typedef double (* MathFunction) (double);
+
+  // Better 
+  using Speed = double;
+  using MathFunction = double (*) (double);
+#+END_SRC
+
+
+ *Function Parameter Passing:*
+
+ + Prefer passing parameters by value, reference or const reference
+   rather than by pointer as in old C++ codes that looks like C with
+   classes. 
+
+Avoid: 
+
+#+BEGIN_SRC cpp 
+   double vector_norm(const Vector* vec)
+   {
+     // ... compute Euclidian norm ... 
+      return value;
+   }
+#+END_SRC
+
+Better: 
+
+#+BEGIN_SRC cpp 
+   double vector_norm(Vector const& vec)
+   {
+     // ... compute Euclidian norm ... 
+      return value;
+   }
+#+END_SRC
+
+ *Function Parameter Passing of Polymorphic Objects*
+
+ + Pass polymorphic objects by pointer (T*) or referece (T&) or (const T&) rather than by
+   smart pointer. Functions that accepts referece or pointer are more
+   flexible tha functions that accepts smart pointers. -- ([[https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#f7-for-general-use-take-t-or-t-arguments-rather-than-smart-pointers][Core Guideline F7]])
+
+Example: Class hirearchy.
+
+#+CAPTION: Sample class hierarchy with a factory function. 
+#+BEGIN_SRC cpp 
+   class Shape{
+      public: 
+        virtual double       GetArea() const = 0;
+        virtual std::string  Name() const = 0;
+        virtual ~Shape() = default;
+   };
+
+  class Square: public Shape  {  ...   };
+  class Circle: public Shape  {  ...  };
+
+  std::unique<Shape> shapeFactory(std::string cosnt& name)
+  {
+     if(name == "square") return std::make_unique<Square>();
+     if(name == "circle") return std::make_unique<Circle>();
+     return nullptr;
+  }
+#+END_SRC
+
+Avoid: 
+
+#+BEGIN_SRC cpp 
+  // Avoid: 
+  void printShapeInfo(std::unique_ptr<Shape> const& shape)
+  {
+    std::cout << "The shape name is " << shape->Name()  
+              << " ; area is "        << shape->Area() << "\n" ;
+  }
+ 
+  // Or: 
+  void printShapeInfo(std::shared_ptr<Shape> const& shape)
+  {
+    std::cout << "The shape name is " << shape->Name()  
+              << " ; area is "        << shape->Area() << "\n" ;
+  }
+
+#+END_SRC
+
+Better:  
+ + The previous functions only work with smart pointers, the following
+   functions using reference or pointer works with smart pointers or 
+   stack allocated objects. 
+
+#+BEGIN_SRC cpp 
+  void printShapeInfoA(Shape const& shape)
+  {
+    std::cout << "The shape name is " << shape.Name()  
+              << " ; area is "        << shape.Area() << "\n" ;
+  }
+
+  // If the function can accept a no-shape parameter, better use pointer: 
+  void printShapeInfoB(Shape* pShape)
+  {
+    if(pShape == nullptr)
+       return; // Do nothing.
+    std::cout << "The shape name is " << shape->Name()  
+              << " ; area is " << shape->Area() << "\n" ;
+  }
+
+  Square shapeStack;
+  std::unique<Shape> shapeHeap = shapeFactory("square");
+  printShapeInfoA(shapeStack);
+  printShapeInfoA(*shapeHeap);
+
+  printShapeInfoB(&shapeStack);
+  printShapeInfoB(shapeHeap.get());
+#+END_SRC
+
+
+ *Function Return Value* 
+
+Many old C++ codes avoid returning large objects by value due to the
+copy-constructor overhead. In those codes, functions returned the
+result by setting some parameter passed by pointer or reference.
+
+Old C++: 
+ + Code afraid of returning by value due to the copy overhead. 
+
+#+BEGIN_SRC cpp 
+    // Code afraid of returnig by value or returning multiple-values as parameter. 
+    void sum(std::vector<double> const& xs, std::vector<double> const& ys, std::vector<double>& result)
+    {  
+        // Pre-condition 
+        assert(xs.size() == ys.size() && xs.size() == result.size());
+        for(size_t i = 0; i < xs.size(); i++)
+           result[i] = xs[i] + ys[i];
+    }
+
+    // Usage: 
+    std::vector<double> xs;
+    std::vector<double> ys;
+    xs.resize(3); 
+    xs.push_back(1); xs.push_back(4); xs.push_back(5);
+    ys.resize(3);
+    ys.push_back(6); ys.push_back(8); ys.push_back(9);
+    
+    std::vector<double> result(xs.size());
+    sum(xs, ys, result);
+    DisplayResult(result);
+#+END_SRC
+
+Modern C++:
+
+ + Returning by value is safe due to the compiler RVO (Return Value
+   Optimization), copy elision and move semantics (move constructor
+   and move destructor) which eliminates the copy-overhead of
+   temporary objects. Since, C++11 all STL containers implements move
+   semantics member functions which makes it safe to return the by value.
+
+#+BEGIN_SRC cpp 
+    vstd::vector<double> 
+    sum(std::vector<double> const& xs, std::vector<double> const& ys)
+    {  
+        // Pre-condition 
+        assert(xs.size() == ys.size());
+        std::vector<double> result(xs.size());
+        for(size_t i = 0; i < xs.size(); i++)
+           result[i] = xs[i] + ys[i];
+
+       // Copy may not happen due to move semantics (move member functions)
+       // and/or Return-Value Optimization.
+       return result;
+    }
+
+    // Usage: 
+    //----------------------------------//
+
+    // Uniform initialization with initializer list 
+    std::vector<double> xs {1, 4, 5};
+    std::vector<double> ys = {6, 8, 9};
+    
+    std::vector<double> result = sum(xs, ys);
+    // Or:
+    auto result  = sum(xs, ys);
+    DisplayResult(result);    
+#+END_SRC
+
+ *Memory Ownership* 
+
+Raw pointers should not own memory or be responsible for releasing
+memory due to raw pointers be prone to memory leak. It is easier to
+forget to call delete operator and also they can leak memory if an
+exception happens. Instead, only smart pointers std::unique_ptr or
+std::shared_ptr should own memory or be used.
+
+Summary: 
+
+ + Avoid calling new and delete directly, instead use
+   std::make_unique, std::make_shared from header <memory>. 
+
+ + Avoid using raw pointers for memory ownership, instead use smart
+   pointers. 
+
+Avoid: 
+
+#+BEGIN_SRC cpp 
+  Shape* shapeFactory(std::string cosnt& name)
+  {
+     // WARNING: new operator can throw std::bad_alloc 
+     if(name == "square") return new Square();
+     if(name == "circle") return new Circle();
+     return nullptr;
+  } 
+
+  void clientCode(Shape* sh){
+     std::cout << "Name = " << sh->Name() << " ; Area = " << sh->Area() << "\n";
+  }
+
+  // Usage: 
+  //-------------------------------
+  Shape* shape = shapeFactory("square"); 
+  clientCode(shape); 
+
+  // Exception happens => Memory Leak!  
+  // Forget to delete ==> Memory leak!
+  delete shape;
+#+END_SRC
+
+Better: 
+ + Note: A factory function or any function returning a polymorphic
+   object should preferentially return an unique_ptr smart pointer
+   instead of shared_ptr because unique_ptr has a lower overhead than
+   shared_ptr and it is easier to convert unique_ptr to shared_ptr,
+   but the other way around is harder. 
+
+#+BEGIN_SRC cpp 
+   std::unique_ptr<Shape> 
+   shapeFactory(std::string cosnt& name)
+   {
+      // WARNING: new operator can throw std::bad_alloc 
+      if(name == "square") return std::make_unique<Square>(300 ,400);
+      if(name == "circle") return std::make_unique<Circle>();
+      return nullptr;
+   }
+
+   void clientCode(Shape const& sh){
+      std::cout << "Name = " << sh.Name() << " ; Area = " << sh.Area() << "\n";
+   } 
+
+  // Usage: 
+
+  // Releases allocated memory automatically when out scope. 
+  std::unique_ptr<Shape> shape = shapeFactory("square"); 
+
+  // Or: 
+  auto shape = shapeFactory("square"); 
+  clientCode(*shape);
+#+END_SRC
+
+
+ *References and Further Reading*
+
+ + [[https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#f7-for-general-use-take-t-or-t-arguments-rather-than-smart-pointers][C++ Core Guidelines]]
+
+ + [[https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#S-gsl][C++ Core Guidelines - GSL: Guideline Support Library]]
+
+ + Microsft's Guideline Support Library:
+   + https://github.com/Microsoft/GSL/
+
+ + GSL Lite: Guidelines Support Library for C++98, C++11 up
+   + https://github.com/martinmoene/gsl-lite
+
+ + [[http://www.modernescpp.com/index.php/c-core-guidelines-rules-to-error-handling][C++ Core Guidelines: Rules for Error Handling - ModernesCpp.com]]
+
+ + [[https://docs.microsoft.com/en-us/cpp/cpp/welcome-back-to-cpp-modern-cpp?view=vs-2017][Welcome Back to C++ (Modern C++) | Microsoft Docs]]
+
+ + [[http://scottmeyers.blogspot.com/2013/01/effective-c11-content-and-status.html][The View from Aristeia: Effective C++11: Content and Status]]
+
+ + [[https://root.cern.ch/blog/rootrwhy][ROOT::RWhy! | ROOT a Data analysis Framework]]
+
+
+
+
+
+
+
 ** Minimal C++ Programs
 *** Simple minimal C++ program 
 
