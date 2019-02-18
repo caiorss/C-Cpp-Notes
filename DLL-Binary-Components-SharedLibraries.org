@@ -128,7 +128,213 @@ Problems:
 
  + [[http://bigbang.waterlin.org/bang/using-python-ctypes-to-link-cpp-library/][The Big Bang on Reading Busy » Blog Archive » Using Python ctypes to link C/C++ library]]
 
-** Cross platform Shared Library
+** Design Guidelines for C-Interfaces 
+
+ *Macro for C-linkage and exporting symbols*
+
+Instead of: 
+
+#+CAPTION: Non portable C-linkage due to compiler-specifc extension. 
+#+BEGIN_SRC cpp 
+   // Does not work on Unix-like OSes. 
+   // Only works on compilers with supporting this MSVC (Visual VC++) compiler-extension. 
+   extern "C" __declspec(dllexport)  
+   double SomeFunctionWithCLinkage(const char* name) {
+     ... function code ... 
+   }
+#+END_SRC
+
+Better export the symbol using a macro for ensuring cross-platform
+portability:  
+
+  + Note: Names of macros should be unique in order to avoid name
+    collisions. This is why the macros are prefixed with library
+    name. 
+  + Note: ~__declspec(dllexport)~ => MSVC (Visual C++) compiler
+    extension only supported on MSVC and Mingw. (No in C++ ISO standard)
+  + Note: ~__attribute__ ((visibility ("default")))~ => GCC/Clang
+    compiler extension used on Unix-like Oses for making symbols
+    hidden by default.
+
+#+CAPTION: Macros for defining C-linkage and exporting symbols in a cross-platform way.
+#+BEGIN_SRC cpp 
+   #if defined(__cplusplus)
+     // Code being compiled with C++ compiler 
+     #define MATHTOOLS_EXTERN_C extern "C"
+   #else 
+     // Code being compiled with C compiler (Not C++ compiler)
+     #define MATHTOOLS_EXTERN_C 
+   #endif 
+
+   #if defined(_WIN32)
+     // MS Windows DLLs (*.dll)
+     #define MATHTOOLS_EXPORT_C MATHTOOLS_EXTERN_C __declspec(dllexport)
+   #else 
+     // Unix-like Shared Object (.so) operating systems and GCC.
+     #define MATHTOOLS_EXPORT_C MATHTOOLS_EXTERN_C __attribute__ ((visibility ("default")))
+   #endif 
+#+END_SRC
+
+So, the function code becomes: 
+
+#+CAPTION: Function with C-linkage exported with cross-platform portability.
+#+BEGIN_SRC cpp 
+   MATHTOOLS_EXPORT_C
+   double SomeFunctionWithCLinkage(const char* name) 
+   {
+     ... function code ... 
+   }
+#+END_SRC
+
+ *Name Prefix*
+
+Functions with C-linkage are always in the global namespace, therefore
+every function needs an unique name in order to avoid name clashing
+which can result in undefined behavior. A good practice to avoid those name
+collisions is to use a common prefix before in the name of every
+function, for instance: 
+
+Instead of:
+
+#+CAPTION: Name schema prone to name clashes and undefined behavior.
+#+BEGIN_SRC cpp   
+  MATHTOOLS_EXPORT_C const char* GetVersion();
+  MATHTOOLS_EXPORT_C double RootSolver(double x0, double (* function) double);
+
+  // Or in multi-line style:
+  MATHTOOLS_EXPORT_C 
+  const char* GetVersion();
+
+  MATHTOOLS_EXPORT_C 
+  double RootSolver(double x0, double (* function) double);
+#+END_SRC 
+
+Better: 
+
+#+CAPTION: Better name schema prefixed by library name.
+#+BEGIN_SRC cpp 
+  // All functions contains the library name as a prefix in order to avoid 
+  // name clashes.
+  MATHTOOLS_EXPORT_C const char* mathtools_GetVersion();
+
+  MATHTOOLS_EXPORT_C 
+  double mathtools_RootSolver(double x0, double (* function) double);
+#+END_SRC
+
+ *Naming Schema for C-wrapers or C-interfaces for C++ classes* 
+
+Sample class: 
+
+#+CATION: Class Plotter declaration;
+#+BEGIN_SRC cpp 
+  class Plotter{
+    struct impl; 
+    std::unique_ptr<impl> m_pimpl;    
+  public: 
+    Plotter();
+    Plotter(double width, double height);
+    Plotter(Plotter const& rhs) = default;
+   ~Plotter() = default;
+
+   void addPoint(double x, double y);
+   void clear();
+  };
+#+END_SRC
+
+C-wrappers schema: 
+
+ + C-interface for default constructor 
+
+#+CAPTION: C-interface for class default constructor. 
+#+BEGIN_SRC cpp 
+  MATHTOOLS_EXPORT_C
+  Plotter* mathtools_Plotter_new() 
+  {
+     return new (std::nothrow) Plotter();
+  }
+#+END_SRC
+
+
+ + C-interface or C-Wrapepr for second constructor: 
+
+#+CAPTION: C-interface for class overload constructor. 
+#+BEGIN_SRC cpp
+  MATHTOOLS_EXPORT_C
+  Plotter* mathtools_Plotter_new2(double width, double height) 
+  {
+     return new (std::nothrow) Plotter(width, height);
+  }
+#+END_SRC
+
+ + C-interface for copy constructor: 
+
+#+CAPTION: C-interface for class copy constructor. 
+#+BEGIN_SRC cpp 
+  // Wrapper for copy constructor 
+  MATHTOOLS_EXPORT_C
+  Plotter* mathtools_Plotter_new_copy(Plotter* hPlotter) 
+  {
+     return new (std::nothrow) Plotter(*hPlotter);
+  }
+#+END_SRC
+
+ + C-interface for destructor:
+
+#+CAPTION: C-interface for class destructor.
+#+BEGIN_SRC cpp 
+  MATHTOOLS_EXPORT_C
+  void mathtools_Plotter_delete(Plotter* hPlotter) 
+  {
+    delete hPlotter;
+  }
+#+END_SRC
+
+ + C-interface for class method.
+   + As C-interfaces cannot throw exceptions, the last parameter is
+     used for returning an error code.
+
+#+CAPTION: C-interface for class ordinary method.
+#+BEGIN_SRC cpp 
+  // Schema: <Library Name>_<Class Name>_<method>
+  MATHTOOLS_EXPORT_C
+  void mathtools_Plotter_addPoint(Plotter* hPlotter, double x, double y)
+  {
+     hPlotter->addPoint(x, y);
+  }
+#+END_SRC
+
+ *Exceptions and Error Handling* 
+
+ + DO NOT: Throw exceptions in functions with C-linkage (extern "C")
+   as exceptions are incompatibles among different compilers. Moreover, the
+   C-language cannot handle exceptions.
+
+ + DO: Instead of exceptions, return an error code enumeration as a
+   function return value or as function parameter.
+
+Example: If a function throws exceptions such as the function
+~mathtools_Plotter_addPoint~, the exceptions should be caught and the
+function should return an error code eihter as return value or
+function parameter.
+
+#+CAPTION: Error handling for C-interface functions or C-APIs
+#+BEGIN_SRC cpp 
+  MATHTOOLS_EXPORT_C
+  void mathtools_Plotter_addPoint(Plotter* hPlotter, double x, double y, int* ErrorCode)
+  {
+      ,*ErrorCode = ErrorEnum::OK;
+      try { 
+         // Method addPoint throws exceptions 
+         hPlotter->addPoint(x, y);
+      } catch(Exception1 const& ex){
+         ,*ErrorCode = ErrorEnum::NO_SPACE_ERROR; // Set with value of some enum 
+      } catch(Exception2 const& ex){
+         ,*ErrorCode = ErrorEnum::SOME_ERROR_ENUM;
+     }
+  }
+#+END_SRC
+
+** Cross platform Shared Library, C-Interfaces and Language Interoperability
 *** Overview 
 
  *Source:*
