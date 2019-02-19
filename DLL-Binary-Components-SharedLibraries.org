@@ -334,6 +334,104 @@ function parameter.
   }
 #+END_SRC
 
+ *Passing std::string STL Object across a DLL boundary*
+
+Type synonym:
+
+#+BEGIN_SRC cpp 
+  // h prefix stands for handle 
+  using hString = std::string*;
+#+END_SRC
+
+Passing std::string 
+
+#+CAPTION: C-interface for std::string default constructor.
+#+BEGIN_SRC cpp 
+  LIBRARY_EXPORT_C  
+  hString libprefix_string_new()
+  {
+     // std::nothrow => Do not throw std::bad_alloc, just return 
+     // a null pointer on failure.
+     return new (std::nothrow) std::string();   
+  }
+#+END_SRC
+
+#+CAPTION: C-interface for std::string overloaded constructor.
+#+BEGIN_SRC cpp 
+  LIBRARY_EXPORT_C  
+  hString libprefix_string_new2(const char* text)
+  {
+     return new (std::nothrow) std::string(text);   
+  }
+#+END_SRC
+
+#+CAPTION: C-interface for std::string destructor 
+#+BEGIN_SRC cpp 
+  // Style 1: 
+  LIBRARY_EXPORT_C 
+  hString libprefix_string_delete(hString hstr)
+  {
+     delete hstr;
+  }
+
+  // Style 2: 
+  LIBRARY_EXPORT_C hString 
+  libprefix_string_delete(hString hstr)
+  {
+     delete hstr;
+  }
+
+  // Style 3: 
+  LIBRARY_EXPORT_C 
+  hString 
+  libprefix_string_delete(hString hstr)
+  {
+     delete hstr;
+  }
+
+  // Style 4: Trailing return-type.
+  LIBRARY_EXPORT_C 
+  auto libprefix_string_delete(hString hstr) -> hString 
+  {
+     delete hstr;
+  }
+#+END_SRC
+
+#+CAPTION: C-interface for std::string getter, returns const char*.
+#+BEGIN_SRC cpp 
+  LIBRARY_EXPORT_C 
+  const char*
+  libprefix_string_text(hString hstr)
+  {
+     return hstr->data();
+  }
+#+END_SRC
+
+#+CAPTION: C-function to print std::string object 
+#+BEGIN_SRC cpp 
+  LIBRARY_EXPORT_C 
+  void 
+  libprefix_string_print(hString hstr)
+  {
+     std::cout << *hstr << "\n";
+  }
+#+END_SRC
+
+#+CAPTION: C-wrapper to method std::string::clear()
+#+BEGIN_SRC cpp 
+  LIBRARY_EXPORT_C 
+  void 
+  libprefix_string_clear(hString hstr)
+  {
+     hstr->clear();
+  }
+#+END_SRC
+
+
+ *See also:*
+
+ + [[https://stackoverflow.com/questions/22797418/how-do-i-safely-pass-objects-especially-stl-objects-to-and-from-a-dll][c++ - How do I safely pass objects, especially STL objects, to and from a DLL? - Stack Overflow]]
+
 ** Cross platform Shared Library, C-Interfaces and Language Interoperability
 *** Overview 
 
