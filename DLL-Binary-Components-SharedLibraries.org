@@ -343,9 +343,8 @@ Type synonym:
   using hString = std::string*;
 #+END_SRC
 
-Passing std::string 
+C-interface for std::string default constructor.
 
-#+CAPTION: C-interface for std::string default constructor.
 #+BEGIN_SRC cpp 
   LIBRARY_EXPORT_C  
   hString libprefix_string_new()
@@ -356,7 +355,20 @@ Passing std::string
   }
 #+END_SRC
 
-#+CAPTION: C-interface for std::string overloaded constructor.
+C-interface for std::string copy-constructor. 
+
+#+BEGIN_SRC cpp 
+  LIBRARY_EXPORT_C  
+  hString libprefix_string_new_copy(hString hstr)
+  {
+     // std::nothrow => Do not throw std::bad_alloc, just return 
+     // a null pointer on failure.
+     return new (std::nothrow) std::string(*hstr);   
+  }
+#+END_SRC
+
+C-interface for std::string overloaded constructor.
+
 #+BEGIN_SRC cpp 
   LIBRARY_EXPORT_C  
   hString libprefix_string_new2(const char* text)
@@ -365,7 +377,8 @@ Passing std::string
   }
 #+END_SRC
 
-#+CAPTION: C-interface for std::string destructor 
+C-interface for std::string destructor.
+
 #+BEGIN_SRC cpp 
   // Style 1: 
   LIBRARY_EXPORT_C 
@@ -397,17 +410,42 @@ Passing std::string
   }
 #+END_SRC
 
-#+CAPTION: C-interface for std::string getter, returns const char*.
+C-interface for std::string getter, returns const char*.
+
+
 #+BEGIN_SRC cpp 
   LIBRARY_EXPORT_C 
   const char*
-  libprefix_string_text(hString hstr)
+  libprefix_string_get(hString hstr)
   {
      return hstr->data();
   }
 #+END_SRC
 
-#+CAPTION: C-function to print std::string object 
+C-interface for std::string setter.
+
+#+BEGIN_SRC cpp 
+  LIBRARY_EXPORT_C 
+  void 
+  libprefix_string_set(hString hstr, const char* text)
+  {
+     *hstr = text; 
+  }
+#+END_SRC
+
+C-interface for std::string concat.
+
+#+BEGIN_SRC cpp 
+  LIBRARY_EXPORT_C 
+  void 
+  libprefix_string_conat(hString hstr, const char* text)
+  {
+     *hstr = *hstr + text; 
+  }
+#+END_SRC
+
+C-function to print std::string object 
+
 #+BEGIN_SRC cpp 
   LIBRARY_EXPORT_C 
   void 
@@ -417,13 +455,126 @@ Passing std::string
   }
 #+END_SRC
 
-#+CAPTION: C-wrapper to method std::string::clear()
+C-wrapper to method std::string::clear()
+
 #+BEGIN_SRC cpp 
   LIBRARY_EXPORT_C 
   void 
   libprefix_string_clear(hString hstr)
   {
      hstr->clear();
+  }
+#+END_SRC
+
+ *Passing std::vector<double> across a DLL boundary*
+
+Handle type: 
+
+#+BEGIN_SRC cpp 
+  using hVectorD = std::vector<double>*;
+#+END_SRC
+
+Constructors: 
+
+#+BEGIN_SRC cpp 
+  LIBRARY_EXPORT_C 
+  hVectorD libprefix_vectorD_new()
+  {
+    return new (std::nothrow) std::vector<double>();
+  }
+
+  LIBRARY_EXPORT_C 
+  hVectorD libprefix_vectorD_new2(size_t n, double x)
+  {
+    return new (std::nothrow) std::vector<double>(n, x);
+  }
+
+  LIBRARY_EXPORT_C 
+  hVectorD libprefix_vectorD_new3(size_t n, double [] array)
+  {
+    // Iterator-range constructor 
+    return new (std::nothrow) std::vector<double>(array, array + n);
+  }
+#+END_SRC
+
+Destructor: 
+
+#+BEGIN_SRC cpp 
+  LIBRARY_EXPORT_C 
+  void libprefix_vectorD_delete(hVectorD hvec)
+  {
+    delete hvec;
+  }
+#+END_SRC
+
+Get size: 
+
+#+BEGIN_SRC cpp
+  LIBRARY_EXPORT_C 
+  size_t libprefix_vectorD_size(hVectorD hvec)
+  {
+    hvec->size();
+  }
+#+END_SRC
+
+Getter: 
+
+#+BEGIN_SRC cpp 
+  LIBRARY_EXPORT_C 
+  double libprefix_vectorD_get(hVectorD hvec, size_t n)
+  {
+    return hvec->operator[](n);
+  }
+#+END_SRC
+
+Setter: 
+
+#+BEGIN_SRC cpp 
+  LIBRARY_EXPORT_C 
+  void libprefix_vectorD_set(hVectorD hvec, size_t n, double x)
+  {
+    hvec->operator[](n) = x;
+  }
+#+END_SRC
+
+Element-wise fundamental math function 'sin()': 
+
+#+BEGIN_SRC cpp 
+  // Returns a new vector Out[i],  Out[i] = sin(Input[i]), i = 0, 1, 2... Input.size() 
+  LIBRARY_EXPORT_C 
+  hVector libprefix_vectorD_sin(hVectorD hvec)
+  {
+     auto result = new (std::nothrow) (hvec->size());
+     for(size_t i = 0; i <= hvec->size(); i++)
+       (*result)[i] = std::sin((*hvec)[i]);
+     return result;
+  }
+
+  // Returns a new vector Out[i],  Out[i] = exp(Input[i]), i = 0, 1, 2... Input.size() 
+  LIBRARY_EXPORT_C 
+  hVector libprefix_vectorD_exp(hVectorD hvec)
+  {
+     auto result = new (std::nothrow) (hvec->size());
+     for(size_t i = 0; i <= hvec->size(); i++)
+       (*result)[i] = std::exp((*hvec)[i]);
+     return result;
+  }
+#+END_SRC
+
+Higher order C-function to apply a function to each element: 
+
+#+BEGIN_SRC cpp 
+  // Returns a new vector Out[i],  Out[i] = exp(Input[i]), i = 0, 1, 2... Input.size() 
+  LIBRARY_EXPORT_C 
+  hVector 
+  libprefix_vectorD_map( 
+               hVectorD hvec              /* Vector handle */
+              ,double Function (double))  /* Function pointer to math function */                                      
+  {
+     auto result = new (std::nothrow) (hvec->size());
+     for(size_t i = 0; i <= hvec->size(); i++)
+       (*result)[i] = Function((*hvec)[i]);
+     return result;
   }
 #+END_SRC
 
