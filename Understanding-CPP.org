@@ -796,8 +796,8 @@ Better:
 
  *Function Return Value* 
 
-Many old C++ codes avoid returning large objects by value due to the
-copy-constructor overhead. In those codes, functions returned the
+Many old C++ codes avoided returning large objects by value due to the
+copy-constructor overhead in C++98. In those codes, functions returned the
 result by setting some parameter passed by pointer or reference.
 
 Old C++: (Pre C++11 or C++98)
@@ -829,11 +829,16 @@ Old C++: (Pre C++11 or C++98)
 
 Modern C++: (>= C++11)
 
- + Returning by value is safe due to the compiler RVO (Return Value
-   Optimization), copy elision and move semantics (move constructor
-   and move destructor) which eliminates the copy-overhead of
-   temporary objects. Since, C++11 all STL containers implements move
-   semantics member functions which makes it safe to return the by value.
+ + Returning by value is safe and efficient due to the compiler RVO
+   (Return Value Optimization), copy elision and move semantics (move
+   constructor and move destructor) which eliminates the copy-overhead
+   of temporary objects. Since, C++11 all STL containers implements
+   move semantics member functions which makes returning by value more
+   efficient and safer.
+
+ + Remark:
+   + Returning by value is safe and efficient in C++11 due to RVO
+     (Return-value optimization) and move semantics.
 
 #+BEGIN_SRC cpp 
     vstd::vector<double> 
@@ -866,18 +871,26 @@ Modern C++: (>= C++11)
  *Memory Ownership* 
 
 Raw pointers should not own memory or be responsible for releasing
-memory due to raw pointers be prone to memory leak. It is easier to
-forget to call delete operator and also they can leak memory if an
-exception happens. Instead, only smart pointers std::unique_ptr or
-std::shared_ptr should own memory or be used.
+memory due to them be prone to memory leaks which can happen due to
+missing call to delete operator; exceptions befored the delete
+operator; functions with early return multiple return paths; and
+shared ownership of the heap-allocated memory.
 
 Summary: 
 
  + Avoid calling new and delete directly, instead use
-   std::make_unique, std::make_shared from header <memory>. 
+   *std::make_unique*, *std::make_shared* from header <memory>. 
 
  + Avoid using raw pointers for memory ownership, instead use smart
-   pointers. 
+   pointers.
+
+ + Smart pointers should only be used for heap-allocated objects
+   (objects allocated at runtime), never stack-allocated ones.
+
+ + Rule of thumb for choosing *std::unique_ptr* or *shared_ptr*
+   + If more than one objects need to refere to some heap-allocated
+     object during their entire lifetime, the best choice is
+     ~std::shared_ptr~. 
 
 Avoid: 
 
