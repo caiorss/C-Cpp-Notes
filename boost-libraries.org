@@ -920,6 +920,219 @@ Headers:
   (std::vector<double> &) { 0.10200000, 0.056000000, 0.082500000 }
 #+END_SRC
 
+** Boost Pointer Container 
+
+The C++ Standard Template Library - STL does not work well with
+polymorphic types as polymorphic objects cannot be stored in container
+directly due to object slicing, only the base part is copied and the
+derived is discarded; storing polymorphic objects with smart pointers
+pointers is memory and exception safe. However, it is still cumbersome
+and does not plays well with STL algorithms such as std::sort or
+std::for_each with functors or lambda wrappers due to STL algorithms
+be designed to work with values, not pointers.
+
+The boost pointer container library provides STL-like containers for
+holding heap-allocated objects or polymorphic objects. The containers
+provide interoperability with STL algorithms; non-pointer notation for
+accessing object members; single memory-ownership.  
+
+Note: If there is shared ownership semantics, in other words, multiple
+objects need to point to a polymorphic object during their entire
+lifetime, then this library is not suitable to this use case. In this
+situation, the best solution is to use a container of shared pointers
+such as std::vector<std::shared<T>>. 
+
+See: [[https://web.archive.org/web/20050413215843/http://www.oonumerics.org:80/tmpw00/kuehl.html][STL and OO Don't Easily Mix]]
+
+ + Documentation: [[https://www.boost.org/doc/libs/1_69_0/libs/ptr_container/doc/ptr_container.html][Pointer Container]]
+ + Headers:
+   + <boost/ptr_container/ptr_vector.hpp>
+   + <boost/ptr_container/ptr_deque.hpp>
+   + <boost/ptr_container/nullable.hpp>	
+   + [[https://www.boost.org/doc/libs/1_69_0/libs/ptr_container/doc/headers.html][Full list]]
+ + Containers:
+   + ptr_vector
+   + ptr_deque 
+   + ptr_list
+   + ptr_map
+   + ptr_set
+ + Functions:
+   + boost::str
+   + boost::format
+
+ *Example:*
+
+Source: 
+ + File: [[file:src/boost/boost-pointer-container.cpp][file:src/boost/boost-pointer-container.cpp]]
+ + Online Compiler: https://rextester.com/LIJMMS16329
+
+Compiling and running: 
+
+#+BEGIN_SRC sh 
+ $ clang++ boost-pointer-container.cpp -o boost-pointer-container.bin -std=c++1z -g -O0 -Wall 
+ $ ./boost-pointer-container.bin
+#+END_SRC
+
+Headers: 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <vector>
+  #include <string>
+  #include <functional>
+
+  #include <boost/ptr_container/ptr_vector.hpp>
+#+END_SRC
+
+Sample class hierarchy: 
+
+#+CAPTION: Base class of sample hierarchy.
+#+BEGIN_SRC cpp 
+  class Base{
+  public:
+      static auto nextID() -> int {
+         static int i = 0;
+         return ++i;
+      }		
+
+      Base() = default;
+      // Destructor of base class must always be virtual
+      virtual ~Base() = default;
+      virtual auto getID() const -> int = 0;
+      virtual auto getType() const -> std::string = 0;
+  };
+#+END_SRC
+
+#+CAPTION: Class DerivedA - Derived class of Base 
+#+BEGIN_SRC cpp 
+  class DerivedA: public Base{	
+  public:
+      const int m_id;
+	
+      DerivedA(): m_id(Base::nextID())  { }
+      auto getType() const  -> std::string {
+         return "DerivedA";
+      }
+      auto getID() const -> int {
+         return m_id;
+      }	
+      ~DerivedA(){
+          std::cout << " [INFO] Class DerivedA deleted. => Object ID = "
+                    << m_id << "\n";
+      }
+  };
+#+END_SRC
+
+#+CAPTION: Class DerivedB - Derived class of Base 
+#+BEGIN_SRC cpp 
+  class DerivedB: public Base{
+      const int m_id;
+  public:		
+      DerivedB(): m_id(Base::nextID())  { }
+      auto getType() const -> std::string {
+         return "DerivedB";
+      }
+      auto getID() const -> int {
+         return m_id;
+      }		
+      ~DerivedB(){
+          std::cout << " [INFO] Class DerivedB deleted. => ObjectID = "
+                    << m_id  << "\n";
+      }
+  };
+#+END_SRC
+
+Function showType: 
+
+#+BEGIN_SRC cpp 
+  void showType(Base const& obj)
+  {
+          std::cout << "Object ID = " << obj.getID()
+                    <<  " Class type = " << obj.getType()
+                    << "\n";
+  }
+#+END_SRC
+
+ *Main Function*
+
+Experiment 0: STL Container olding non-polymorphic objects
+(non-dynamically allocated, type is known at compile-time).
+
+#+BEGIN_SRC cpp 
+  std::vector<DerivedA> xsa;
+  xsa.push_back(DerivedA());
+  xsa.push_back(DerivedA());
+  xsa.emplace_back();
+
+  std::cout << "Run std::for_each" << "\n";
+  std::for_each(xsa.begin(), xsa.end(), showType);
+#+END_SRC
+
+Experiment 1: STL container holding polymorphic objects:
+
+ + Note: STL algorithms require lambda wrappers.
+
+#+BEGIN_SRC cpp 
+  std::cout << "\n === EXPERIMENT 1 ==============================" << "\n";
+
+  std::vector<std::shared_ptr<Base>> xs;
+  xs.push_back(std::make_shared<DerivedA>());
+  xs.push_back(std::make_shared<DerivedB>());
+  xs.push_back(std::make_shared<DerivedA>());
+  xs.push_back(std::make_shared<DerivedB>());
+
+  std::cout << " <<INFO>> xs[0]  type " << xs[0]->getType()
+            << " ; id = " << xs[0]->getID() << "\n";
+
+  std::cout << " <<INFO>> xs[2]  type " << xs[2]->getType()
+            << " ; id = " << xs[2]->getID() << "\n";
+
+  std::for_each(xs.begin(), xs.end(),
+                [](auto const& pBase){
+                        showType(*pBase);
+                });
+
+  std::vector<int> identifiers1;
+  std::transform(xs.begin(), xs.end(),
+                 std::back_inserter(identifiers1),
+                 [](auto pBase){ return pBase->getID(); });
+#+END_SRC
+
+Experiment 2: Boost ptr_vector 
+
+ + Notes:
+   + Accessing elements ps[0] uses conventional notation without (->)
+     arrow operator.
+   + STL algorithms does not need lambda or functor wrappers.
+   + Memory solely owned by ptr_vector (single-ownership)
+
+#+BEGIN_SRC cpp 
+  boost::ptr_vector<Base> ps;
+  ps.push_back(new DerivedA);
+  ps.push_back(new DerivedB());
+  ps.push_back(new DerivedA());
+  ps.push_back(new DerivedB);
+
+  std::cout << " <<INFO>> ps[0]  type " << ps[0].getType() << " ; id = " << ps[0].getID() << "\n";
+  std::cout << " <<INFO>> ps[1]  type " << ps[1].getType() << " ; id = " << ps[1].getID() << "\n";
+  std::cout << " <<INFO>> ps[2]  type " << ps[2].getType() << " ; id = " << ps[2].getID() << "\n";
+
+  std::vector<int> identifiers2;
+  std::transform(xs.begin(), xs.end(),
+                 std::back_inserter(identifiers2),
+                 std::bind(&Base::getID, std::placeholders::_1));
+
+  std::cout << "\n ==> Show objects before deleting last item " << "\n";
+  std::for_each(ps.begin(), ps.end(), showType);
+
+  std::cout << "\n ==> Show objects after deleting last item " << "\n";
+  ps.pop_back();
+  std::for_each(ps.begin(), ps.end(), showType);
+
+  std::cout << " ============= END =================" << "\n";
+#+END_SRC
+
+
 ** Library Map 
 *** Math 
 
