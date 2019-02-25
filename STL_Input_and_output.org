@@ -253,41 +253,41 @@ Usage:
 
  *Example 2* Custom IO manipulators for numerical tables. 
 
-
-
 #+BEGIN_SRC cpp 
   #include <iostream>
   #include <iomanip>
   #include <type_traits>
 
   // Requires headers:  <iostream>, <iomanip>, <type_traits>
-  template<typename Numeric,
-           // Used for restricting the types of arguments that can be used. 
-           // It will generate a compiler error for non-float arguments. 
-           typename std::enable_if<std::is_floating_point<Numeric>::value, void>::type* = nullptr
-           >
+  template< 
+     typename Numeric,
+     // Used for restricting the types of arguments that can be used. 
+     // It will generate a compiler error for non-float arguments. 
+     typename std::enable_if<std::is_floating_point<Numeric>::value, void>::type* = nullptr
+     >
   struct to_fix {
-        Numeric m_value;
-        size_t  m_precision;
-        size_t  m_field_size;
+      Numeric m_value;
+      size_t  m_precision;
+      size_t  m_field_size;
 
-        to_fix(Numeric value, size_t fieldSize = 8, size_t precision = 4)
-        {
-            m_value       = value;
-            m_field_size  = fieldSize;
-            m_precision	  = precision;
-        }
+      to_fix(Numeric value, size_t fieldSize = 8, size_t precision = 4)
+      {
+          m_value       = value;
+          m_field_size  = fieldSize;
+          m_precision	  = precision;
+      }
 
-        friend std::ostream& operator<<(std::ostream& os, to_fix const& rhs)
-        {
-            size_t prec = os.precision();
-            std::ios config{nullptr};
-            config.copyfmt(std::cout);	
-            os << std::fixed << std::setprecision(rhs.m_precision)
-               << std::setw(rhs.m_field_size) << rhs.m_value;
-            std::cout.copyfmt(config);
-            return os;
-     }
+      friend std::ostream& operator<<(std::ostream& os, to_fix const& rhs)
+      {
+          size_t prec = os.precision();
+          std::ios config{nullptr};
+          config.copyfmt(std::cout);	
+          os << std::fixed << std::setprecision(rhs.m_precision)
+             << std::setw(rhs.m_field_size) << rhs.m_value;
+          std::cout.copyfmt(config);
+          return os;
+   }
+
   };
 #+END_SRC
 
@@ -338,6 +338,39 @@ Experiment 2 output:
    80.00  8.94427
    90.00  9.48683
 #+END_SRC
+
+Experiment 3: Print table to file.
+
+#+BEGIN_SRC cpp 
+  std::ofstream report("/tmp/report.txt");
+
+  for(double x = 0.0; x < 100.0; x += 10.0) {
+       using T = double;
+       double y = std::sqrt(x);
+       report << to_fix<T>(x, 8, 2) << to_fix<T>(y, 9, 5) << "\n";
+  }
+
+  // Sync buffer with IO 
+  // force buffer to be written to IO 
+  report.flush();
+
+  // Force close
+  report.close();
+
+  // Run shell command to check file 
+  >> .! head -n 3 /tmp/report.txt
+      0.00  0.00000
+     10.00  3.16228
+     20.00  4.47214
+  >> 
+
+  >> .! tail -n 3 /tmp/report.txt
+     70.00  8.36660
+     80.00  8.94427
+     90.00  9.48683
+  >> 
+#+END_SRC
+
 ** IO - Insertion << and extraction >> operators
 
 This example shows how to overload the operators insertion (<<) and
