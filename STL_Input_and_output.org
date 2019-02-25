@@ -234,4 +234,73 @@ Usage:
   >> std::cout << "x = " << to_hex<int>(255) << " y = " << 246 << "\n";
   x = 0xFF y = 246
 #+END_SRC
+** Redirect IO 
+
+See: [[http://www.cplusplus.com/reference/ios/ios/rdbuf/][ios::rdbuf - C++ Reference]]
+
+ + Overload 1: Return pointer to stream buffer attached to stream.
+ + Overload 2: Set pointer to stream buffer attached to stream and
+   clears the error state flags.
+
+#+BEGIN_SRC cpp 
+ /* Overload 1 [get] */ 
+  streambuf* ios::rdbuf() const;
+
+ /* Overload 2 [set] */ 
+  streambuf* ios::rdbuf (streambuf* sb);
+#+END_SRC
+
+ Example: *Redirect std::cerr to std::stringstream string IO*
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string> 
+  #include <sstream>
+
+  std::stringstream ss;
+
+  >> std::cerr << " Stderr output \n";
+   Stderr output 
+  >> 
+  // Backup pointer to cout stream buffer 
+  >> auto buf = std::cerr.rdbuf()
+  (std::basic_streambuf<char, std::char_traits<char> > *) @0x7ffe4c3bc4d8
+  >> 
+  // Redirect stream 
+  std::cerr.rdbuf(ss.rdbuf());
+#+END_SRC
+
+The global object std::cerr prints to stringstream instead of process'
+stderr (standard error output):
+
+#+BEGIN_SRC cpp 
+  >> std::cerr << "hello world ";
+  >> std::cerr << "pi = " << M_PI << " exp(3.5) " << std::exp(3.5) << "\n";
+#+END_SRC
+
+Get content of stream ss: 
+
+#+BEGIN_SRC cpp 
+  // Stream content 
+  >> ss
+  (std::stringstream &) @0x7fa0341bb018
+  >> 
+  >> ss.str()
+  "hello world pi = 3.14159 exp(3.5) 33.1155"
+  >>   
+#+END_SRC
+
+Restore buffer:  
+
+#+BEGIN_SRC cpp 
+  >> std::cerr.rdbuf(buf);
+
+  >> std::cerr << "pi = " << M_PI << " exp(3.5) " << std::exp(3.5) << "\n";
+  pi = 3.14159 exp(3.5) 33.1155  
+
+#+END_SRC
+
+
+
+
 
