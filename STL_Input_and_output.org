@@ -239,73 +239,6 @@ Usage:
   >> std::cout << "x = " << to_hex<int>(255) << " y = " << 246 << "\n";
   x = 0xFF y = 246
 #+END_SRC
-** Redirect IO 
-
-See: [[http://www.cplusplus.com/reference/ios/ios/rdbuf/][ios::rdbuf - C++ Reference]]
-
- + Overload 1: Return pointer to stream buffer attached to stream.
- + Overload 2: Set pointer to stream buffer attached to stream and
-   clears the error state flags.
-
-#+BEGIN_SRC cpp 
- /* Overload 1 [get] */ 
-  streambuf* ios::rdbuf() const;
-
- /* Overload 2 [set] */ 
-  streambuf* ios::rdbuf (streambuf* sb);
-#+END_SRC
-
- Example: *Redirect std::cerr to std::stringstream string IO*
-
-#+BEGIN_SRC cpp 
-  #include <iostream>
-  #include <string> 
-  #include <sstream>
-
-  std::stringstream ss;
-
-  >> std::cerr << " Stderr output \n";
-   Stderr output 
-  >> 
-  // Backup pointer to cout stream buffer 
-  >> auto buf = std::cerr.rdbuf()
-  (std::basic_streambuf<char, std::char_traits<char> > *) @0x7ffe4c3bc4d8
-  >> 
-  // Redirect stream 
-  std::cerr.rdbuf(ss.rdbuf());
-#+END_SRC
-
-The global object std::cerr prints to stringstream instead of process'
-stderr (standard error output):
-
-#+BEGIN_SRC cpp 
-  >> std::cerr << "hello world ";
-  >> std::cerr << "pi = " << M_PI << " exp(3.5) " << std::exp(3.5) << "\n";
-#+END_SRC
-
-Get content of stream ss: 
-
-#+BEGIN_SRC cpp 
-  // Stream content 
-  >> ss
-  (std::stringstream &) @0x7fa0341bb018
-  >> 
-  >> ss.str()
-  "hello world pi = 3.14159 exp(3.5) 33.1155"
-  >>   
-#+END_SRC
-
-Restore buffer:  
-
-#+BEGIN_SRC cpp 
-  >> std::cerr.rdbuf(buf);
-
-  >> std::cerr << "pi = " << M_PI << " exp(3.5) " << std::exp(3.5) << "\n";
-  pi = 3.14159 exp(3.5) 33.1155  
-
-#+END_SRC
-
-
 
 
 
@@ -486,4 +419,224 @@ Output:
    Enter product: 461 "Cappucino coffee" 25.60        
     prod =  461 "Cappucino coffee" 25.6 ;  price = 25.6
 #+END_SRC
+** Redirect IO .rdbuf()
 
+See: [[http://www.cplusplus.com/reference/ios/ios/rdbuf/][ios::rdbuf - C++ Reference]]
+
+ + Overload 1: Return pointer to stream buffer attached to stream.
+ + Overload 2: Set pointer to stream buffer attached to stream and
+   clears the error state flags.
+
+#+BEGIN_SRC cpp 
+ /* Overload 1 [get] */ 
+  streambuf* ios::rdbuf() const;
+
+ /* Overload 2 [set] */ 
+  streambuf* ios::rdbuf (streambuf* sb);
+#+END_SRC
+
+ Example: *Redirect std::cerr to std::stringstream string IO*
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string> 
+  #include <sstream>
+
+  std::stringstream ss;
+
+  >> std::cerr << " Stderr output \n";
+   Stderr output 
+  >> 
+  // Backup pointer to cout stream buffer 
+  >> auto buf = std::cerr.rdbuf()
+  (std::basic_streambuf<char, std::char_traits<char> > *) @0x7ffe4c3bc4d8
+  >> 
+  // Redirect stream 
+  std::cerr.rdbuf(ss.rdbuf());
+#+END_SRC
+
+The global object std::cerr prints to stringstream instead of process'
+stderr (standard error output):
+
+#+BEGIN_SRC cpp 
+  >> std::cerr << "hello world ";
+  >> std::cerr << "pi = " << M_PI << " exp(3.5) " << std::exp(3.5) << "\n";
+#+END_SRC
+
+Get content of stream ss: 
+
+#+BEGIN_SRC cpp 
+  // Stream content 
+  >> ss
+  (std::stringstream &) @0x7fa0341bb018
+  >> 
+  >> ss.str()
+  "hello world pi = 3.14159 exp(3.5) 33.1155"
+  >>   
+#+END_SRC
+
+Restore buffer:  
+
+#+BEGIN_SRC cpp 
+  >> std::cerr.rdbuf(buf);
+
+  >> std::cerr << "pi = " << M_PI << " exp(3.5) " << std::exp(3.5) << "\n";
+  pi = 3.14159 exp(3.5) 33.1155  
+
+#+END_SRC
+** Saving and restoring IO flags 
+*** Manual saving restoring  
+
+IO manipulators such as std::scientific, std::fixed, std::setprecision
+or std::uppercase are stateful and permanently affects the IO flags
+what can make the code hard to understand and cause unintended IO
+changes. This issue can be solved by saving and restoring the IO
+flags. 
+
+Save IO state: 
+ 
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <iomanip>
+
+  // ========= Save IO flags =========
+  std::ios config{nullptr};
+  config.copyfmt(std::cout);
+#+END_SRC
+
+Before changing IO flags: 
+
+#+BEGIN_SRC cpp 
+  >> std::cout << "pi = " << M_PI << " gravity = " << 9.8145723e3 << " E = " << 956e6 << "\n";
+  pi = 3.14159 gravity = 9814.57 E = 9.56e+08
+  >> 
+
+  >> std::cout << " true = " << true << " false = " << false << "\n";
+   true = 1 false = 0
+  >> 
+#+END_SRC
+
+Change IO flags: 
+
+#+BEGIN_SRC cpp 
+   std::cout << std::boolalpha;
+   std::cout << std::setprecision(3) << std::fixed;
+#+END_SRC
+
+After changing IO flags: 
+
+#+BEGIN_SRC cpp 
+   >> std::cout << "pi = " << M_PI << " gravity = " << 9.8145723e3 << " E = " << 956e6 << "\n";
+   pi = 3.142 gravity = 9814.572 E = 956000000.000
+
+   >> std::cout << "sqrt(2) = " << std::sqrt(2.0) << "\n" ;
+   sqrt(2) = 1.414
+   >> 
+
+   >> std::cout << " true = " << true << " false = " << false << "\n";
+    true = true false = false
+   >> 
+#+END_SRC
+
+Restore IO flags: 
+
+#+BEGIN_SRC cpp 
+  std::cout.copyfmt(config);
+#+END_SRC
+
+After restoring IO flags: 
+
+#+BEGIN_SRC cpp 
+  >> std::cout << "pi = " << M_PI << " gravity = " << 9.8145723e3 << " E = " << 956e6 << "\n";
+  pi = 3.14159 gravity = 9814.57 E = 9.56e+08
+
+  >> std::cout << "sqrt(2) = " << std::sqrt(2.0) << "\n" ;
+  sqrt(2) = 1.41421
+
+  >> std::cout << " true = " << true << " false = " << false << "\n";
+   true = 1 false = 0 
+#+END_SRC
+*** Automatic saving and restoring IO flags with RAAI
+
+Class for saving IO flags using RAAI.
+
+#+CAPTION: Class for saving and restoring IO context. 
+#+BEGIN_SRC cpp 
+  struct IOContext {
+      std::ios      m_config{nullptr};
+      std::ostream* m_pos;
+
+      // Save context 
+      IOContext(std::ostream& os = std::cout): m_pos(&os)
+      {
+          std::cerr << " [INFO] saved IO flags" << std::endl;
+          m_config.copyfmt(os);
+      }
+      // Restore context 
+      ~IOContext()
+      {
+          std::cerr << " [INFO] restored IO flags" << std::endl;
+          m_pos->copyfmt(m_config);
+      }
+
+  };
+#+END_SRC
+
+Test function: 
+
+#+CAPTION: Function testIOFlags for testing and demonstrating class IOContext.
+#+BEGIN_SRC cpp 
+  void testIOFlags() {
+       std::cout << "===== Before =======" << "\n";
+       std::cout << "pi = " << M_PI
+                 << " gravity = " << 9.8145723e3
+                 << " E = " << 956e6 << "\n";
+
+       std::cout << " true = " << true << " false = " << false << "\n";
+
+       std::cout << "===== Context - IO flags changed =======" << "\n";
+       {  /* Sub-scope start */
+           IOContext ctx{std::cout}; /* Save IO Flags */
+
+           std::cout << std::boolalpha;
+           std::cout << std::setprecision(3) << std::fixed;
+
+           std::cout << "pi = " << M_PI
+                     << " gravity = " << 9.8145723e3
+                     << " E = " << 956e6 << "\n";
+
+           std::cout << " true = " << true << " false = " << false << "\n";
+
+          /* End of sub-scope */
+       } // Object ctx destroyed here => IO flags restored 
+
+       std::cout << "===== After => IO flags restored =======" << "\n";
+
+       std::cout << "pi = " << M_PI
+                 << " gravity = " << 9.8145723e3
+                 << " E = " << 956e6 << "\n";
+
+       std::cout << " true = " << true << " false = " << false << "\n";
+  } /** --- End of function testIOFlags --- */
+#+END_SRC
+
+Test in REPL: 
+
+#+CAPTION: CERN's ROOT repl session. 
+#+BEGIN_SRC cpp 
+  >> testIOFlags()
+
+  ===== Before =======
+  pi = 3.14159 gravity = 9814.57 E = 9.56e+08
+   true = 1 false = 0
+  ===== Context - IO flags changed =======
+   [INFO] saved IO flags
+  pi = 3.142 gravity = 9814.572 E = 956000000.000
+   true = true false = false
+   [INFO] restored IO flags
+  ===== After => IO flags restored =======
+  pi = 3.14159 gravity = 9814.57 E = 9.56e+08
+   true = 1 false = 0
+  >> 
+  >> 
+#+END_SRC
