@@ -144,21 +144,30 @@ Case manipulators:
  + std::uppercase => Print everything as uppercase.
  + std::nouppercase => Print without forcing uppercase.
 
-Change numerical base used for printing integers
+Change numerical base used for printing integers (flag std::ios::basefield)
 
  + std::dec => Print integers as decimal 
  + std::hex => Print integers as heaxdecimal  
  + std::oct => Print integers as octal
 
-Float point number formatting:
+Float point number formatting: (flag: std::ios::floatfield)
 
-  + std::setprecision(int N)
   + std::defaultflot (C++11)
   + std::fixed
     + Print float with fixed precision (fixed numbers of decimal places)
   + std::scientific
     + Print float with scientific notation 
   + std::hexfloat (C++11)
+
+Float point precision: 
+
+  + std::setprecision(int N)
+
+Field adjusting (flag: std::ios::adjustfield)
+ 
+ + std::ios::left 
+ + std::ios::right
+ + std::ios::internal 
 
 Flushing manipulators:
 
@@ -209,10 +218,12 @@ Flushing manipulators:
   sqrt(pi) = 1.77245 x = 2.5
   >> 
 #+END_SRC
-** Custom IO manipulator 
+** Custom IO manipulators 
 
-Example: custom IO manipulator to print integers in hexadecimal format
-without affecting IO global state. 
+ *Example: 1* 
+
+Custom IO manipulator to print integers in hexadecimal format without
+affecting IO global state.
 
 #+BEGIN_SRC cpp 
   #include <iostream>
@@ -240,8 +251,93 @@ Usage:
   x = 0xFF y = 246
 #+END_SRC
 
+ *Example 2* Custom IO manipulators for numerical tables. 
 
 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <iomanip>
+  #include <type_traits>
+
+  // Requires headers:  <iostream>, <iomanip>, <type_traits>
+  template<typename Numeric,
+           // Used for restricting the types of arguments that can be used. 
+           // It will generate a compiler error for non-float arguments. 
+           typename std::enable_if<std::is_floating_point<Numeric>::value, void>::type* = nullptr
+           >
+  struct to_fix {
+        Numeric m_value;
+        size_t  m_precision;
+        size_t  m_field_size;
+
+        to_fix(Numeric value, size_t fieldSize = 8, size_t precision = 4)
+        {
+            m_value       = value;
+            m_field_size  = fieldSize;
+            m_precision	  = precision;
+        }
+
+        friend std::ostream& operator<<(std::ostream& os, to_fix const& rhs)
+        {
+            size_t prec = os.precision();
+            std::ios config{nullptr};
+            config.copyfmt(std::cout);	
+            os << std::fixed << std::setprecision(rhs.m_precision)
+               << std::setw(rhs.m_field_size) << rhs.m_value;
+            std::cout.copyfmt(config);
+            return os;
+     }
+  };
+#+END_SRC
+
+Experiment 1: 
+
+#+BEGIN_SRC cpp 
+  for(double x = 0.0; x < 4.0; x += 0.5) {
+       using T = double;
+       double y = std::sqrt(x);
+       std::cout << to_fix<T>(x) << to_fix<T>(y) << "\n";
+  }
+#+END_SRC
+
+Experiment 1 Output: 
+
+#+BEGIN_SRC text 
+  0.0000  0.0000
+  0.5000  0.7071
+  1.0000  1.0000
+  1.5000  1.2247
+  2.0000  1.4142
+  2.5000  1.5811
+  3.0000  1.7321
+  3.5000  1.8708
+#+END_SRC
+
+Experiment 2: 
+
+#+BEGIN_SRC cpp 
+  for(double x = 0.0; x < 100.0; x += 10.0) {
+       using T = double;
+       double y = std::sqrt(x);
+       std::cout << to_fix<T>(x, 8, 2) << to_fix<T>(y, 9, 5) << "\n";
+  }
+#+END_SRC
+
+Experiment 2 output: 
+
+#+BEGIN_SRC text 
+    0.00  0.00000
+   10.00  3.16228
+   20.00  4.47214
+   30.00  5.47723
+   40.00  6.32456
+   50.00  7.07107
+   60.00  7.74597
+   70.00  8.36660
+   80.00  8.94427
+   90.00  9.48683
+#+END_SRC
 ** IO - Insertion << and extraction >> operators
 
 This example shows how to overload the operators insertion (<<) and
