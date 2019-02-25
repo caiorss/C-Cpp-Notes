@@ -1,0 +1,178 @@
+#+INCLUDE: theme/style.org 
+#+TITLE: CPP/C++ STL Input and Output 
+#+DESCRIPTION: cpp/c++ stl standard template library algorithms and iterators
+#+STARTUP: content 
+
+ - [[wiki:index][Index]]
+
+* C++ IO  Input and Output System 
+** IO Class Hierarchy
+
+ *C++ IO Features:*
+
+ + Object oriented and polymorphic
+ + Stateful
+   + The IO classes have internal states such as precision that float
+     point will be printed; base which numbers will be print such as
+     octal (base 8), hexadecimal (base 16) and decimal (default).
+ + Without exceptions
+   + The C++ IO does not have exceptions, it indicates error through
+     error flags that must be checked by the calling code.
+
+ *IO Classes:*
+
+ * ios - base class for streams
+ * istream - input stream base class
+   + ifstream => Input file stream 
+   + istringstream => Input string stream
+ * ostream - output stream base class
+   + ofstream => Output file stream 
+   + ostringstream => Output string stream
+ * iostream - input/output stream base class
+   + fstream => Input/Output file stream.
+   + sstringstream => String stream that can be used for reading and writing.
+
+ *IO Global Objects*
+
+Output stream global objects (instances of std::ostream): 
+ + std::cout - Standard output stream (stdout)
+ + std::cerr - Standard output error stream (stderr)
+ + std::clog
+ + std::wcout - Standard output stream (stdout) - wide character version. 
+ + std::wcerr
+ + std::wclog 
+
+Input stream global objects (instances of std::istream): 
+ + std::cin  - Standard input stream (stdin)
+ + std::wcin - Standard input stream (stdin), wide character version.
+
+ *Header Files* 
+
+ * [[https://en.cppreference.com/w/cpp/header/iostream][<iostream>]] => Basic IO 
+   + _std::ostream_, _std::istream_, std::cout, std::cerr, std::clog, std::wcerr 
+
+ * [[https://en.cppreference.com/w/cpp/header/fstream][<fstream>]] => File IO 
+   + std::ifstream, std::ofstream, std::fstream
+
+ * [[https://en.cppreference.com/w/cpp/header/sstream][<sstream>]] => String / Memory IO
+   + std::stringstream, std::istringstream, std::ostringstream
+
+ * [[https://en.cppreference.com/w/cpp/header/iomanip][<iomanip>]] => IO manipulation functions
+   * std::setfill, std::setprecision, std::setw, std::right,
+     std::left, std::dec, std::hex, std::quoted (C++14)
+
+Full references at: 
+ + http://www.cplusplus.com/reference/iolibrary/
+
+
+#+CAPTION: C++ IO Class hierarchy
+#+BEGIN_SRC text 
+                                  ios
+                                   +
+                  +----------------+--------------+
+                  |                               |
+                 \|/                             \|/
+              +-------+                      +--------+
+              |istream|                      |ostream |
+              +--+----+                      +---+----+
+                 |                               |
+                \|/       +-----------+         \|/
+      +------------------>+  iostream +<------+--v--------+-----------+
+      |          |        +-----+-----+       |           |           |
+      v          v              |             v           v           v
+  ,*std::cin  ifstream           |         *std::cerr   ofstream   ostringstream
+             istringstream      |          *std::cout
+                                |          *std::clog
+                          ------v------
+                          |           |
+                          v           v
+                       fstream stringstream
+#+END_SRC
+
+
+ *Statefullness* 
+
+The C++ IO streams are stateful, they have internal states for IO
+configuration such as [[https://en.cppreference.com/w/cpp/io/ios_base/fmtflags][IO flags]] and numerical precision. In the
+following code, the IO manipulator std::boolalpha enables the IO flag
+std::ios_base::boolalpha that makes the IO stream print booleans as
+string instead of '0' or '1'. The flag can be disabled with the IO
+manipulator std::noboolalpha.
+
+#+BEGIN_SRC cpp 
+  #include <iostream> 
+  #include <iomanip> 
+
+  >> std::cout << "flag1 = " << true << " flag2 = " << false << "\n";
+  flag1 = 1 flag2 = 0
+  >> 
+  >> std::cout << "flag1 = " << true << " flag2 = " << false << "\n";
+  flag1 = 1 flag2 = 0
+  >> 
+
+  // IO Manipulator that enables boolalpha flag which enables booleans
+  // be print as strings instead of being print as numbers.
+  >> std::cout << std::boolalpha;
+
+  >> std::cout << "flag1 = " << true << " flag2 = " << false << "\n";
+  flag1 = true flag2 = false
+
+  // Output continues in this way until the flag boolalpha is disabled. 
+  >> std::cout << "flag1 = " << true << " flag2 = " << false << "\n";
+  flag1 = true flag2 = false
+  >> 
+
+  // Disable flag 
+  >> std::cout << std::noboolalpha;
+  >> 
+  >> std::cout << "flag1 = " << true << " flag2 = " << false << "\n";
+  flag1 = 1 flag2 = 0
+#+END_SRC
+** IO Manipulators 
+
+All mapipulators: [[https://en.cppreference.com/w/cpp/io/manip][documentation]]
+
+ - Switch numeric representation of booleans
+   + std::boolapha
+     + => Print booleans as 'true' or 'false' rather than 0 or 1. 
+   + std::noboolalpha
+     + => Print boolean as number true as 1 and false as 0.
+
+ - Set output to uppercase
+   + std::uppercase => Print everything as uppercase.
+   + std::nouppercase => Print without forcing uppercase.
+
+ - Change numerical base used for printing integers
+   + std::dec => Print integers as decimal 
+   + std::hex => Print integers as heaxdecimal  
+   + std::oct => Print integers as octal
+
+ - Float point number formatting:
+   + std::setprecision(int N)
+   + std::defaultflot (C++11)
+   + std::fixed
+     + Print float with fixed precision (fixed numbers of decimal places)
+   + std::scientific
+     + Print float with scientific notation 
+   + std::hexfloat (C++11)
+
+ - Flushing manipulators:
+   + std::flush
+     + Flush output stream, in other words, it forces the stream
+       buffer to be written to the IO, for instance, it can force the
+       buffer of a file output stream to be written to a file. TL;DR
+       syncronize stream buffer with output.
+
+   + std::endl
+     + Insert new line character in the output stream ~\n~ and flushes
+       the stream (std::flush).
+
+   + std::unitbuf
+     + => Automatically flushes the output stream after
+       each operation, such as (std::cout << value).
+     + Sets the flag: std::ios_base::unitbuf.
+
+   + std::nounitbuf
+     + => Disables automatic output stream flushing.
+     + => Disables the flag: std::ios_base::unitbuf
+
