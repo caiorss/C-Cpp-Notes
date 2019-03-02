@@ -124,12 +124,65 @@ var initMobileTocMenu = function(){
     
     var tocLinks = document.querySelectorAll("#table-of-contents a");
     tocLinks.forEach(a => a.addEventListener("click", closeTOCMenu));
-}
+
+} // --- End of Function initMobileTocMenu() ---- //
+
+
+var initDesktopMenu = function () {
+    var xoffset  =  50;
+    var btnWidth = "60px";
+
+    var cont = document.querySelector("#content");
+    var boundRectangle = cont.getBoundingClientRect();
+    var xpos = boundRectangle.x + boundRectangle.width + xoffset + "px";
+    var body = document.querySelector("body");
+
+    var makeMenuButton = function(caption, ypos){
+        var button = document.createElement("button")
+        body.appendChild(button);
+        button.textContent     = caption;
+        button.style.width     = btnWidth;
+        button.style.top       = ypos;
+        button.style.left      = xpos;
+        button.style.position  = "fixed";
+        button.style.backgroundColor = "black";
+        button.style.color = "white";
+        return button
+    };
+
+    // Button index - go to index page
+    //-------------------------------------------------
+    var btnIndex = makeMenuButton("Index", "200px");
+    // button.style.zIndex = 10000;
+    btnIndex.addEventListener("click", function(){
+        window.location = "index.html";
+    });
+
+    var btnTop = makeMenuButton("Top", "260px");
+    btnTop.addEventListener("click", function(){
+        var doc = document.documentElement || document;
+        doc.scrollTop = 0;
+    });
+
+    // Button bottom - scroll to page bottom
+    //-------------------------------------------
+    var btnBottom = makeMenuButton("Bottom", "320px");
+    btnBottom.addEventListener("click", function(){
+        var elem =  document.querySelector("#content");
+        var doc = document.documentElement || document;
+        doc.scrollTop = elem.scrollHeight;
+        // elem.scrollTop = elem.scrollHeight;
+    });
+
+
+} // --- End of function() initDesktopMenu() ---- /q
 
 
 var init = function(){
     if (window.screen.width <= 960)
-        initMobileTocMenu();    
+        initMobileTocMenu();
+    if(window.screen.width > 960)
+        initDesktopMenu();
 }
 
 
