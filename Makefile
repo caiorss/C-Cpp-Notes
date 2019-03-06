@@ -1,4 +1,8 @@
-
+# Create directory dist containing the orphan branch gh-pages
+# The html pages are stored in the gh-pages branch 
+tree:
+	git worktree add dist gh-pages
+	ln -s dist/theme .
 
 # Compile html pages 
 build:
