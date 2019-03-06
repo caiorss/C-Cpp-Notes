@@ -10,6 +10,11 @@
 #include <functional>
 #include <iomanip>
 
+// Solve Mingw error: '::hyport' has not been declared 
+#include <math.h>
+
+//#define hypot _hypot
+
 /// C-API header to Python Native Interface API, similar to Java JNI
 /// (Java Native Interface)
 #include <Python.h>
@@ -120,7 +125,7 @@ PyObject* testArguments(PyObject* self, PyObject* args)
 	int         aint;
 	float       afloat;
 	double      adouble;
-	const char*       aword;
+	char*       aword;
 	// Parse function arguments 
 	if(!PyArg_ParseTuple(args, "pifds", &abool, &aint, &afloat, &adouble, &aword))
 		return nullptr;
@@ -128,7 +133,7 @@ PyObject* testArguments(PyObject* self, PyObject* args)
 	std::cerr << " Function: [" << __FUNCTION__ << "]" 
 			  << " ==> Number of arguments = " << PyTuple_GET_SIZE(args) << "\n";
 	
-	std::string str = aword;
+	std::string str(aword, aword + strlen(aword));
 	str = "'Received string = " + str + "'";
 	
 	std::cout << " Received Python Arguments " << "\n";
