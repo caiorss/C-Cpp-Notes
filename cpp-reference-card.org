@@ -3615,14 +3615,14 @@ only reused as source.
 
 The ABI is defined by the compiler and the operating system and it the
 binary interface is not specified by the ISO C++ standard. Among other
-things, the ABI specifies:
+things, the ABI specifies: 
 
  + Class layout: VTable Layout, padding, member function-pointer, RTTI
    and so on.
 
- + Exception implementation and exception hanling
+ + Exception implementation and exception hanling 
 
- + Linkage information
+ + Linkage information 
 
  + _Name decoration schema (name mangling)_
    + The schema or rules used to encode symbols in a unique way. In C,
@@ -3637,7 +3637,7 @@ things, the ABI specifies:
      specifying to the compiler that the function has C-linkage and
      the function symbol is the same as its name.
 
-Notes:
+Notes: 
 
  + The ABI incompatibility can also happen even between different
    versions of the same compilers.
@@ -3645,7 +3645,7 @@ Notes:
  + Due to the ABI problems, it is almost impossible to distribute
    pre-compiled C++ code as static or shared libraries. As a result,
    unlike C shared libraries, it is hard to find pre-compiled C++
-   libraries available as shared libraries.
+   libraries available as shared libraries.  
 
  + The only way to build binary componets with C++ which can be reused
    by other codes in C, C++ or other programming languages via FFI
@@ -3654,15 +3654,15 @@ Notes:
 
  + Newer verions of GCC and Clang on Unix-like operating systems are
    adopting the Itanium ABI which mitigates the ABI problem, however
-   it is not guaranteed by the C++ standard.
+   it is not guaranteed by the C++ standard. 
 
-References:
+References: 
 
  + *Defining a Portable C++ ABI* - Herb Sutter
    + <https://isocpp.org/files/papers/n4028.pdf>
 
- + *Stability of the C++ ABI: Evolution of a Programming Language*
-   + <https://www.oracle.com/technetwork/articles/servers-storage-dev/stablecplusplusabi-333927.html>
+ + *Stability of the C++ ABI: Evolution of a Programming Language* 
+   + <https://www.oracle.com/technetwork/articles/servers-storage-dev/stablecplusplusabi-333927.html> 
 
  + *GCC5 and the C++11 ABI - Red Hat Develper*
    + <https://developers.redhat.com/blog/2015/02/05/gcc5-and-the-c11-abi/>
@@ -3682,6 +3682,95 @@ References:
 
  + [[http://mirror.informatimago.com/next/developer.apple.com/tools/mpw-tools/compilers/docs/abi_spec.pdf][Macintosh C/C++ ABI - Standard Specification 1993]]
 
+
+ *ABI - Fragile Base Class or Fragile Binary Interface* 
+
+ + C++ has the fragile base class problem that happens when changes in
+   a base class break its ABI requiring recompilation of all derived
+   classes, client code or third-party code. This issue is specially
+   important for libraries or plugin-systems where third-party code is
+   loaded dynamically at runtime.
+
+What can keep or break a base class ABI compatibility:
+
+ + *DO* Changes which that *do not break the base class ABI*: ([[https://community.kde.org/Policies/Binary_Compatibility_Issues_With_C%252B%252B][KDE Guide]])
+   + Append new non-virtual member functions.
+   + Add Enumeration to class.
+   + Changet the implementation of virtual member functions
+     (overridable methods) without changing its signature (interface).
+   + Create new static member functions (static methods)
+   + Add new classes
+   + Append or remove friend functions
+   + Rename class private member variables 
+
+ + *DONT* Changes that *breaks the class ABI* and disrupts binary
+   compatibility: ([[https://community.kde.org/Policies/Binary_Compatibility_Issues_With_C%252B%252B][KDE Guide]])
+   + Change the order of existing virtual member functions 
+   + Add virtual member function (method) to a class without any
+     virtual member function or virtual base class.
+   + Add or remove virtual member functions
+   + Addition or removal of member variables
+   + Change the order of member variables
+   + Change the type of member variables 
+
+Techniques for keeping the ABI compatibility: 
+
+ + *PIMPL* - Use the PIMP (Pointer to implementation) technique for
+   encapsulatiing the member variables into a opaque pointer which the
+   implementation is not exposed in the header file. The opaque
+   pointer becomes the unique class member variable exposed in the
+   header file, as a result any change of the encapsulated member
+   variables no longer breaks the class ABI. 
+
+ + *Interface Class* - An interface class has only virtual member
+   functions, virtual constructor and no member variables.
+
+ + *Extend, but not modify*, do not change interfaces or base classes
+   relied by external codes, libraries or client code. If a new
+   functionality is needed, it is better to create a new class
+   extending the base class instead of modifying it what would break
+   extenal codes relying on it.
+
+ + *Prefer composition to inheritance* 
+
+ + *C-interface (extern "C") with opaque pointer* - C-interface or
+   C-wrapper with C-linkage functions and opaque pointers. The classes
+   and functions are not exposed and the client code can only access
+   the library using the C-API or functions with C-linkage. This is
+   the only reliable way to share compiled code between different
+   compilers.
+
+References: 
+
+ + *Binary Compatibility for library developers*
+   + <https://events.static.linuxfound.org/sites/events/files/slides/Binary_Compatibility_for_library_devs.pdf>
+ 
+ + *TECH : ABI bugs are a NIGHTMARE!*
+   + <https://www.snsystems.com/tech-blog/2014/12/18/abi-bugs-are-a-nightmare/>
+
+ + http://wiki.c2.com/?FragileBinaryInterfaceProblem
+
+ + *KDE - Policies/Binary Compatibility Issues With C++*
+   + <https://community.kde.org/Policies/Binary_Compatibility_Issues_With_C%2B%2B>
+
+ + https://www.gamedev.net/forums/topic/282869-working-around-fragile-base-class-syndrome/
+
+ + [[https://stackoverflow.com/questions/2921397/what-is-the-fragile-base-class-problem][java - What is the fragile base class problem? - Stack Overflow]]
+
+ + [[https://softwareengineering.stackexchange.com/questions/273305/why-is-base-for-all-objects-discouraged-in-c][Why is base-for-all-objects discouraged in C++ - Software Engineering Stack Exchange]]
+
+ + [[https://softwareengineering.stackexchange.com/questions/85317/is-it-bad-habit-not-using-interfaces][programming practices - Is it bad habit not using interfaces? - Software Engineering Stack Exchange]]
+
+ + http://www.vincehuston.org/cpp/inheritance.html
+
+ + [[http://preserve.mactech.com/articles/mactech/Vol.13/13.03/CandObjectiveCCompared/index.html][MacTech - C++ Versus Objective C]] - Shows how ObjectiveC solves the
+   fragile base class problem.
+
+ + [[https://blogs.msdn.microsoft.com/oldnewthing/20111024-00/?p=9303][If the shell is written in C++, why not just export its base classes?]] (The Old-new thing)
+
+ + [[https://blog.lukhnos.org/2009-2012/166322529.html][A Very Short Note on Why C++ Is Not Suitable for Plug-In Architecture]]
+
+ *Processes and Operating Systems* 
 
  + *Process*: A unique instance of a running program with its own PID
    (Process Identifier), address-space, virtual memory and threads. 
