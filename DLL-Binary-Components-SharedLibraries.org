@@ -2738,6 +2738,7 @@ View exported symbols demangled (without name mangling):
 #+END_SRC
 
 ** Plugins and Dynamically Loading Classes 
+*** Overview  
 
 A Plugin system allows loading software components, classes and
 functions at runtime without from shared libraries without needing to
@@ -2749,6 +2750,43 @@ A plugin architechture provides the following benefits:
  + Allow third-parties to create new plugings, addons, extensions and so on.
  + Hot-swap or replace plugins at runtime.
  + Faster compile-time 
+
+References: 
+ 
+  + [[https://github.com/christopherpoole/cppplugin/wiki/Plugins-in-CPP:-Dynamically-Linking-Shared-Objects][Plugins in CPP: Dynamically Linking Shared Objects · christopherpoole/cppplugin Wiki · GitHub]]
+
+  + [[https://helloacm.com/how-to-use-the-dynamic-link-library-in-c-linux-gcc-compiler/][How to Use the Dynamic Link Library in C++ Linux (gcc compiler)? | Technology of Computing]]
+
+  + [[https://0x00sec.org/t/c-dynamic-loading-of-shared-objects-at-runtime/1498][C++ Dynamic Loading of Shared Objects at Runtime - Programming - 0x00sec - The Home of the Hacker]]
+
+  + [[https://www.sofa-framework.org/community/doc/programming-with-sofa/start-coding/create-your-plugin/][SOFA – Create your plugin]]
+
+  + [[https://www.gwb.com/plugin-wrapper.php][The Geochemist's Workbench® Plug-in: Wrapper]]
+
+  + [[http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0275r2.html][A Proposal to add Classes and Functions Required for Dynamic Library Load]]
+
+  + [[http://blog.nuclex-games.com/tutorials/cxx/plugin-architecture/][Plugin Architecture – Nuclex Games Blog]]
+
+  + [[https://www.andynicholas.com/?p=27][Andy Nicholas » Blog Archive » A Simple Plugin Architecture For C++]]
+
+Other Implementations: 
+
+ + [[https://github.com/sourcey/pluga][GitHub - sourcey/pluga: Simple C++ cross-platform plugin system]]
+
+ + [[https://www.codeproject.com/Articles/20648/DynObj-C-Cross-Platform-Plugin-Objects][DynObj - C++ Cross Platform Plugin Objects - CodeProject]]
+
+ + [[https://sourcey.com/articles/building-a-simple-cpp-cross-platform-plugin-system][Building a Simple C++ Cross-platform Plugin System | Sourcey]]
+
+ + [[http://www.cplusplus.com/articles/48TbqMoL/][Making a Plugin System - C++ Articles]]
+
+ + [[https://www.3dgep.com/using-dynamic-link-libraries-dll-to-create-plug-ins/][Using Dynamic Link Libraries (DLL) to Create Plug-Ins - 3D Game Engine Programming3D Game Engine Programming]]
+
+ + https://github.com/jbandela/cppcomponents (Similar to Windows' COM componets)
+
+ + [[https://dxuuu.xyz/cpp-static-registration.html][C++ patterns: static registration]]
+
+
+*** API used for loading shared libraries dynamically
 
 Unix C-API for loading shared libraries (shared objects)
 
@@ -2777,592 +2815,590 @@ Windows APIs: ([[https://docs.microsoft.com/en-gb/windows/desktop/api/libloadera
   void FreeLibrary(HMODULE hModule);
 #+END_SRC
 
-** Example 
-*** Overview 
+*** Example 
+**** Overview 
 
-This section presents a simple plugin system which allows loading
-classes at runtime from dynamically-loaded shared libraries. This
-approach allows adding new functionality to a software without
-recompilation or modification of the source code. The plugin system
-can load any class matching a user supplied interface without knowing
-anything about a particular class implementaiton. 
+ This section presents a simple plugin system which allows loading
+ classes at runtime from dynamically-loaded shared libraries. This
+ approach allows adding new functionality to a software without
+ recompilation or modification of the source code. The plugin system
+ can load any class matching a user supplied interface without knowing
+ anything about a particular class implementaiton. 
 
-In this example: The plugin PluginA, which the file name is
-PluginA.dll on Windows or PluginA.so on Linux, exports the classes
-'Log' and 'Exp' that implements the interface class IMathFunction. The
-application loads those classes only knowing the interface
-IMathFunction. This design allows to add more third-party plugins and
-more classes matching any known interface class.
-
-
- *General Consideration for an Interface Class*
-
-   + MUST NOT have member variables.
-
-   + MUST have only pure virtual member functions, in other words,
-     only abstract methods.
+ In this example: The plugin PluginA, which the file name is
+ PluginA.dll on Windows or PluginA.so on Linux, exports the classes
+ 'Log' and 'Exp' that implements the interface class IMathFunction. The
+ application loads those classes only knowing the interface
+ IMathFunction. This design allows to add more third-party plugins and
+ more classes matching any known interface class.
 
 
- *ABI - Application Binary Interface Considerations for an Interface Class*
+  *General Consideration for an Interface Class*
 
-   + MUST use only C-compatible types in the method signatures in
-     order to ensure that the interface to be compatible with multiple
-     compilers. Note: It is very likely that the application and the
-     plugins (aka addons) may be developed with different compilers
-     without a common ABI - Application Binary Interface.
+    + MUST NOT have member variables.
 
-   + MUST NOT use any use any STL type or container in the class
-     method signatures, although the implementation classes provided
-     by the plugins can use them internally. The reason to avoid the
-     use of the STL is that the STL implementation is
-     compiler-dependent what can lead to liking error when linking
-     object-codes generated by different compilers. 
-
- *Fragile-Base-class Problem and class ABI*
-
- + *Avoid changing interfaces* - Any interface class already being used
-   by third parties plugins should not be changed, otherwise it will
-   break the interface class ABI and disrupt users plugins as they no
-   longer will binary compatible with the interface. As a result, all
-   plugins would have to recompiled. 
-
- + *Fragile Base Class Problem:* - Some changes that can break a base
-   class ABI requiring recompilation of all derived classes are:
-   + Add new virtual member functions, aka virtual methods
-   + Change the order of virtual member functions
-   + Add new member variables
-   + Change the order or type of member variables
-
- + *Solution:* The solution to fragile base class problem in this case
-   is: don't modify interface classes relied by third-party plugins and add
-   new interface classes or extend the existing ones instead of
-   modifying them. 
+    + MUST have only pure virtual member functions, in other words,
+      only abstract methods.
 
 
- *Source Code:*
-  + Repository: [[https://github.com/caiorss/sample-cpp-plugin][github/sample-cpp-plugin]]
-*** File: psdk/interfaces.hpp 
+  *ABI - Application Binary Interface Considerations for an Interface Class*
+
+    + MUST use only C-compatible types in the method signatures in
+      order to ensure that the interface to be compatible with multiple
+      compilers. Note: It is very likely that the application and the
+      plugins (aka addons) may be developed with different compilers
+      without a common ABI - Application Binary Interface.
+
+    + MUST NOT use any use any STL type or container in the class
+      method signatures, although the implementation classes provided
+      by the plugins can use them internally. The reason to avoid the
+      use of the STL is that the STL implementation is
+      compiler-dependent what can lead to liking error when linking
+      object-codes generated by different compilers. 
+
+  *Fragile-Base-class Problem and class ABI*
+
+  + *Avoid changing interfaces* - Any interface class already being used
+    by third parties plugins should not be changed, otherwise it will
+    break the interface class ABI and disrupt users plugins as they no
+    longer will binary compatible with the interface. As a result, all
+    plugins would have to recompiled. 
+
+  + *Fragile Base Class Problem:* - Some changes that can break a base
+    class ABI requiring recompilation of all derived classes are:
+    + Add new virtual member functions, aka virtual methods
+    + Change the order of virtual member functions
+    + Add new member variables
+    + Change the order or type of member variables
+
+  + *Solution:* The solution to fragile base class problem in this case
+    is: don't modify interface classes relied by third-party plugins and add
+    new interface classes or extend the existing ones instead of
+    modifying them. 
 
 
-This interface class provides plugin metadata and a factory function
-(Factory) which allows to instantiate any class. The method _Factory_
-takes as argument the name of a class provided by the plugin and
-returns an instance of it casted as a void pointer (opaque pointer).  
+  *Source Code:*
+   + Repository: [[https://github.com/caiorss/sample-cpp-plugin][github/sample-cpp-plugin]]
+**** File: psdk/interfaces.hpp 
 
-#+BEGIN_SRC cpp 
-  #ifndef _INTERFACES_HPP_
-  #define _INTERFACES_HPP_
 
-  struct IPluginFactory{
-       /** Get Plugin Name */
-       virtual const char* Name() const = 0 ;
-       /** Get Plugin Version */
-       virtual const char* Version() const = 0;
+ This interface class provides plugin metadata and a factory function
+ (Factory) which allows to instantiate any class. The method _Factory_
+ takes as argument the name of a class provided by the plugin and
+ returns an instance of it casted as a void pointer (opaque pointer).  
 
-       virtual size_t NumberOfClasses() const = 0;
-       virtual const char* GetClassName(size_t index) const = 0;
+ #+BEGIN_SRC cpp 
+   #ifndef _INTERFACES_HPP_
+   #define _INTERFACES_HPP_
 
-       /** Instantiate a class from its name */
-       virtual void* Factory(const char* className) const = 0;
-  };
+   struct IPluginFactory{
+        /** Get Plugin Name */
+        virtual const char* Name() const = 0 ;
+        /** Get Plugin Version */
+        virtual const char* Version() const = 0;
 
-  #endif 
-#+END_SRC
+        virtual size_t NumberOfClasses() const = 0;
+        virtual const char* GetClassName(size_t index) const = 0;
 
-*** File: psdk/factory.hpp 
+        /** Instantiate a class from its name */
+        virtual void* Factory(const char* className) const = 0;
+   };
 
-Headers: 
+   #endif 
+ #+END_SRC
 
-#+BEGIN_SRC cpp 
-  ifndef _FACTORY_HPP_
-  #define _FACTORY_HPP_
+**** File: psdk/factory.hpp 
 
-  #include <string> 
-  #include <functional>
-  #include <map>
-  #include <vector>
-  #include <algorithm>
+ Headers: 
 
-  #include "interfaces.hpp"
+ #+BEGIN_SRC cpp 
+   ifndef _FACTORY_HPP_
+   #define _FACTORY_HPP_
 
-  /** Macro EXPORT_CPP makes a symbol visible. */
-  #if defined(_WIN32)
-    // MS-Windows NT 
-    #define PSDK_PLUGIN_EXPORT_C extern "C" __declspec(dllexport) 
-  #else
-    // Unix-like OSes
-    #define PSDK_PLUGIN_EXPORT_C extern "C" __attribute__ ((visibility ("default")))
-  #endif 
-#+END_SRC
+   #include <string> 
+   #include <functional>
+   #include <map>
+   #include <vector>
+   #include <algorithm>
 
-Class PluginFactory: Implementation of the interface IPluginFactory.
+   #include "interfaces.hpp"
 
-#+BEGIN_SRC cpp 
-  class PluginFactory: public IPluginFactory
-  {
-         // Constructor database
-         using CtorItem = std::pair<std::string, std::function<void* ()>>;
-         using CtorDB = std::vector<CtorItem>;
-         std::string m_name;
-         std::string m_version;	
-         CtorDB m_ctordb;	
-  public:	
-          PluginFactory(const char* name, const char* version):
-              m_name(name),
-              m_version(version)
-          {
-          }
+   /** Macro EXPORT_CPP makes a symbol visible. */
+   #if defined(_WIN32)
+     // MS-Windows NT 
+     #define PSDK_PLUGIN_EXPORT_C extern "C" __declspec(dllexport) 
+   #else
+     // Unix-like OSes
+     #define PSDK_PLUGIN_EXPORT_C extern "C" __attribute__ ((visibility ("default")))
+   #endif 
+ #+END_SRC
+
+ Class PluginFactory: Implementation of the interface IPluginFactory.
+
+ #+BEGIN_SRC cpp 
+   class PluginFactory: public IPluginFactory
+   {
+          // Constructor database
+          using CtorItem = std::pair<std::string, std::function<void* ()>>;
+          using CtorDB = std::vector<CtorItem>;
+          std::string m_name;
+          std::string m_version;	
+          CtorDB m_ctordb;	
+   public:	
+           PluginFactory(const char* name, const char* version):
+               m_name(name),
+               m_version(version)
+           {
+           }
 	
-          /** Get Plugin Name */
-          const char* Name() const
-          {
-              return m_name.data();
-          }
+           /** Get Plugin Name */
+           const char* Name() const
+           {
+               return m_name.data();
+           }
 
-           /** Get Plugin Version */
-          const char* Version() const
-          {
-              return m_version.data();
-          }
+            /** Get Plugin Version */
+           const char* Version() const
+           {
+               return m_version.data();
+           }
 
-          virtual size_t NumberOfClasses() const
-          {
-               return m_ctordb.size();
-          }
-          virtual const char* GetClassName(size_t index) const
-          {
-              return m_ctordb[index].first.data();
-          }
+           virtual size_t NumberOfClasses() const
+           {
+                return m_ctordb.size();
+           }
+           virtual const char* GetClassName(size_t index) const
+           {
+               return m_ctordb[index].first.data();
+           }
 	
-          /** Instantiate a class from its name */
-          void* Factory(const char* className) const
-          {
-              auto it = std::find_if(m_ctordb.begin(), m_ctordb.end(),
-                                     [&className](const auto& p){
-                                             return p.first == className;
-                                     });
-              if(it == m_ctordb.end())
-                      return nullptr;
-              return it->second();
-          }
+           /** Instantiate a class from its name */
+           void* Factory(const char* className) const
+           {
+               auto it = std::find_if(m_ctordb.begin(), m_ctordb.end(),
+                                      [&className](const auto& p){
+                                              return p.first == className;
+                                      });
+               if(it == m_ctordb.end())
+                       return nullptr;
+               return it->second();
+           }
 
-          template<typename AClass>
-          PluginFactory& registerClass(std::string const& name)
-          {
-               auto constructor = []{ return new (std::nothrow) AClass; };
-               m_ctordb.push_back(std::make_pair(name, constructor));
-               return *this;
-          }		
-  };
-  #endif 
-#+END_SRC
+           template<typename AClass>
+           PluginFactory& registerClass(std::string const& name)
+           {
+                auto constructor = []{ return new (std::nothrow) AClass; };
+                m_ctordb.push_back(std::make_pair(name, constructor));
+                return *this;
+           }		
+   };
+   #endif 
+ #+END_SRC
 
+**** File: psdk/loader.hpp 
 
+ Headers:
 
-*** File: psdk/loader.hpp 
+ #+BEGIN_SRC cpp 
+   ifndef _LOADER_HPP_
+   #define _LOADER_HPP_
 
-Headers:
+   #include <cassert>
+   #include <map>
+   #include <memory>
 
-#+BEGIN_SRC cpp 
-  ifndef _LOADER_HPP_
-  #define _LOADER_HPP_
+   #include "interfaces.hpp"
 
-  #include <cassert>
-  #include <map>
-  #include <memory>
+   // Unix
+   #if defined(_WIN32)
+      #include <windows.h>
+   #elif defined(__unix__)
+     // APIs: dlopen, dlclose, dlopen 
+     #include <dlfcn.h>
+   #else
+     #error "Not supported operating system"
+   #endif 
 
-  #include "interfaces.hpp"
+   #ifdef GetClassName 
+     #undef GetClassName 
+   #endif
+ #+END_SRC
 
-  // Unix
-  #if defined(_WIN32)
-     #include <windows.h>
-  #elif defined(__unix__)
-    // APIs: dlopen, dlclose, dlopen 
-    #include <dlfcn.h>
-  #else
-    #error "Not supported operating system"
-  #endif 
+ Class Plugin: 
 
-  #ifdef GetClassName 
-    #undef GetClassName 
-  #endif
-#+END_SRC
+  + This class loads a shared library dynamically with dlopen on Unix
+    or LoadLibrary on Windows and gets a function pointer to the symbol
+    GetPluginFactory which returns a pointer to a statically allocated
+    IPluginFactory object that allows instantiating at runtime any
+    registered class in the plugin.
 
-Class Plugin: 
+ #+BEGIN_SRC cpp 
+   class Plugin
+   {	
+   public:
+     // Function pointer to DLL entry-point
+     using GetPluginInfo_fp = IPluginFactory* (*) ();
 
- + This class loads a shared library dynamically with dlopen on Unix
-   or LoadLibrary on Windows and gets a function pointer to the symbol
-   GetPluginFactory which returns a pointer to a statically allocated
-   IPluginFactory object that allows instantiating at runtime any
-   registered class in the plugin.
+     void*        m_hnd		= nullptr;
+     std::string  m_file		= "";
+     bool         m_isLoaded = false;
+     IPluginFactory* m_info     = nullptr;
 
-#+BEGIN_SRC cpp 
-  class Plugin
-  {	
-  public:
-    // Function pointer to DLL entry-point
-    using GetPluginInfo_fp = IPluginFactory* (*) ();
+     Plugin()
+     {
+     }
 
-    void*        m_hnd		= nullptr;
-    std::string  m_file		= "";
-    bool         m_isLoaded = false;
-    IPluginFactory* m_info     = nullptr;
+     explicit Plugin(std::string file)
+     {
+           m_file = std::move(file);
+          #if !defined(_WIN32)
+             m_hnd = ::dlopen(m_file.c_str(), RTLD_LAZY);
+          #else
+             m_hnd  = (void*) ::LoadLibraryA(m_file.c_str());
+          #endif 
+             m_isLoaded = true;
+             assert(m_hnd != nullptr);
+          #if !defined(_WIN32)
+            auto dllEntryPoint =
+                reinterpret_cast<GetPluginInfo_fp>(dlsym(m_hnd, "GetPluginFactory"));
+          #else
+            auto dllEntryPoint =
+                reinterpret_cast<GetPluginInfo_fp>(GetProcAddress((HMODULE) m_hnd, "GetPluginFactory"));
+          #endif 
+          assert(dllEntryPoint != nullptr);
+          // Retrieve plugin metadata from DLL entry-point function 
+          m_info = dllEntryPoint();
+     }
 
-    Plugin()
-    {
-    }
+     ~Plugin()
+     {
+             this->Unload();
+     }
+     Plugin(Plugin const&) = delete;
+     Plugin& operator=(const Plugin&) = delete;
 
-    explicit Plugin(std::string file)
-    {
-          m_file = std::move(file);
-         #if !defined(_WIN32)
-            m_hnd = ::dlopen(m_file.c_str(), RTLD_LAZY);
-         #else
-            m_hnd  = (void*) ::LoadLibraryA(m_file.c_str());
-         #endif 
-            m_isLoaded = true;
-            assert(m_hnd != nullptr);
-         #if !defined(_WIN32)
-           auto dllEntryPoint =
-               reinterpret_cast<GetPluginInfo_fp>(dlsym(m_hnd, "GetPluginFactory"));
-         #else
-           auto dllEntryPoint =
-               reinterpret_cast<GetPluginInfo_fp>(GetProcAddress((HMODULE) m_hnd, "GetPluginFactory"));
-         #endif 
-         assert(dllEntryPoint != nullptr);
-         // Retrieve plugin metadata from DLL entry-point function 
-         m_info = dllEntryPoint();
-    }
+     Plugin(Plugin&& rhs) 
+     {
+          m_isLoaded	= std::move(rhs.m_isLoaded);
+          m_hnd		= std::move(rhs.m_hnd);
+          m_file		= std::move(rhs.m_file);
+          m_info      = std::move(rhs.m_info);
+     } 
+     Plugin& operator=(Plugin&& rhs)
+     {
+          std::swap(rhs.m_isLoaded, m_isLoaded);
+          std::swap(rhs.m_hnd,  m_hnd);
+          std::swap(rhs.m_file, m_file);
+          std::swap(rhs.m_info, m_info);
+          return *this;
+     }
 
-    ~Plugin()
-    {
-            this->Unload();
-    }
-    Plugin(Plugin const&) = delete;
-    Plugin& operator=(const Plugin&) = delete;
+     IPluginFactory* GetInfo() const
+     {
+        return m_info;
+     }
 
-    Plugin(Plugin&& rhs) 
-    {
-         m_isLoaded	= std::move(rhs.m_isLoaded);
-         m_hnd		= std::move(rhs.m_hnd);
-         m_file		= std::move(rhs.m_file);
-         m_info      = std::move(rhs.m_info);
-    } 
-    Plugin& operator=(Plugin&& rhs)
-    {
-         std::swap(rhs.m_isLoaded, m_isLoaded);
-         std::swap(rhs.m_hnd,  m_hnd);
-         std::swap(rhs.m_file, m_file);
-         std::swap(rhs.m_info, m_info);
-         return *this;
-    }
+     void* CreateInstance(std::string const& className)
+     {
+         return m_info->Factory(className.c_str());
+     }
 
-    IPluginFactory* GetInfo() const
-    {
-       return m_info;
-    }
+     bool isLoaded() const
+     {
+         return m_isLoaded;
+     }
 
-    void* CreateInstance(std::string const& className)
-    {
-        return m_info->Factory(className.c_str());
-    }
+     void Unload()
+     {
+         if(m_hnd != nullptr) {
+            #if !defined(_WIN32)
+               ::dlclose(m_hnd);
+            #else
+               ::FreeLibrary((HMODULE) m_hnd);
+             #endif 
+             m_hnd = nullptr;
+             m_isLoaded = false;
+         }
+     }
+   };
+ #+END_SRC
 
-    bool isLoaded() const
-    {
-        return m_isLoaded;
-    }
+ Class PluginManager: 
 
-    void Unload()
-    {
-        if(m_hnd != nullptr) {
-           #if !defined(_WIN32)
-              ::dlclose(m_hnd);
-           #else
-              ::FreeLibrary((HMODULE) m_hnd);
+ #+BEGIN_SRC cpp 
+   class PluginManager
+   {
+   public:
+         using PluginMap = std::map<std::string, Plugin>;
+         // Plugins database 
+         PluginMap m_plugindb;
+
+         PluginManager()
+         {								
+         }
+         std::string GetExtension() const 
+         {
+            std::string ext;
+            #if defined (_WIN32) 	     
+                  ext = ".dll"; // Windows 
+            #elif defined(__unix__) && !defined(__apple__)
+                  ext = ".so";  // Linux, BDS, Solaris and so on. 
+            #elif defined(__apple__)
+                  ext = ".dylib"; // MacOSX 
+            #else 	 
+              #error "Not implemented for this platform"
             #endif 
-            m_hnd = nullptr;
-            m_isLoaded = false;
-        }
-    }
-  };
-#+END_SRC
+                 return ext;
+         }
 
-Class PluginManager: 
+         IPluginFactory* addPlugin(const std::string& name)
+         {	  		
+                 std::string fileName = name + GetExtension();
+                 m_plugindb[name] = Plugin(fileName);
+                 return m_plugindb[name].GetInfo();
+         }
 
-#+BEGIN_SRC cpp 
-  class PluginManager
-  {
-  public:
-        using PluginMap = std::map<std::string, Plugin>;
-        // Plugins database 
-        PluginMap m_plugindb;
+         IPluginFactory* GetPluginFactory(const char* pluginName)
+         {
+                 auto it = m_plugindb.find(pluginName);
+                 if(it == m_plugindb.end())
+                         return nullptr;
+                 return it->second.GetInfo();
+         }
 
-        PluginManager()
-        {								
-        }
-        std::string GetExtension() const 
-        {
-           std::string ext;
-           #if defined (_WIN32) 	     
-                 ext = ".dll"; // Windows 
-           #elif defined(__unix__) && !defined(__apple__)
-                 ext = ".so";  // Linux, BDS, Solaris and so on. 
-           #elif defined(__apple__)
-                 ext = ".dylib"; // MacOSX 
-           #else 	 
-             #error "Not implemented for this platform"
-           #endif 
-                return ext;
-        }
+         void* CreateInstance(std::string pluginName, std::string className)
+         {
+                 auto it = m_plugindb.find(pluginName);
+                 if(it == m_plugindb.end())
+                         return nullptr;		
+                 return it->second.CreateInstance(className);
+         }
 
-        IPluginFactory* addPlugin(const std::string& name)
-        {	  		
-                std::string fileName = name + GetExtension();
-                m_plugindb[name] = Plugin(fileName);
-                return m_plugindb[name].GetInfo();
-        }
-
-        IPluginFactory* GetPluginFactory(const char* pluginName)
-        {
-                auto it = m_plugindb.find(pluginName);
-                if(it == m_plugindb.end())
-                        return nullptr;
-                return it->second.GetInfo();
-        }
-
-        void* CreateInstance(std::string pluginName, std::string className)
-        {
-                auto it = m_plugindb.find(pluginName);
-                if(it == m_plugindb.end())
-                        return nullptr;		
-                return it->second.CreateInstance(className);
-        }
-
-        template<typename T>
-        std::shared_ptr<T>
-        CreateInstanceAs(std::string pluginName, std::string className)
-        {
-                void* pObj = CreateInstance(std::move(pluginName), std::move(className));
-                return std::shared_ptr<T>(reinterpret_cast<T*>(pObj));
-        }
+         template<typename T>
+         std::shared_ptr<T>
+         CreateInstanceAs(std::string pluginName, std::string className)
+         {
+                 void* pObj = CreateInstance(std::move(pluginName), std::move(className));
+                 return std::shared_ptr<T>(reinterpret_cast<T*>(pObj));
+         }
 	
-  }; /* --- End of class PluginManager --- */
+   }; /* --- End of class PluginManager --- */
 
 
-  #endif 
-#+END_SRC
-*** File: PluginA.cpp 
+   #endif 
+ #+END_SRC
+**** File: PluginA.cpp 
 
-Sample plugin file exporting classes Exp and Log which implement the
-interface IMathFunction. When compiled on Windows, the file name
-becomes PluginA.dll, when compiled on Linux, it becomes PluginA.so.
+ Sample plugin file exporting classes Exp and Log which implement the
+ interface IMathFunction. When compiled on Windows, the file name
+ becomes PluginA.dll, when compiled on Linux, it becomes PluginA.so.
 
-Header: 
+ Header: 
 
-#+BEGIN_SRC cpp 
-  #include <iostream>
-  #include <cmath>
-  #include <psdk/factory.hpp>
-#+END_SRC
+ #+BEGIN_SRC cpp 
+   #include <iostream>
+   #include <cmath>
+   #include <psdk/factory.hpp>
+ #+END_SRC
 
-Interface class IMathFunction: 
+ Interface class IMathFunction: 
 
-#+BEGIN_SRC cpp 
-  class IMathFunction
-  {
-  public:
-      virtual const char* Name() const = 0;
-      virtual double  Eval(double x) const = 0;	
-      virtual ~IMathFunction() = default;
-  };
-#+END_SRC
-
-Sample classes exported by the Plugin: implementations
-
-#+BEGIN_SRC cpp 
-   class Exp: public IMathFunction
+ #+BEGIN_SRC cpp 
+   class IMathFunction
    {
    public:
-       Exp() = default;
-       const char* Name() const {
-          return "Exp";
-       }
-       double Eval(double x) const {
-          return std::exp(x);
-       }
-   };
-
-   class Log: public IMathFunction
-   {
-   public:
-       Log() = default;
-       const char* Name() const {
-          return "Log";
-       }
-       double Eval(double x) const {
-          return std::log(x);
-       }
-   };
-#+END_SRC
-
-Plugin Entry Point: 
-
-  + This function returns a PluginFactory object which contains the
-    shared library metadata and a factory function for instantiating
-    the exported classes Exp and Log. On Unix-like operating system,
-    this global function is loaded  by through the API _dlopen_ and
-    _dlsym_. On Windows, this entry point is loaded through the Win32
-    APIs _LoadLibrary_ and _GetProcAddress_. 
-
-#+BEGIN_SRC cpp 
-   PSDK_PLUGIN_EXPORT_C
-   auto GetPluginFactory() -> IPluginFactory*
-   {
-      static PluginFactory pinfo = []{
-                auto p = PluginFactory("PluginA", "0.1-alpha");
-                p.registerClass<Exp>("Exp");
-                p.registerClass<Log>("Log");
-                return p;
-           }();
-           return &pinfo;
-   }
-#+END_SRC
-*** File: main.cpp 
-
-Main application that loads the sample plugin PluginA, file name
-PluginA.so (Linux) or PluginA.dll (Windows).
-
-Headers and interface:
-
-#+BEGIN_SRC cpp 
-  #include <iostream>
-  #include <psdk/loader.hpp> 
-
-  class IMathFunction
-  {
-  public:
        virtual const char* Name() const = 0;
        virtual double  Eval(double x) const = 0;	
        virtual ~IMathFunction() = default;
-  };
-#+END_SRC
+   };
+ #+END_SRC
 
- *Main Function:*
+ Sample classes exported by the Plugin: implementations
 
-Create a plugin manager object (ma), a repository of plugins: 
+ #+BEGIN_SRC cpp 
+    class Exp: public IMathFunction
+    {
+    public:
+        Exp() = default;
+        const char* Name() const {
+           return "Exp";
+        }
+        double Eval(double x) const {
+           return std::exp(x);
+        }
+    };
 
-#+BEGIN_SRC cpp 
-    PluginManager ma;
-#+END_SRC
+    class Log: public IMathFunction
+    {
+    public:
+        Log() = default;
+        const char* Name() const {
+           return "Log";
+        }
+        double Eval(double x) const {
+           return std::log(x);
+        }
+    };
+ #+END_SRC
 
-Load the plugin file at current directory, on Windows it loads the
-shared library file PluginA.dll and on Linux, it loads the file
-PluginA.so (aka shared object)
+ Plugin Entry Point: 
 
-#+BEGIN_SRC cpp 
-  IPluginFactory* infoA = ma.addPlugin("PluginA");
-  assert(infoA != nullptr);
-#+END_SRC
+   + This function returns a PluginFactory object which contains the
+     shared library metadata and a factory function for instantiating
+     the exported classes Exp and Log. On Unix-like operating system,
+     this global function is loaded  by through the API _dlopen_ and
+     _dlsym_. On Windows, this entry point is loaded through the Win32
+     APIs _LoadLibrary_ and _GetProcAddress_. 
 
-Print plugin metadata: 
+ #+BEGIN_SRC cpp 
+    PSDK_PLUGIN_EXPORT_C
+    auto GetPluginFactory() -> IPluginFactory*
+    {
+       static PluginFactory pinfo = []{
+                 auto p = PluginFactory("PluginA", "0.1-alpha");
+                 p.registerClass<Exp>("Exp");
+                 p.registerClass<Log>("Log");
+                 return p;
+            }();
+            return &pinfo;
+    }
+ #+END_SRC
+**** File: main.cpp 
 
-#+BEGIN_SRC cpp 
-  std::cout << " ---- Plugin Information --------- " << "\n"
-            << "  =>              Name = " << infoA->Name() << "\n"
-            << "  =>           Version = " << infoA->Version() << "\n"
-            << "  => Number of classes = " << infoA->NumberOfClasses()
-            << "\n\n";
+ Main application that loads the sample plugin PluginA, file name
+ PluginA.so (Linux) or PluginA.dll (Windows).
 
-  std::cout << "Classes exported by the Plugin: (PluginA) " << "\n";
+ Headers and interface:
+
+ #+BEGIN_SRC cpp 
+   #include <iostream>
+   #include <psdk/loader.hpp> 
+
+   class IMathFunction
+   {
+   public:
+        virtual const char* Name() const = 0;
+        virtual double  Eval(double x) const = 0;	
+        virtual ~IMathFunction() = default;
+   };
+ #+END_SRC
+
+  *Main Function:*
+
+ Create a plugin manager object (ma), a repository of plugins: 
+
+ #+BEGIN_SRC cpp 
+     PluginManager ma;
+ #+END_SRC
+
+ Load the plugin file at current directory, on Windows it loads the
+ shared library file PluginA.dll and on Linux, it loads the file
+ PluginA.so (aka shared object)
+
+ #+BEGIN_SRC cpp 
+   IPluginFactory* infoA = ma.addPlugin("PluginA");
+   assert(infoA != nullptr);
+ #+END_SRC
+
+ Print plugin metadata: 
+
+ #+BEGIN_SRC cpp 
+   std::cout << " ---- Plugin Information --------- " << "\n"
+             << "  =>              Name = " << infoA->Name() << "\n"
+             << "  =>           Version = " << infoA->Version() << "\n"
+             << "  => Number of classes = " << infoA->NumberOfClasses()
+             << "\n\n";
+
+   std::cout << "Classes exported by the Plugin: (PluginA) " << "\n";
   
-  for(size_t n = 0; n < infoA->NumberOfClasses(); n++)
-  {
-     std::cout << " -> Exported Class: " << infoA->GetClassName(n) << "\n";
-  }
-#+END_SRC
+   for(size_t n = 0; n < infoA->NumberOfClasses(); n++)
+   {
+      std::cout << " -> Exported Class: " << infoA->GetClassName(n) << "\n";
+   }
+ #+END_SRC
 
-Load class 'Exp' from the plugin or module 'PluginA' and casting it to
-the interface IMathFunction.
+ Load class 'Exp' from the plugin or module 'PluginA' and casting it to
+ the interface IMathFunction.
 
-#+BEGIN_SRC cpp 
-   // Type of pExp: std::shared_ptr<IMathFunction>
-   auto pExp = ma.CreateInstanceAs<IMathFunction>("PluginA", "Exp");
-   assert(pExp != nullptr);
+ #+BEGIN_SRC cpp 
+    // Type of pExp: std::shared_ptr<IMathFunction>
+    auto pExp = ma.CreateInstanceAs<IMathFunction>("PluginA", "Exp");
+    assert(pExp != nullptr);
    
-   std::cout << "pExp->Name()    = " << pExp->Name() << "\n";
-   std::cout << "pExp->Eval(3.0) = " << pExp->Eval(3.0) << "\n";
-#+END_SRC
+    std::cout << "pExp->Name()    = " << pExp->Name() << "\n";
+    std::cout << "pExp->Eval(3.0) = " << pExp->Eval(3.0) << "\n";
+ #+END_SRC
 
-Load class 'Log' from plugin 'PluginA':
+ Load class 'Log' from plugin 'PluginA':
 
-#+BEGIN_SRC cpp
-   auto pLog = ma.CreateInstanceAs<IMathFunction>("PluginA", "Log");
-   std::cout << "pLog->Name()    = " << pLog->Name() << "\n";
-   std::cout << "pLog->Eval(3.0) = " << pLog->Eval(3.0) << "\n";
-#+END_SRC
+ #+BEGIN_SRC cpp
+    auto pLog = ma.CreateInstanceAs<IMathFunction>("PluginA", "Log");
+    std::cout << "pLog->Name()    = " << pLog->Name() << "\n";
+    std::cout << "pLog->Eval(3.0) = " << pLog->Eval(3.0) << "\n";
+ #+END_SRC
 
- *Compilation on Linux:*
+  *Compilation on Linux:*
 
-#+BEGIN_SRC sh 
-  # Build application 
-  $ g++ main.cpp -o main.bin -I. -Wall -std=c++1z -ldl
+ #+BEGIN_SRC sh 
+   # Build application 
+   $ g++ main.cpp -o main.bin -I. -Wall -std=c++1z -ldl
 
-  # Build the Plugin  DLL - Shared library 
-  $ g++ PluginA.cpp -o PluginA.so -I. -Wall -std=c++1z -shared -fPIC
+   # Build the Plugin  DLL - Shared library 
+   $ g++ PluginA.cpp -o PluginA.so -I. -Wall -std=c++1z -shared -fPIC
 
-  # Test the application 
-  $ ./main.bin 
-#+END_SRC
+   # Test the application 
+   $ ./main.bin 
+ #+END_SRC
 
- *Compile on Linux with CMake* 
+  *Compile on Linux with CMake* 
 
-#+BEGIN_SRC sh 
-  $ git clone https://github.com/caiorss/sample-cpp-plugin
-  $ cd sample-cpp-plugin
-  $ cmake -Bbuild -H.
-  $ cmake --build build --target install
+ #+BEGIN_SRC sh 
+   $ git clone https://github.com/caiorss/sample-cpp-plugin
+   $ cd sample-cpp-plugin
+   $ cmake -Bbuild -H.
+   $ cmake --build build --target install
  
-  $ ls bin/
-  main.bin*  PluginA.so*
+   $ ls bin/
+   main.bin*  PluginA.so*
 
-  $ ./main.bin 
-#+END_SRC
+   $ ./main.bin 
+ #+END_SRC
 
- *Compile On Windows with CMake* 
+  *Compile On Windows with CMake* 
 
-#+BEGIN_SRC sh 
-  $ git clone https://github.com/caiorss/sample-cpp-plugin
-  $ cd sample-cpp-plugin
-  $ cmake -H. -Bbuild2 -DCMAKE_BUILD_TYPE=DEBUG -G "Visual Studio 15 2017 Win64"
-  $ cmake --build build2 --target install
-  $ cd bin 
+ #+BEGIN_SRC sh 
+   $ git clone https://github.com/caiorss/sample-cpp-plugin
+   $ cd sample-cpp-plugin
+   $ cmake -H. -Bbuild2 -DCMAKE_BUILD_TYPE=DEBUG -G "Visual Studio 15 2017 Win64"
+   $ cmake --build build2 --target install
+   $ cd bin 
 
-  $ ls
-  PluginA.dll*  PluginA.lib  PluginA.so  main.bin  main.exe*
+   $ ls
+   PluginA.dll*  PluginA.lib  PluginA.so  main.bin  main.exe*
   
-  $ main.exe # Load PluginA.dll 
-#+END_SRC
+   $ main.exe # Load PluginA.dll 
+ #+END_SRC
 
- *Program Output:*
+  *Program Output:*
 
-#+BEGIN_SRC text 
-  $ ./main.bin 
-   [TRACE] Shared library PluginA loaded OK.
-   ---- Plugin Information --------- 
-    =>              Name = PluginA
-    =>           Version = 0.1-alpha
-    => Number of classes = 2
+ #+BEGIN_SRC text 
+   $ ./main.bin 
+    [TRACE] Shared library PluginA loaded OK.
+    ---- Plugin Information --------- 
+     =>              Name = PluginA
+     =>           Version = 0.1-alpha
+     => Number of classes = 2
 
-  Classes exported by the Plugin: (PluginA) 
-   -> Exported Class: Exp
-   -> Exported Class: Log
-  pExp->Name()    = Exp
-  pExp->Eval(3.0) = 20.0855
-  pLog->Name()    = Log
-  pLog->Eval(3.0) = 1.09861
-   [TRACE] Shared library PluginA unloaded OK.
-  (base) 
-#+END_SRC
+   Classes exported by the Plugin: (PluginA) 
+    -> Exported Class: Exp
+    -> Exported Class: Log
+   pExp->Name()    = Exp
+   pExp->Eval(3.0) = 20.0855
+   pLog->Name()    = Log
+   pLog->Eval(3.0) = 1.09861
+    [TRACE] Shared library PluginA unloaded OK.
+   (base) 
+ #+END_SRC
 ** Return string from a C++ function to Python Ctypes
 
 Example: Create a function with C linkage or C-API which returns a
