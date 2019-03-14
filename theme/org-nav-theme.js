@@ -56,7 +56,10 @@ var closeTOCMenu = function(){
 }
 
 var isOverflown = function(element) {
-    return element.scrollHeight > element.clientHeight || element.scrollWidth > element.clientWidth;
+	// Vertical overflow
+    return element.scrollHeight > element.clientHeight; 
+    // Horizontal overflow
+    // || element.scrollWidth > element.clientWidth;
 }
 
 var addCodeExpansionButton = function(){
