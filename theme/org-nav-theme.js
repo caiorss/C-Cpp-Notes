@@ -55,6 +55,53 @@ var closeTOCMenu = function(){
     toc.style.setProperty("overflow-y", "hidden");
 }
 
+var isOverflown = function(element) {
+    return element.scrollHeight > element.clientHeight || element.scrollWidth > element.clientWidth;
+}
+
+var addCodeExpansionButton = function(){
+    codes = document.querySelectorAll("pre");   
+	
+	if(window.screen.width <= 960)
+	{  // Mobile	   	
+	   maxHeight = "200px";	
+	   btnLeftPosition = "70%";	   
+	} else {
+		// Desktop
+	   maxHeight = "400px";
+	   btnLeftPosition = "90%";
+	}		
+    
+    codes.forEach(x => {
+		
+		if(!isOverflown(x)) return;
+		
+		var button = document.createElement("button");
+		button.textContent     = "Expand";						
+		button.style.position  = "relative";
+		button.style.top       = "5px";
+		button.style.bottom    = "5px";
+		button.style.left      = btnLeftPosition;
+		button.style.backgroundColor = "black";
+        button.style.color = "white";
+		x.parentNode.insertBefore(button, x);		
+		
+		flag = false;
+		button.addEventListener("click", () => {
+			
+			if(flag == false){
+				x.style.maxHeight = "none";			
+				flag = true;
+			} else {
+				flag = false;
+				x.style.maxHeight = maxHeight;			
+			}
+		});
+		
+	});		
+}
+
+
 var initMobileTocMenu = function(){
     var toc = document.querySelector("#table-of-contents");
     var to  = document.querySelector("#table-of-contents h2");
@@ -66,6 +113,8 @@ var initMobileTocMenu = function(){
     btnTop.style.top       = "20px";    
     btnTop.style.left      = "100px";   
     btnTop.style.position  = "fixed";
+    btnTop.style.color     = "white";
+    btnTop.style.backgroundColor = "black";
     // button.style.zIndex = 10000;
 
     btnTop.addEventListener("click", function(){
@@ -80,6 +129,8 @@ var initMobileTocMenu = function(){
     btnBottom.style.top       = "20px";    
     btnBottom.style.left      = "200px";   
     btnBottom.style.position  = "fixed";
+    btnBottom.style.color     = "white";
+    btnBottom.style.backgroundColor = "black";    
     // button.style.zIndex = 10000;
 
     btnBottom.addEventListener("click", function(){        
@@ -96,6 +147,8 @@ var initMobileTocMenu = function(){
     btnIndex.style.top       = "20px";    
     btnIndex.style.left      = "300px";   
     btnIndex.style.position  = "fixed";
+    btnIndex.style.color     = "white";
+    btnIndex.style.backgroundColor = "black";        
     // button.style.zIndex = 10000;
     btnIndex.addEventListener("click", function(){
         window.location = "index.html";
@@ -124,6 +177,8 @@ var initMobileTocMenu = function(){
     
     var tocLinks = document.querySelectorAll("#table-of-contents a");
     tocLinks.forEach(a => a.addEventListener("click", closeTOCMenu));
+    
+    addCodeExpansionButton();
 
 } // --- End of Function initMobileTocMenu() ---- //
 
@@ -173,8 +228,9 @@ var initDesktopMenu = function () {
         doc.scrollTop = elem.scrollHeight;
         // elem.scrollTop = elem.scrollHeight;
     });
-
-
+	
+	addCodeExpansionButton();
+	
 } // --- End of function() initDesktopMenu() ---- /q
 
 
@@ -182,7 +238,7 @@ var init = function(){
     if (window.screen.width <= 960)
         initMobileTocMenu();
     if(window.screen.width > 960)
-        initDesktopMenu();
+        initDesktopMenu();        
 }
 
 
