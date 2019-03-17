@@ -1139,6 +1139,188 @@ Experiment 2: Boost ptr_vector
   std::cout << " ============= END =================" << "\n";
 #+END_SRC
 
+** Boost Interprocess 
+*** Overview  
+
+[[https://www.boost.org/doc/libs/1_69_0/doc/html/interprocess.html][Boost.Interprocess]] is a library that provides wrappers or a common
+interface for many operating-system-specific inter process
+communication (IPC) primitive functions. The library provides wrappers
+to the following IPC facilities:
+
+ + File locking 
+ + Mutex
+ + Semaphore 
+ + Shared Memory
+ + Memory Mapped File
+ + Message Queue 
+*** Example: Shared memory logging 
+
+This sample program emulates a client that sends logging message to a
+shared memory segment and a server that receives the logging messages
+from the shared memory and prints them to the standard output
+stdout. A named mutex object is used for coordinating both processes. 
+
+ *File:*
+ + [[file:src/boost/boost-shared-memory-logger.cpp][file:src/boost/boost-shared-memory-logger.cpp]]
+
+ *Headers:*
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+  #include <sstream>
+
+  #include <cstring> // strok 
+  #include <ctime>
+  #include <chrono>
+
+  #include <boost/interprocess/mapped_region.hpp>
+  #include <boost/interprocess/shared_memory_object.hpp>
+  #include <boost/interprocess/sync/named_mutex.hpp>
+  #include <boost/interprocess/sync/scoped_lock.hpp>
+#+END_SRC
+
+ *Namespace Alias*
+
+#+BEGIN_SRC cpp 
+  namespace bi = boost::interprocess;
+#+END_SRC
+
+ *Function Main* 
+
+Create shared memory segment: 
+
+#+BEGIN_SRC cpp 
+     // Create shared memory wrapper object 
+     auto shm = bi::shared_memory_object{
+             bi::open_or_create,  
+             "logger_shm",
+             bi::read_write
+     };
+     // Set size of the shared memory segment in Kb (kbytes = 1024 bytes)
+     shm.truncate(4096); // 4kb (kbytes)
+     // Map the shared memory segment to current process
+     auto region = bi::mapped_region{shm, bi::read_write};
+     // Pointer to shared memory 
+     void* pMem = region.get_address();
+#+END_SRC
+
+Create a named mutex object for process synchronizing the shared memory
+access: 
+
+#+BEGIN_SRC cpp 
+   // Create mutex Object 
+   bi::named_mutex amutex(bi::open_or_create, "logger_mutex");
+#+END_SRC
+
+Check command line arguments: 
+
+#+BEGIN_SRC cpp 
+  if(argc < 2){
+      std::cout << "$ " << argv[0] << " [-client|-server]" << "\n";
+      return EXIT_SUCCESS;
+  }
+
+  std::string cmd = argv[1];
+#+END_SRC
+
+Server command: 
+
+#+BEGIN_SRC cpp 
+     if(cmd == "-server"){
+         char* pMessage = (char*) pMem;
+         while(true)
+         {
+              std::cerr << " [TRACE] Waiting logging message " << std::endl;
+              // Acquire mutex lock blocking this thread 
+              amutex.lock();
+              // Print logging memssage from shared memory 
+              std::cout << pMessage << std::endl;
+         }
+         return EXIT_SUCCESS;
+     }
+#+END_SRC
+
+Client command: 
+
+#+BEGIN_SRC cpp 
+     if(cmd == "-client")
+     {
+         // Interpret shared memory as a pointer an null-terminated
+         // array of characters 
+         char* pMessage = (char*) pMem;
+         std::string line;
+         while(true)
+         {
+             std::cout << " => Enter line: ";
+             std::getline(std::cin, line);			
+             std::stringstream ss;
+             auto now = std::chrono::system_clock::now();
+             std::time_t ttp = std::chrono::system_clock::to_time_t(now);
+             ss << " [INFO] " << strtok(std::ctime(&ttp), "\n") << " - " << line;
+             // Print to shared memory (pointer by pMessage)
+             std::sprintf(pMessage, "%s", ss.str().c_str());
+             // Release mutex lock 
+             amutex.unlock();
+         }	   
+         return EXIT_SUCCESS;
+     }
+#+END_SRC
+
+ *Compiling on Linux or any other Unix-like OS:*
+
+#+BEGIN_SRC sh 
+ # Clang 
+ $ clang++ boost-shared-memory-logger.cpp -o logger.bin -std=c++1z -g -O0 -Wall -lpthread -lrt  
+ # GCC
+ $ gcc++ boost-shared-memory-logger.cpp -o logger.bin -std=c++1z -g -O0 -Wall -lpthread -lrt  
+#+END_SRC
+
+ *Compiling on Windows with MingW/GCC* 
+
+#+BEGIN_SRC sh 
+  $ g++ boost-logger.cpp -o boost-logger.exe -IC:\boost\boost_1_69_0
+#+END_SRC
+
+ *Compiling on Windows with MSVC (VC++)*
+
+Problem when compiling faced:
+ + [[https://stackoverflow.com/questions/9628527/linker-error-lnk1104-with-libboost-filesystem-vc100-mt-s-1-49-lib][c++ - Linker error LNK1104 with 'libboost_filesystem-vc100-mt-s-1_49.lib' - Stack Overflow]]
+
+#+BEGIN_SRC sh 
+  $ cl.exe boost-logger.cpp /Fe:boost-logger1.exe /EHsc /GA /MDd /nologo /I C:\boost\boost_1_69_0 /link /LIBPATH:C:\boost\lib
+#+END_SRC
+
+Run program as server in terminal 1: 
+
+#+BEGIN_SRC sh 
+  $ ./logger.bin -server
+   [TRACE] Waiting logging message 
+   [INFO] Sun Mar 17 08:13:26 2019 - price 10% up
+   [TRACE] Waiting logging message 
+   [INFO] Sun Mar 17 08:13:38 2019 - price change 4.5 down
+   [TRACE] Waiting logging message 
+   [INFO] Sun Mar 17 08:14:07 2019 - new forecast arriving soon
+   [TRACE] Waiting logging message 
+   [INFO] Sun Mar 17 08:14:11 2019 - new data
+   [TRACE] Waiting logging message 
+   ... ...  ... ...  ... ...  ... ... 
+#+END_SRC
+
+Run program as client in terminal 2: 
+ + User type messages in this terminal and they are sent to the shared
+   memory buffer, then mutex lock is released what makes the server
+   process print the message from the shared memory to standard output.
+
+
+#+BEGIN_SRC sh 
+  $ ./logger.bin -client
+   => Enter line: price 10% up
+   => Enter line: price change 4.5 down
+   => Enter line: new forecast arriving soon
+   => Enter line: new data
+   => Enter line: ^C
+#+END_SRC
 ** Library Map 
 *** Math 
 
