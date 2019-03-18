@@ -1714,7 +1714,7 @@ Client command:
 
  *Compiling on Windows with MSVC (VC++)*
 
-Problem when compiling faced:
+Problem faced when compiling wiht MSVC:
  + [[https://stackoverflow.com/questions/9628527/linker-error-lnk1104-with-libboost-filesystem-vc100-mt-s-1-49-lib][c++ - Linker error LNK1104 with 'libboost_filesystem-vc100-mt-s-1_49.lib' - Stack Overflow]]
 
 #+BEGIN_SRC sh 
@@ -1751,6 +1751,225 @@ Run program as client in terminal 2:
    => Enter line: new data
    => Enter line: ^C
 #+END_SRC
+*** Example: Memory Mapped Files 
+
+Most operating systems have system-calls or APIs for mapping files
+into a process' address space or virtual memory which allows reading
+and writing to a file as it was a memory. Any changes in memory-mapped
+file memory segment is immediately written to the disk. 
+
+Among other thing the memory-mapped files provides the following
+benefits:
+ + Faster file processing, specially for big files of Gigabyte-size.
+ + Persistence and serialization: Any object allocated in a
+   memory-mapped file segment is automatically written to the disk.
+
+See also: 
+ + Boost.Interprocess: [[https://www.boost.org/doc/libs/1_69_0/doc/html/interprocess/sharedmemorybetweenprocesses.html#interprocess.sharedmemorybetweenprocesses.mapped_file][Memory Mapped Files]]
+ + Boost.Interprocess: [[https://www.boost.org/doc/libs/1_69_0/doc/html/interprocess/managed_memory_segments.html#interprocess.managed_memory_segments.managed_mapped_files][Managed Mapped Files]]
+ + [[http://john.freml.in/mmap-pattern][John Fremlin's blog: The mmap pattern]]
+ + [[https://en.wikipedia.org/wiki/Memory-mapped_file][Memory-mapped file - Wikipedia]]
+
+ *File*:
+  + [[file:src/boost/boost-memory-mapped-file.cpp][file:src/boost/boost-memory-mapped-file.cpp]]
+
+Headers: 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <functional>
+  #include <string>
+  #include <fstream>
+  #include <vector>
+
+  #include <boost/interprocess/managed_mapped_file.hpp>
+  #include <boost/interprocess/file_mapping.hpp>
+  #include <boost/interprocess/mapped_region.hpp>
+#+END_SRC
+
+ *Namespace alias:*
+
+#+BEGIN_SRC cpp 
+  namespace bi = boost::interprocess;	
+#+END_SRC
+
+ *Template aliases:*
+
+#+BEGIN_SRC cpp 
+  /** Generic Memory-mapped file allocator */
+  template<typename T>
+  using MMFAllocator = bi::allocator<T, bi::managed_mapped_file::segment_manager> ;
+
+  /** Generic STL vector allocated in memory-mapped file */
+  template<typename T>
+  using MMFVector = std::vector<T, MMFAllocator<T>> ;
+#+END_SRC
+
+ *Function Main*
+
+Intial definitions: 
+
+#+BEGIN_SRC cpp 
+  constexpr const char* fileName = "memory-dump.dat";
+  constexpr size_t      fileSize = 4096; // 4 kbytes
+  bool flagFileExists            = fileExists(fileName);
+
+  // Manged file mapping object => Creates the file if it does not exists 
+  auto mf = bi::managed_mapped_file{bi::open_or_create, fileName, fileSize};
+#+END_SRC
+
+Check if file exits, if does not exist yet, then initial data is
+written to the file by allocating data in the mapped memory. 
+
+#+BEGIN_SRC cpp 
+  if(!flagFileExists){
+       // Executed when the file did not exist 
+       std::cout << " [INFO] Setting file data" << std::endl;
+       mf.construct<int>("NumberOfNodes")(100);	
+       mf.construct<double>("Speed")(200.0);
+       mf.construct<const char*>("Text")("'Allocated text in memory mapped file'");
+
+       // Allocate std::vector<double>
+       MMFAllocator<double> aloc1(mf.get_segment_manager());
+       MMFVector<double>* pVector = mf.construct<MMFVector<double>>("AVector")(aloc1);
+       pVector->reserve(20);
+       pVector->push_back(40.5);
+       pVector->push_back(98.10);
+       pVector->push_back(-50.45);
+       pVector->push_back(10);		
+
+       return EXIT_SUCCESS;
+  }
+#+END_SRC
+
+If the file already exists, then it is mapped into the current
+process' virtual memory and the data extracted just by reading the
+memory, any modification to this mapped segment is written to the file
+memory-dump.dat. 
+
+Get variable: NumberOfNodes and increment it.
+
+#+BEGIN_SRC cpp 
+  // ======= Executed when file already exists =========// 
+
+  std::cout << " [INFO] Retrieving objects from memory mapped file" << std::endl;
+
+  // Retrieve variable NumberOfNodes with very explicitly and verbose notation 
+  std::pair<int*, size_t> pairResult1 =  mf.find<int>("NumberOfNodes");
+  if(pairResult1.first == nullptr){
+          std::cerr << " [ERROR] I cannot find the object 'NumberOfNodes'" << std::endl;
+          return EXIT_FAILURE;
+  }
+  std::cout << "Number of nodes = " << *pairResult1.first  << "\n";
+  (*pairResult1.first)++;
+#+END_SRC
+
+Get variable 'Text' and display it. 
+
+#+BEGIN_SRC cpp 
+  // Retrieve variable text
+  auto [pText, _size1 ] = mf.find<const char*>("Text");
+  assert(pText != nullptr);
+  std::cout << "Text = " << *pText << "\n";
+#+END_SRC
+
+Get variable 'Speed' and update it with value read from user input. 
+
+#+BEGIN_SRC cpp 
+  // Retrieve variable speed
+  auto [pSpeed, _size2 ] = mf.find<double>("Speed");
+  assert(pSpeed != nullptr);
+  std::cout << "Speed = " << *pSpeed << "\n";
+  std::cout << " => Set new speed := ";
+  std::cin >> *pSpeed;
+#+END_SRC
+
+Get vector named 'AVector', display, and update it. 
+
+#+BEGIN_SRC cpp 
+  // Rerieve vector
+  auto [pVector, _size3] = mf.find<MMFVector<double>>("AVector");
+  assert(pVector != nullptr);
+  std::cout << "\n pVector->size() = " << pVector->size() << std::endl;
+  size_t idx = 0;
+  for(auto const& x: *pVector)
+     std::cout << " pVector[" << idx++ << "] = " << x << std::endl ;	
+
+  pVector->push_back(*pSpeed);	
+  return 0;
+#+END_SRC
+
+ *Compile on Linux or any other Unix-like OS*
+
+#+BEGIN_SRC sh    
+  # Clang 
+  $ clang++ boost-memory-mapped-file.cpp -o boost-memory-mapped-file.bin -std=c++1z -g -O0 -Wall -lpthread -lrt 
+  # GCC
+  $ g++ boost-memory-mapped-file.cpp -o boost-memory-mapped-file.bin -std=c++1z -g -O0 -Wall -lpthread -lrt 
+#+END_SRC
+
+ *Compile on Windows*
+
+Compile with MSVC (VC++)
+
+#+BEGIN_SRC bat
+  $ cl.exe boost-memory-mapped-file.cpp /Fe:boost-memory-mapped-file.exe /EHsc /std:c++17 ...
+     /GA /MDd /nologo /I C:\boost\boost_1_69_0 /link /LIBPATH:C:\boost\lib
+#+END_SRC
+
+Compile with Mingw
+
+#+BEGIN_SRC sh 
+  $ g++ boost-memory-mapped-file.cpp -o boost-memory-mapped-file.exe -std=c++1z -I C:\boost\boost_1_69_0
+#+END_SRC
+
+ *Running* 
+
+Running for the first time, before the file 'memory-dump.dat'
+exists. Note: (compiled with Mingw).
+
+#+BEGIN_SRC sh 
+  F:\boost> boost-memory-mapped-file.exe
+
+   [INFO] Setting file data
+#+END_SRC
+
+Running for the second time: 
+
+#+BEGIN_SRC sh 
+  F:\boost> boost-memory-mapped-file.exe
+
+   [INFO] Retrieving objects from memory mapped file
+  Number of nodes = 100
+  Text = 'Allocated text in memory mapped file'
+  Speed = 200
+   => Set new speed := 4.51
+
+   pVector->size() = 4
+   pVector[0] = 40.5
+   pVector[1] = 98.1
+   pVector[2] = -50.45
+   pVector[3] = 10
+#+END_SRC
+
+Running for the third time: 
+
+#+BEGIN_SRC sh 
+  F:\boost> boost-memory-mapped-file.exe
+   [INFO] Retrieving objects from memory mapped file
+  Number of nodes = 101
+  Text = 'Allocated text in memory mapped file'
+  Speed = 4.51
+   => Set new speed := 125.75
+
+   pVector->size() = 5
+   pVector[0] = 40.5
+   pVector[1] = 98.1
+   pVector[2] = -50.45
+   pVector[3] = 10
+   pVector[4] = 4.51
+#+END_SRC
+
 ** Library Map 
 *** Math 
 
