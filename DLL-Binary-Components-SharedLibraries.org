@@ -3787,6 +3787,8 @@ Global object for DLL initialization (optional):
 Exposed functions declarations: 
 
 #+BEGIN_SRC cpp 
+  /** ======== List of functions exposed to Python =========== */
+
   PyObject*
   exposedFunction(PyObject* self, PyObject* args);
 
@@ -3794,7 +3796,10 @@ Exposed functions declarations:
 
   auto printRange(PyObject* self, PyObject* args) -> PyObject*;
   auto taylorSeriesExp(PyObject* self, PyObject* args) -> PyObject*;
+  PyObject* returnTuple(PyObject* self, PyObject* args);
+  PyObject* returnDictionary(PyObject* self, PyObject* args);
   PyObject* tabulateFunction(PyObject* self, PyObject* args);
+  PyObject* computeStatistics(PyObject* self, PyObject* args);
 #+END_SRC
 
 Table of exported functions to the Python module: 
@@ -3802,25 +3807,28 @@ Table of exported functions to the Python module:
 #+BEGIN_SRC cpp 
   static PyMethodDef ModuleFunctions [] =
   {
-       { "exposedFunction", exposedFunction, METH_VARARGS,
-         "Documentation or docstring of function exposedFunction1." }
+          { "exposedFunction", exposedFunction, METH_VARARGS,
+            "Documentation or docstring of function exposedFunction1." }
 
-       ,{"testArguments", testArguments, METH_VARARGS,
-         "Test python arguments: Signature testArguments(int, float, double, const char*)"}
+          ,{"testArguments", testArguments, METH_VARARGS,
+            "Test python arguments: Signature testArguments(int, float, double, const char*)"}
+	
+          // Function without docstring: printRange(int i, double x)
+          ,{ "printRange", printRange, METH_VARARGS, nullptr }
 
-       // Function without docstring: printRange(int i, double x)
-       ,{ "printRange", printRange, METH_VARARGS, nullptr }
-
-       ,{ "taylorSeriesExp", &taylorSeriesExp, METH_VARARGS,
-          "taylorSeriesExp(double x, size_t maxiter, double tol) -> double"
-          "\n Computes exponential of a given value with taylor serie approximation."
-          "\n Formula reference:  https://www.mathsisfun.com/algebra/taylor-series.html"
-       }
-       ,{"tabulateFunction", tabulateFunction, METH_VARARGS,
-           "Tabulate some mathematical function or callable object"}
-       // Sentinel value used to indicate the end of function listing.
-       // All function listing must end with this value.
-       ,{nullptr, nullptr, 0, nullptr}									
+          ,{ "taylorSeriesExp", &taylorSeriesExp, METH_VARARGS,
+             "taylorSeriesExp(double x, size_t maxiter, double tol) -> double"
+             "\n Computes exponential of a given value with taylor serie approximation."
+             "\n Formula reference:  https://www.mathsisfun.com/algebra/taylor-series.html"
+          }
+          ,{"returnTuple", &returnTuple, METH_VARARGS, nullptr}
+          ,{"returnDictionary", &returnDictionary, METH_VARARGS, nullptr}
+          ,{"computeStatistics", &computeStatistics, METH_VARARGS, nullptr}
+          ,{"tabulateFunction", tabulateFunction, METH_VARARGS,
+            "Tabulate some mathematical function or callable object"}
+          // Sentinel value used to indicate the end of function listing.
+          // All function listing must end with this value.
+          ,{nullptr, nullptr, 0, nullptr}									
   };
 #+END_SRC
 
@@ -3982,6 +3990,9 @@ Function Py_BuildValue("s", str.data());
    class instance or multiple values as a tuple. 
  
 #+BEGIN_SRC cpp 
+  // Return None in the python side 
+  return Py_BuildValue("");
+
   // Return a single value as string string 
   return Py_BuildValue("s", str.data());
   return Py_BuildValue("s", "A string to python side");
@@ -4035,6 +4046,120 @@ Function Py_BuildValue("s", str.data());
           std::cout << " k[" << k << "] = " << 3 * k + x << "\n";	
        Py_RETURN_NONE;
    }
+
+#+END_SRC
+
+ *Function: returnTuple* 
+
+ + Return multiple values as tuple. 
+
+#+BEGIN_SRC cpp 
+  /** Function that returns multiple values as tuple object */
+  PyObject* returnTuple(PyObject* self, PyObject* args)
+  {
+       double x;
+       double y;
+       int    n;
+       if(!PyArg_ParseTuple(args, "ddi", &x, &y, &n))
+               return nullptr;
+       // Build tuple object containing
+       // (d: double, d: double, i: integer, s: string)
+       return Py_BuildValue("(ddis)", 2 * x + y * n, x + 2 * y - n, n, "Result"); 
+  }
+#+END_SRC
+
+ *Function: returnDictionary*
+
+ + Return a dictionary (hash-table) 
+
+#+BEGIN_SRC cpp 
+  /** Return a dictionary object */
+  PyObject* returnDictionary(PyObject* self, PyObject* args)
+  {
+       double x;
+       double y;
+       int    n;
+       if(!PyArg_ParseTuple(args, "ddi", &x, &y, &n))
+               return nullptr;
+
+       // Create new dictionary object 
+       PyObject* pDict = PyDict_New();
+
+       PyObject* p = nullptr;
+       // Fill dictionary
+       p = Py_BuildValue("d", 2 * x + y * n);
+       PyDict_SetItemString(pDict, "alpha", p);
+       Py_DECREF(p);
+
+       p = Py_BuildValue("i", 3 * n) ;
+       PyDict_SetItemString(pDict, "size", p);
+       Py_DECREF(p);
+
+       p = Py_BuildValue("s", "Some string") ;
+       PyDict_SetItemString(pDict, "beta", p);
+       Py_DECREF(p);	
+
+       return pDict;
+  }
+#+END_SRC
+
+ *Function: computeStatistics*
+
+ + Computes statistics sum and mean for any iterable object containing
+   double values such as list.
+
+#+BEGIN_SRC cpp 
+  PyObject* computeStatistics(PyObject* self, PyObject* args)
+  {
+       std::cerr << " [TRACE] " << __FILE__ << "(" << __LINE__ << ") - "
+                         << "Calling function: " << __FUNCTION__ << "\n";
+
+       std::cerr << " [TRACE] Arguments = "; PyObject_Print(args, stdout, 0); std::cerr << "\n";
+
+       PyObject* pSeq;
+       // Parse function argument as sequence
+       if(!PyArg_ParseTuple(args, "O", &pSeq))
+               return nullptr;
+
+       pSeq = PySequence_Fast(pSeq, "Expected iterable arguments");
+       if(pSeq == nullptr) return nullptr;
+
+       int numberOfElements = PySequence_Fast_GET_SIZE(pSeq);
+       std::cerr << " [TRACE] numberOfElements = " << numberOfElements << "\n";
+
+       PyObject* pItem = nullptr;
+       double x;
+       double sum;
+
+       for(int n = 0; n < numberOfElements; n++)
+       {
+           pItem = PySequence_Fast_GET_ITEM(pSeq, n);
+           if(!pItem) {
+               Py_DECREF(pSeq);
+               return nullptr;
+           }
+           // Print item 
+           std::cout << "item[" << n << "] = ";
+           PyObject_Print(pItem, stdout, 0);
+           std::cout << "\n";
+
+           x = PyFloat_AsDouble(pItem);
+           if(PyErr_Occurred() != nullptr){
+                   PyErr_SetString(PyExc_TypeError, "Error: expected float point.");
+                   return nullptr;
+           }
+           sum += x;
+       }
+
+       double mean = sum / numberOfElements;
+       std::cout << "\n (C++) Statics Result " << "\n";
+       std::cout << "---------------" << "\n";
+       std::cout << " Sum  = " << sum << "\n";
+       std::cout << " Mean = " << mean << "\n";
+
+       Py_DECREF(pSeq);
+       return Py_BuildValue(""); // Return None 
+  }
 
 #+END_SRC
 
@@ -4227,7 +4352,7 @@ Load module in Python 3 REPL:
   [GCC 7.3.0] :: Anaconda, Inc. on linux
   Type "help", "copyright", "credits" or "license" for more information.
   >>> 
-  >>> import mymodule as a
+  >>> import mymodule as m
    [TRACE] Python module DLL loaded by process PID = <5236> 
    [TRACE] Attach the debugger with: $ gdb -pid=5236
   >>> 
@@ -4237,26 +4362,32 @@ Load module in Python 3 REPL:
 Module Docstring (documentation): 
 
 #+BEGIN_SRC python 
-  >>> help(a)
+  >>> help(m)
   Help on module mymodule:
 
   NAME
       mymodule - A sample C++ native-code module for python3.
 
   FUNCTIONS
+      computeStatistics(...)
+    
       exposedFunction(...)
           Documentation or docstring of function exposedFunction1.
-
+    
       printRange(...)
-
+    
+      returnDictionary(...)
+    
+      returnTuple(...)
+    
       tabulateFunction(...)
           Tabulate some mathematical function or callable object
-
+    
       taylorSeriesExp(...)
           taylorSeriesExp(double x, size_t maxiter, double tol) -> double
           Computes exponential of a given value with taylor serie approximation.
           Formula reference:  https://www.mathsisfun.com/algebra/taylor-series.html
-
+    
       testArguments(...)
           Test python arguments: Signature testArguments(int, float, double, const char*)
 
@@ -4264,13 +4395,13 @@ Module Docstring (documentation):
       version = 'version 0.1-Alpha'
 
   FILE
-      /home/archbox/Documents/projects/cpp-programming.cpp/src/dlls/mymodule.so
+      /home/archbox/shared/python-module/mymodule.so
 #+END_SRC
 
 Module version: 
 
 #+BEGIN_SRC python
-  >>> a.version
+  >>> m.version
   'version 0.1-Alpha'
   >>> 
 #+END_SRC
@@ -4278,7 +4409,7 @@ Module version:
 Call function exposedFunction()
 
 #+BEGIN_SRC python 
-  >>> a.exposedFunction()
+  >>> m.exposedFunction()
    =>> Hello word Python from C++ side.
   >>> 
 #+END_SRC
@@ -4286,7 +4417,7 @@ Call function exposedFunction()
 Call function testArguments:
 
 #+BEGIN_SRC python 
-  >>> s1 = a.testArguments(False, 100, 10.9361, 0.344, "from Python to C++")
+  >>> s1 = m.testArguments(False, 100, 10.9361, 0.344, "from Python to C++")
    Function: [testArguments] ==> Number of arguments = 5
    Received Python Arguments 
   abool[bool] = false
@@ -4301,7 +4432,7 @@ Call function testArguments:
   >>> 
 
   >>> 
-  >>> s2 = a.testArguments(True, 90, -0.56e6, 9.344e5, "something else more")
+  >>> s2 = m.testArguments(True, 90, -0.56e6, 9.344e5, "something else more")
    Function: [testArguments] ==> Number of arguments = 5
    Received Python Arguments 
   abool[bool] = true
@@ -4318,33 +4449,97 @@ Call function testArguments:
 Call function printRange()
 
 #+BEGIN_SRC python
-  >>> a.printRange(5, 4.5)
+  >>> m.printRange(5, 4.5)
    =>> Printing numeric range 
    k[0] = 4.5
    k[1] = 7.5
    k[2] = 10.5
    k[3] = 13.5
    k[4] = 16.5
-  >>> 
-  >>> a.printRange(-5, 4.5)
+
+  >>> m.printRange(-5, 4.5)
    =>> Printing numeric range 
   Traceback (most recent call last):
     File "<stdin>", line 1, in <module>
   RuntimeError: Invalid argument: n supposed to be greater than zero.
-  >>> 
-  >>> a.printRange(0, 4.5)
+
+  >>> m.printRange(0, 4.5)
    =>> Printing numeric range 
   Traceback (most recent call last):
     File "<stdin>", line 1, in <module>
   RuntimeError: Invalid argument: n supposed to be greater than zero.
-  >>> 
-  >>> 
+#+END_SRC
+
+Calll function returnTuple:
+
+#+BEGIN_SRC python 
+   >>> tpl = m.returnTuple(3.5, 4.2, 10)
+
+   >>> tpl
+   (49.0, 1.9000000000000004, 10, 'Result')
+
+   >>> tpl[0]
+   49.0
+
+   >>> tpl[1]
+   1.9000000000000004
+
+   >>> tpl[2]
+   10
+
+   >>> m.returnTuple(8.5, 4.2, 20)
+   (101.0, -3.1000000000000014, 20, 'Result')
+#+END_SRC
+
+Call functon returnDictionary: 
+
+#+BEGIN_SRC python 
+   >>> d = m.returnDictionary(8.5, 8.62, 10)
+
+   >>> d
+   {'alpha': 103.19999999999999, 'size': 30, 'beta': 'Some string'}
+
+   >>> d["alpha"]
+   103.19999999999999
+
+   >>> d["beta"]
+   'Some string'
+
+   >>> d["size"]
+   30
+#+END_SRC
+
+Call function computeStatistics:
+
+#+BEGIN_SRC python 
+   >>> xs = [4, 1.2, 9.5, 10.5, 3.4, 5.10, 6.0]
+
+   >>> xs
+   [4, 1.2, 9.5, 10.5, 3.4, 5.1, 6.0]
+
+   >>> m.computeStatistics(xs)
+    [TRACE] mymodule.cpp(268) - Calling function: computeStatistics
+    [TRACE] Arguments = ([4, 1.2, 9.5, 10.5, 3.4, 5.1, 6.0],)
+    [TRACE] numberOfElements = 7
+   item[0] = 4
+   item[1] = 1.2
+   item[2] = 9.5
+   item[3] = 10.5
+   item[4] = 3.4
+   item[5] = 5.1
+   item[6] = 6.0
+
+    (C++) Statics Result 
+   ---------------
+    Sum  = 39.7
+    Mean = 5.67143
+   >>> 
 #+END_SRC
 
 Call function taylorSerieExp: 
 
 #+BEGIN_SRC python 
-  >>> help(a.taylorSeriesExp)
+  >>> help(m.taylorSeriesExp)
   Help on built-in function taylorSeriesExp in module mymodule:
 
   taylorSeriesExp(...)
@@ -4359,10 +4554,10 @@ Call function taylorSerieExp:
   33.11545195869231
 
   # Approximation 
-  >>> a.taylorSeriesExp(3.5, 10, 0.001)
+  >>> m.taylorSeriesExp(3.5, 10, 0.001)
    [ERROR] Series does not converge.
   nan
-  >>> a.taylorSeriesExp(3.5, 100, 0.001)
+  >>> m.taylorSeriesExp(3.5, 100, 0.001)
   33.10588185071678
   >>> 
 
@@ -4371,10 +4566,10 @@ Call function taylorSerieExp:
   148.4131591025766
 
   # Approximation 
-  >>> a.taylorSeriesExp(5.0, 100, 0.001)
+  >>> m.taylorSeriesExp(5.0, 100, 0.001)
   148.37958007973663
 
-  >>> a.taylorSeriesExp(5.0, 100, 0.0001)
+  >>> m.taylorSeriesExp(5.0, 100, 0.0001)
   148.41021027504306
   >>> 
 #+END_SRC
@@ -4383,7 +4578,7 @@ Call function: tabulateFunction which takes a callable object as
 argumet. 
 
 #+BEGIN_SRC python 
->>> help(a.tabulateFunction)
+>>> help(m.tabulateFunction)
 Help on built-in function tabulateFunction in module mymodule:
 
 tabulateFunction(...)
@@ -4403,7 +4598,7 @@ Pass ordinary functions:
   11.180339887498949
   >>> 
 
-  >>> a.tabulateFunction(math.exp, -5.0, 5.0, 1.0)
+  >>> m.tabulateFunction(math.exp, -5.0, 5.0, 1.0)
   Tabulating range:  ; xmin = -5.0000 ; xmax = 5.0000 ; step = 1.0000
    -5.0000    0.0067
    -4.0000    0.0183
@@ -4431,7 +4626,7 @@ Pass ordinary functions:
 Pass lambda functions: 
 
 #+BEGIN_SRC cpp 
-  >>> a.tabulateFunction(lambda x: x, 0.0, 25.0, 4.0)
+  >>> m.tabulateFunction(lambda x: x, 0.0, 25.0, 4.0)
   Tabulating range:  ; xmin = 0.0000 ; xmax = 25.0000 ; step = 4.0000
     0.0000    0.0000
     4.0000    4.0000
@@ -4442,7 +4637,7 @@ Pass lambda functions:
    24.0000   24.0000
   >>> 
 
-  >>> a.tabulateFunction(lambda x: 3 * x + 5, 0.0, 25.0, 4.0)
+  >>> m.tabulateFunction(lambda x: 3 * x + 5, 0.0, 25.0, 4.0)
   Tabulating range:  ; xmin = 0.0000 ; xmax = 25.0000 ; step = 4.0000
     0.0000    5.0000
     4.0000   17.0000
@@ -4479,7 +4674,7 @@ Pass a callable object:
   >>> lfun.eval(6)
   34
 
-  >>> a.tabulateFunction(lfun, 0.0, 25.0, 4.0)
+  >>> m.tabulateFunction(lfun, 0.0, 25.0, 4.0)
   Tabulating range:  ; xmin = 0.0000 ; xmax = 25.0000 ; step = 4.0000
     0.0000    4.0000
     4.0000   24.0000
@@ -4505,7 +4700,7 @@ Pass a callable object:
   5
   >>> lfun.a  = 0
   >>> 
-  >>> a.tabulateFunction(lfun.eval, 0.0, 25.0, 4.0)
+  >>> m.tabulateFunction(lfun.eval, 0.0, 25.0, 4.0)
   Tabulating range:  ; xmin = 0.0000 ; xmax = 25.0000 ; step = 4.0000
     0.0000    4.0000
     4.0000    4.0000
