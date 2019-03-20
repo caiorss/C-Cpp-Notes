@@ -3715,6 +3715,7 @@ Reverse engineering:
  + [[https://recon.cx/2008/a/aaron_portnoy-ali_rizvi_santiago/slides.pdf][Reverse Engineering Dynamic Languages - A Focus on Python]]
 
 *** Module Code 
+**** Sources  
 
  *Module Source:*
 
@@ -3730,9 +3731,27 @@ Reverse engineering:
   # Clang LLVM 
   $ clang++ mymodule.cpp -o mymodule.so -g -std=c++1z -fPIC -shared -I/usr/include/python3.6m  
 #+END_SRC
+**** File: setup.py 
 
-Header files: 
+Python script used for building and installing the Python module.
 
+#+CAPTION: File setup.py 
+#+BEGIN_SRC python 
+  from distutils.core import setup, Extension
+
+  mymodule = Extension('mymodule', sources = ['mymodule.cpp'])
+
+  setup(
+      name        = 'mymodule',
+      version     = '1.0',
+      description = 'Sample python C-API exploration',
+      ext_modules = [mymodule]
+  )
+#+END_SRC
+
+**** File: mymodule.cpp 
+
+Heades: 
 
 #+BEGIN_SRC cpp 
   #include <iostream>
@@ -4298,7 +4317,17 @@ Annotated code block in the for-loop:
   // Display table row 
   std::cout << std::setw(8) << x << std::setw(10) << y  << "\n";
 #+END_SRC
-*** Loading the native module 
+*** Compiling and Running Native Module 
+
+ *Clone repository:*
+
+#+BEGIN_SRC sh 
+  $ git clone https://gist.github.com/caiorss/bc7dc373d87b828029eb0e0ec048d91e python-module 
+  $ cd python-module 
+#+END_SRC
+
+
+ *Manual Compilation* 
 
 Compile the native module mymodule.so on Linux or any other Unix-like OS:
 
@@ -4313,6 +4342,62 @@ Compile the native module mymodule.pyd on Windows OS with Mingw compiler:
      -I"C:\Users\archbox\Miniconda3\pkgs\python-3.6.5-h0c2934d_0\include" \
      C:\Users\archbox\Miniconda3\pkgs\python-3.6.5-h0c2934d_0\libs\Python36.lib
 #+END_SRC
+
+ *Compilation with setup.py*
+
+Build only: 
+
+ + $ python.exe setup.py build 
+
+
+#+BEGIN_SRC sh 
+  $ python.exe setup.py build 
+
+  $ cd build\
+  lib.win-amd64-3.6\   temp.win-amd64-3.6\
+  F:\python-module (master -> origin)
+  λ cd build\lib.win-amd64-3.6\
+
+  $ ls
+  mymodule.cp36-win_amd64.pyd*
+
+  $ C:\Users\archbox\Miniconda3\python.exe
+  Python 3.6.5 |Anaconda, Inc.| (default, Mar 29 2018, 13:32:41) [MSC v.1900 64 bit (AMD64)] on win32
+  Type "help", "copyright", "credits" or "license" for more information.
+  >>>
+  >>> import mymodule as m
+   [TRACE] Python module DLL loaded by process PID = <620>
+   [TRACE] Attach the debugger with: $ gdb -pid=620
+
+#+END_SRC
+
+Install: 
+  
+  + $ python.exe setup.py install
+  + For uninstall see: [[https://stackoverflow.com/questions/1550226/python-setup-py-uninstall][question 1550226]]
+
+#+BEGIN_SRC sh 
+ $ python.exe setup.py install
+
+  $ C:\Users\archbox\Miniconda3\python.exe setup.py install
+  running install
+  running build
+  running build_ext
+  building 'mymodule' extension
+  creating build\temp.win-amd64-3.6
+  creating build\temp.win-amd64-3.6\Release
+  C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Tools\MSVC\14.16.27023\bin\HostX86\x64\cl.exe /c /nologo /Ox
+   /W3 /GL /DNDEBUG /MD -IC:\Users\archbox\Miniconda3\include -IC:\Users\archbox\Miniconda3\include "-IC:\Program Files (x86)\Mi
+  crosoft Visual Studio\2017\Community\VC\Tools\MSVC\14.16.27023\ATLMFC\include" ... ... 
+  ... ....   ... ....   ... ....   ... ....   ... ....   ... ....   ... ....  
+  ... ....   ... ....   ... ....   ... ....   ... ....   ... ....   ... ....  
+  Finished generating code
+  running install_lib
+  copying build\lib.win-amd64-3.6\mymodule.cp36-win_amd64.pyd -> C:\Users\archbox\Miniconda3\Lib\site-packages
+  running install_egg_info
+  Writing C:\Users\archbox\Miniconda3\Lib\site-packages\mymodule-1.0-py3.6.egg-info
+#+END_SRC
+
 
 Check generated file on Linux: 
 
