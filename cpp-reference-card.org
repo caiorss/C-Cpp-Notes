@@ -4023,9 +4023,8 @@ References:
  + Note: Technical standards aren't laws, they are specifications, 
    recommendations for standardization and set of good practices.  
 
-** Bits, bytes, sizes and numerical ranges
-
- *Bits in a byte by position:*
+** Bits, bytes, sizes, endianess and numerical ranges
+*** Bits in a byte by position
 
 #+BEGIN_SRC text 
    MSB                                LSB 
@@ -4055,16 +4054,16 @@ Example:
   +----+----+----+----+----+----+----+----+
   | 1  |  0 | 1  | 0  | 0  | 1  | 1  |  1 |
 
-  Decimal Value = Σ b[i] x 2^i 
+  Decimal Value of a Bit of Order N = 2^N
+
+  Decimal Value of 0xA7 = Σ b[i] x 2^i 
                 = b0 x 2^0 + b1 x 2^1 + b2 x 2^2 + b3 x 2^3 + b4 x 2^4 + b5 x 2^5 + b6 x 2^6 + b7 x 2^7
                 = 1  x 2^0 + 1  x 2^1 + 1  x 2^2 + 0  x 2^3 + 0  x 2^4 +  1 x 2^5 + 0  x 2^6 + 1  x 2^7
                 = 1  x 1   + 1  x 2   + 1  x 4   + 0  x 8   + 0  x 16  +  1 x 32  + 0  x 64  + 1  x 128
                 = 1 + 2 + 4 + 0 + 0 + 32 + 0 + 128
-                = 167
+                = 167 OK
 #+END_SRC
-
-
-Decimal - Hexadecimal and Binary 
+*** Decimal - Hexadecimal and Binary Conversion Table 
 
 #+TABLE: Conversion - Decimal / Hexadecimal / Binary 
 | Decimal | Hexadecimal | Binary |
@@ -4087,8 +4086,7 @@ Decimal - Hexadecimal and Binary
 |      14 |           E |   1110 |
 |      15 |           F |   1111 |
 |---------+-------------+--------|
-
-Bits and byte bitmak by position: 
+*** Bits and byte bitmak by position
 
 |--------------+-------------+---------+------|
 |        Bit N | Binary      | Decimal |  Hex |
@@ -4103,9 +4101,7 @@ Bits and byte bitmak by position:
 |            7 | 0b1000.0000 |     128 | 0x80 |
 | All bits set | 0b1111.1111 |     255 | 0xFF |
 |--------------+-------------+---------+------|
-
-
-Binary - Octal Conversion 
+*** Binary - Octal Conversion 
 
 #+TABLE: Conversion - Octal / Binary 
 |  Octal | Binary |
@@ -4120,9 +4116,7 @@ Binary - Octal Conversion
 |      6 |    110 |
 |      7 |    111 |
 |--------+--------|
-
-
- *Bits, bytes, Megabytes and information units*
+*** Bits, bytes, Megabytes and information units
 
 #+CAPTION: Information units 
 |-----------------+-----------------+-------------+-----------+---------------+--------------|
@@ -4146,8 +4140,7 @@ Summary:
  + 1 Gb (Giga byte)  = 1024 Megabytes
  + 1 TB (Tera Byte)  = 1024 Giga bytes
  + 1 PT (Penta Byte) = 1024 Tera bytes 
-
- *Numerical Ranges for Unsigned Integers of N bits*
+*** Numerical Ranges for Unsigned Integers of N bits
 
 #+CAPTION: Range of unsigned integers of N bits for the most common number of bits.
 |--------+-----+--------------------------------+--------------------+------------------|
@@ -4160,8 +4153,7 @@ Summary:
 |     32 |   0 | 2^32 - 1 =~ 1E9 =~ 10 billions |                  - |             2^32 |
 |     64 |   0 | 2^64 - 1 =~ 1E19               |                  - |             2^64 |
 |--------+-----+--------------------------------+--------------------+------------------|
-
- *Numerical Ranges for Signed Integers of N bits*
+*** Numerical Ranges for Signed Integers of N bits
 
 #+CAPTION: Range of signed integer of N bits (2's complement)
 |--------+----------------------+--------------------|
@@ -4185,6 +4177,124 @@ Summary:
   minNumberOfNbits[N = 16] = -2^(16 - 1)    = -2^15     = -32768
   maxNumberOfNbits[N = 16] =  2^(16 - 1) - 1 = 2^15 - 1 = +32767
 #+END_SRC
+*** Endianess - Big Endian X Little Endian
+
+The endinaess is the order in which bytes are stored in which the
+bytes of some data are encoded in the memory, disk, file or network
+protocol. 
+
+The endianess matters in: 
+ + Embedded Systems
+ + Dealing with raw binary data
+ + Data Serialization 
+ + Processor memory layout
+ + Network data transmission 
+
+ *Little Endian* - LE 
+
+The least significant byte is stored first. In a big-endian processor
+or system, the number 0xFB4598B2 (bytes 0xFB 0x45 0x98 0xB2 ) would
+be stored as: 
+
+#+CAPTION: Number 0xFB4598B2 memory layout in a Little-Endian System
+| Memory Address | Order | Data | Tag |
+|----------------+-------+------+-----|
+|          0x100 |     0 | 0xB2 | LSB |
+|          0x101 |     1 | 0x98 |     |
+|          0x102 |     2 | 0x45 |     |
+|          0x103 |     3 | 0xFB | MSB |
+|----------------+-------+------+-----|
+
+ + LSB - Least Significant Byte
+ + MSB - Most  Significant Byte 
+
+Endianess and C++: 
+ + This session in CERN's REPL shows the memory layout endianess of
+   the number 0xFB4598B2 in a Intel x64 processor (Vanilla Desktop -
+   IBM-PC processor). Note: In a bing-endian processor the byte order
+   display in the next code block would be in reverse order.
+
+#+BEGIN_SRC cpp 
+  >> int k = 0xFB4598B2
+  (int) -79325006
+  >> 
+
+  // Print integers in hex formats 
+  std::cout << std::hex; 
+
+  >> std::cout << "k = " << k << "\n";
+  k = fb4598b2
+  >> 
+
+  >> *p
+  (char) '0xb2'
+
+  >> *(p + 1)
+  (char) '0x98'
+
+  // Print bytes using pointer offset
+  >> std::cout << "p[0] = 0x" << (0xFF & (int) *(p + 0)) << "\n";
+  p[0] = 0xb2
+  >> 
+  >> std::cout << "p[1] = 0x" << (0xFF & (int) *(p + 1)) << "\n";
+  p[1] = 0x98
+  >> std::cout << "p[2] = 0x" << (0xFF & (int) *(p + 2)) << "\n";
+  p[2] = 0x45
+  >> std::cout << "p[3] = 0x" << (0xFF & (int) *(p + 3)) << "\n";
+  p[3] = 0xfb
+
+  // Print bytes using array notation 
+  >> std::cout << "p[0] = 0x" << (0xFF & (int) p[0]) << "\n";
+  p[0] = 0xb2
+  >> std::cout << "p[1] = 0x" << (0xFF & (int) p[1]) << "\n";
+  p[1] = 0x98
+  >> std::cout << "p[2] = 0x" << (0xFF & (int) p[2]) << "\n";
+  p[2] = 0x45
+  >> std::cout << "p[3] = 0x" << (0xFF & (int) p[3]) << "\n";
+  p[3] = 0xfb
+  >>  
+#+END_SRC
+
+
+ *Big Endian* - BE 
+
+The most signficant byte is stored first, the bytes of some data are
+stored in reverse order than the little endian (LE) encoding. 
+
+#+CAPTION: Number 0xFB4598B2 memory layout in a Big-Endian System
+| Memory Address | Order | Data | Tag |
+|----------------+-------+------+-----|
+|          0x100 |     0 | 0xFB | MSB |
+|          0x101 |     1 | 0x45 |     |
+|          0x102 |     2 | 0x98 |     |
+|          0x103 |     3 | 0xB2 | LSB |
+|----------------+-------+------+-----|
+
+ *Processors Endianess*
+
+| Processor / CPU Family       | Endianess     | Note:                                     |
+|------------------------------+---------------+-------------------------------------------|
+| Intel x86, x86-x64 and IA-32 | Little Endian | Default processor of IBM-PC architechture |
+| ARM                          | Little Endian | Default endianess, can also be Big-Endian |
+|                              |               |                                           |
+| Sparcs                       | Big Endian    |                                           |
+| Motorola 68000               | Big Endian    |                                           |
+| *JVM - Java Virtual Machine  | Big-Endian    | *Not a processor.                         |
+|                              |               |                                           |
+| MIPS                         | Supports Both |                                           |
+| PowerPC                      | Supports Both |                                           |
+|------------------------------+---------------+-------------------------------------------|
+
+
+ *References* 
+
+ + [[https://www.qnx.com/developers/docs/6.3.0SP3/neutrino/prog/freedom.html][QNX - Freedom from Hardware and Platform Dependencies]]
+ + [[http://users.wpi.edu/~ndemarinis/ece2049/e16/lecture2.html][ECE2049 Lecture 2: Endianness and Memory Organization]]
+ + [[https://en.wikipedia.org/wiki/Endianness][Endianness - Wikipedia]]
+ + [[https://users.cs.fiu.edu/~prabakar/cda4101/Common/notes/lecture04.html][CDA-4101 Lecture 4 Notes]] 
+ + [[https://ecs-network.serv.pacific.edu/past-courses/2016-fall-ecpe-170/slides/12endianness.pdf][Computer Systems and Network - Endianess]]
+
+
 
 ** Quotes 
 
