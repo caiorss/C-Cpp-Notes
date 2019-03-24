@@ -4725,9 +4725,8 @@ Codes using "virtual copy constructor":
 
  + [[https://people.math.ethz.ch/~concepts/doxygen/html/classconcepts_1_1FrmE__TangentialVector.html#a9da3ec4c6f5b2b0d8f3eff38602c624b][Home – Concepts | Numerical C++ Library Concepts | ETH Zurich]]
 
- + [[http://www.java2s.com/Tutorial/Cpp/0180__Class/Virtualcopyconstructor.htm][Virtual
-   copy constructor : constructor « Class « C++ Tutorial]]
-*** Examṕle: Virtual Copy Constructor with CRTP 
+ + [[http://www.java2s.com/Tutorial/Cpp/0180__Class/Virtualcopyconstructor.htm][Virtual   copy constructor : constructor « Class « C++ Tutorial]] 
+*** Example: Virtual Copy Constructor with CRTP 
 
 This alternative implementation uses CRTP (Curious Recurring Template)
 for eliminating the boilerplate code and smart pointers.
@@ -4844,9 +4843,27 @@ and Windows.
 
 Example: 
 
+  + Include operating-system specific headers: 
+
 #+BEGIN_SRC cpp 
-  // Scoped enum is used to identify the operating system the code 
-  // was copiled against.
+  #if  defined(__unix__)
+      // Unix: Linux, BSD, OSX ... 
+     #include <unistd.h>
+     #include <dlfcn.h>
+     #include <elf.h>
+  #elif defined(_WIN32)
+     // Windows 
+     #include <windows.h>
+  #else 
+     #error "Error: Operating system not supported."
+  #endif 
+#+END_SRC
+
+
+  + Scoped enum is used to identify the operating system the code was
+    copiled. 
+
+#+BEGIN_SRC cpp 
   enum class SystemType{
       WindowsNT,
       Linux,
@@ -4854,10 +4871,12 @@ Example:
       FreeBSD,
       Unknown
   };
+#+END_SRC
 
-  /**  Returns operating system that the 
-   *   library was compiled against.
-  ,*/
+ + Functions returns operating system that the library was compiled
+   against.  
+
+#+BEGIN_SRC cpp 
   auto getSystemType() -> SystemType {
        #ifdef __apple__
           return SystemType::MacOSX;
@@ -4869,7 +4888,11 @@ Example:
          return SystemType::Unknown;
        #endif
   }
+#+END_SRC
 
+ + Function that turns Enum into string: 
+
+#+BEGIN_SRC cpp 
   auto getOperatingSystem() -> std::string {
        SystemType type = getSystemType();
        if (type == SystemType::Linux)
@@ -4882,7 +4905,11 @@ Example:
           return "FreeBSD";       
        return "Unknown operating system";
   }
+#+END_SRC
 
+ + Predicate functions for detecting current OS:
+
+#+BEGIN_SRC cpp 
   auto isWindows() -> bool {
       return getSystemType() == SystemType::WindowsNT;
   }
@@ -4894,7 +4921,12 @@ Example:
                || t == SystemType::FreeBSD
                || t == SystemType::MacOSX;
   }
+#+END_SRC
 
+ + Operating-system specific APIs are isolated using macros. mkdir =>
+   Unix only and CreateDirectory is a Windows API (Win32 API).
+
+#+BEGIN_SRC cpp 
   /** Cross platform code for creating directory */
   void makeDirectory(std::string path){
        #if defined __linux__ || defined __apple__
@@ -4905,7 +4937,11 @@ Example:
           CreateDirectoryA(path.c_str(), NULL);
        #endif
   }
+#+END_SRC
 
+ + Get home or user directory:
+
+#+BEGIN_SRC cpp 
   /** Get home directory, ~/ or $HOME on Unix or %USERPROFILE% 
    ,* environment variable on Windows 
    ,*/
@@ -4916,6 +4952,7 @@ Example:
         return getEnv("HOME");
   }
 #+END_SRC
+
 
 * Misc Techniques 
 ** Polymorphic IO 
