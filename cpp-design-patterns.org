@@ -4370,6 +4370,261 @@ Compiling and running: (File: [[file:src/design-patterns/type-erasure1.cpp][file
   I am the class B
   I am the class C
 #+END_SRC
+*** Example 2 - Template type erasure - property system 
+
+ *Problem:* 
+
+In the following code the templated class TProperty<T> encapsulates
+Get/Set properties. The problem is to put multiple properties with
+different types such as TProperty<int>, TProperty<double> and
+TProperty<std::string> in the same container, std::vector, std::map
+and so on. 
+
+ + File:  [[file:src/design-patterns/property-type-erasure1.cpp][file:src/design-patterns/property-type-erasure1.cpp]]
+ + Online Compiler: https://rextester.com/JTC56116
+
+#+CAPTION: Property class encapsulating get/set class member variables. 
+#+BEGIN_SRC cpp 
+  /** Class that encapsulate get/set properties 
+   ,*  @tparam - Type default constructible, copiable and equality-comparable 
+   ,*/
+  template <typename T>
+  class TProperty
+  {
+      std::string    m_name;	
+      T              m_value;
+      std::type_info const& m_tinfo;
+  public:
+     TProperty(std::string name, T const& init = T{})
+         : m_name(std::move(name))
+         , m_value(init)
+         , m_tinfo(typeid(T))
+     { }
+
+     std::string Name() const 
+     {
+             return m_name;
+     }
+
+     const std::type_info& Type()
+     {
+             return m_tinfo;
+     }
+     TProperty<T> Get() const
+     {
+             return m_value;
+     }
+     TProperty<T>& Set(T const& value)
+     {
+             std::cerr << " [TRACE] Property [" << m_name << "] set to value = "
+                       << value << std::endl;
+             m_value = value;
+     }
+
+     friend std::ostream& operator<<(std::ostream& os, TProperty<T> const& rhs)
+     {
+         return os << " Property{ Name = " << std::quoted(rhs.m_name)
+                   << " ; Value = " << rhs.m_value << " }";
+     }
+  };
+#+END_SRC
+
+Sample usage: (function main)
+
+#+BEGIN_SRC cpp 
+  TProperty<int>         p1("count", 100);
+  TProperty<double>      p2("range", 5.6);
+  TProperty<std::string> p3("name", "Box");
+
+  std::cout << "Before setting" << std::endl;
+  std::cout << "p1 = " << p1 << "\n";
+  std::cout << "p2 = " << p2 << "\n";
+  std::cout << "p3 = " << p3 << "\n";
+
+  std::cout << "\n After setting" << std::endl;
+  p1.Set(20);
+  p2.Set(80.50);
+  p3.Set("Square");
+  std::cout << "p1 = " << p1 << "\n";
+  std::cout << "p2 = " << p2 << "\n";
+  std::cout << "p3 = " << p3 << "\n";
+#+END_SRC
+
+ *Solution:* 
+
+The solution for the requirement of referring to multiple properties
+using the same pointer or "storing" properties with different types in
+the same container is to use type erasure through inheritance, or make
+the template class inherit from some base class or base interface
+class.
+
+ + File: [[file:src/design-patterns/property-type-erasure2.cpp][file:src/design-patterns/property-type-erasure2.cpp]] 
+
+Interface class IProperty: 
+
+#+CAPTION: Property base class (interface)
+#+BEGIN_SRC cpp 
+  template <typename T>
+  class TProperty;
+
+  class IProperty
+  {		
+  public:	
+    virtual std::string           Name() const = 0;
+    virtual std::type_info const& Type() const = 0 ;
+    virtual void                  Print(std::ostream& os) const = 0;
+
+    virtual ~IProperty() = default;
+
+    // Note: Adding Non virtual methods does not causes break the base class ABI
+    // or binary compatibility with derived classes (fragile-base class problem).
+    template<typename T>
+    T Get() const {
+         if(this->Type() != typeid(T)) throw std::bad_cast();
+         return static_cast<TProperty<T> const*>(this)->Get();
+    }
+
+    template<typename T>
+    void Set(T const& value) {
+         if(this->Type() != typeid(T)) throw std::bad_cast();
+         static_cast<TProperty<T>*>(this)->Set(value);
+    }
+
+    template<typename T>
+    TProperty<T>& As()
+    {
+         if(this->Type() != typeid(T)) throw std::bad_cast();
+         return *static_cast<TProperty<T>*>(this);
+    }
+
+    template<typename T, typename Visitor>
+    void Visit(Visitor& visitor)
+    {
+        if(this->Type() != typeid(T)) throw std::bad_cast();
+        static_cast<TProperty<T>*>(this)->Visit(visitor);
+    }
+
+    // Make class printable 
+    friend std::ostream& operator<<(std::ostream& os, IProperty const& rhs)
+    {
+        rhs.Print(os);
+        return os;
+    }
+  };
+#+END_SRC
+
+Class template TProperty: 
+  + As the class TProperty inherits the base class IProperty, all
+    template instances TProperty<int>, TProperty<double> and so on can
+    be referred by the same pointer and "stored" in the same
+    container. 
+
+#+BEGIN_SRC cpp 
+  /** Class that encapsulate get/set properties 
+   ,*  @tparam - Type default constructible, copiable and equality-comparable 
+   ,*/
+  template <typename T>
+  class TProperty: public IProperty
+  {
+       std::string     m_name;	
+      T               m_value;
+      std::type_info const* m_tinfo;
+  public:
+    TProperty(std::string name, T const& init = T{})
+            : m_name(std::move(name))
+            , m_value(init)
+            , m_tinfo(&typeid(T))
+    { }
+
+    ~TProperty() = default;
+
+    std::string Name() const 
+    {
+         return m_name;
+    }
+
+    const std::type_info& Type() const
+    {
+         return *m_tinfo;
+    }
+
+    T Get() const
+    {
+         return m_value;
+    }
+
+    TProperty<T>& Set(T const& value)
+    {
+         std::cerr << " [TRACE] Property [" << m_name << "] set to value = "
+                   << value << std::endl;
+         m_value = value;
+         return *this;
+    }
+
+    void Print(std::ostream& os) const
+    {
+         os << " Property{ Name = " << std::quoted(m_name)
+            << " ; Value = " << m_value << " }";		
+    }
+
+    void PrintValue(std::ostream& os) const
+    {
+         os << m_value;
+    }
+
+    template<typename Visitor>
+    void Visit(Visitor& visitor)
+    {
+         visitor.visit(m_value);
+    }
+  };
+
+#+END_SRC
+
+Usage (main function): 
+
+#+BEGIN_SRC cpp 
+  std::vector<std::shared_ptr<IProperty>> plist;
+
+  plist.push_back(make_property<int>("basis-points", 100));
+  plist.push_back(make_property<double>("price", 5.6));
+  plist.push_back(make_property<std::string>("product", ""));
+
+  std::cout <<"\n ======= Experiment 1 =======" << std::endl;
+  int i = 0; 
+  for(const auto& p: plist)
+          std::cout << " => p[" << i++ << "] = " << *p << "\n";
+
+  std::cout <<"\n ======= Experiment 2 =======" << std::endl;
+  TProperty<int>& p0 = plist[0]->As<int>();
+  p0.Set(200);
+  std::cout << " => p0.Name() = " << p0.Name() << " ; Value = " << p0.Get() << "\n";
+
+  plist[0]->Set(80);
+
+  std::cout << " => plist[0]->Name() = "  << plist[0]->Name()
+            <<  " plist[0]->Get<int>() = " << plist[0]->Get<int>()
+            << std::endl;
+#+END_SRC
+
+Compilation Output: 
+
+#+BEGIN_SRC sh 
+  $ clang++ property-type-erasure2.cpp -o property-type-erasure2.bin -std=c++1z -g -O0 -Wall 
+  $ ./property-type-erasure2.bin
+
+   ======= Experiment 1 =======
+   => p[0] =  Property{ Name = "basis-points" ; Value = 100 }
+   => p[1] =  Property{ Name = "price" ; Value = 5.6 }
+   => p[2] =  Property{ Name = "product" ; Value =  }
+
+   ======= Experiment 2 =======
+   [TRACE] Property [basis-points] set to value = 200
+   => p0.Name() = basis-points ; Value = 200
+   [TRACE] Property [basis-points] set to value = 80
+   => plist[0]->Name() = basis-points plist[0]->Get<int>() = 80
+#+END_SRC
+
 ** CRTP - Curious Recurring Template Pattern
 *** Overview 
 
@@ -4952,7 +5207,6 @@ Example:
         return getEnv("HOME");
   }
 #+END_SRC
-
 
 * Misc Techniques 
 ** Polymorphic IO 
