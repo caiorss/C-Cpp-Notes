@@ -501,6 +501,212 @@ What is shown:
      + Template metaprogramming is crucial for developing lightweight
        abstraction and reducing run-time overhead.
 
+** Safety and Code Recommendation 
+*** CppCon 2015: Herb Sutter "Writing Good C++14... By Default" :modernccpp:safety:sanity:
+
+ + [[https://www.youtube.com/watch?v=hEx5DNLWGgA][CppCon 2015: Herb Sutter "Writing Good C++14... By Default"]]
+   + Total time: 1:29:05
+   + "Modern C++ is clean, safe, and fast. It continues to deliver
+     better and simpler features than were previously available. How
+     can we help most C++ programmers get the improved features by
+     default, so that our code is better by upgrading to take full
+     advantage of modern C++?. This talk continues from Bjarne
+     Stroustrup’s Monday keynote to describe how the open C++ core
+     guidelines project is the cornerstone of a broader effort to
+     promote modern C++. Using the same cross-platform effort
+     Stroustrup described, this talk shows how to enable programmers
+     write production-quality C++ code that is, among other benefits,
+     type-safe and memory-safe by default – free of most classes of
+     type errors, bounds errors, and leak/dangling errors – and still
+     exemplary, efficient, and fully modern C++."
+
+Core Suppport Guidelines ISO CPP: 
+ + http://github.com/isocpp/CppCoreGuidelines 
+
+Core Support Guideline Microsft GSL:
+ + http://github.com/microsft/gsl 
+
+
+ *Old X New, modern C++* 
+
+Moment: [[https://youtu.be/hEx5DNLWGgA?t=115][At 1:55]]  
+
+Old C++ 98: 
+
+ + Problem: code hard to reactor, hard to make changes as it can cause
+   memory leaks.
+ + Any changes in the code requires verification for memory leaks and
+   dangling pointers.
+ + A great deal of security vulnerabilities are related to memory
+   leaks. 
+
+#+CAPTION: Old C++98 Code 
+#+BEGIN_SRC cpp 
+  circle* p = new circle(42);
+  vector<shape*> v = load_shapes();
+
+  for(vector<shape*>::iterator i = v.begin(); i != v.end(); ++i)
+  {
+    if(*i && **i == *p)
+       cout << **i << "is a match\n";
+  }
+  //.. later, possibly elsehwere 
+  for(vector<shape*>::iterator i = v.begin(); i != v.end(); ++i)
+  {
+     delete *i;
+  }
+
+  delete p;
+#+END_SRC
+
+Modern C++: (>= C++11)
+  + Advantages:
+    + Easier to read and more memory-safe.
+    + Modifications do not require following pointers around on every
+      possible return path and checking for memory leaks or double
+      deleting. 
+
+#+CAPTION: Modern C++ Code 
+#+BEGIN_SRC cpp
+  // Smart pointers for memory safety  
+  auto p = std::make_shared<circle>(42);
+
+  // Usage of auto keyword for type deduction 
+  auto v = load_shapes();
+
+  // For-loop uses the new notation instead of iterators.
+  for(auto& s: v)
+  {
+    if(s && *s  == *p)
+      cout << *s << "is a match\n";
+  }
+#+END_SRC
+
+ *GSL - Guideline Support Library - Safety* - [[https://youtu.be/hEx5DNLWGgA?t=366][At 6:06]] 
+
+Core Guidelines - Safe replacements (GSL)
+ + Type safety + concepts + module s
+ + Bound safety + contracts
+ + Lifetime safety 
+
+ *Initial Target: Type & Memory Safety* 
+
+ + Traditional definitin:
+   * = *type-safe*
+   * (+) bound-safe:
+     * Don't go outside the bounds of an allocation, for instance, go
+       outside the bounds of an array. 
+   * (+) lifetime-safe
+     * Don't access an invalid memory. 
+
+ + Examples:
+   + Type: Avoid unions, use variants
+   + Bounds: Avoid pointer arithmetiuc, use _array_view_
+   + Lifetime:
+     + Don't leak (do not forget to delete)
+     + Don't corrupt (double-delete)
+     + Don't dangle:
+       + use a pointer to an already deleted object 
+       + return a reference to locally allocated value
+   + Future: Concurrency (thread-safe), security ... 
+
+ *Target Gurantee:* [[https://youtu.be/hEx5DNLWGgA?t=529][8:49]] 
+
+ + Goal is not to provide verifed, whole-program guarantees of safety.
+
+ + Goal is enable type and memory *safety by construction*, for as much
+   of *your program code* as possible. This type and memory safe can be
+   *enforced at compile time* via static language subset restrictions +
+   at runtime by validations/eforcement (fail-fast, or configurable)
+
+#+BEGIN_QUOTE
+  C++ code *compile in the safe subset* is *never the root cause* of
+  type/memory safety errors, except where explictly annotated as unsafe.
+#+END_QUOTE
+
+ *Safety profiles* 
+
+ + A profile is:
+   + A cohesive set of deterministic portable suset rules
+   + designed to achieve a specific guaranteee
+
+ + Benefits of decomposed profiles:
+   + Articulates what guarantees you get for what effort.
+   + Avoids monolith "safe/unsafe" when opting in/out
+   + Extensible to future safety profile (e.g, security, concurrency,
+     arithmetic, noexcept, noalloc, ...)
+   + Enables incremental development/delivery 
+
+ *Type safety overview* - [[https://youtu.be/hEx5DNLWGgA?t=689][11:29]]  
+
+ + GSL Types:
+   + byte: Raw memory is not a char (character)
+   + variat<..Ts> Contains one object at a time (tagged union)
+
+Rules:
+   1. Don't use *reinterpret_cast*
+   2. Don't use *static_cast* downcast, use dynamic casts instead.
+   3. Don't use const_cast to cast away consts
+   4. Don't use C-tstyle (T) expression casts that would perform
+      reinterpret_cast, static_cast downcast, or const_cast.
+   5. Don't use a loca variable before it has been initialized.
+   6. Alaways initialize a member variable
+   7. Avoid accessing members of raw unions. Prefere variants
+      instead.
+   8. Avoid reading from varargs or passing varargs arguments. Prefere variadic.
+
+Also: safe math -> Separate profile. 
+
+ *Bounds safety overview* - [[https://youtu.be/hEx5DNLWGgA?t=823][at 13:43]] 
+
+Rules: 
+ 1. Do'nt use pointer arithmetic. Use array_view instead.
+ 2. Only index into arrays using constant expresison.
+ 3. Don't use array-to-ppointer decay.
+ 4. Don't use std::functions and types that are bounds-checked. 
+
+ *Applying a profile: Explicit opt-out* - [[https://youtu.be/hEx5DNLWGgA?t=1257][at 20:57]] 
+
+ *Lifetime Profile* - [[https://youtu.be/hEx5DNLWGgA?t=1474][at 24:34]]
+
+ + Delete every heap object (no leaks)
+ + Delete every heap object only once. (no memory corruption)
+ + Don't dereference * to a delete object (no dangling)
+
+PSA: Pointers are not evil. - [[https://youtu.be/hEx5DNLWGgA?t=1712][at 28:32]] 
+ 
+ + Smart pointers are good - they encapsulate *ownership*
+   + Observation: They should only be used where there is ownership:
+     with heap-allocated objects or polymorphic objects of some class
+     hierarchy that oftens need dynamic allocation. 
+
+ + Raw T* and T& are good - we want to maintain the efficiency of
+   "just an address", specially on the stack (locals, parameters,
+   return values)
+   + Observation: Better used as function parameters and for parameter
+     passing, even for smart pointers when there is no ownership. 
+
+ *Lifetime Safety Overview* - [[https://youtu.be/hEx5DNLWGgA?t=1766][at 29:26]] 
+
+GSL types, aliases,  concepts: 
+ + Indirect concept:
+   + Owner (can'ty dangle): owner<T>, container, smart pointers, ...
+   + Pointer(could dangle): ~*~, &, array_view,/string_view, ranges,
+     ..., not_null<T>, Warps any indirection and enforces non-null.
+ + Owner<>: Alias, ABI-compatible, building block for smart ptrs,
+   container...
+   + Main owner<T*>
+
+Rules: 
+ 1. Prefer to allocate heap object using *make_unique*, *make_shared_ or
+    containers. 
+ 2. Otherwise, use owner<> for source/layout compatibility with old
+    code. Each non-null owner<> must be deleted exactly once, or
+    moved. 
+ 3. Never dereference a null or invalid pointer 
+ 4. Never allow an invalid pointer to escape a function. 
+
+
 ** Generic Programming, Type Erasure and Polymorphism
 *** CppCon 2018 - Victor Ciura - Regular Type and Why Do I Care
 
@@ -1748,7 +1954,6 @@ functions" with templates:
    => 21
 
  #+END_SRC
-
 
 
 
