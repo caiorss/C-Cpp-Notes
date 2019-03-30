@@ -1843,6 +1843,286 @@ Display local variables:
      Windows ports are underway with varying degrees of
      functionality." 
 
+** Debugging Assembly x86 (IA32) Code 
+
+Code in Intel x86 (IA32) assembly with Intel syntax. 
+
+ *File: invoke.asm*
+
+#+BEGIN_SRC asm 
+  ;  BRIEF: Invoke funcitons on Linux 
+  ; ------------------------------------------------------;
+      BITS 32    
+
+  ;;=======================================;
+  ;;             Data Segment              ;
+  ;;=======================================;
+      SECTION .data
+  
+  ; null-terminated c-string always terminated by 0 (zero)
+  message db "Hello world Linux System Call", 0
+
+  ; string followed by '\n' LF (10) character and terminated by 0 
+  message2 db  " [TRACE] Hello world Linux System Call", 10, 0   
+
+  ; Note: 10 => decimal value of '\n' new line LF character  
+  format db " [INFO] a = %d b = %d result = %d", 10, 0
+
+  ;;=======================================;
+  ;;            Text Segment               ;
+  ;;=======================================; 
+    
+  ; Executable code goes here
+      SECTION .text
+      global main 
+
+  ; ********** Function: Exit ********************
+  ; Exit program calling Linux Interrupt of code 0 or C-function exit(0)
+  exit:
+      mov eax, 1   ;system call number 1 is exit()
+      mov ebx, 0   ;exit(0)
+      int 0x80     ;call it    
+      ret 0
+
+  ;******** Function: _subtract(int a, int b) CDECL convention ******.
+  _subtract:
+      ; epilogue 
+      push ebp                   ; Save EBP on the stack
+      mov ebp, esp               ; Save stacke pointer ESP in EBP (EBP := ESP)
+      ; Function main code 
+      mov eax, [ebp + 8]         ; Get 2nd second parameter b (ESP + sizeof(Param) * paramOrder)
+      mov edx, [ebp + 12]        ; Get 1st first paramter a
+      sub eax, edx               ; EAX = EAX - EDX = b - a
+      ; function cleanup
+      pop ebp 
+      ret                        ; Return to the caller
+    
+    
+  ; ********** Function: _start or main() *************    
+  main:   
+      extern puts                 ; Indicates a extenal C-library
+      extern printf 
+
+      ; Call C-function int puts(const char*)        
+      push DWORD message
+      call puts
+      add  ESP, DWORD 1           ; Restore stack size 
+                                  ; ESP = ESP + Number Of Bytes * NumberOfStackParams / 4
+                                  ; ESP = ESP + (4 size of 1 dword) / 4 = ESP + 1 DWORD
+
+      push DWORD message2
+      call printf
+      add ESP, 4
+    
+      ;; Call: int subtract(int a, b)
+      push DWORD 200               ; Set second paramter b = 200 
+      push DWORD 50                ; Set first parameter a = 50
+      call _subtract
+      add ESP, DWORD 2   
+
+      ;; Call function printf    
+      push eax 
+      push 200 
+      push 50 
+      push format 
+      call printf
+      add ESP, DWORD 4
+    
+      call exit   
+#+END_SRC
+
+ *Compiling and running*
+
+Build executable file: invoke.elf 
+
+Compile:
+
+#+BEGIN_SRC sh 
+   $ nasm -f elf -g -F dwarf invoke.asm 
+#+END_SRC
+
+Link: 
+
+#+BEGIN_SRC sh 
+   $  ld invoke.o -melf_i386 -o invoke.elf -I/lib/ld-linux.so.2 -lc --entry main 
+#+END_SRC
+
+Check file: 
+
+#+BEGIN_SRC sh 
+  $ file invoke.elf 
+  invoke.elf: ELF 32-bit LSB executable, Intel 80386, version 1 (SYSV), dynamically linked, interpreter /lib/ld-, with debug_info, not stripped
+#+END_SRC
+
+Run: 
+
+#+BEGIN_SRC sh 
+  $ ./invoke.elf
+
+  Hello world Linux System Call
+   [TRACE] Hello world Linux System Call
+   [INFO] a = 200 b = 50 result = -150
+#+END_SRC
+
+ *Debugging* 
+
+Load the file in the debugger: 
+
+#+BEGIN_SRC sh 
+  $ gdb --silent invoke.elf 
+  Reading symbols from invoke.elf...done.
+#+END_SRC
+
+Run the executable without breaking points: 
+
+#+BEGIN_SRC sh 
+  (gdb) r
+  Starting program: /home/archbox/root-scripts/asm/invoke.elf 
+  Missing separate debuginfos, use: dnf debuginfo-install glibc-2.27-37.fc28.i686
+  Hello world Linux System Call
+   [TRACE] Hello world Linux System Call
+   [INFO] a = 50 b = 200 result = -150
+  [Inferior 1 (process 31433) exited normally]
+#+END_SRC
+
+Set breaking points: 
+
+#+BEGIN_SRC sh 
+  # Set break point at main() function 
+  (gdb) b main
+  Note: breakpoint 1 also set at pc 0x80481fc.
+  Breakpoint 2 at 0x80481fc: file invoke.asm, line 55.
+
+
+  # Set break point at line 55
+  (gdb) b 55
+  Breakpoint 1 at 0x80481fc: file invoke.asm, line 55.
+
+  # Set break point at function subtract
+  (gdb) b _subtract 
+  Breakpoint 3 at 0x80481ef: file invoke.asm, line 38.  
+#+END_SRC
+
+Restart process being debugged: 
+
+#+BEGIN_SRC 
+  (gdb) r
+  Starting program: /home/archbox/root-scripts/asm/invoke.elf 
+
+  Breakpoint 1, main () at invoke.asm:55
+  55	    push DWORD message
+#+END_SRC
+
+Step over:
+
+#+BEGIN_SRC sh 
+  (gdb) n
+  56	    call puts
+
+  # Print ESP register (Stack Pointer)
+  (gdb) p $esp
+  $17 = (void *) 0xffffc00c
+
+  # Print the memory location pointed by the stack pointer 
+  # interpreting the location as a string: 
+  (gdb) p *((char**) ($esp))
+  $19 = 0x804a014 <message> "Hello world Linux System Call"
+
+
+  (gdb) n
+  0x080481d0 in puts@plt ()
+
+  (gdb) n
+  Single stepping until exit from function puts@plt,
+  which has no line number information.
+  0x080481b0 in ?? ()
+
+  (gdb) s
+  Cannot find bounds of current function
+
+  (gdb) si
+  0x080481b6 in ?? ()
+
+  (gdb) si
+  0xf7fea6f0 in _dl_runtime_resolve () from /lib/ld-linux.so.2
+  (gdb) si
+   ... 
+#+END_SRC
+
+Continue until next break point: 
+
+#+BEGIN_SRC sh 
+  (gdb) c
+  Continuing.
+  Hello world Linux System Call
+   [TRACE] Hello world Linux System Call
+
+  Breakpoint 3, _subtract () at invoke.asm:38
+  38	    push ebp                   ; Save EBP on the stack
+  (gdb) 
+#+END_SRC
+
+Stepping by step execution: 
+
+#+BEGIN_SRC sh 
+  (gdb) n
+  39	    mov ebp, esp               ; Save stacke pointer ESP in EBP (EBP := ESP)
+
+  (gdb) n
+  _subtract () at invoke.asm:41
+  41	    mov eax, [ebp + 8]         ; Get 2nd second parameter b (ESP + sizeof(Param) * paramOrder)
+
+  (gdb) n
+  42	    mov edx, [ebp + 12]        ; Get 1st first paramter a
+  (gdb) 
+#+END_SRC
+
+Print stack parameters: 
+
+#+BEGIN_SRC sh 
+  # Prin stack parameters of current stack frame: 
+  (gdb) p *((int*) ($ebp + 8))
+  $25 = 50
+
+  (gdb) p *((int*) ($ebp + 12))
+  $26 = 200
+  (gdb) 
+
+  (gdb) n
+  43	    sub eax, edx               ; EAX = EAX - EDX = b - a
+
+  (gdb) p $edx $29 = 200
+
+  (gdb) p $eax
+  $30 = 50
+  (gdb) 
+
+  # Return value 
+  (gdb) p $eax
+  $31 = -150
+  (gdb) 
+#+END_SRC
+
+Continue execution: 
+
+#+BEGIN_SRC sh 
+  (gdb) n
+  46	    ret                        ; Return to the caller
+
+  (gdb) n
+  main () at invoke.asm:69
+  69	    add ESP, DWORD 2   
+#+END_SRC
+
+Continue until exiting: 
+
+#+BEGIN_SRC sh 
+  (gdb) c
+  Continuing.
+   [INFO] a = 50 b = 200 result = -150
+  [Inferior 1 (process 32151) exited normally]
+#+END_SRC
+
 ** References, Bookmarks and Further Reading 
 *** Selected GDB Documentation
 
