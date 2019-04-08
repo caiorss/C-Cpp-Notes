@@ -216,7 +216,7 @@ be generated rather than a runtime error.
 The advantage of C++ template is that it eliminates the runtime
 overhead of dynamic polymorphism or virtual function calls, therefore
 it makes the code more performant and loosely coupled as it can work
-with any class without any inheritance hierarchy.
+with any class regardless of any inheritance hierarchy.
 
 #+BEGIN_SRC cpp 
   #include <iostream>
@@ -267,12 +267,13 @@ with any class without any inheritance hierarchy.
 
 Running: 
 
- - The template generates multiple versions of the function
-   describeArea specific for each type, for instance, it generates,
-   describeArea(const Circle&) and describeArea(const Square&). The
-   static polymorphism is a high performance alternative to the use of
-   dynamic polymorphism, inheritance, and virtual methods since the
-   methods that will be called are resolved at compile-time.
+ + The template generates multiple versions of the function
+   *describeArea* specific for each type, for instance, it generates the
+   overload functions *describeArea(const Circle&)* and
+   *describeArea(const Square&)*.
+ + Static polymorphism is a high performance alternative to dynamic
+   polymorphism, inheritance, and virtual methods since all called
+   functions are resolved at compile-time.
 
 #+BEGIN_SRC sh 
   $ clang++ -std=c++11 templateDuckTyping.cpp -o out.bin && ./out.bin
@@ -286,7 +287,7 @@ Running:
 
 Generated functions: 
 
- + Once the template is instantiated, it will generate the following
+ + Once the template is instantiated, it generates the following
    overloaded functions as object-code (compiled-code):
 
 #+BEGIN_SRC cpp 
@@ -316,16 +317,27 @@ Main function assembly (object-code):
           push    rbp
           mov     rbp, rsp
           ... ... ... ... ... ... ... ... 
-          call    void describeArea<Square>(Square const&)
+          call    void describeArea<Square>(Square const&) ;; Mangled name:  _Z12describeAreaI6SquareEvRKT_ 
           lea     rdi, [rbp - 24]
-          call    void describeArea<Circle>(Circle const&)
+          call    void describeArea<Circle>(Circle const&) ;; Mangled name: _Z12describeAreaI6CircleEvRKT_ 
           ... ... ... ... ... ... ... ... 
           ret
 #+END_SRC
 
-Generated function overload objected code: describeArea<Square>(Square const&).
+As C++ supports function overloading and the object code need a unique
+function name for every function, the compiler generates an unique name
+for every function overload, classes and template classes. This
+process of generating an unique this name is called *name mangling* or
+name decoration which is unique to every compiler. Due to the name
+mangling, the compiler (Clang) encodes the symbol of the overloaded function
+*describeArea<Square>* as  ~_Z12describeAreaI6SquareEvRKT_~  and the
+symbol of the overloaded function *describeArea<Circle>* as
+~_Z12describeAreaI6CircleEvRKT_~.
+
+Generated object code for function overload: describeArea<Square>(Square const&).
 
 #+BEGIN_SRC asm 
+  ;; Mangled name: _Z12describeAreaI6SquareEvRKT_
   void describeArea<Square>(Square const&):         # @void describeArea<Square>(Square const&)
           push    rbp
           mov     rbp, rsp
@@ -335,9 +347,10 @@ Generated function overload objected code: describeArea<Square>(Square const&).
 #+END_SRC
 
 
-Generated function overload objected code: describeArea<Circle>(Circle const&).
+Generated object code for function overload: describeArea<Circle>(Circle const&).
 
 #+BEGIN_SRC asm 
+  ;; Mangled name:  _Z12describeAreaI6CircleEvRKT_
   void describeArea<Circle>(Circle const&):         # @void describeArea<Circle>(Circle const&)
           push    rbp
           mov     rbp, rsp
@@ -377,22 +390,25 @@ Generated function overload objected code: describeArea<Circle>(Circle const&).
    compile-time.
 
  + Hard to hide or obfuscate templates in proprietary code as they
-   need to exposed in header files. 
+   need to be exposed in header files.
 
  + Template code can be hard to understand and it may be hard to
-   figure out the set of types parameters that a template can
-   accept.
+   figure out the set of types parameters that can satisfy the
+   template constraints. 
 
- + Hard to restrict type parameters that a template can accept. The
-   requirements of a template type parameters are called concepts and
-   they are not part of C++ language yet.
+ + Hard to restrict type parameters that a template can take. The
+   requirements of a template type parameters are called *concepts* and
+   there is no language feature for making concepts explicit.
 
  + Templates can generate long and cryptic error messages.
 
  + Templates can increase the executable size, since they generate
-   object-code for overloaded functions or classes generated at
-   compile time. It may not be a problem for desktop applications,
-   but it can be a drawback for embedded systems. 
+   object-code for overloaded functions generated by function
+   templates and also object code for classes generated by class
+   templates. It may not be a problem for desktop applications,
+   but it can be a drawback for embedded systems with limited ROM
+   size.  
+
 ** Class Template
 *** Example: Generic stack class 
 
