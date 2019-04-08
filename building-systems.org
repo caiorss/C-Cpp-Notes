@@ -1385,6 +1385,91 @@ Taken from:
  + [[https://stackoverflow.com/questions/33873735/correctly-set-visual-studio-linker-flag-subsystem-in-cmake][c++ -
    Correctly set Visual Studio linker flag /SUBSYSTEM in CMAKE - Stack
    Overflow]]
+** Force Settings 
+*** Force generation of debugging symbols 
+
+This snippet forces the generation of debugging symbols regardless of
+the build type. It is a useful setting when building from command
+line. 
+
+Add the following line to the CMake file: 
+
+#+BEGIN_SRC cpp 
+ set(CMAKE_BUILD_TYPE Debug) # Force debug build
+#+END_SRC
+
+After the line is added, the file CMakeLists.txt becomes:
+
+#+BEGIN_SRC cmake
+  #========= Global Configuration ===============# 
+  cmake_minimum_required(VERSION 3.9)
+  project(Demo_cpp_plugin)
+  set(CMAKE_CXX_STANDARD 17)     
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+
+  # Force debug build
+  set(CMAKE_BUILD_TYPE Debug) # Force debug build
+
+  #========== Targets Configurations ============#
+
+  add_executable(app ... )
+  .. ... ... ... 
+#+END_SRC
+*** Force Compiler to Clang 
+
+Despite C++ language remarkable improvements, C++ compiler error
+messages of most compilers still cryptic and hard to grasp. Even for
+silly syntax mistakes, C++ compilers can fill the screen with error
+messages providing little context about the compiler error. 
+
+Such cryptic errors can be better diagnosed by switching the compiler
+to Clang that provides much better error messages that other compilers.
+The compiler can be temporarily switched by using the IDE, by setting
+environment variables or by setting CMake variables to force using an
+specific compiler.
+
+
+Example: CMakeLists.txt forcing compiler to Clang.
+
+#+BEGIN_SRC cmake 
+  cmake_minimum_required(VERSION 3.9)
+  project(NumericalMethods)
+  set(CMAKE_CXX_STANDARD 17)     
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+
+  set(FORCE_CLANG ON)
+  # Force compiler to Clang++
+  if(FORCE_CLANG)
+      set(CMAKE_C_COMPILER clang)
+      set(CMAKE_CXX_COMPILER clang++)
+  endif()
+
+  #========== Targets Configurations ============#
+
+  # TARGET: rootFinding1.cpp 
+  add_executable(rootFinding1 rootFinding1.cpp)
+#+END_SRC
+
+ *Explanation:*
+
+This next line sets the variable FORCE_CLANG:
+
+#+BEGIN_SRC cmake 
+   set(FORCE_CLANG ON)   # Force using clang compiler 
+   set(FORCE_CLANG OFF)  # Use default compiler 
+#+END_SRC
+
+When the variable FORCE_CLANG is set, the commands within the if-endif
+block set the C and C++ compiler to Clang and Clang++.
+
+#+BEGIN_SRC cmake 
+  # Force compiler to Clang++
+  if(FORCE_CLANG)
+      set(CMAKE_C_COMPILER clang)
+      set(CMAKE_CXX_COMPILER clang++)
+  endif()
+#+END_SRC
+
 ** Snippets 
 *** Debug Information for diagnosing problems
 
@@ -1639,36 +1724,6 @@ Check whether current configuration is for 64 bits build:
  else()
     message(" [INFO] 32 bits build.")
  endif()
-#+END_SRC
-
-*** Force generation of debugging symbols 
-
-This snippet forces the generation of debugging symbols regardless of
-the build type. It is a useful setting when building from command
-line. 
-
-Add the following line to the CMake file: 
-
-#+BEGIN_SRC cpp 
- set(CMAKE_BUILD_TYPE Debug) # Force debug build
-#+END_SRC
-
-After the line is added, the file CMakeLists.txt becomes:
-
-#+BEGIN_SRC cmake
-  #========= Global Configuration ===============# 
-  cmake_minimum_required(VERSION 3.9)
-  project(Demo_cpp_plugin)
-  set(CMAKE_CXX_STANDARD 17)     
-  set(CMAKE_VERBOSE_MAKEFILE ON)
-
-  # Force debug build
-  set(CMAKE_BUILD_TYPE Debug) # Force debug build
-
-  #========== Targets Configurations ============#
-
-  add_executable(app ... )
-  .. ... ... ... 
 #+END_SRC
 
 *** Copy some target binaries to a directory
