@@ -1998,6 +1998,292 @@ Running for the third time:
    pVector[4] = 4.51
 #+END_SRC
 
+**  Boost DateTime 
+*** Overview 
+
+Documentation:
+  + Boost: [[https://www.boost.org/doc/libs/1_69_0/doc/html/date_time.html][Date Time]]
+  + [[http://www.crystalclearsoftware.com/libraries/date_time/release_1_33/date_time/doxy.html][Doxygen]]
+  + [[http://www.crystalclearsoftware.com/libraries/date_time/date_time.pdf][PDF Documentation]]
+
+Documentation Code Examples: 
+ + [[https://www.boost.org/doc/libs/1_69_0/doc/html/date_time/examples.html#date_time.examples.days_alive][Date Time Examples]]
+
+Headers: 
+ + <boost/date_time/date.hpp>
+ + <boost/date_time/date_formatting.hpp>
+ + <boost/date_time/date_duration.hpp>
+ + <boost/date_time/time.hpp>
+ + <boost/date_time/gregorian/gregorian.hpp>
+
+Library Dependency:
+ + Requires linkign the library *-lboost_date_time* with GCC or Clang.
+
+Motivation: 
+
+#+BEGIN_QUOTE
+  The motivation for this library comes from working with and helping
+  build several date-time libraries on several projects. Date-time
+  libraries provide fundamental infrastructure for most development
+  projects. However, most of them have limitations in their ability to
+  calculate, format, convert, or perform some other functionality. For
+  example, most libraries do not correctly handle leap seconds,
+  provide concepts such as infinity, or provide the ability to use
+  high resolution or network time sources. These libraries also tend
+  to be rigid in their representation of dates and times. Thus
+  customized policies for a project or subproject are not possible.
+ #+END_QUOTE
+
+Domain Concepts: 
+ + Time Point
+ + Time Duration
+ + Time Interval 
+
+Calendar Systems: 
+ + Gregorian System
+ + UTC - UTC (Coordinated Universal Time) 
+*** Example - Date Manipulation 
+
+Search where is Boost Date time on Linux/Fedora: 
+
+#+BEGIN_SRC sh 
+  $ ls /lib/ | grep -i date
+  kconf_update_bin/
+  libboost_date_time.a
+  libboost_date_time.so@
+  libboost_date_time.so.1.67.0*
+#+END_SRC
+
+ *Simple tests in CERN ROOT REPL:*
+
+Load library in REPL:
+
+#+BEGIN_SRC cpp 
+  #include <boost/date_time/gregorian/gregorian.hpp>
+
+  // Load shared library 
+  gSystem->Load("/lib/libboost_date_time.so")
+
+  namespace g = boost::gregorian;
+  namespace dt = boost::date_time;
+#+END_SRC
+
+Construct a date from year-month-day, for instance 
+(year = 2009, month = 10, day = 20):
+
+#+BEGIN_SRC cpp 
+  >> auto d1 = g::date(2009, 10, 20)
+  (boost::gregorian::date &) @0x7fd6d7647050
+
+  >> stg::cout << "d1 = " << d1 << "\n";
+  d1 = 2009-Oct-20
+#+END_SRC
+
+
+Get current Date: 
+
+#+BEGIN_SRC cpp 
+  >> auto today = g::day_clock::local_day()
+  (boost::gregorian::date &) @0x7fd6d7647030
+
+  >> stg::cout << "today = " << today << "\n";
+  today = 2019-Apr-02
+  >> 
+#+END_SRC
+
+Convert date to string: 
+
+#+BEGIN_SRC cpp 
+  >> auto mdate = g::date(2012, 06, 21)
+  (boost::gregorian::date &) @0x7f83a2ba70a8
+
+  >> g::to_simple_string(mdate)
+  (std::string) "2012-Jun-21"
+
+  >> g::to_iso_string(mdate)
+  (std::string) "20120621"
+
+  >> g::to_iso_extended_string(mdate)
+  (std::string) "2012-06-21"
+#+END_SRC
+
+
+Parse Date with ISO format YYYYMMDD:
+
+#+BEGIN_SRC cpp 
+  >> auto p = gr::from_undelimited_string("20100921")
+  (boost::gregorian::date &) @0x7f83a2ba7014
+
+  >> std::cout << " p = " << p << "\n";
+   p = 2010-Sep-21
+#+END_SRC
+
+Parse Date with ISO format YYYY-MM-DD: 
+
+#+BEGIN_SRC cpp 
+  g::from_simple_string("2001-10-11")
+
+  >> auto s1 = g::from_simple_string("2001-10-11")
+  (boost::gregorian::date &) @0x7fd6d7647010
+
+  // ========= Parse Date =============
+  >> stg::cout << "s1 = " << s1 << "\n";
+  s1 = 2001-Oct-11
+#+END_SRC
+
+
+Get year component:
+
+#+BEGIN_SRC cpp 
+  >> s1.year()
+  (boost::date_time::date<boost::gregorian::date, boost::gregorian::gregorian_calendar, 
+   boost::gregorian::date_duration>::year_type) @0x79588b0
+  >> 
+
+  >> (int) s1.year()
+  (int) 2001
+
+  >> static_cast<int>(s1.year())
+  (int) 2001
+  >> 
+#+END_SRC
+
+Get month component:
+
+#+BEGIN_SRC cpp 
+  >> s1.month()
+  (boost::date_time::date<boost::gregorian::date, boost::gregorian::gregorian_calendar, 
+  boost::gregorian::date_duration>::month_type) @0x7d69550
+
+  >> (int) s1.month()
+  (int) 10
+
+  >> static_cast<int>(s1.month())
+  (int) 10
+  >> 
+#+END_SRC
+
+Get day component: 
+
+#+BEGIN_SRC cpp 
+  >> s1.day()
+  (boost::date_time::date<boost::gregorian::date, boost::gregorian::gregorian_calendar, 
+  boost::gregorian::date_duration>::day_type) @0x7f9bfc0
+
+  >> (int) s1.day()
+  (int) 11
+
+  >> stg::cout << s1.day() << "\n";
+  11
+#+END_SRC
+
+Get day of Week: 
+
+#+BEGIN_SRC cpp 
+  >> auto dw = s1.day_of_week()
+  (boost::gregorian::greg_weekday &) @0x7fd6d764702e
+
+  >> (int) dw
+  (int) 4
+
+  >> (int) s1.day_of_week()
+  (int) 4
+
+  >> static_cast<int>(dw)
+  (int) 4
+#+END_SRC
+
+Get day of Week as Enumeration:
+
+#+BEGIN_SRC cpp 
+  >> auto dw = s1.day_of_week()
+  (boost::gregorian::greg_weekday &) @0x7fd6d764702e
+
+  >> dw.as_enum()
+  (boost::gregorian::greg_weekday::weekday_enum) (boost::date_time::weekdays::Thursday) : (unsigned int) 4
+
+  >> dw.as_enum() == dt::weekdays::Thursday
+  (bool) true  
+#+END_SRC
+
+Get day of Week as C-string (const char*): 
+
+#+BEGIN_SRC cpp 
+  >> dw.as_short_string()
+  (const char *) "Thu"
+
+  >> dw.as_long_string()
+  (const char *) "Thursday"
+#+END_SRC
+
+Get day of year (number of elapsed days until the date s1)
+
+#+BEGIN_SRC cpp 
+  >> s1.day_of_year()
+  (boost::gregorian::date::day_of_year_type) @0x8000e30
+
+  >> (int) s1.day_of_year()
+  (int) 284
+
+  >> static_cast<int>(s1.day_of_year())
+  (int) 284
+#+END_SRC
+
+Get difference between two dates in days: 
+
+#+BEGIN_SRC cpp 
+  >> auto date_a = g::date(2009, 10, 20)
+  (boost::gregorian::date &) @0x7fd6d7647068
+
+  >> auto date_b = g::date(2011, 1, 1)
+  (boost::gregorian::date &) @0x7fd6d764706c
+
+  >> auto diff = date_b - date_a
+  (boost::gregorian::date_duration &) @0x7fd6d7647070
+
+  >> diff.days()
+  (long) 438
+#+END_SRC
+
+ *Date arithmetics:*
+
+Add days to a date: 
+
+ + Add 200 days to date 2005-09-25 
+
+#+BEGIN_SRC cpp 
+  >> auto date_a = g::date(2005, 9, 25)
+  (boost::gregorian::date &) @0x7f83a2ba7048
+
+  >> std::cout << "date_a = " << date_a << "\n";
+  date_a = 2005-Sep-25
+
+  // Create a new date object = date_a + 200 days 
+  >> auto date_b = date_a + g::days(200)
+  (boost::gregorian::date &) @0x7f83a2ba7060
+
+  >> std::cout << "date_b = " << date_b << "\n";
+  date_b = 2006-Apr-13
+
+  >> std::cout << "date_a + 200 days = " << date_a + g::days(200) << "\n";
+  date_a + 200 days = 2006-Apr-13
+
+  >> std::cout << "date_a + 1200 days = " << date_a + g::days(1200) << "\n";
+  date_a + 1200 days = 2009-Jan-07
+#+END_SRC
+
+Add months to a date: 
+ + Add 5 months to date 2005-09-25
+
+#+BEGIN_SRC cpp 
+    >> auto date_a = g::date(2005, 9, 25)
+    (boost::gregorian::date &) @0x7f83a2ba7048
+
+    >> std::cout << "date_a + 5 months  = " << date_a + g::months(5) << "\n";
+    date_a + 5 months  = 2006-Feb-25
+#+END_SRC
+
+
 ** Library Map 
 *** Math 
 
