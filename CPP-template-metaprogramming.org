@@ -1578,13 +1578,13 @@ Program output:
   [1] Types are not equal
   [2] Types are equal
 #+END_SRC
-** Template Type Alias - 'using'
+** Template Type Alias - 'using' (C++11)
 
 In addition to be useful for creating type alias, the keyword "using"
 can also be used for defining template type alias or parametrized type
 alias. 
 
- *Example:*
+ *Basic Example:*
 
 Type alias for shared_ptr: 
 
@@ -1606,7 +1606,58 @@ Type alias for unique_ptr:
   std::vector<up<DataObjeect>> objects;
 #+END_SRC
 
- *Example:*
+Type alias for polymorphic objects containers:
+
+#+BEGIN_SRC cpp 
+  #include <memory>
+  #include <vector> 
+
+  // Vector of shared pointer for storing polymorphic objects (shared ownership)
+  template<typename T>
+  using SHVector<T> = std::vector<std::shared_ptr<T>>;
+
+  // Vector of shared pointer for storing polymorphic objects (unique ownership)
+  template<typename T>
+  using UPVector<T> = std::vector<std::unique_ptr<T>>;
+
+
+  class Base{
+    ... 
+    public:
+      ~Base() = default;
+      virtual double Price(double x) const = 0 ;
+  };
+
+ class DerivedA: public Base{
+   ... 
+   double Price(double x) const override 
+   {
+       ... // Compute Price --- // 
+   }
+ };
+
+ class DerivedB: public Base{
+   ... 
+   double Price(double x) const override 
+  {
+   ... // Compute Price --- // 
+   }
+ };
+
+ 
+ // Usage: 
+ SHVector<Base> list;
+ list.reserve(10);
+ list.push_back( std::make_shared<Base>());
+ list.push_back( std::make_shared<DerivedA>(arg0, arg1, arg2, ... argN));
+ list.push_back( std::make_shared<DerivedB>(arg0, arg1, arg2, ... argN));
+
+ for(auto const& impl : list) 
+   std::cout << "Price = " << impl->Price(10.0) << std::endl;
+#+END_SRC
+
+
+ *Example: std::function container type alias*
 
 Type synonym: 
 
