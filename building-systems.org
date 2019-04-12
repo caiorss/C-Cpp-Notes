@@ -587,16 +587,19 @@ instance: Code Blocks.
   1 directory, 4 files
 #+END_SRC
 
-** Target Configuration 
+** Project with multiple targets 
+*** Adding and setting multiple targets  
 
-CMake can set up a compilation target in compiler-agnostic manner:
+This section provides shows how to set up a project with additional
+configuration and multiple targets which means a project with multiple
+executables, shared libraries or static libraries.
 
  *Set up executable target*
 
  + Executable target defintion => Builds a *.exe on Windows.
 
 #+BEGIN_SRC cmake  
-   add_executable(SampleApp main.cpp sourc1.cpp source2.cpp)
+   add_executable(SampleApp main.cpp source1.cpp source2.cpp)
 #+END_SRC
 
  *Set target defines #define or -D<DEFINITION>=VALUE or /D<DEFINTION>=<VALUE>*
@@ -824,9 +827,83 @@ static libraries or shared libraries.
    interface to many compilers and build-systems, such as
    _target_compile_definitions_ that allows setting defines in a
    compiler agnostic manner.
+*** Example 
 
+Project directory structure:
 
-Additional Reading: 
+ + ~C:\User\Dummy\Documents\SampleProject~  (Project Root Directory)
+
+   * CMakeLists.txt
+
+   * ./bin => Directory where the compiled binaries will be installed. 
+
+   * ./src - Directory 
+     + src/main.cpp
+     + src/execMain.cpp
+     + src/source1.cpp
+     + src/source1.hpp
+     + src/source2.cpp
+     + src/source2.hpp 
+     + src/source3.cpp 
+     + ... ... .. 
+
+   * ./lib - directory
+     + lib/lib1.cpp
+     + lib/lib2.cpp
+     + lib/lib3.cpp
+
+CMakeLists.txt file for this hypothetical project.
+
+#+CAPTION: CMakeLists.txt file for a project with multiple targets. 
+#+BEGIN_SRC cmake 
+  # ========= Global Configuration  ===============#
+  # The global configuration is shared by all targets. 
+
+  cmake_minimum_required(VERSION 3.9)
+  project(SuperCADTool)
+  set(CMAKE_CXX_STANDARD 17)     
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+
+  link_directories(  
+    # C:\Users\DummyUser\libs
+    "C:\\Users\\DummyUser\\libs" # Windows paths with backward slash must be escaped with '\'
+    "C:/libs/Graphics"           # Windows paths with forward slash 
+    "/home/DummyUser/libs" 
+  )
+
+  # ======= Configuration per target =============#
+ 
+  # Target: SampleApp executable 
+  #---------------------------------------------------------
+  add_executable(SampleApp src/main.cpp src/source1.cpp src/source2.cpp) 
+  target_compile_definitions(SampleApp PRIVATE VERBOSITY=100 Optimize foo=bar)
+  target_include_directories(SampleApp PUBLIC src/include1 /home/usr/include)
+
+  target_link_libraries(SampleApp  
+          GL blas opencv ole32 user32  # System libraries  /usr/lib/*.so files on Linux 
+                                       # or *.lib files for MSVC VC++/Windows compiler and DLLs 
+                                       # at C:\Windows\System32
+          SampleSharedLib              # Project shared library 
+          StaticLibrary                # Project static library 
+  )
+
+ # Target: Executable2 
+ #-----------------------------------------------------------------
+ add_executable(Executable2 src/execMain.cpp src/source1.cpp src/source2.cpp src/source3.cpp) 
+
+ # Target: SampleShared - Shared library dll, so 
+ #-------------------------------------------------------------------
+ add_library(SampleSharedLib SHARED  lib/lib1.cpp lib/lib2.cpp lib/lib3.cpp)
+ target_include_directories(SampleSharedLib PRIVATE src/lib/include1)
+
+ # Install binaries locally during development.
+ # The binaries are installed in project's "${ROOT DIRECTORY}./bin" 
+ #----------------------------------------------------------------------
+ install(TARGETS SampleApp Executable2 SampleSharedLib DESTINATION  ${CMAKE_CURRENT_LIST_DIR})
+#+END_SRC
+*** Further Reading
+
+General 
 
  + Ben Morgan - The University of Warwick - [[https://web.archive.org/web/20190109203537/https://indico.fnal.gov/event/9717/session/38/contribution/82/material/slides/0.pdf][C++11/14/1z in CMake]]
  + [[https://foonathan.net/doc/compatibility/][Documentation of Compatibility]]
