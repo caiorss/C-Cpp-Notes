@@ -2700,6 +2700,199 @@ Running (ROOT/Cling REPL):
        e   16     0xbbbbed2c
 #+END_SRC
 
+** C++17 Variadic Template - Fold Expressions 
+
+C++17 fold expression features allow to expand and process variadic
+template type arguments, also known as parameter pack, without
+complicated recursion and function overloads.
+
+ + Documentation: [[https://en.cppreference.com/w/cpp/language/fold][C++17 fold expression]]
+
+ *Syntax:*
+
+|-------+-----------------------+-------------------|
+| Index | Syntax                | Description       |
+|-------+-----------------------+-------------------|
+|     1 | ( pack op ... )       | Unary Right Fold  |
+|     2 | ( ... op pack)        | Unarfy Left Fold  |
+|     3 | (pack op ... op init) | Binary Right Fold |
+|     4 | (init op ... op pack) | Binary Left Fold  |
+|-------+-----------------------+-------------------|
+
+ + Pack - [[https://en.cppreference.com/w/cpp/language/parameter_pack][Parameter pack]]
+
+ + init	- "an expression that does not contain an unexpanded
+   parameter pack and does not contain an operator with precedence
+   lower than cast at the top level (formally, a cast-expression)"
+
+ + OP - Operator that can be any of the 32 supported operators: 
+
+#+CAPTION: Supported operators by fold expressiosn 
+#+BEGIN_SRC text 
+  + - * / % ^ & | = < > << >> += -= *= /= %= ^= &= 
+  |= <<= >>= == != <= >= && || , .* ->*. 
+#+END_SRC
+
+ *Example:*
+
+ + File: [[file:src/cpp17/fold-expressions1.cpp][file:src/cpp17/fold-expressions1.cpp]]
+ + Online Compiler: https://wandbox.org/permlink/6ZmVdoDWFMa89eBO
+
+Compilation: 
+
+#+BEGIN_SRC sh 
+  # Compile with GCC 
+  $ g++ fold-expressions1.cpp -o fold-expressions1.bin -std=c++1z -g -O0 -Wall
+  # Compile with Clang 
+  $ clang++ fold-expressions1.cpp -o fold-expressions1.bin -std=c++1z -g -O0 -Wall
+  # Run 
+  $ ./fold-expressions1.bin
+#+END_SRC
+
+Headers: 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <iomanip>
+  #include <string>
+  #include <vector>
+  #include <functional>
+  #include <tuple>
+  #include <any>
+#+END_SRC
+
+Function multiply:
+
+#+BEGIN_SRC cpp 
+  template<typename ... Args>
+  auto multiply(Args ... args)
+  {
+      return (args * ...);
+  }
+#+END_SRC
+
+Function printArguments: 
+
+#+BEGIN_SRC cpp 
+  template<typename ... Args>
+  void printArguments(Args&& ...  args )
+  {
+     ((std::cout << typeid(args).name()  << " " << args << std::endl), ...);
+  }
+#+END_SRC
+
+Function GetTypesFromArgs1:
+
+#+BEGIN_SRC cpp 
+  template<typename ... Args>
+  std::vector<std::type_info const*>
+  GetTypesFromArgs1(){
+      std::vector<std::type_info const*> tinfo;
+      std::cout << "Received " << sizeof...(Args)
+                << " types arguments" << std::endl;
+      ((tinfo.push_back(&typeid(Args))), ...) ;
+      return tinfo;
+  }
+#+END_SRC
+
+Function GetTypesFromArgs2:
+
+#+BEGIN_SRC cpp 
+  template<typename ... Args>
+  std::vector<std::type_info const*>
+  GetTypesFromArgs2(Args const& ... args){    
+      std::cout << "Received " << sizeof...(Args)
+                << " types arguments" << std::endl;
+      return {&typeid(args) ...};
+  }
+#+END_SRC
+
+ *Main Function:* 
+
+Experiment 1: 
+
+#+BEGIN_SRC cpp 
+  std::cout << "\n ======= EXPERIMENT 1 ===============\n";	
+  std::cout << " => Result 1 = " << multiply(1, 2, 3, 4, 5, 6) << std::endl;
+  std::cout << " => Result 2 = " << multiply(3.5, 1.65, 0.25, 10.98, 100.5, 6) << std::endl;
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC text 
+
+ ======= EXPERIMENT 1 ===============
+ => Result 1 = 720
+ => Result 2 = 9558.98
+#+END_SRC
+
+Experiment 2: 
+
+#+BEGIN_SRC cpp 
+  std::cout << "\n ======= EXPERIMENT 2 ===============\n";
+  printArguments(10, 200.5, "hello world", 'x');
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC text 
+   ======= EXPERIMENT 2 ===============
+  i 10
+  d 200.5
+  A12_c hello world
+  c x
+#+END_SRC
+
+Experiment 3: 
+
+#+BEGIN_SRC cpp 
+  std::cout << "\n ======= EXPERIMENT 3 ===============\n";
+  auto tinfo = GetTypesFromArgs1<int, double, const char*, std::string>();
+  for(auto const& t: tinfo)
+  {
+       std::cout << "Name = " << t->name()
+                 << " - id = " << t->hash_code()
+                 << std::endl;
+  }	
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC text 
+  ======= EXPERIMENT 3 ===============
+  Received 4 types arguments
+  Name = i - id = 6253375586064260614
+  Name = d - id = 14494284460613645429
+  Name = PKc - id = 3698062409364629473
+  Name = NSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE - id = 5774750460303204477
+#+END_SRC
+
+Experiment 4: 
+
+#+BEGIN_SRC cpp 
+  std::cout << "\n ======= EXPERIMENT 4 ===============\n";
+  auto tinfo2 = GetTypesFromArgs2(200, 'x', 9.87, std::string("hello world"), "CPP17");
+  for(auto const& t: tinfo2)
+  {
+       std::cout << "Name = " << t->name()
+                 << " - id = " << t->hash_code()
+                 << std::endl;
+  }
+#+END_SRC
+
+Output:
+
+#+BEGIN_SRC text 
+   ======= EXPERIMENT 4 ===============
+  Received 5 types arguments
+  Name = i - id = 6253375586064260614
+  Name = c - id = 10959529184379665549
+  Name = d - id = 14494284460613645429
+  Name = NSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE - id = 5774750460303204477
+  Name = A6_c - id = 15419073316311588377
+#+END_SRC
+
+
 ** SFINAE - Substution Is Not a Failure
 *** Fundamentals 
 
@@ -3760,7 +3953,6 @@ According to goldbot, this call generates the following object-code
           jmp     .L3
           ret 
 #+END_SRC
-
 
 
 ** References and Bookmarks 
