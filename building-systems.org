@@ -899,8 +899,85 @@ CMakeLists.txt file for this hypothetical project.
  # Install binaries locally during development.
  # The binaries are installed in project's "${ROOT DIRECTORY}./bin" 
  #----------------------------------------------------------------------
- install(TARGETS SampleApp Executable2 SampleSharedLib DESTINATION  ${CMAKE_CURRENT_LIST_DIR})
+ 
+ # During the development install ./bin dir.  in project's root directory 
+ # To install using CMAKE_INSTALL_PREFIX path, set this variable to 'OFF'
+ set(INSTALL_LOCAL ON) 
+
+ if(INSTALL_LOCAL ON)
+   # Overrides the default default install location that would be 
+   # ${CMAKE_INSTALL_PREFIX}/bin as ${CMAKE_CURRENT_LIST_DIR}/bin 
+   #
+   # Note: CMAKE_CURRENT_LIST_DIR is the directory where is CMakeLists.txt 
+   install(TARGETS SampleApp Executable2 SampleSharedLib DESTINATION  ${CMAKE_CURRENT_LIST_DIR}/bin)
+ else()
+   # Install binary to directory probvided by the variable CMAKE_INSTALL_PREFIX 
+   install(TARGETS SampleApp Executable2 SampleSharedLib DESTINATION  bin)
+ endif()
 #+END_SRC
+
+Once the project file CMakeLists.txt is opened in any supported IDE or
+an text editor such as QTCreator, the IDE will show all available
+targets and provide menus, context menus or buttons where is possible
+to select all targets for building the entire project; build individual
+targets; debug an specific executable targets and run the *install*
+target that copies the compiled files to the directory stored in the
+variable *CMAKE_INSTALL_PREFIX*. 
+
+ *Running targets manually from command line without any IDE:* 
+
+Step 1. Configuration - run the command from the project's top level directory.
+
+ + Configure with install path CMAKE_INSTALL_PREFIX set to default
+   sytem location. (/usr/local on Linux). To install the binaries to
+   the this location, set the variable INSTALL_LOCAL in the code to
+   OFF. 
+
+#+BEGIN_SRC sh 
+  # Use Ninja build system 
+  $ cmake -Bcache -H. -G Ninja 
+
+  # Use Makefile 
+  $ cmake -Bcache -H. -G Ninja 
+#+END_SRC
+
+ + Configure base install path (CMAKE_INSTALL_PREFIX) to
+   /home/dummy/Documents/myapp, assuming that INSTALL_LOCAL is set to
+   OFF.
+
+#+BEGIN_SRC sh 
+  $ cmake -Bcache -H. -G Ninja -DCMAKE_INSTALL_PREFIX=/home/dummy/Documents/myapp 
+#+END_SRC
+
+Step 2. Run targets. 
+
+ + Run all targetes building the whole project 
+
+#+BEGIN_SRC sh 
+   $ cmake --build cache --target  
+#+END_SRC
+
+ + Run only the target SampleApp that build the SampleApp executable:
+
+#+BEGIN_SRC sh 
+  $ cmake --build cache --target SampleApp
+#+END_SRC
+
+ + Run only the target Executable2 that build the SampleApp executable 
+
+#+BEGIN_SRC sh 
+   $ cmake --build cache --target Executable2 
+#+END_SRC
+ 
+ + Run the target 'install' that will install all binaries specified
+   in target install to ./bin directory if the option *INSTALL_LOCAL* is
+   set in the code (ON), to install the standard location specified
+   ${CMAKE_INSTALL_PREFIX}, set *INSTALL_LOCAL* in the code to OFF.
+
+#+BEGIN_SRC sh 
+   $ cmake --build cache --target install 
+#+END_SRC
+
 *** Further Reading
 
 General 
