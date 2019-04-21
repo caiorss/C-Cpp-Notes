@@ -103,3 +103,260 @@ See:
    <http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0631r2.pdf>
  + [[https://en.cppreference.com/w/cpp/numeric/math/INFINITY][INFINITY - cppreference.com]]
  + [[https://en.cppreference.com/w/cpp/numeric/math/NAN][NAN -   cppreference.com]]
+** C++11 Random Number Library 
+*** Overview 
+
+C++11 provides a safer, more convenient and useful random number
+facilities than the old C-API rand() that fits many different domains
+such as numerical simulations, games, quizzes, password generation,
+security and so on. 
+
+ + Header: [[https://en.cppreference.com/w/cpp/numeric/random][<random>]]
+ + Predecessor: [[https://www.boost.org/doc/libs/1_70_0/doc/html/boost_random.html][Boost.Random]] 
+
+ + Advatanges over the old C-API rand():
+   + Safer
+   + More user control
+   + Multiple random number engines
+   + Multiple probability distributions. 
+
+ *C++11 Random Number System:*
+
+The random number API has three parts, a seed generator, a pseudo-random
+number engine and a probability distribution. 
+
+ + *seed* - Initial state of a pseudo-random number generator, a big
+   random integer.  
+
+ + *seed generator:* An object that yields new seed random whenever
+   it is invoked. Its purpose is to initialize the random engine.    
+
+ + *pseudo-random generator engine*: Generates a reproducible sequence
+   of big integers that are fed to a probability distribution. A
+   pseudo-random generator always yields the same numerical sequence
+   for the same *seed* or initial state, therefore, in order to make the
+   generator really random, it is necessary to initialize it with a
+   different seed during the program initialization. While the
+   deterministic feature of the random engines may look like a
+   disadvantange, they are useful for testing and reproducibility of
+   results, simulations and experiments. For instance, by using the
+   same seed and engine, it is possible to reproduce and test the
+   results of monte-carlo numerical simulation.
+   + std::default_random_engine
+   + std::mt19937 - 32-bit Mersenne Twister by Matsumoto and Nishimura, 1998
+   + 
+
+ + *probability distribution*: A probability distribution object takes
+   the generator output, a big number, and returns a random number
+   specified by the distribution.
+
+Some Engines: 
+
+| Library Class                      | Description                                                                |
+|------------------------------------+----------------------------------------------------------------------------|
+| *Seed Generator*                     |                                                                            |
+|------------------------------------+----------------------------------------------------------------------------|
+| [[https://en.cppreference.com/w/cpp/numeric/random/random_device][std::random_device]]                 | Generates a seed, aka non-deterministic random number.                     |
+|                                    |                                                                            |
+| *Random Generator Engines*           |                                                                            |
+|------------------------------------+----------------------------------------------------------------------------|
+| std::default_random_engine         | Default engine, the algorithm used is implementation defined.              |
+| std::mt19937                       | 32-bit Mersenne Twister by Matsumoto and Nishimura, 1998                   |
+| std::mt19937_64                    | 64-bit Mersenne Twister by Matsumoto and Nishimura, 2000                   |
+| std::minstd_rand0                  | Linear Congruential                                                        |
+| std::minstd_rand                   | Linear Congruential                                                        |
+| std::ranlux48                      |                                                                            |
+| std::knuth_b                       |                                                                            |
+|                                    |                                                                            |
+| *Probability Distributions*          |                                                                            |
+|------------------------------------+----------------------------------------------------------------------------|
+| [[https://en.cppreference.com/w/cpp/numeric/random/uniform_int_distribution][std::uniform_int_distribution]]      | Generates uniformly distributed integers in the interval [a, b]            |
+| [[https://en.cppreference.com/w/cpp/numeric/random/uniform_real_distribution][std::uniform_real_distribution<T>]]  | Generates uniformly distributed float point numbers.                       |
+|                                    |                                                                            |
+| [[https://en.cppreference.com/w/cpp/numeric/random/normal_distribution][std::normal_distribution]]           | Yields normally distributed numbers with some mean and standard deviation. |
+| [[https://en.cppreference.com/w/cpp/numeric/random/lognormal_distribution][std::lognormal_distribution]]        | Variant of the normal distribution.                                        |
+|                                    | -                                                                          |
+| bernouli_distributions<T>          | -                                                                          |
+| binomial_distribution<T>           | -                                                                          |
+| negative_binonmial_distribution<T> | -                                                                          |
+| geometric_distribution<T>          | -                                                                          |
+|------------------------------------+----------------------------------------------------------------------------|
+
+
+*** Basic Examples 
+
+ *Example in CERN's ROOT REPL:*
+
+ + Example 1: The function generate_randoms1 fails to generate a
+   random sequence as whenever the function is called, it generates
+   the same sequence of numbers because the seed was not set.
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <random>
+
+  void generate_randoms1(size_t n){
+       // Create default initialized engine object 
+       std::default_random_engine engine{};
+       // Generates uniformily distributed integers from 1 to 10, 
+       // including both bounds of the interval.  
+       std::uniform_int_distribution<int> dist(1, 10); 
+       for(auto i = 0; i < n; i++)
+         std::cout << " x[" << i << "] = " << dist(engine) << std::endl;
+  }
+#+END_SRC
+
+Testing: 
+
+#+BEGIN_SRC cpp 
+  >> generate_randoms1(4)
+   x[0] = 1
+   x[1] = 2
+   x[2] = 8
+   x[3] = 5
+
+  >> generate_randoms1(4)
+   x[0] = 1
+   x[1] = 2
+   x[2] = 8
+   x[3] = 5
+
+  >> generate_randoms1(6)
+   x[0] = 1
+   x[1] = 2
+   x[2] = 8
+   x[3] = 5
+   x[4] = 6
+   x[5] = 3 
+
+  >> generate_randoms1(10)
+   x[0] = 1
+   x[1] = 2
+   x[2] = 8
+   x[3] = 5
+   x[4] = 6
+   x[5] = 3
+   x[6] = 1
+   x[7] = 7
+   x[8] = 7
+   x[9] = 10
+#+END_SRC
+
+ + Example 2: The function generate_randoms2, generates quasi-random
+   numbers whenever the seed is changed, if it is kept unchanged, the
+   distribution and engine will always generate the same results. 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <random>
+
+  void generate_randoms2(size_t n, unsigned int seed){
+       // Create default initialized engine object 
+       std::default_random_engine engine{seed};
+       // Generates uniformily distributed integers from 1 to 10, 
+       // including both bounds of the interval.  
+       std::uniform_int_distribution<int> dist(1, 10); 
+       for(auto i = 0; i < n; i++)
+         std::cout << " x[" << i << "] = " << dist(engine) << std::endl;
+  }
+#+END_SRC
+
+Testing: 
+
+#+BEGIN_SRC cpp 
+  // Generates a new seed whenever it is called 
+  std::random_device seed_gen{};
+
+  // A seed is a big integer used for initializing the generator 
+  >> seed_gen()
+  (unsigned int) 4133644392
+
+  >> seed_gen()
+  (unsigned int) 2900292039
+
+  // Save current seed 
+  >> auto seed = seed_gen()
+  (unsigned int) 2616205616
+
+  >> generate_randoms2(5, seed)
+   x[0] = 4
+   x[1] = 1
+   x[2] = 5
+   x[3] = 10
+   x[4] = 6
+  >> 
+  >> generate_randoms2(6, seed)
+   x[0] = 4
+   x[1] = 1
+   x[2] = 5
+   x[3] = 10
+   x[4] = 6
+   x[5] = 10
+
+  >> generate_randoms2(10, seed)
+   x[0] = 4
+   x[1] = 1
+   x[2] = 5
+   x[3] = 10
+   x[4] = 6
+   x[5] = 10
+   x[6] = 2
+   x[7] = 8
+   x[8] = 9
+   x[9] = 6
+  >> 
+#+END_SRC
+
+Changing the seed: 
+
+#+BEGIN_SRC cpp 
+  >> auto seed2 = seed_gen()
+  (unsigned int) 3091314163
+
+
+  >> generate_randoms2(4, seed2)
+   x[0] = 8
+   x[1] = 5
+   x[2] = 2
+   x[3] = 7
+
+  >> generate_randoms2(8, seed2)
+   x[0] = 8
+   x[1] = 5
+   x[2] = 2
+   x[3] = 7
+   x[4] = 6
+   x[5] = 9
+   x[6] = 4
+   x[7] = 1
+#+END_SRC
+
+Making the sequence "really" random:
+
+#+BEGIN_SRC cpp 
+  >> generate_randoms2(5, seed_gen())
+   x[0] = 1
+   x[1] = 9
+   x[2] = 8
+   x[3] = 10
+   x[4] = 2
+
+  >> generate_randoms2(5, seed_gen())
+   x[0] = 5
+   x[1] = 6
+   x[2] = 7
+   x[3] = 8
+   x[4] = 4
+
+  >> generate_randoms2(5, seed_gen())
+   x[0] = 3
+   x[1] = 4
+   x[2] = 1
+   x[3] = 8
+   x[4] = 8
+#+END_SRC
+
+
+
+
+
