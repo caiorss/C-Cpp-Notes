@@ -182,7 +182,6 @@ Some Engines:
 | geometric_distribution<T>          | -                                                                          |
 |------------------------------------+----------------------------------------------------------------------------|
 
-
 *** Basic Examples 
 
  *Example in CERN's ROOT REPL:*
@@ -357,6 +356,214 @@ Making the sequence "really" random:
 #+END_SRC
 
 
+
+
+
+*** Example - Normally Distribution Randoms 
+
+The following sample code generates N normally distributed random
+numbers with mean 10.0 and standard deviation 5 in three different
+ways: first with seed not set; then with seed set by used and third
+with seed generated automatically. 
+
+ + File: *randoms1.cpp*
+
+#+BEGIN_SRC cpp 
+#include <iostream>
+#include <random> 
+#include <vector> 
+#include <string> 
+#include <functional>
+
+int main(int argc, char** argv)
+{		
+    if(argc < 3)
+    {
+        std::cout << "Error: option provided. Try again!" << std::endl;
+        return EXIT_FAILURE;		
+    }	
+
+    size_t quantity = std::stoi(argv[1]);
+    std::string command = argv[2];
+
+    // Subprogram 1 - Run without any provided seed 
+    if(command == "-empty")
+    {
+        std::cout << " [INFO] Running without setting the generator's seed" << std::endl;		
+        // Random number engine 
+        std::default_random_engine rngen{};
+        // mean = 10.0, stdev = 5.0 
+        std::normal_distribution<double> ndist(10.0, 5.0);
+        for(auto i = 0; i < quantity; i++)
+            std::cout << "Next random is = " << ndist(rngen) << std::endl;
+        return EXIT_SUCCESS;
+    }
+    // Subprogram 2 - User provides the seed 
+    if(command == "-seed")
+    {
+        if(argc < 4){
+                std::cout << "Error: missing seed. " << std::endl;
+                return EXIT_FAILURE;
+        }
+        auto seed = std::atol(argv[3]);
+        std::cout << " [INFO] Using seed = " << seed << std::endl;
+
+        // Random number engine 
+        std::default_random_engine rngen{seed};
+        // mean = 10.0, stdev = 5.0 
+        std::normal_distribution<double> ndist(10.0, 5.0);
+        for(auto i = 0; i < quantity; i++)
+           std::cout << "Next random is = " << ndist(rngen) << std::endl;				
+    }
+    // Subprogram 2  - Automatically generates a seed 
+    if(command == "-auto")
+    {
+        // Object that generates seed (initial state of random generator)
+        std::random_device seed_gen;
+
+        // Get a seed (big random integer) used for initializing the random generator. 
+        auto seed = seed_gen();	
+        std::cout << "seed = " <<  seed << std::endl;
+
+        // Random number engine 
+        std::default_random_engine rngen{seed};
+        // mean = 10.0, stdev = 5.0 
+        std::normal_distribution<double> ndist(10.0, 5.0);
+        for(auto i = 0; i < quantity; i++)
+           std::cout << "Next random is = " << ndist(rngen) << std::endl;				
+    }		
+
+    return 0;
+}
+
+#+END_SRC
+
+Compiling: 
+
+#+BEGIN_SRC sh  
+  # Using Clang 
+  $ clang++ randoms1.cpp -o randoms1.bin -std=c++1z -g -O0 -Wall 
+
+  # Using GCC
+  $ gcc++ randoms1.cpp -o randoms1.bin -std=c++1z -g -O0 -Wall 
+#+END_SRC
+
+ + *Experiment 1:* Running command *empty* => generates N normally
+   distributed numbers with mean 4 and standard deviation 10 without
+   setting the engine rngen's seed, aka initial state. 
+
+#+BEGIN_SRC text 
+  # Fails! 
+
+  $ ./randoms1.bin 5 -empty
+   [INFO] Running without setting the generator's seed
+  Next random is = 9.39017
+  Next random is = 4.56591
+  Next random is = 13.4214
+  Next random is = 4.62405
+  Next random is = 10.1663
+
+
+  $ ./randoms1.bin 5 -empty
+   [INFO] Running without setting the generator's seed
+  Next random is = 9.39017
+  Next random is = 4.56591
+  Next random is = 13.4214
+  Next random is = 4.62405
+  Next random is = 10.1663
+  (base) 
+
+  $ ./randoms1.bin 8 -empty
+   [INFO] Running without setting the generator's seed
+  Next random is = 9.39017
+  Next random is = 4.56591
+  Next random is = 13.4214
+  Next random is = 4.62405
+  Next random is = 10.1663
+  Next random is = 13.7242
+  Next random is = 10.168
+  Next random is = 7.36681
+#+END_SRC
+
+ + *Experiment 2:* Running command *auto* => generate N random numbers
+   with same features, but with a seed generated automatically by the
+   object _seed_gen_ with type random_device. 
+
+Simulation run A:
+
+#+BEGIN_SRC text 
+  $ ./randoms1.bin 4 -auto
+  seed = 2138866676
+  Next random is = 6.58512
+  Next random is = 11.7181
+  Next random is = 9.55006
+  Next random is = 7.35961
+#+END_SRC
+
+Simulation run B: 
+
+#+BEGIN_SRC text 
+  $ ./randoms1.bin 8 -auto
+  seed = 4200712391
+  Next random is = 0.575461
+  Next random is = 11.82
+  Next random is = 6.07653
+  Next random is = 13.8118
+  Next random is = 11.0999
+  Next random is = 7.04851
+  Next random is = 7.56055
+  Next random is = 3.67443
+#+END_SRC
+
+Simulation run C:
+
+#+BEGIN_SRC text 
+  $ ./randoms1.bin 3 -auto
+  seed = 1536173647
+  Next random is = 13.4482
+  Next random is = 12.2431
+  Next random is = 12.2183
+#+END_SRC
+
+ + *Experiment 3:* The results of the simulation runs of experiment 2
+   can be reproduced by reusing the seed with command *-seed*.
+
+Reproduce simulation run A: 
+
+#+BEGIN_SRC cpp 
+  $ ./randoms1.bin 4 -seed 2138866676
+   [INFO] Using seed = 2138866676
+  Next random is = 6.58512
+  Next random is = 11.7181
+  Next random is = 9.55006
+  Next random is = 7.35961
+
+  $ ./randoms1.bin 8 -seed 2138866676
+   [INFO] Using seed = 2138866676
+  Next random is = 6.58512
+  Next random is = 11.7181
+  Next random is = 9.55006
+  Next random is = 7.35961
+  Next random is = 3.621
+  Next random is = 8.41599
+  Next random is = 11.3628
+  Next random is = 8.27506
+#+END_SRC
+
+Reproduce simulation run B:
+
+#+BEGIN_SRC cpp 
+  $ ./randoms1.bin 8 -seed 4200712391
+   [INFO] Using seed = 4200712391
+  Next random is = 0.575461
+  Next random is = 11.82
+  Next random is = 6.07653
+  Next random is = 13.8118
+  Next random is = 11.0999
+  Next random is = 7.04851
+  Next random is = 7.56055
+  Next random is = 3.67443
+#+END_SRC
 
 
 
