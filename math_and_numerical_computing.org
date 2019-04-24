@@ -115,10 +115,37 @@ security and so on.
  + Predecessor: [[https://www.boost.org/doc/libs/1_70_0/doc/html/boost_random.html][Boost.Random]] 
 
  + Advatanges over the old C-API rand():
-   + Safer
+   + Safer and Stronger 
    + More user control
    + Multiple random number engines
-   + Multiple probability distributions. 
+   + Many probability distributions
+
+
+Note:
+
+ + The C++11 random numbers' API is not object oriented, there is no
+   class hierarchy. The library is *generic* and uses lots of *C++'s
+   generic programming* (template meta programming) features. This
+   design choice allows the library to be header-only and to be reused
+   for many different types without virtual-function calls overhead.
+
+ *Uses of Random Numbers* 
+
+ + Many Science, Physics and Engineering fields:
+   + Monte-Carlo Simulations
+   + Brownian Motion Simulation
+   + Simulation of noises and disturbances 
+   + SDE 
+
+ + Cryptography
+   + Password generation
+   + Generation of keys 
+
+ + Games and RPG Role Play Games
+
+ + Shuffling 
+
+ + Lottery and gambling
 
  *C++11 Random Number System:*
 
@@ -128,8 +155,9 @@ number engine and a probability distribution.
  + *seed* - Initial state of a pseudo-random number generator, a big
    random integer.  
 
- + *seed generator:* An object that yields new seed random whenever
-   it is invoked. Its purpose is to initialize the random engine.    
+ + *seed generator:* A non-deterministic random number generator that
+   yields new seed random whenever it is invoked. Its purpose is to
+   initialize the random engine.
 
  + *pseudo-random generator engine*: Generates a reproducible sequence
    of big integers that are fed to a probability distribution. A
@@ -142,9 +170,9 @@ number engine and a probability distribution.
    results, simulations and experiments. For instance, by using the
    same seed and engine, it is possible to reproduce and test the
    results of monte-carlo numerical simulation.
-   + std::default_random_engine
-   + std::mt19937 - 32-bit Mersenne Twister by Matsumoto and Nishimura, 1998
-   + 
+   + Note: The engines are deterministic, but can be made
+     non-deterministic by changing the seed during the
+     initialization. 
 
  + *probability distribution*: A probability distribution object takes
    the generator output, a big number, and returns a random number
@@ -181,6 +209,30 @@ Some Engines:
 | negative_binonmial_distribution<T> | -                                                                          |
 | geometric_distribution<T>          | -                                                                          |
 |------------------------------------+----------------------------------------------------------------------------|
+
+ *Further Reading*
+
+ + [[https://en.wikipedia.org/wiki/Applications_of_randomness][Applications of randomness]]
+
+ + [[https://en.wikipedia.org/wiki/Pseudorandom_number_generator][Pseudorandom number generator]]
+
+ + [[http://www0.cs.ucl.ac.uk/staff/d.jones/GoodPracticeRNG.pdf][Good Practice in (Pseudo) Random Number Generation for Bioinformatics Applications]]
+
+ + 
+
+ *Reproducibility in Science and Research* 
+
+ + [[https://www.nature.com/news/1-500-scientists-lift-the-lid-on-reproducibility-1.19970][1,500 scientists lift the lid on reproducibility : Nature News & Comment]]
+
+ + [[https://reproduciblescience.org/][Reproducible Science]]
+
+ + [[http://rescience.github.io/][Reproducible Science is good. Replicated Science is better.]]
+
+ + [[https://www.natureindex.com/news-blog/when-it-comes-to-reproducible-science-git-is-code-for-success][When it comes to reproducible science, Git is code for success | Nature Index]]
+
+ + [[https://towardsdatascience.com/data-sciences-reproducibility-crisis-b87792d88513][Data Science's Reproducibility Crisis – Towards Data Science]]
+
+ + [[https://www.codeproject.com/Articles/1083372/Random-Number-Generator-Recommendations-for-Applic][Random Number Generator Recommendations for Applications - CodeProject]]
 
 *** Basic Examples 
 
@@ -359,7 +411,7 @@ Making the sequence "really" random:
 
 
 
-*** Example - Normally Distribution Randoms 
+*** Example - Normally Distributed Randoms 
 
 The following sample code generates N normally distributed random
 numbers with mean 10.0 and standard deviation 5 in three different
@@ -369,72 +421,72 @@ with seed generated automatically.
  + File: *randoms1.cpp*
 
 #+BEGIN_SRC cpp 
-#include <iostream>
-#include <random> 
-#include <vector> 
-#include <string> 
-#include <functional>
+  #include <iostream>
+  #include <random> 
+  #include <vector> 
+  #include <string> 
+  #include <functional>
 
-int main(int argc, char** argv)
-{		
-    if(argc < 3)
-    {
-        std::cout << "Error: option provided. Try again!" << std::endl;
-        return EXIT_FAILURE;		
-    }	
+  int main(int argc, char** argv)
+  {		
+      if(argc < 3)
+      {
+          std::cout << "Error: option provided. Try again!" << std::endl;
+          return EXIT_FAILURE;		
+      }	
 
-    size_t quantity = std::stoi(argv[1]);
-    std::string command = argv[2];
+      size_t quantity = std::stoi(argv[1]);
+      std::string command = argv[2];
 
-    // Subprogram 1 - Run without any provided seed 
-    if(command == "-empty")
-    {
-        std::cout << " [INFO] Running without setting the generator's seed" << std::endl;		
-        // Random number engine 
-        std::default_random_engine rngen{};
-        // mean = 10.0, stdev = 5.0 
-        std::normal_distribution<double> ndist(10.0, 5.0);
-        for(auto i = 0; i < quantity; i++)
-            std::cout << "Next random is = " << ndist(rngen) << std::endl;
-        return EXIT_SUCCESS;
-    }
-    // Subprogram 2 - User provides the seed 
-    if(command == "-seed")
-    {
-        if(argc < 4){
-                std::cout << "Error: missing seed. " << std::endl;
-                return EXIT_FAILURE;
-        }
-        auto seed = std::atol(argv[3]);
-        std::cout << " [INFO] Using seed = " << seed << std::endl;
+      // Subprogram 1 - Run without any provided seed 
+      if(command == "-empty")
+      {
+          std::cout << " [INFO] Running without setting the generator's seed" << std::endl;		
+          // Random number engine 
+          std::default_random_engine rngen{};
+          // mean = 10.0, stdev = 5.0 
+          std::normal_distribution<double> ndist(10.0, 5.0);
+          for(auto i = 0; i < quantity; i++)
+              std::cout << "Next random is = " << ndist(rngen) << std::endl;
+          return EXIT_SUCCESS;
+      }
+      // Subprogram 2 - User provides the seed 
+      if(command == "-seed")
+      {
+          if(argc < 4){
+                  std::cout << "Error: missing seed. " << std::endl;
+                  return EXIT_FAILURE;
+          }
+          auto seed = std::atol(argv[3]);
+          std::cout << " [INFO] Using seed = " << seed << std::endl;
 
-        // Random number engine 
-        std::default_random_engine rngen{seed};
-        // mean = 10.0, stdev = 5.0 
-        std::normal_distribution<double> ndist(10.0, 5.0);
-        for(auto i = 0; i < quantity; i++)
-           std::cout << "Next random is = " << ndist(rngen) << std::endl;				
-    }
-    // Subprogram 2  - Automatically generates a seed 
-    if(command == "-auto")
-    {
-        // Object that generates seed (initial state of random generator)
-        std::random_device seed_gen;
+          // Random number engine 
+          std::default_random_engine rngen{seed};
+          // mean = 10.0, stdev = 5.0 
+          std::normal_distribution<double> ndist(10.0, 5.0);
+          for(auto i = 0; i < quantity; i++)
+             std::cout << "Next random is = " << ndist(rngen) << std::endl;				
+      }
+      // Subprogram 2  - Automatically generates a seed 
+      if(command == "-auto")
+      {
+          // Object that generates seed (initial state of random generator)
+          std::random_device seed_gen;
 
-        // Get a seed (big random integer) used for initializing the random generator. 
-        auto seed = seed_gen();	
-        std::cout << "seed = " <<  seed << std::endl;
+          // Get a seed (big random integer) used for initializing the random generator. 
+          auto seed = seed_gen();	
+          std::cout << "seed = " <<  seed << std::endl;
 
-        // Random number engine 
-        std::default_random_engine rngen{seed};
-        // mean = 10.0, stdev = 5.0 
-        std::normal_distribution<double> ndist(10.0, 5.0);
-        for(auto i = 0; i < quantity; i++)
-           std::cout << "Next random is = " << ndist(rngen) << std::endl;				
-    }		
+          // Random number engine 
+          std::default_random_engine rngen{seed};
+          // mean = 10.0, stdev = 5.0 
+          std::normal_distribution<double> ndist(10.0, 5.0);
+          for(auto i = 0; i < quantity; i++)
+             std::cout << "Next random is = " << ndist(rngen) << std::endl;				
+      }		
 
-    return 0;
-}
+      return 0;
+  }
 
 #+END_SRC
 
