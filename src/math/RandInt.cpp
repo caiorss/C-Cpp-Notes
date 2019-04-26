@@ -48,7 +48,7 @@ public:
 		return m_seed;
 	}
 	// Get NExt random 
-	TInt Next()
+	TInt operator()()
 	{
 		return m_dist(m_engine);
 	}
@@ -69,7 +69,7 @@ int main()
 			auto field = std::string(" x[") + std::to_string(i) + "] = "; 
 			std::cout << std::setw(10)
 					  << field
-					  << std::setw(5) << rnd.Next() << std::endl;
+					  << std::setw(5) << rnd() << std::endl;
 		}		
 	}	
 
@@ -89,7 +89,7 @@ int main()
 			auto field = std::string(" x[") + std::to_string(i) + "] = "; 
 			std::cout << std::setw(10)
 					  << field
-					  << std::setw(5) << rnd.Next() << std::endl;
+					  << std::setw(5) << rnd() << std::endl;
 		}		
 	}	
 	
