@@ -3587,8 +3587,8 @@ Wrapper for function C:
   =============================================
    RESULT =  b'The square root of x = 167.420000 is equal to 12.939088'
 #+END_SRC
-** Python native module (shared library)
-*** Overview  
+* Python Native Extension API 
+** Overview  
 
 Many programming languages provide a C-native interfaces such as
 Python C-API or Java Native Interface where it is possible to create
@@ -3714,8 +3714,8 @@ Python (CPython) debugging with GDB:
 Reverse engineering: 
  + [[https://recon.cx/2008/a/aaron_portnoy-ali_rizvi_santiago/slides.pdf][Reverse Engineering Dynamic Languages - A Focus on Python]]
 
-*** Module Code 
-**** Sources  
+** Module Code 
+*** Sources  
 
  *Module Source:*
 
@@ -3731,7 +3731,7 @@ Reverse engineering:
   # Clang LLVM 
   $ clang++ mymodule.cpp -o mymodule.so -g -std=c++1z -fPIC -shared -I/usr/include/python3.6m  
 #+END_SRC
-**** File: setup.py 
+*** File: setup.py 
 
 Python script used for building and installing the Python module.
 
@@ -3749,7 +3749,7 @@ Python script used for building and installing the Python module.
   )
 #+END_SRC
 
-**** File: mymodule.cpp 
+*** File: mymodule.cpp 
 
 Heades: 
 
@@ -4317,7 +4317,7 @@ Annotated code block in the for-loop:
   // Display table row 
   std::cout << std::setw(8) << x << std::setw(10) << y  << "\n";
 #+END_SRC
-*** Compiling and Running Native Module 
+** Compiling and Running Native Module 
 
  *Clone repository:*
 
@@ -4797,4 +4797,923 @@ Pass a callable object:
 #+END_SRC
 
 
+* R Language (RLang) Native Extension API 
+** R Raw C API 
+*** Overview 
 
+  *R Language C data structures* 
+
+ Reference: http://adv-r.had.co.nz/C-interface.html
+
+ | Data Structure   | Description                                      |   |
+ |------------------+--------------------------------------------------+---|
+ | *Vector*           |                                                  |   |
+ |------------------+--------------------------------------------------+---|
+ | REALSXP          | Numeric Vector                                   |   |
+ | INTSXP           | Integer Vector                                   |   |
+ | LGSXP            | Logical Vector                                   |   |
+ | STRSXP           | Character Vector                                 |   |
+ | CPLSXP           | Complex Vectors                                  |   |
+ |                  |                                                  |   |
+ | VECSXP           | List                                             |   |
+ |                  |                                                  |   |
+ | *Null*             |                                                  |   |
+ |------------------+--------------------------------------------------+---|
+ | NILSXP           | Null                                             |   |
+ |                  |                                                  |   |
+ | *Misc*             |                                                  |   |
+ |------------------+--------------------------------------------------+---|
+ | CLOSXP           | Function (closure)                               |   |
+ | ENVSXP           | Environment                                      |   |
+ | LISTSXP          | Pair list                                        |   |
+ | DOTSXP           |                                                  |   |
+ | SYMSXP           | names/symbols                                    |   |
+ |                  |                                                  |   |
+ |------------------+--------------------------------------------------+---|
+ | *Internal Objects* | Note: Only used by C functions, not R functions. |   |
+ | LANGSXP          | Language constructs                              |   |
+ | CHARSXP          | -                                                |   |
+ | PROMSXP          | -                                                |   |
+ | EXPRSXP          | Expressions                                      |   |
+ |------------------+--------------------------------------------------+---|
+
+ Fuctions for coercing Scalars: 
+
+  + asLogical(xs): LGSXP -> int
+  + asInteger(xs): INTSXP -> int
+  + asReal(xs): REALSXP -> double
+  + CHAR(asChar(x)): STRSXP -> const char*
+
+ R Types: 
+  + All numbers are float point (double 64 bits)
+  + Scalar data are vectors, a single number is vector of size one.
+
+  *Useful References:*
+
+  + [[https://cran.r-project.org/doc/manuals/r-release/R-ints.html][R Internals]] - C API Documentation
+
+  + [[https://tolstoy.newcastle.edu.au/R/e17/devel/att-0724/R_API_cheat_sheet.pdf][R Native API Cheat Sheet]]
+
+  + [[https://www.rdocumentation.org/packages/base/versions/3.5.3/topics/Foreign][Foreign function | R Documentation]]
+
+  + [[https://www.avrahamadler.com/2018/12/09/the-need-for-speed-part-1-building-an-r-package-with-fortran/][The Need for Speed Part 1: Building an R Package with Fortran (or C) | Strange Attractors]]
+
+  + [[http://adv-r.had.co.nz/C-interface.html][R's C interface · Advanced R.]]
+
+  + [[https://developer.r-project.org/Blog/public/2019/03/28/use-of-c---in-packages/index.html][Use of C++ in Packages - The R Blog]]
+
+  + [[https://www.r-bloggers.com/three-ways-to-call-cc-from-r/][Three ways to call C/C++ from R | R-bloggers]]
+
+  + [[https://www.nceas.ucsb.edu/scicomp/usecases/CreateRPackageWithC][Integrate C Language Functions into R With an R Package | NCEAS]]
+
+*** Install R language and development tools 
+
+ Install R development libraries with [[https://en.wikipedia.org/wiki/Anaconda_(Python_distribution)][Anaconda Python Distribution]] 
+
+ #+BEGIN_SRC sh 
+  # Install R language, interpreter 
+  $ conda install r-base   
+  
+  # Install R development libraries 
+  $ conda install r-devtools -c r
+ #+END_SRC
+
+ Locate where the headers: 
+
+ #+BEGIN_SRC sh 
+   $ find ~/opt/anaconda3/ -name "Rin*.h"
+   /home/dummy/opt/anaconda3/lib/R/include/Rinterface.h
+   /home/dummy/opt/anaconda3/lib/R/include/Rinternals.h
+   /home/dummy/opt/anaconda3/pkgs/r-base-3.5.1-h1e0a451_2/lib/R/include/Rinterface.h
+   /home/dummy/opt/anaconda3/pkgs/r-base-3.5.1-h1e0a451_2/lib/R/include/Rinternals.h
+
+
+   $ ls ~/opt/anaconda3/lib/R/include/
+   R_ext/     Rdefines.h   R.h           Rinternals.h  Rversion.h
+   Rconfig.h  Rembedded.h  Rinterface.h  Rmath.h       S.h
+ #+END_SRC
+
+*** Example using R native C API
+**** Source 
+
+ *File:* 
+  + [[https://github.com/caiorss/Rlang-RcppExamples/blob/master/rnative.cpp][rnative.cpp]] 
+
+ *Compilation:*
+
+ + Manual compilation
+
+#+BEGIN_SRC sh  
+   $ clang++ rnative.cpp -o rnative.so -std=c++1z -g -O0 -Wall -shared -fPIC -I/home/archbox/opt/anaconda3/lib/R/include/
+#+END_SRC
+
+ + Automatic with R command line tool. 
+
+#+BEGIN_SRC sh 
+  $ R CMD SHLIB rnative.cpp 
+#+END_SRC
+
+  *Source Code*
+
+Headers: 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <iomanip>
+  #include <cmath>
+  #include <vector> 
+
+  #include <R.h>
+  #include <Rinternals.h>
+  #include <Rmath.h>
+#+END_SRC
+
+Global object for logging when the library is loaded or unloaded.
+
+#+BEGIN_SRC cpp 
+
+  struct DLLIntializer{
+       DLLIntializer()
+       {
+           std::cerr << "[TRACE] - DLL loaded into process OK." << std::endl;
+       }
+       ~DLLIntializer()
+       {
+           std::cerr << "[TRACE] - DLL unloaded from process OK." << std::endl;
+       }
+  };
+
+  DLLIntializer init_hook{};
+#+END_SRC
+
+Function: basicFunction 
+
+ + Computes the 10.0 * x + 4.0 * y where x and y are scalars (vectors of size one)
+ + Note 1: Every argument of a R-function is a SEXP (S-expression
+   structure) that can be a vector, scalar, matrix, R function and so
+   on.
+ + Note 2: Every scalar in R is a vector of size 1.
+
+#+BEGIN_SRC cpp 
+  extern "C"
+  SEXP basicFunction(SEXP x, SEXP y)
+  {
+      std::cerr << " [TRACE] Calling R from C++" << std::endl;
+      // Allocate a vector of size 1 of type real (double)
+      // Remember: in R, a scalar is a vector of size one  
+      SEXP out = PROTECT(allocVector(REALSXP, 1));
+      // asReal(x) => Interprets the first element of the
+      // vector x as a double 
+      REAL(out)[0] = 10.0 * asReal(x) + 4.0 * asReal(y);
+      //     UNPROTECT(< Number of allocations> )
+      // OR: UNPROTECT(< Number of protects> )
+      UNPROTECT(1);	
+      return out;
+  }
+
+#+END_SRC
+
+Function: GetVersion
+ + Returns library verion. 
+
+#+BEGIN_SRC cpp 
+  extern "C"
+  SEXP GetVersion()
+  {
+      SEXP version;
+      // Allocate 1 string 
+      PROTECT(version = allocVector(STRSXP, 1));
+      SET_STRING_ELT(version, 0, ::mkChar("version 0.1"));
+      UNPROTECT(1);
+      return version;
+  }
+#+END_SRC
+
+Function: Metric 
+ + Display vector statistics 
+
+#+BEGIN_SRC cpp 
+  extern "C"
+  auto metrics(SEXP xs) -> SEXP 
+  {
+     size_t size = ::length(xs);
+     double* vec =  REAL(xs);
+     double sumsq  = 0.0;
+     double sum    = 0.0;
+     double x;
+     for(auto i = 0; i < size; i++){
+         x = vec[i];
+         sumsq = sumsq + x * x;
+         sum   = sum + x;
+     }
+     std::cout << std::setprecision(4) << std::fixed;
+     std::cout << std::endl;
+     std::cout << " =>    Mean = " << sum / size << std::endl;
+     std::cout << " =>    Norm = " << std::sqrt(sumsq) << std::endl;
+     std::cout << " =>    Size = " << size << std::endl;
+     // If the function returns nothing, it should return R_NilValue 
+     return R_NilValue;
+  }
+
+#+END_SRC
+
+Function: linearcomb 
+ + Return a linear combination between vectors. 
+
+#+BEGIN_SRC cpp 
+  /** Computes the equation: 
+    ,* For each i = 0, 1, 2, ... N - 1
+    ,*   zs_vector[i] = a * xs_vector[i] + b * ys_vector[i] + c 
+    ,*
+    ,* Returns: Vector zs_vector[i]
+    ,*/
+  extern "C"
+  SEXP linearcomb(SEXP xs_vector, SEXP ys_vector, SEXP a, SEXP b, SEXP c)
+  {
+       size_t size = ::length(xs_vector);
+       // Allocate output vector of same size 
+       SEXP output = PROTECT(allocVector(REALSXP, size));
+       double *pout, *pxs, *pys;
+       pout = REAL(output);
+       pxs  = REAL(xs_vector);
+       pys  = REAL(ys_vector);
+       for(size_t i = 0; i < size; i++)
+               pout[i] = asReal(a) * pxs[i] + asReal(b) * pys[i] + asReal(c);
+       UNPROTECT(1);
+       return output;
+  }
+#+END_SRC
+**** Load into R REPL 
+
+Load shared library:
+
+#+BEGIN_SRC R 
+   > dyn.load("rnative.so")
+   [TRACE] - DLL loaded into process OK.
+#+END_SRC
+
+Call function basicFunction 
+
+#+BEGIN_SRC R
+   > .Call("basicFunction", 10, 5)
+    [TRACE] Calling R from C++
+   [1] 120
+#+END_SRC
+
+Call function metrics: 
+
+#+BEGIN_SRC R 
+   > .Call("metrics", 10)
+    => Average = 10.0000
+    =>    Norm = 10.0000
+    =>    Size = 1
+   NULL
+
+   > .Call("metrics", c(4.5, 8.0, 6, -10.0))
+    => Average = 2.1250
+    =>    Norm = 14.8408
+    =>    Size = 4
+   NULL
+ #+END_SRC
+
+Call function linearcomb:
+ + Test function *linearcomb* which perform linear combination between
+   two vectors:
+
+ #+BEGIN_SRC R 
+   > .Call("linearcomb", c(1, 2, 3, 4), c(4, 5, 6, 9), 10, 2, 0)
+   [1] 18 30 42 58
+
+   > .Call("linearcomb", c(1, 2, 3, 4), c(4, 5, 6, 9), 10, 2, 5)
+   [1] 23 35 47 63
+
+   > .Call("linearcomb", 4, 6, 10, 1, 2)
+   [1] 48
+
+   > .Call("linearcomb", 4, 6, 10, 5, 2)
+   [1] 72
+ #+END_SRC
+
+ End of the interative session:
+
+#+BEGIN_SRC R 
+   > quit()
+   Save workspace image? [y/n/c]: n
+   [TRACE] - DLL unloaded from process OK.
+#+END_SRC
+
+Those functions need wrappers for making usage easier: 
+
+File: rnative.R 
+
+#+BEGIN_SRC R 
+  dyn.load("rnative.so")
+
+  basicFunction <- function(x, y){  .Call("basicFunction", x, y) }
+
+  getVersion <- function(){ .Call("GetVersion")}
+
+  metrics <- function(xs){ .Call("metrics", xs) }
+
+  # Compute: a * xs + b * ys + c
+  linearcomb <- function(xs, ys, a, b, c){
+      .Call("linearcomb", xs, ys, a, b, c)
+  }
+
+
+  testPackage <- function(){
+      print(sprintf("basicFunction(4, 5) = %.3f", basicFunction(4, 5)))
+      print(sprintf("basicFunction(10, 6) = %.3f", basicFunction(10, 6)))
+
+      metrics(8)
+      metrics(c(3.4, 9.0, 10.0, -15.75, 20.65))
+  }
+#+END_SRC
+
+This script can be loaded into the REPL with:
+
+#+BEGIN_SRC R 
+  > source("rnative.R")
+  [TRACE] - DLL loaded into process OK.
+
+  > getVersion()
+  [1] "version 0.1"
+
+  > metrics(c(4, 5, 10.5, 8.65, 5))
+
+   =>    Mean = 6.6300
+   =>    Norm = 15.8453
+   =>    Size = 5
+  NULL
+  > 
+
+  > quit()
+  Save workspace image? [y/n/c]: n
+  [TRACE] - DLL unloaded from process OK.
+#+END_SRC
+** Rcpp Library for easier C++ Integration 
+*** Overview 
+
+Rcpp is a C++ library that makes easier to write native R functions in
+C++ and also to create bindings to existing C++ libraries.
+
+ *Rcpp*
+
+Official Web Sites:
+ + http://www.rcpp.org/
+ + http://dirk.eddelbuettel.com/code/rcpp 
+
+Doxygen - C++ API Docs:
+ + http://dirk.eddelbuettel.com/code/rcpp/html/index.html
+
+Further Reading: 
+ + [[http://dirk.eddelbuettel.com/code/rcpp/Rcpp-introduction.pdf][Rcpp: Seamless R and C++ Integration]] [MUST READ]
+   + (Dirk Eddelbuettel and Romain François) 
+ + [[http://adv-r.had.co.nz/Rcpp.html][Rcpp · Advanced R.]]
+ + [[https://adv-r.hadley.nz/rcpp.html][25 Rewriting R code in C++ | Advanced R]]
+ + [[https://rdrr.io/rforge/Rcpp/f/inst/doc/Rcpp-modules.pdf][Exposing C++ functions and classes with Rcpp modules]] 
+
+Lots of examples: 
+ + http://gallery.rcpp.org/
+
+Repository: 
+ + https://github.com/RcppCore/Rcpp
+
+Questions: 
+ + https://stackoverflow.com/questions/tagged/rcpp
+
+ *R Language Limitations*
+
+ + GIL - Global Interpreter Lock of garbage collector 
+ + Single thread 
+ + Interpretation overhead
+ + Vectorized operations can cost many passes over the input data and
+   be slower than a single loop.
+
+ *Use Cases for Rcpp package and reasons to write R functions in C++*
+
+ + Create R wrappers for existing C++ libraries.
+ + Create high performance R packages in C++
+ + Access operating system functionality not exposed in the
+   language.
+ + Embed R interpreter into some application.
+ + R Functions or algorithms written in C++ can be reused with other
+   programming languages or in production systems.
+
+ *Other RCPP Libraries in CRAN:*
+
+Misc:
+
+ + [[https://rdrr.io/rforge/Rcpp/f/inst/doc/Rcpp-modules.pdf][Rcpp Modules]] => Rcpp extension wrapper library based on
+   Boost.Python library which has a declarative and intituitive syntax
+   for wrapping C++ libraries into Python.
+
+ + [[https://www.r-bloggers.com/user2014-rcpp11-tutorial/][Rcpp11]] => Library similar to Rcpp Modules and based on Python
+   Pybind11.
+   + Repository: https://github.com/Rcpp11/Rcpp11
+
+ + RProtBuf (Google's Protobuf)
+
+Linear Algebra Libraries:
+
+ + [[https://cran.r-project.org/web/packages/RcppArmadillo/index.html][Rcpp Armadillo]] => Wraps C++ [[http://arma.sourceforge.net/][armadillo]] library linear algebra
+
+ + [[https://cran.r-project.org/web/packages/RcppEigen/index.html][Rcpp Eigen]] => (Eigen Library)
+
+General Scientific Libraries 
+
+ + [[http://dirk.eddelbuettel.com/code/rcpp.gsl.html][RcppGSL]] => (GNU Scientific Library Wrapper)
+
+
+ *Install Rcpp Package* 
+
+#+BEGIN_SRC R 
+  > install.packages(c("Rcpp", "RInside", "inline"))
+#+END_SRC
+
+ *RCPP Available Functions* 
+
+Note: The RCPP convenience functions are vectorized, therefore they
+can operate on numeric vector or matrices without explicit loops. 
+
+| Convenience Functions in           | Description                                                       |   |
+| Rcpp namespace                     |                                                                   |   |
+|------------------------------------+-------------------------------------------------------------------+---|
+| *Fundamental Transcendatal Function* |                                                                   |   |
+| Rcpp::exp                          | Exponential e^x                                                   |   |
+| Rcpp::log                          | Natural logarithm base e = 2.718282                               |   |
+| Rcpp::log1p                        | Natural logarithm, however, log(1 + x), where x is a small number |   |
+| Rcpp::log10                        | Logarith base 10                                                  |   |
+| Rcpp::sqrt                         | Square root                                                       |   |
+|                                    |                                                                   |   |
+|                                    |                                                                   |   |
+| *Statistcs*                          |                                                                   |   |
+|------------------------------------+-------------------------------------------------------------------+---|
+| Rcpp::sd                           | Standard Deviation                                                |   |
+| Rcpp::mean                         | Mean, or average                                                  |   |
+|                                    |                                                                   |   |
+| Rcpp::sum                          | Sum of input values                                               |   |
+| Rcpp::cumsum                       | Cummulative sum                                                   |   |
+| Rcpp::diff                         |                                                                   |   |
+| Rcpp::pmin                         | Return paralallel maxima of the input values                      |   |
+| Rcpp::pmax                         | Return paralallel minima of the input values                      |   |
+|                                    |                                                                   |   |
+| ..... and more ...                 |                                                                   |   |
+|------------------------------------+-------------------------------------------------------------------+---|
+
+
+ *RCPP Classes* 
+
+| RCPP Class            | R type typeof(<OBJ>) |   |
+|-----------------------+----------------------+---|
+| *Vector*                |                      |   |
+|-----------------------+----------------------+---|
+| Rcpp::IntegerVector   | integer              |   |
+| Rcpp::NumericVector   | numeric              |   |
+| Rcpp::LogicalVector   | logical              |   |
+| Rcpp::CharacterVector | character            |   |
+| Rcpp::RawVector       | raw...               |   |
+| Rcpp::ComplexVector   | complex...           |   |
+|                       |                      |   |
+| *Matrix*                |                      |   |
+|-----------------------+----------------------+---|
+| Rcpp::IntegerMatrix   |                      |   |
+| Rcpp::NumericMatrix   |                      |   |
+| Rcpp::LogicalMatrix   |                      |   |
+| Rcpp::RawMatrix       |                      |   |
+| Rcpp::ComplexMatrix   |                      |   |
+|                       |                      |   |
+| *Other Types*           |                      |   |
+|-----------------------+----------------------+---|
+| Rcpp::Environment     | environment          |   |
+| Rcpp::Function        | function (closure)   |   |
+| Rcpp::XPtr            | externalptr          |   |
+| Rcpp::Language        | Language             |   |
+|-----------------------+----------------------+---|
+*** Example - Native R library in C++ with Rcpp 
+**** Source Files 
+
+ *Source Files* 
+ + File: [[https://github.com/caiorss/Rlang-RcppExamples/blob/master/rcxx.cpp][rcxx.cpp]]
+ + File: [[https://github.com/caiorss/Rlang-RcppExamples/blob/master/CMakeLists.txt][CMakeLists.txt]]
+
+ *Compilation* 
+
+Manual: 
+
+#+BEGIN_SRC sh 
+  $ clang++ rcxx.cpp -o rcxx.so -std=c++1z -g -O0 -Wall -shared -fPIC \
+     -I/home/archbox/opt/anaconda3/lib/R/include/ \
+     -I/home/archbox/opt/anaconda3/lib/R/library/Rcpp/include/
+#+END_SRC
+
+Build with CMake: 
+
+#+BEGIN_SRC sh 
+  $ cmake -Bbuild -H. 
+
+  $ cmake --build build --target 
+  Scanning dependencies of target rcxx
+  [ 50%] Building CXX object CMakeFiles/rcxx.dir/rcxx.cpp.o
+  [100%] Linking CXX shared library rcxx.so
+  [100%] Built target r
+
+  $ ls build/
+  CMakeFiles/  CMakeCache.txt  cmake_install.cmake  Makefile  rcxx.so*
+
+  $ cp build/rcxx.so . 
+#+END_SRC
+
+ *File: rcxx.cpp*
+
+Headers: 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <cmath>
+  #include <iomanip>
+  #include <algorithm>
+  #include <string>
+  #include <map>
+
+  #include <Rcpp.h>
+#+END_SRC
+
+Global object for logging when the DLL is loaded or unloaded.
+
+#+BEGIN_SRC cpp 
+  struct DLLIntializer{
+      DLLIntializer()
+      {
+          std::cerr << "[TRACE] - DLL loaded into process OK." << std::endl;
+      }
+      ~DLLIntializer()
+      {
+          std::cerr << "[TRACE] - DLL unloaded from process OK." << std::endl;
+      }
+  };
+
+  // Global object allocated in process' data segment for
+  // DLL logging during loading and unloading. 
+  DLLIntializer init_hook{};
+#+END_SRC
+
+Function *libraryVersion* 
+ + Returns the library version as string.
+
+#+BEGIN_SRC cpp 
+  RcppExport
+  auto libraryVersion() -> SEXP
+  {
+      return Rcpp::wrap("version 1.0 - alpha");
+  }
+#+END_SRC
+
+Function *linearcomb*
+ + Performs the transformation:
+ + ys[i] = a * xs[i] + b for every i = 0, 1, 2 ... N - 1
+
+#+BEGIN_SRC cpp 
+
+  /** Compute equation: 
+   ,* for_each(i) => ys[i] = a * xs[i] + b 
+   ,* return ys 
+   ,*/
+  RcppExport
+  SEXP linearcomb(SEXP a, SEXP b, SEXP xs)
+  {
+      Rcpp::NumericVector vx(xs);    
+      double aa = Rcpp::as<double>(a);
+      double bb = Rcpp::as<double>(b);
+      Rcpp::NumericVector out(vx.size());	
+      size_t n = vx.size();
+      // std::cerr << " [TRACE] Size of xs = " << n << std::endl;
+      for(auto i = 0; i < vx.size(); i++)
+         out[i] = aa * vx[i] + bb;
+      return out;
+  }
+#+END_SRC
+
+Function: *computeStatistics*
+
+#+BEGIN_SRC cpp 
+
+  RcppExport
+  auto computeStatistics(SEXP xs) -> SEXP
+  {
+      Rcpp::NumericVector vx{xs};
+      double sum = 0.0;
+      double sumsq = 0.0;
+
+      std::for_each(vx.begin(), vx.end(), [&](double x)
+      {
+          sum   += x;
+          sumsq += x * x;
+      });
+
+      auto result = std::map<std::string, double>
+      {
+          {"sum",   sum},
+          {"sumsq", sumsq},
+          {"mean",  sum / vx.size()},
+          {"norm",  std::sqrt(sumsq)}
+      };
+      return Rcpp::wrap(result);
+  }
+#+END_SRC
+
+Function: computeStatistics2: 
+
+#+BEGIN_SRC cpp 
+  RcppExport
+  auto computeStatistics2(SEXP xs) -> SEXP
+  {
+      Rcpp::NumericVector vx{xs};
+      double sum = 0.0;
+      double sumsq = 0.0;
+
+      std::for_each(vx.begin(), vx.end(), [&](double x)
+      {
+          sum   += x;
+          sumsq += x * x;
+      });
+      return Rcpp::List::create(
+                      Rcpp::Named("sum", sum)
+                     ,Rcpp::Named("sumsq", sumsq)
+                     ,Rcpp::Named("mean", sum / vx.size())
+                     ,Rcpp::Named("norm", std::sqrt(sumsq))
+                  );
+  }
+#+END_SRC
+
+Function *tabulate*: 
+
+#+BEGIN_SRC cpp
+  RcppExport
+  SEXP tabulate(SEXP mfunc, SEXP mvec)
+  {
+      Rcpp::Function     func = mfunc;
+      Rcpp::NumericVector vec = mvec;
+      std::cout << std::setprecision(4) << std::fixed;
+      for(auto const& x: vec)
+          std::cout << std::setw(10) << x
+                    << std::setw(10) << Rcpp::as<double>(func(x))
+                    << std::endl;
+      // Return nothing on R side
+      return R_NilValue;
+  }
+#+END_SRC
+
+Function: vectorOperations 
+ + This function performs arithmetic operation on two input R numeric
+   vectors. 
+
+#+BEGIN_SRC cpp 
+  /* Compute:
+   ,*
+   ,*  FOR i = 0 TO N DO:
+   ,*    out[i] = sqrt(va[i] * 4.0 + vb[i] * 5.0
+   ,*  RETURN ouy
+   ,*
+   ,* Note: The vectorized operation are not efficient
+   ,* Rcpp::sqrt(4.0 * va + 5.0 * vb) is equivaent to:
+   ,* Rcpp::sqrt(operatior*(4.0, va) + operator*(5.0, vb))
+   ,* Rcpp::sqrt(operator+(operatior*(4.0, va), operator*(5.0, vb)))
+   ,*
+   ,* Every operator function call is 1 loop, so, the total number
+   ,* of passes over the input data is equal to:
+   ,*  =>  1 (SQRT Call) + 3 (Number of operators) = 4
+   ,*
+   ,* This function requires 4 for-loops over the data,
+   ,* thus a single for-loop is more efficient.
+   ,*/
+  RcppExport
+  SEXP vectorOperations(SEXP sa, SEXP sb)
+  {
+      using Vector = Rcpp::NumericVector;
+      Vector va = sa;
+      Vector vb = sb;
+      Vector result = Rcpp::sqrt(4.0 * va + 5.0 * vb);
+      return result;
+  }
+#+END_SRC
+
+Function: *ShowNormalRandoms*
+  + This code demonstrates how to call R functions such as rnorm from
+    C++ side. It takes as parameter the number of normally distributed
+    random numbers that will be generated with mean 20.0 and standard
+    deviation 5.0
+
+#+BEGIN_SRC cpp 
+  RcppExport
+  SEXP ShowNormalRandoms(SEXP s_size)
+  {
+      size_t n = Rcpp::as<size_t>(s_size);
+      std::cout << " [INFO] size = " << n << std::endl;
+
+      // Get R function rnorm for generating N normally distributed
+      // random numbers
+      Rcpp::Function rnorm("rnorm");
+
+      // Call R built-in function rnorm
+      // that generates n normally distributed random numbers with
+      // mean 20.0 and standard deviation std = 5.0
+      //---------------------------------------------
+      // NOTE: Every R fuction returns an S-expression struct
+      SEXP sexp = rnorm(Rcpp::Named("n", n),
+                        Rcpp::Named("sd", 5.0),
+                        Rcpp::Named("mean", 20.0)
+                        );
+      // Convert s-expression to numeric vector
+      Rcpp::NumericVector result{sexp};
+
+      std::cout << std::setprecision(5) << std::fixed;
+      size_t k = 0;
+      std::for_each(result.begin(), result.end(),
+                    [&](auto x) -> void
+                     {
+                      std::cout << std::setw(10) << k++
+                                << std::setw(10) << x
+                                << std::endl;
+                     });
+      // std::for_each(result.begin())
+      return R_NilValue;
+  }
+#+END_SRC
+
+**** Loading into R REPL 
+
+Interactive Session:
+
+#+BEGIN_SRC R
+  > library(Rcpp)
+
+  > # Load shared library into current REPL 
+  > dyn.load("rcxx.so")
+  [TRACE] - DLL loaded into process OK.
+#+END_SRC
+
+Call function *libraryVersion*: 
+
+#+BEGIN_SRC cpp 
+  > .Call("libraryVersion")
+  [1] "version 1.0 - alpha"
+  > 
+
+  # Better 
+  > .Call("libraryVersion", PACKAGE = "rcxx")
+  [1] "version 1.0 - alpha"
+
+  > .Call("libraryVersion", PACKAGE = "rm")
+  Error in .Call("libraryVersion", PACKAGE = "rm") : 
+    "libraryVersion" not available for .Call() for package "rm"
+#+END_SRC
+
+Call function *linearcomb* 
+
+#+BEGIN_SRC R
+  > # Call function from shared library 
+  > .Call("linearcomb", 10.0, 4.0, c(4.5, 9.8, 5.6, 10.0), PACKAGE = "rcxx")
+  [1]  49 102  60 104
+
+  > .Call("linearcomb", 10.0, 0, c(4.5, 9.8, 5.6, 10.0), PACKAGE = "rcxx")
+  [1]  45  98  56 100
+#+END_SRC
+
+Call function *computeStatistics*
+
+#+BEGIN_SRC R
+  > .Call("computeStatistics", c(4.5, 3.5, 9.81, 4.6))
+       mean      norm       sum     sumsq 
+    5.60250  12.24321  22.41000 149.89610 
+  > 
+
+  > out = .Call("computeStatistics", c(4.5, 3.5, 9.81, 4.6), PACKAGE = "rcxx")
+  > out
+       mean      norm       sum     sumsq 
+    5.60250  12.24321  22.41000 149.89610 
+
+  > out["mean"]
+    mean 
+  5.6025 
+
+  > out["norm"]
+      norm 
+  12.24321 
+
+  > out["sum"]
+    sum 
+  22.41 
+#+END_SRC
+
+Call function *computeStatistics2* 
+
+#+BEGIN_SRC cpp 
+  > res = .Call("computeStatistics2", c(4.5, 3.5, 9.81, 4.6), PACAKGE = "rcxx")
+
+  > res
+  $sum
+  [1] 22.41
+
+  $sumsq
+  [1] 149.8961
+
+  $mean
+  [1] 5.6025
+
+  $norm
+  [1] 12.24321
+
+  > res$sum
+  [1] 22.41
+
+  > res$mean
+  [1] 5.6025
+  > 
+  > 100 * res$mean
+  [1] 560.25
+#+END_SRC
+
+Call function *tabulate* 
+
+#+BEGIN_SRC R 
+  > .Call("tabulate", sqrt, c(4.5, 3.5, 9.81, 4.6))
+      4.5000    2.1213
+      3.5000    1.8708
+      9.8100    3.1321
+      4.6000    2.1448
+  NULL
+
+  > .Call("tabulate", function(x){ 10 * x + 5 }, c(4.5, 3.5, 9.81, 4.6))
+      4.5000   50.0000
+      3.5000   40.0000
+      9.8100  103.1000
+      4.6000   51.0000
+  NULL
+  > 
+#+END_SRC
+
+Call function *vectorOperations*
+
+#+BEGIN_SRC R 
+  > .Call("vectorOperations", c(4.0, 3.0, 2.0, 6.0), c(10.0, 5, 8, 4))
+  [1] 8.124038 6.082763 6.928203 6.633250
+
+  > xs = .Call("vectorOperations", c(4.0, 3.0, 2.0, 6.0), c(10.0, 5, 8, 4))
+
+  > xs
+  [1] 8.124038 6.082763 6.928203 6.633250
+
+  > xs * xs
+  [1] 66 37 48 44
+
+  > sqrt(4.0 * 4.0 + 5.0 * 10.0)
+  [1] 8.124038
+  > 
+#+END_SRC
+
+Call function *ShowNormalRandoms*
+
+ + This function invokes the R built-in function rnorm from the C++
+   side and displays the result on the screen.
+
+#+BEGIN_SRC R
+   > .Call("ShowNormalRandoms", 5, PACKAGE = "rcxx")
+    [INFO] size = 5
+            0  15.61839
+            1  25.08418
+            2  22.76518
+            3  17.96007
+            4  17.60298
+   NULL
+
+   > .Call("ShowNormalRandoms", 10, PACKAGE = "rcxx")
+    [INFO] size = 10
+            0  17.92591
+            1  16.47821
+            2  24.35774
+            3  19.33816
+            4  22.70113
+            5  17.37169
+            6  14.92140
+            7  11.94084
+            8  14.29367
+            9  12.16308
+   NULL
+#+END_SRC
+
+*** References 
+
+ + [[https://thecoatlessprofessor.com/programming/unofficial-rcpp-api-documentation/][Unofficial Rcpp API Documentation - The Coatless Professor]]
+
+ + *Cran - RCPP* - Rcpp: Seamless R and C++ Integration
+   + <https://cran.r-project.org/web/packages/Rcpp/index.html>
+
+ + Roman François. *Integrating R with C++: Rcpp, RInside and RProtoBuf*
+   + <https://www.slideshare.net/romainfrancois/integrating-r-with-c-rcpp-rinside-and-rprotobuf>
+
+ + Roman François. *R / C++*
+   + <https://www.slideshare.net/romainfrancois/rc-67163677>
+
+ + Hyun Min Kang - *Biostatistics 615/815 Lecture 12 - Interfacing C++ and R*
+   + <https://genome.sph.umich.edu/w/images/4/47/Bios615-fa12-lec12-presentation.pdf>
