@@ -2611,6 +2611,264 @@ Add months to a date:
   + [[https://www.boost.org/doc/libs/1_69_0/libs/endian/doc/index.html][Endian Library - 1.69.0]]
 
 * Complementary Libraries 
+** fmtlib (fmt) - Better printf 
+
+Fmt is a highly popular library for printing  in a formatted way just
+like the old C's printf, however fmt is type safe like std::ostream
+IO, however its format specifiers are more concise and based on Python
+ones.
+
+Web Site:
+ + http://fmtlib.net/latest/index.html
+
+Repository: 
+ + https://github.com/fmtlib/fmt
+
+Conan Refence: 
+ + [[https://bintray.com/bincrafters/public-conan/fmt%253Abincrafters/5.3.0%253Astable][fmt/5.3.0@bincrafters/stable]] 
+
+ *Library Local Installation for header-only usage* 
+
+Installation at: ~/dev/include/fmt 
+
+#+BEGIN_SRC sh 
+ $ git clone https://github.com/fmtlib/fmt
+
+ # Build directory /home/<USER>/dev on Linux 
+ $ mkdir -p ~/dev && cd dev                           
+ # Clone repository 
+ $ git clone https://github.com/fmtlib/fmt
+ # Extract headers 
+ $ cp -r -v fmt/include ~/dev/
+ # Delete fmt directory 
+ $ rm -rf fmt 
+#+END_SRC
+
+Testing code: File - *fmttest.cpp*
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <fstream>
+  #include <cmath>
+  #include <sstream>
+
+  // If defined before including fmt, uses it as header-only library
+  #define FMT_HEADER_ONLY
+
+  // Basic functionality
+  #include <fmt/core.h>
+  // fmt string literals "name"_a, "product"_a
+  #include <fmt/format.h>
+  // Print to streams std::cout, std::cerr, std::ostream
+  #include <fmt/ostream.h>
+
+  #include <fmt/color.h>
+
+  // #include <fmt/color.h>
+
+  using namespace fmt::literals;
+
+  void printHeader(const char* header)
+  {
+      fmt::print("\n{}\n", header);
+      fmt::print("---------------------------------------------\n");
+  }
+
+  int main()
+  {
+      printHeader(" ***** EXPERIMENT 1 - Boolean  *************");
+      fmt::print(" true == {0} ; false == {1} \n", true, false);
+
+
+      printHeader(" ***** EXPERIMENT 2 - Numeric Base  *********");
+
+      fmt::print(" [BASES] => dec: {0:d} ; hex = 0x{0:X} "
+                 " ; oct = {0:o} ; bin = 0b{0:b} \n", 241 );
+
+      printHeader(" ***** EXPERIMENT 3 - Positional arguments ****");
+
+      fmt::print(" first = {0}, 2nd = {1}, 1st = {1}, 3rd = {2}\n",
+                  200, "hello", 5.615);
+
+      printHeader("**** EXPERIMENT 4 - Named Arguments ********* ");
+
+      fmt::print(" [A] Product => product = {0} id = {1} price = {2}\n"
+                 ,"oranges 1 kg", 200, 10.6758 );
+
+      // Requires: #include <fmt/format.h>
+      // using namespace fmt::literals;
+      fmt::print(" [B] Product => product = {product} id = {id} price = {price:.2F}\n"
+                 , "product"_a = "oranges 1 kg", "id"_a = 200, "price"_a = 10.6758 );
+
+      fmt::print(" [B] Product => product = {product} id = {id} price = {price:.2F}\n"
+                 , fmt::arg("product", "oranges 1 kg")
+                 , fmt::arg("id",  200)
+                 , fmt::arg("price", 10.6758 ));
+
+      printHeader("************ Colored Output ******************");
+
+      fmt::print( fmt::fg(fmt::color::aqua) | fmt::emphasis::bold,
+                 " [INFO] Voltage Leval  = {0:+.3F}\n", 10.6478);
+
+      fmt::print( fmt::fg(fmt::color::red) | fmt::emphasis::underline,
+                 " [ERROR] Fatal Error, shutdown systems code  0x{0:X}\n", 2651);
+
+
+      printHeader(" ***** EXPERIMENT 5 - Numeric Formatting ******");
+
+      double x = 20.0;
+      fmt::print("The square root of x = {}\n", std::sqrt(x));
+
+      x = 28524.0;
+
+      fmt::print(" log(x) = {:.2F}  (2 digit precision)\n", std::log(x));
+      fmt::print(" log(x) = {:+.6F} (6 digit precision)\n", std::log(x));
+      fmt::print(" 2000 * log(x) = {:+.6G} (6 digit precision)\n", 1e5 * std::log(x));
+      fmt::print("  log(x) = {0:+.8E} ; sqrt(x) = {1:+8E} (8 digit precision)\n",
+                 std::log(x), std::sqrt(x));
+
+      printHeader(" ***** EXPERIMENT 6 - Print numeric table ******");
+
+      int i = 0;
+      for(double x = 0.0; x <= 4.0; x += 0.5)
+          fmt::print("{0:8d}{1:10.5F}{2:10.5F}\n", i++, x, std::exp(x));
+
+      printHeader(" ***** EXPERIMENT 7 - Print table to file *******");
+
+      // std::ofstream file("/tmp/table.txt");
+      std::stringstream file; // Fake file
+
+      i = 0;
+
+      // Note: Requires <fmt/ostream.h>
+      for(double x = -4.0; x <= 4.0; x += 1.0)
+          fmt::print(file, "{0:8d}{1:10.5F}{2:10.5F}\n", i++, x, std::exp(x));
+
+      fmt::print("File content = \n{0}", file.str());
+
+      return 0;
+  }
+#+END_SRC
+
+Program output: 
+
+#+BEGIN_SRC text 
+   ,***** EXPERIMENT 1 - Boolean  *************
+  ---------------------------------------------
+   true == true ; false == false 
+
+   ,***** EXPERIMENT 2 - Numeric Base  *********
+  ---------------------------------------------
+   [BASES] => dec: 241 ; hex = 0xF1  ; oct = 361 ; bin = 0b11110001 
+
+   ,***** EXPERIMENT 3 - Positional arguments ****
+  ---------------------------------------------
+   first = 200, 2nd = hello, 1st = hello, 3rd = 5.615
+
+  ,**** EXPERIMENT 4 - Named Arguments ********* 
+  ---------------------------------------------
+   [A] Product => product = oranges 1 kg id = 200 price = 10.6758
+   [B] Product => product = oranges 1 kg id = 200 price = 10.68
+   [B] Product => product = oranges 1 kg id = 200 price = 10.68
+
+  ,************ Colored Output ******************
+  ---------------------------------------------
+  [1m[38;2;000;255;255m [INFO] Voltage Leval  = +10.648
+  [0m[4m[38;2;255;000;000m [ERROR] Fatal Error, shutdown systems code  0xA5B
+  [0m
+   ,***** EXPERIMENT 5 - Numeric Formatting ******
+  ---------------------------------------------
+  The square root of x = 4.47213595499958
+   log(x) = 10.26  (2 digit precision)
+   log(x) = +10.258501 (6 digit precision)
+   2000 * log(x) = +1.02585e+06 (6 digit precision)
+    log(x) = +1.02585011E+01 ; sqrt(x) = +1.688905E+02 (8 digit precision)
+
+   ,***** EXPERIMENT 6 - Print numeric table ******
+  ---------------------------------------------
+         0   0.00000   1.00000
+         1   0.50000   1.64872
+         2   1.00000   2.71828
+         3   1.50000   4.48169
+         4   2.00000   7.38906
+         5   2.50000  12.18249
+         6   3.00000  20.08554
+         7   3.50000  33.11545
+         8   4.00000  54.59815
+
+   ,***** EXPERIMENT 7 - Print table to file *******
+  ---------------------------------------------
+  File content = 
+         0  -4.00000   0.01832
+         1  -3.00000   0.04979
+         2  -2.00000   0.13534
+         3  -1.00000   0.36788
+         4   0.00000   1.00000
+         5   1.00000   2.71828
+         6   2.00000   7.38906
+         7   3.00000  20.08554
+         8   4.00000  54.59815
+#+END_SRC
+
+Compilation: 
+
+#+BEGIN_SRC sh 
+  $ g++  fmttest.cpp -o app.bin -std=c++1z -Wall -I$HOME/dev/include 
+
+  # Or, on Linux
+  $ clang++  fmttest.cpp -o app.bin -std=c++1z -Wall -I/home/<USER>/dev/include 
+
+  # Or, On OSX 
+  $ clang++  fmttest.cpp -o app.bin -std=c++1z -Wall -I/Users/<USER>/dev/include 
+#+END_SRC
+
+The code can be compiled without specifying the include path, by
+adding the following code to the file  *~/.profile* on Linux.
+
+#+BEGIN_SRC sh 
+  #------------ Local Libraries Installation ---------------------
+  LOCAL_LIB_PATH=~/dev
+  export CPLUS_INCLUDE_PATH=$LOCAL_LIB_PATH/include:$CPLUS_INCLUDE_PATH
+  export C_INCLUDE_PATH=$LOCAL_LIB_PATH/include:$C_INCLUDE_PATH
+  export LIBRARY_PATH=$LOCAL_LIB_PATH/lib:$LIBRARY_PATH
+  export LD_LIBRARY_PATH=$LOCAL_LIB_PATH/lib:$LD_LIBRARY_PATH
+#+END_SRC
+
+After this configuration was set, the code can be compiled with:
+
+#+BEGIN_SRC sh 
+  $ g++  fmttest.cpp -o app.bin -std=c++1z -Wall
+
+  # Header only compilation takes 2 seconds 
+  $ time g++  fmttest.cpp -o app.bin -std=c++1z -Wall
+
+  real	0m1.824s
+  user	0m1.650s
+  sys	0m0.156s
+#+END_SRC
+
+Once the environment variabble CPLUS_INCLUDE_PATH is set, the library
+can be loaded from CERN's Root or Cling REPL with:  
+
+#+BEGIN_SRC cpp 
+  #define FMT_HEADER_ONLY
+  #include <fmt/format.h>
+  #include <fmt/color.h>
+  #include <fmt/ostream.h>
+
+  >> fmt::print(" x = {0:.5F}, sqrt(x) = {1:+.8F}\n", 20.6, std::sqrt(20.6))
+   x = 20.60000, sqrt(x) = +4.53872229
+  >> 
+
+  // Print with color foreground blue 
+  >> fmt::print(fmt::fg(fmt::color::blue), " [INFO] x = {0:.5E}\n", 20.6)
+   [INFO] x = 2.06000E+01
+
+  // Print with background color blue 
+  >> fmt::print(fmt::bg(fmt::color::blue), " [INFO] x = {0:.5E}\n", 20.6)
+   [INFO] x = 2.06000E+01
+  >> 
+#+END_SRC
 ** Range v3 (C++20)
 
 Ranges v3 is a header-only generic library that will be included in
@@ -2624,6 +2882,9 @@ Resources:
 
   * Documentation:
     + https://ericniebler.github.io/range-v3/
+
+  * Conan Reference:
+    * [[https://bintray.com/range-v3/range-v3/range-v3%253Aericniebler][range-v3/0.5.0@ericniebler/stable]]
 
   * Github Repsitory:
     + https://github.com/ericniebler/range-v3
@@ -3153,3 +3414,4 @@ Output:
    BEFORE => output = [0](  )
    AFTER => output = [10]( 20 26 32 38 44 50 56 62 68 74  )
 #+END_SRC
+
