@@ -2090,35 +2090,96 @@ See:
  + [[https://www.quora.com/Is-there-any-advantage-to-C-style-bit-manipulation-over-std-bitset-in-C++-I-test-it-But-in-many-famous-blog-they-use-C-style-bit-manipulation][Is there any advantage to C-style bit manipulation over std: :bitset in C++?]]
  + [[https://accu.org/index.php/journals/1606][One Approach to Using Hardware Registers in C++]]
 * General C++ Reference Card 
-** Data Types 
+** Data Types and Data Models 
 
-Numeric Types 
+ *C++ Types and Data Models* 
 
-| Type                |   Size |    Size | Description                            | Maximum number of |
-|                     | (bits) | (bytes) |                                        |    decimal digits |
-|---------------------+--------+---------+----------------------------------------+-------------------|
-| *Fixed-width integer* |        |         |                                        |                   |
-| int8_t              |      8 |       1 | 8-bits signed int                      |                 2 |
-| uint8_t             |     16 |       2 | 8-bits unisgned int (positive)         |                 2 |
-| int16_t             |     16 |       2 | 16-bits signed int                     |                 4 |
-| uint16_t            |     32 |       4 | 16-bits unsigned int                   |                 4 |
-| int32_t             |     32 |       4 | 32-bits signed int                     |                 9 |
-| uint32_t            |     32 |       4 | 32-bits unsigned int                   |                 9 |
-| int64_t             |     64 |       8 | 64-bits signed int                     |                18 |
-| uint64_t            |     64 |       8 | 64-bits unsigned int                   |                18 |
-|                     |        |         |                                        |                   |
-| *Integers*            |        |         |                                        |                   |
-| short               |     16 |       2 | 16-bits signed int                     |                 4 |
-| unsigned short      |     16 |       2 | 16-bits unsigned int                   |                 4 |
-| int                 |     32 |       4 | 32-bits signed int                     |                 9 |
-| unsigned int        |     32 |       4 |                                        |                 9 |
-|                     |        |         |                                        |                   |
-| long                |     64 |       8 | 64-bits signed int                     |                18 |
-| unsigned long       |     64 |       8 | 64-bits unsigned int                   |                19 |
-| long long           |     64 |       8 | 64-bits unsigned int (in this machine) |                19 |
-|                     |        |         |                                        |                   |
+This table shows the numeric types data sizes in bits per memory
+model, architechture operating system and ISA - Instruction Set
+Architechture. Note: *ptr is the pointer size in bits. 
 
-Float Point Numebers 
+|-------------------------+-------------------------+----------------------------------+--------+-------+-----+------+------|
+| Data                    | Arch. ISA               | Operating System                 |  *ptr. | short | int | long | long |
+| Model                   |                         |                                  | size_t |       |     |      | long |
+|-------------------------+-------------------------+----------------------------------+--------+-------+-----+------+------|
+|                         |                         |                                  |        |       |     |      |      |
+| *16 Bits Systems*         |                         |                                  |        |       |     |      |      |
+|-------------------------+-------------------------+----------------------------------+--------+-------+-----+------+------|
+| IP16                    | PDP-11                  | Unix (1973)                      |     16 |     - |  16 |    - | -    |
+| IP16L32                 | PDP-11                  | Unix (1977)                      |     16 |    16 |  16 |   32 | -    |
+| LP32                    | x86 (16 bits)           | Microsft Win16 and Apple' MacOSX |     32 |    16 |  16 |   32 | -    |
+|-------------------------+-------------------------+----------------------------------+--------+-------+-----+------+------|
+| *32 Bits Systems*         |                         |                                  |        |       |     |      |      |
+|-------------------------+-------------------------+----------------------------------+--------+-------+-----+------+------|
+| I116LP32                | MC680000, x86 (16 bits) | Macintosh (1982), Windows        |     16 |       |  16 |      |      |
+| ILP32                   | IBM-370                 | Vax Unix                         |     32 |    16 |  32 |   32 | -    |
+| *ILP32LL* or ILP32LL64    | x86 or IA32             | Microsft *Win32*                   |     32 |    16 |  32 |   32 | 64   |
+|                         |                         |                                  |        |       |     |      |      |
+| *64 Bits Systems*         |                         |                                  |        |       |     |      |      |
+|-------------------------+-------------------------+----------------------------------+--------+-------+-----+------+------|
+| LLP64, IL32LLP64 or P64 | x86-x64 (IA64, AMD64)   | Microsft *Win64* (x64 / x86)       |     64 |    16 |  32 |   32 | 64   |
+| LP64 or I32LP64         | IA64, AMD64             | Linux, Solaris, DEC OSF, HP UX   |     64 |    16 |  32 |   64 | 64   |
+| ILP64                   | -                       | HAL                              |     64 |    16 |  32 |   64 | 64   |
+| SILP64                  | -                       | UNICOS                           |        |       |     |      |      |
+|                         |                         |                                  |        |       |     |      |      |
+|-------------------------+-------------------------+----------------------------------+--------+-------+-----+------+------|
+
+Sumary: 
+
+ * ILP32 
+   + int, long and pointer are all 32 bits
+
+ * *ILP32LL* - Used by most compilers and OSes on 32 bits platforms. (De
+   facto standard for 32 bits platforms)
+   + int, long, and pointer are all 32 bits, but the type *long long*
+     has 64 bits in size.
+
+ * *LP64* - Used by most 64 bit Unix-like OSes, including Linux, BSD and
+   Apple's Mac OSX (De facto standard for 64 bits platforms)
+   + int, long and ponter are all 64 bits.
+
+ * ILP64 
+   + int, long and pointer are all 64 bits.
+
+ * LLP64 (Used by Windows 64 bits)
+   + pointers and long long are 64 bits and the types int and long are
+     32 bits.
+
+Note: 
+
+ + It is not safe to rely on the size of numeric data type or make
+   assumptions about the numeric sizes. In cases where the size of the
+   data type matters such as serialization, embedded systems or low
+   level code related to hardware it is better to use fixed-width
+   integer.
+
+ + Underflow and overflow can lead to undefined behaviors and
+   unpredictable results. 
+
+References: 
+
+ + [[https://en.cppreference.com/w/cpp/language/types][Fundamental types - cppreference.com]]
+
+ + [[https://www.viva64.com/en/t/0012/][PVS Studio - Data model]] 
+
+ + [[http://nickdesaulniers.github.io/blog/2016/05/30/data-models-and-word-size/][Data Models and Word Size - Nick Desaulniers]]
+
+ + [[https://www.codeguru.com/cpp/misc/samples/basicprogramming/article.php/c16093/Seven-Steps-of-Migrating-a-Program-to-a-64bit-System.htm][Seven Steps of Migrating a Program to a 64-bit System]]
+
+ + [[https://www.ibm.com/support/knowledgecenter/en/SSLTBW_2.3.0/com.ibm.zos.v2r3.cbcpx01/datatypesize64.htm][ILP32 and LP64 data models and data type sizes]] 
+
+ + [[http://www.cs.ubbcluj.ro/~raul/ss/implementation-sins-c-language-issues-beamer.version.pdf][Implementation Sins - C Language Issues]] (Security)
+   + Discusses potential buffer overflow security vulnerability in C
+     code due to wrong assumptions about size of numeric types.
+
+ + [[https://trailofbits.github.io/ctf/vulnerabilities/references/Dowd_ch06.pdf][Chapter 6 - C Language Issues]] (Security)
+
+ + [[https://blog.feabhas.com/2014/10/vulnerabilities-in-c-when-integers-go-bad/][Vulnerabilities in C : When integers go bad! - Sticky Bits - Powered by FeabhasSticky Bits – Powered by Feabhas]]
+
+ + [[https://www.viva64.com/en/a/0050/][About size_t and ptrdiff_t]] 
+
+
+ *Float Point Numebers* 
 
 | Type         | Size (bits) | Size (bytes) | Description                             |
 |--------------+-------------+--------------+-----------------------------------------|
@@ -2126,6 +2187,24 @@ Float Point Numebers
 | float        |          32 |            4 | Single-precision IEEE754 float point    |
 | double       |          64 |            8 | Double-precision IEEE754 float point    |
 | long float   |         128 |           16 | Quadruple-precision IEEE754 float point |
+
+
+ *Fixed-Width Numeric Types*
+
+| Type                |   Size |    Size | Description                    | Maximum number of |
+|                     | (bits) | (bytes) |                                |    decimal digits |
+|---------------------+--------+---------+--------------------------------+-------------------|
+| *Fixed-width integer* |        |         |                                |                   |
+| int8_t              |      8 |       1 | 8-bits signed int              |                 2 |
+| uint8_t             |     16 |       2 | 8-bits unisgned int (positive) |                 2 |
+| int16_t             |     16 |       2 | 16-bits signed int             |                 4 |
+| uint16_t            |     32 |       4 | 16-bits unsigned int           |                 4 |
+| int32_t             |     32 |       4 | 32-bits signed int             |                 9 |
+| uint32_t            |     32 |       4 | 32-bits unsigned int           |                 9 |
+| int64_t             |     64 |       8 | 64-bits signed int             |                18 |
+| uint64_t            |     64 |       8 | 64-bits unsigned int           |                18 |
+|                     |        |         |                                |                   |
+|---------------------+--------+---------+--------------------------------+-------------------|
 
 
  *Sample code for showing numeric limits:*
@@ -2247,161 +2326,8 @@ Output:
 
 #+BEGIN_SRC text 
    $ clang++ numeric-limits.cpp -o numeric-limits.bin -g -std=c++11 -Wall -Wextra && ./numeric-limits.bin
-   Numeric limits for type: bool
-   ------------------------------------------------------------
-                            Type:                     bool
-                      Is integer:                     true
-                       Is signed:                    false
-             Number of digits 10:                        0
-         Max Number of digits 10:                        0
-                         Min Abs:                        0
-                             Min:                        0
-                             Max:                        1
-                   Size in bytes:                        1
-                    Size in bits:                        8
 
-   Numeric limits for type: char
-   ------------------------------------------------------------
-                            Type:                     char
-                      Is integer:                     true
-                       Is signed:                     true
-             Number of digits 10:                        2
-         Max Number of digits 10:                        0
-                         Min Abs:                     -128
-                             Min:                     -128
-                             Max:                      127
-                   Size in bytes:                        1
-                    Size in bits:                        8
-
-   Numeric limits for type: unsigned char
-   ------------------------------------------------------------
-                            Type:            unsigned char
-                      Is integer:                     true
-                       Is signed:                    false
-             Number of digits 10:                        2
-         Max Number of digits 10:                        0
-                         Min Abs:                        0
-                             Min:                        0
-                             Max:                      255
-                   Size in bytes:                        1
-                    Size in bits:                        8
-
-   Numeric limits for type: wchar_t
-   ------------------------------------------------------------
-                            Type:                  wchar_t
-                      Is integer:                     true
-                       Is signed:                     true
-             Number of digits 10:                        9
-         Max Number of digits 10:                        0
-                         Min Abs:              -2147483648
-                             Min:              -2147483648
-                             Max:               2147483647
-                   Size in bytes:                        4
-                    Size in bits:                       32
-
-   Numeric limits for type: int8_t
-   ------------------------------------------------------------
-                            Type:                   int8_t
-                      Is integer:                     true
-                       Is signed:                     true
-             Number of digits 10:                        2
-         Max Number of digits 10:                        0
-                         Min Abs:                     -128
-                             Min:                     -128
-                             Max:                      127
-                   Size in bytes:                        1
-                    Size in bits:                        8
-
-   Numeric limits for type: uint8_t
-   ------------------------------------------------------------
-                            Type:                  uint8_t
-                      Is integer:                     true
-                       Is signed:                    false
-             Number of digits 10:                        2
-         Max Number of digits 10:                        0
-                         Min Abs:                        0
-                             Min:                        0
-                             Max:                      255
-                   Size in bytes:                        1
-                    Size in bits:                        8
-
-   Numeric limits for type: int16_t
-   ------------------------------------------------------------
-                            Type:                  int16_t
-                      Is integer:                     true
-                       Is signed:                     true
-             Number of digits 10:                        4
-         Max Number of digits 10:                        0
-                         Min Abs:                   -32768
-                             Min:                   -32768
-                             Max:                    32767
-                   Size in bytes:                        2
-                    Size in bits:                       16
-
-   Numeric limits for type: uint16_t
-   ------------------------------------------------------------
-                            Type:                 uint16_t
-                      Is integer:                     true
-                       Is signed:                    false
-             Number of digits 10:                        4
-         Max Number of digits 10:                        0
-                         Min Abs:                        0
-                             Min:                        0
-                             Max:                    65535
-                   Size in bytes:                        2
-                    Size in bits:                       16
-
-   Numeric limits for type: int32_t
-   ------------------------------------------------------------
-                            Type:                  int32_t
-                      Is integer:                     true
-                       Is signed:                     true
-             Number of digits 10:                        9
-         Max Number of digits 10:                        0
-                         Min Abs:              -2147483648
-                             Min:              -2147483648
-                             Max:               2147483647
-                   Size in bytes:                        4
-                    Size in bits:                       32
-
-   Numeric limits for type: uint32_t
-   ------------------------------------------------------------
-                            Type:                 uint32_t
-                      Is integer:                     true
-                       Is signed:                    false
-             Number of digits 10:                        9
-         Max Number of digits 10:                        0
-                         Min Abs:                        0
-                             Min:                        0
-                             Max:               4294967295
-                   Size in bytes:                        4
-                    Size in bits:                       32
-
-   Numeric limits for type: int64_t
-   ------------------------------------------------------------
-                            Type:                  int64_t
-                      Is integer:                     true
-                       Is signed:                     true
-             Number of digits 10:                       18
-         Max Number of digits 10:                        0
-                         Min Abs:     -9223372036854775808
-                             Min:     -9223372036854775808
-                             Max:      9223372036854775807
-                   Size in bytes:                        8
-                    Size in bits:                       64
-
-   Numeric limits for type: uint64_t
-   ------------------------------------------------------------
-                            Type:                 uint64_t
-                      Is integer:                     true
-                       Is signed:                    false
-             Number of digits 10:                       19
-         Max Number of digits 10:                        0
-                         Min Abs:                        0
-                             Min:                        0
-                             Max:     18446744073709551615
-                   Size in bytes:                        8
-                    Size in bits:                       64
+   ...   ...   ...   ...   ...   ...   ...   ...   ...   ... 
 
    Numeric limits for type: short
    ------------------------------------------------------------
@@ -2507,54 +2433,8 @@ Output:
                    Size in bytes:                        8
                     Size in bits:                       64
 
-   Numeric limits for type: float
-   ------------------------------------------------------------
-                            Type:                    float
-                      Is integer:                    false
-                       Is signed:                     true
-             Number of digits 10:                        6
-         Max Number of digits 10:                        9
-                         Min Abs:              1.17549e-38
-                             Min:             -3.40282e+38
-                             Max:              3.40282e+38
-                   Size in bytes:                        4
-                    Size in bits:                       32
+   ... ....    ... ....    ... ....    ... ....    ... .... 
 
-                         Epsilon:              1.19209e-07
-                    Min exponent:                      -37
-                    Max exponent:                       38
-   Numeric limits for type: double
-   ------------------------------------------------------------
-                            Type:                   double
-                      Is integer:                    false
-                       Is signed:                     true
-             Number of digits 10:                       15
-         Max Number of digits 10:                       17
-                         Min Abs:             2.22507e-308
-                             Min:            -1.79769e+308
-                             Max:             1.79769e+308
-                   Size in bytes:                        8
-                    Size in bits:                       64
-
-                         Epsilon:              2.22045e-16
-                    Min exponent:                     -307
-                    Max exponent:                      308
-   Numeric limits for type: long double
-   ------------------------------------------------------------
-                            Type:              long double
-                      Is integer:                    false
-                       Is signed:                     true
-             Number of digits 10:                       18
-         Max Number of digits 10:                       21
-                         Min Abs:             3.3621e-4932
-                             Min:           -1.18973e+4932
-                             Max:            1.18973e+4932
-                   Size in bytes:                       16
-                    Size in bits:                      128
-
-                         Epsilon:               1.0842e-19
-                    Min exponent:                    -4931
-                    Max exponent:                     4932
 #+END_SRC
 
 ** Numeric Literals 
