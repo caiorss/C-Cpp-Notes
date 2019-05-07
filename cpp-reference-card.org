@@ -47,6 +47,65 @@ Modern C++ code style based on C++11 and C++ core guidelines:
   using MathFunction = double (*) (double);
 #+END_SRC
 
+ 
+ *Prefer using enum class to enums* 
+
+Lots of possible runtime erros hard to detect can be avoided by using
+C++11 enum classes instead of enums that are vulnerable to implicit
+conversion to integer or any other type. Enum classes avoids those
+implicit conversion buges by yielding compile-time errors whenever
+there is an enum class implicit conversion that should be made
+explicit with static cast. Another problem of old enums is that they
+are not scoped which can lead to name clashes in large code.
+
+Avoid: 
+
+#+BEGIN_SRC cpp 
+  enum ErrorCode {
+     ErrorCode_OK,
+     ErrorCode_SYSTEM_FAILURE, 
+     ErrorCode_LOW_VIOLTAGE, 
+    ... 
+    ..
+  };
+
+  ErroCode x = ::getOperationStatus();
+
+  if(error == ErrorCode_OK){
+    std::cout << "Proceed to next step" << "\n";
+  }
+
+  int x;
+  // Implicit convernsion bug 
+  x = error; 
+#+END_SRC
+
+Better: 
+
+#+BEGIN_SRC cpp 
+  enum class ErrorCode {
+     OK,
+     SYSTEM_FAILURE, 
+     LOW_VIOLTAGE, 
+    ... 
+    ..
+  };
+
+  ErroCode x = ::getOperationStatus();
+
+  if(error == ErrorCode::OK){
+    std::cout << "Proceed to next step" << "\n";
+  }
+ 
+  int x; 
+  // Compile-time error !
+  //-------------------
+   x = error; 
+
+  // Conversion only possible with static cast 
+  x = static_cast<int>(error);
+#+END_SRC
+
 
  *Function Parameter Passing:*
 
@@ -326,7 +385,6 @@ Better:
  + [[http://scottmeyers.blogspot.com/2013/01/effective-c11-content-and-status.html][The View from Aristeia: Effective C++11: Content and Status]]
 
  + [[https://root.cern.ch/blog/rootrwhy][ROOT::RWhy! | ROOT a Data analysis Framework]]
-
 
 
 ** Standard Library, STL and language features Map 
