@@ -3714,1089 +3714,1985 @@ Python (CPython) debugging with GDB:
 Reverse engineering: 
  + [[https://recon.cx/2008/a/aaron_portnoy-ali_rizvi_santiago/slides.pdf][Reverse Engineering Dynamic Languages - A Focus on Python]]
 
-** Module Code 
-*** Sources  
+** Python Raw C API 
+*** Module Code 
+**** Sources  
 
- *Module Source:*
+  *Module Source:*
 
- + File: [[file:src/dlls/mymodule.cpp][file:src/dlls/mymodule.cpp]]
- + Gist: [[https://gist.github.com/caiorss/bc7dc373d87b828029eb0e0ec048d91e][mymodule.cpp]] 
+  + File: [[file:src/dlls/mymodule.cpp][file:src/dlls/mymodule.cpp]]
+  + Gist: [[https://gist.github.com/caiorss/bc7dc373d87b828029eb0e0ec048d91e][mymodule.cpp]] 
 
- *Compilation:*
+  *Compilation:*
 
-#+BEGIN_SRC sh 
-  # GCC - GNU C/C++ compiler 
-  $ g++ mymodule.cpp -o mymodule.so -g -std=c++1z -fPIC -shared -I/usr/include/python3.6m  
+ #+BEGIN_SRC sh 
+   # GCC - GNU C/C++ compiler 
+   $ g++ mymodule.cpp -o mymodule.so -g -std=c++1z -fPIC -shared -I/usr/include/python3.6m  
   
-  # Clang LLVM 
+   # Clang LLVM 
+   $ clang++ mymodule.cpp -o mymodule.so -g -std=c++1z -fPIC -shared -I/usr/include/python3.6m  
+ #+END_SRC
+**** File: setup.py 
+
+ Python script used for building and installing the Python module.
+
+ #+CAPTION: File setup.py 
+ #+BEGIN_SRC python 
+   from distutils.core import setup, Extension
+
+   mymodule = Extension('mymodule', sources = ['mymodule.cpp'])
+
+   setup(
+       name        = 'mymodule',
+       version     = '1.0',
+       description = 'Sample python C-API exploration',
+       ext_modules = [mymodule]
+   )
+ #+END_SRC
+
+**** File: mymodule.cpp 
+
+ Heades: 
+
+ #+BEGIN_SRC cpp 
+   #include <iostream>
+   #include <string>
+   #include <functional>
+   #include <iomanip>
+
+   // Solve Mingw error: '::hyport' has not been declared 
+   #include <math.h>
+
+   //#define hypot _hypot
+
+   /// C-API header to Python Native Interface API, similar to Java JNI
+   /// (Java Native Interface)
+   #include <Python.h>
+
+   #ifdef _WIN32
+     #include <process.h> // Exports _getpid()
+   #else
+     #include <unistd.h>  // Exports getpid()
+   #endif
+ #+END_SRC
+
+ Global object for DLL initialization (optional): 
+
+  + The global object dllinit_hook is used for logging to stdout when
+    the DLL is loaded or unloaded by the python process. 
+
+ #+BEGIN_SRC cpp 
+   struct DLLInitialization
+   {
+        DLLInitialization(){
+            int pid;
+            #ifdef _WIN32
+               pid = _getpid();
+            #else
+               pid = getpid();       
+            #endif 
+            std::cerr << " [TRACE] Python module DLL loaded by process PID = <"
+                              << pid << "> "
+                              << std::endl;
+            std::cerr << " [TRACE] Attach the debugger with: $ gdb -pid=" << pid << "\n";
+        }
+        ~DLLInitialization(){
+            std::cerr << " [TRACE] DLL native DLL unloaded OK." << std::endl;
+        }	
+   };
+
+   DLLInitialization dllinit_hook;
+ #+END_SRC
+
+ Exposed functions declarations: 
+
+ #+BEGIN_SRC cpp 
+   /** ======== List of functions exposed to Python =========== */
+
+   PyObject*
+   exposedFunction(PyObject* self, PyObject* args);
+
+   PyObject* testArguments(PyObject* self, PyObject* args);
+
+   auto printRange(PyObject* self, PyObject* args) -> PyObject*;
+   auto taylorSeriesExp(PyObject* self, PyObject* args) -> PyObject*;
+   PyObject* returnTuple(PyObject* self, PyObject* args);
+   PyObject* returnDictionary(PyObject* self, PyObject* args);
+   PyObject* tabulateFunction(PyObject* self, PyObject* args);
+   PyObject* computeStatistics(PyObject* self, PyObject* args);
+ #+END_SRC
+
+ Table of exported functions to the Python module: 
+
+ #+BEGIN_SRC cpp 
+   static PyMethodDef ModuleFunctions [] =
+   {
+           { "exposedFunction", exposedFunction, METH_VARARGS,
+             "Documentation or docstring of function exposedFunction1." }
+
+           ,{"testArguments", testArguments, METH_VARARGS,
+             "Test python arguments: Signature testArguments(int, float, double, const char*)"}
+	
+           // Function without docstring: printRange(int i, double x)
+           ,{ "printRange", printRange, METH_VARARGS, nullptr }
+
+           ,{ "taylorSeriesExp", &taylorSeriesExp, METH_VARARGS,
+              "taylorSeriesExp(double x, size_t maxiter, double tol) -> double"
+              "\n Computes exponential of a given value with taylor serie approximation."
+              "\n Formula reference:  https://www.mathsisfun.com/algebra/taylor-series.html"
+           }
+           ,{"returnTuple", &returnTuple, METH_VARARGS, nullptr}
+           ,{"returnDictionary", &returnDictionary, METH_VARARGS, nullptr}
+           ,{"computeStatistics", &computeStatistics, METH_VARARGS, nullptr}
+           ,{"tabulateFunction", tabulateFunction, METH_VARARGS,
+             "Tabulate some mathematical function or callable object"}
+           // Sentinel value used to indicate the end of function listing.
+           // All function listing must end with this value.
+           ,{nullptr, nullptr, 0, nullptr}									
+   };
+ #+END_SRC
+
+ Module definition: 
+
+ #+BEGIN_SRC cpp 
+   /* Module definition */
+   static struct PyModuleDef ModuleDefinitions {
+       PyModuleDef_HEAD_INIT,
+      // Module name as string 
+      "mymodule",
+      // Module documentation (docstring)
+      "A sample C++ native-code module for python3.",
+      -1,
+      // Functions exposed to the module 
+      ModuleFunctions
+   };
+
+ #+END_SRC
+
+ Module initialization function: 
+
+  + Note: This function must contain the name in the format
+    ~PyInit_<MODULE NAME>~ where module name is the same name as the
+    module file name <MODULE NAME>.so (Linux) or <MODULE NAME>.pyd on
+    Windows. 
+
+ #+BEGIN_SRC cpp 
+   /** Module Initialization function: must have this name schema
+    ,*  PyInit_<ModuleName> where ModuleName is the same base name of the 
+    ,*  shared library ModuleName.so (on Linux) or ModuleName.pyd (on Windows)
+    ,*/
+   PyMODINIT_FUNC PyInit_mymodule(void)
+   {
+      Py_Initialize();
+      PyObject* pModule = PyModule_Create(&ModuleDefinitions);
+      PyModule_AddObject(pModule, "version", Py_BuildValue("s", "version 0.1-Alpha"));
+      return pModule;
+   }
+ #+END_SRC
+
+  *Module Functions Implementations*
+
+ All functions exposed to the Python C-API must have the same type
+ signature of the function pointer PyExposedFunction or the same type
+ signature of the function MyExposedFunction.
+
+ #+BEGIN_SRC cpp 
+    using PyExposedFunction = PyObject* (*) (PyObject* self, PyObject* args)
+
+    // Example: 
+    PyObject* MyExposedFunction(PyObject* self, PyObject* args )
+    {
+       // On Failure return null 
+       return nullptr;  
+ 
+       return /* Some instance of PyObject */;
+   }
+ #+END_SRC
+
+ Notes:
+
+   + The function takes always two arguments self, and args (tuple
+     object containing arguments passed to the function)
+   + The exposed function always return an object PyObject.
+   + All Python objects are heap-allocated.
+   + In Python everything is an object: integers, double, classes,
+     class instances, modules and functions and so on. All those types
+     have the same type PyObject in the C-API. 
+   + Functions exposed to Python runtime should not throw a C++
+     exceptions, instead they should return null (nullptr) that causes
+     a runtime error or exception on Python side. 
+
+  *Function: exposedFunction*
+
+   + Function that takes a void argument and returns nothing.
+
+ #+BEGIN_SRC cpp 
+   PyObject*
+   exposedFunction(PyObject* self, PyObject* args)
+   {
+        std::cout << " =>> Hello word Python from C++ side." << "\n";
+        // All python functions that returns anything
+        // should end with this macro 
+        Py_RETURN_NONE;
+   }
+ #+END_SRC
+
+  *Function: testArguments*
+
+  + Function that takes many arguments used to demonstrate how to
+    extract tuple arguments. 
+
+ #+BEGIN_SRC cpp 
+   PyObject* testArguments(PyObject* self, PyObject* args)
+   {
+         int         abool;
+         int         aint;
+         float       afloat;
+         double      adouble;
+         const char* aword;
+         // Parse function arguments 
+         if(!PyArg_ParseTuple(args, "pifds", &abool, &aint, &afloat, &adouble, &aword))
+             return nullptr;
+
+         std::cerr << " Function: [" << __FUNCTION__ << "]" 
+                   << " ==> Number of arguments = " << PyTuple_GET_SIZE(args) << "\n";
+
+         std::string str = aword;
+         str = "'Received string = " + str + "'";
+
+         std::cout << " Received Python Arguments " << "\n";
+         std::cout << std::boolalpha;
+         std::cout << "abool[bool] = " << (bool) abool << "\n"
+                           << " abool[int] = " << abool << "\n"
+                           << "      aint  = " << aint << "\n"
+                           << "     afloat = " << afloat << "\n"
+                           << "    adouble = " << adouble << "\n"
+                           << "    aword   = " << str << "\n"
+                           << "\n";		
+         return Py_BuildValue("s", str.data());
+   }
+
+ #+END_SRC
+
+ Function PyArg_ParseTuple:
+
+  + The function PyArg_ParseTuple is used for extracting function
+    arguments from the tuple object (args).
+
+  + The letters in the string parameter "pifds" means:
+    + p => Extract first argument from tuple object as boolean (integer
+      0 or 1) storing the value in the variable abool. 
+    + i => Extract second argument from tuple object as integer storing
+      the value in the variable 'aint'. 
+    + f => Extract third argument as float (float point 32 bits). The
+      value is then stored in the variable 'afloat'.
+    + d => Extract fourth argument as double (float point 64 bits)
+    + s => Extract fith argument as string.
+
+  + If the function fails, it must return null which causes a runtime
+    error on Python side. 
+
+ #+BEGIN_SRC cpp 
+    int         abool;
+    int         aint;
+    float       afloat;
+    double      adouble;
+    const char* aword;
+    // Parse function arguments 
+    if(!PyArg_ParseTuple(args, "pifds", &abool, &aint, &afloat, &adouble, &aword))
+        return nullptr;
+ #+END_SRC
+
+ Function Py_BuildValue("s", str.data());
+
+  + This function is used for building return values to the python
+    side. It can return any python object, such as string, number,
+    class instance or multiple values as a tuple. 
+ 
+ #+BEGIN_SRC cpp 
+   // Return None in the python side 
+   return Py_BuildValue("");
+
+   // Return a single value as string string 
+   return Py_BuildValue("s", str.data());
+   return Py_BuildValue("s", "A string to python side");
+
+   // Return integer 
+   return Py_BuildValue("i", 1000);
+
+   // Return float  
+   return Py_BuildValue("f", 3.465);
+
+   // Return double   
+   return Py_BuildValue("d", 140.346);
+
+   // Return a tuple with a single double value: (3.156)
+   return Py_BuildValue("(d)", 3.156);
+
+   // Return a tuple with a single double and integer: (3.156, 100)
+   return Py_BuildValue("(di)", 3.156, 100);
+
+   // Return a tuple with a single double, integer and string
+   // tuple object: (3.156, 100, "a string")
+   return Py_BuildValue("(dis)", 3.156, 100, "a string");
+ #+END_SRC
+
+  *Function: printRange*
+ 
+  + Pseudo-Python signature: printRange(int n, float x) => void
+
+ #+BEGIN_SRC cpp 
+    auto printRange(PyObject* self, PyObject* args) -> PyObject*
+    {
+        std::cerr << " =>> Printing numeric range " << "\n";	
+        int    n;
+        float  x;
+        // Extract function argument from tuple argument object
+        // "if" => i - Extract integer
+        //      => f - Extract float (IEEE754 32 bits float point)
+        if(!PyArg_ParseTuple(args, "if", &n, &x)){
+            PyErr_SetString(PyExc_RuntimeError, "Invalid argument");
+            // Always return null on failure 
+            return nullptr; 
+        }
+
+        if(n <= 0){
+            PyErr_SetString( PyExc_RuntimeError
+                            ,"Invalid argument: n supposed to be greater than zero.");
+            return nullptr;
+        }	
+
+        for(int k = 0; k < n; k++)
+           std::cout << " k[" << k << "] = " << 3 * k + x << "\n";	
+        Py_RETURN_NONE;
+    }
+
+ #+END_SRC
+
+  *Function: returnTuple* 
+
+  + Return multiple values as tuple. 
+
+ #+BEGIN_SRC cpp 
+   /** Function that returns multiple values as tuple object */
+   PyObject* returnTuple(PyObject* self, PyObject* args)
+   {
+        double x;
+        double y;
+        int    n;
+        if(!PyArg_ParseTuple(args, "ddi", &x, &y, &n))
+                return nullptr;
+        // Build tuple object containing
+        // (d: double, d: double, i: integer, s: string)
+        return Py_BuildValue("(ddis)", 2 * x + y * n, x + 2 * y - n, n, "Result"); 
+   }
+ #+END_SRC
+
+  *Function: returnDictionary*
+
+  + Return a dictionary (hash-table) 
+
+ #+BEGIN_SRC cpp 
+   /** Return a dictionary object */
+   PyObject* returnDictionary(PyObject* self, PyObject* args)
+   {
+        double x;
+        double y;
+        int    n;
+        if(!PyArg_ParseTuple(args, "ddi", &x, &y, &n))
+                return nullptr;
+
+        // Create new dictionary object 
+        PyObject* pDict = PyDict_New();
+
+        PyObject* p = nullptr;
+        // Fill dictionary
+        p = Py_BuildValue("d", 2 * x + y * n);
+        PyDict_SetItemString(pDict, "alpha", p);
+        Py_DECREF(p);
+
+        p = Py_BuildValue("i", 3 * n) ;
+        PyDict_SetItemString(pDict, "size", p);
+        Py_DECREF(p);
+
+        p = Py_BuildValue("s", "Some string") ;
+        PyDict_SetItemString(pDict, "beta", p);
+        Py_DECREF(p);	
+
+        return pDict;
+   }
+ #+END_SRC
+
+  *Function: computeStatistics*
+
+  + Computes statistics sum and mean for any iterable object containing
+    double values such as list.
+
+ #+BEGIN_SRC cpp 
+   PyObject* computeStatistics(PyObject* self, PyObject* args)
+   {
+        std::cerr << " [TRACE] " << __FILE__ << "(" << __LINE__ << ") - "
+                          << "Calling function: " << __FUNCTION__ << "\n";
+
+        std::cerr << " [TRACE] Arguments = "; PyObject_Print(args, stdout, 0); std::cerr << "\n";
+
+        PyObject* pSeq;
+        // Parse function argument as sequence
+        if(!PyArg_ParseTuple(args, "O", &pSeq))
+                return nullptr;
+
+        pSeq = PySequence_Fast(pSeq, "Expected iterable arguments");
+        if(pSeq == nullptr) return nullptr;
+
+        int numberOfElements = PySequence_Fast_GET_SIZE(pSeq);
+        std::cerr << " [TRACE] numberOfElements = " << numberOfElements << "\n";
+
+        PyObject* pItem = nullptr;
+        double x;
+        double sum;
+
+        for(int n = 0; n < numberOfElements; n++)
+        {
+            pItem = PySequence_Fast_GET_ITEM(pSeq, n);
+            if(!pItem) {
+                Py_DECREF(pSeq);
+                return nullptr;
+            }
+            // Print item 
+            std::cout << "item[" << n << "] = ";
+            PyObject_Print(pItem, stdout, 0);
+            std::cout << "\n";
+
+            x = PyFloat_AsDouble(pItem);
+            if(PyErr_Occurred() != nullptr){
+                    PyErr_SetString(PyExc_TypeError, "Error: expected float point.");
+                    return nullptr;
+            }
+            sum += x;
+        }
+
+        double mean = sum / numberOfElements;
+        std::cout << "\n (C++) Statics Result " << "\n";
+        std::cout << "---------------" << "\n";
+        std::cout << " Sum  = " << sum << "\n";
+        std::cout << " Mean = " << mean << "\n";
+
+        Py_DECREF(pSeq);
+        return Py_BuildValue(""); // Return None 
+   }
+
+ #+END_SRC
+
+  *Function: taylorSeriesExp*
+
+  + This function computes the exponential function approximation using its taylor
+    series expansion. Formula at: [[https://www.mathsisfun.com/algebra/taylor-series.html][taylor series]]
+
+ #+BEGIN_SRC cpp 
+   auto taylorSeriesExp(PyObject* self, PyObject* args) -> PyObject*
+   {
+        double x;
+        size_t maxiter;  // Maximum number of iterations 
+        double tol;      // Tolerance
+
+        // Parse function arguments 
+        if(!PyArg_ParseTuple(args, "did", &x, &maxiter, &tol))
+                return nullptr;
+
+        // Validate function arguments
+
+        if(tol <= 0 || tol > 1.0){
+                PyErr_SetString( PyExc_RuntimeError
+                               ,"Invalid tolerance, expected in range (0, 1]");
+                return nullptr;
+        }
+
+        // Compute exponential taylor series available at
+        // https://www.mathsisfun.com/algebra/taylor-series.html
+        unsigned long factorial = 1;
+        double        xpower    = 1.0;
+        double        sum       = 0.0;
+        double        term      = 0.0;
+        size_t        idx       = 1;
+        do{
+             term      = xpower / factorial;
+             sum       = sum + term;
+             xpower    = xpower * x ;
+             factorial = factorial * idx;		
+             idx++;
+        } while(idx <= maxiter && std::abs(term) > std::abs(sum) * tol );
+        // Return float point constnat NAN (Not a Number)
+        if(idx >= maxiter){
+                std::cerr << " [ERROR] Series does not converge." << "\n";
+                return Py_BuildValue("d", NAN);
+        }
+        return Py_BuildValue("d", sum);
+   }
+ #+END_SRC
+
+  *Function: tabulateFunction* 
+
+  + This function takes a callable object (callback) which can be a
+    function, lambda function, callable object (object with method ~__call__~) and so on.
+
+ Pseudo Python method signature using C++ notation: 
+
+ #+BEGIN_SRC cpp 
+   using Callback = std::function<double (double)>;
+   void tabulateFunction(Callback callback, double xmin, double xmax, double step)
+ #+END_SRC
+
+ Function code: 
+
+ #+BEGIN_SRC cpp 
+   PyObject* tabulateFunction(PyObject* self, PyObject* args)
+   {
+        PyObject* pObj = nullptr;
+        double xmin, xmax, xstep;
+
+        if(!PyArg_ParseTuple(args, "Oddd", &pObj, &xmin, &xmax, &xstep))
+             return nullptr;
+        if(pObj == nullptr) {
+             PyErr_SetString(PyExc_RuntimeError, "Error: invalid None object.");
+             return nullptr;
+        }
+        PyObject* pArgs  = nullptr;
+        PyObject* pResult = nullptr;
+        double y = 0.0;
+
+        std::cout << std::fixed << std::setprecision(4);
+
+        std::cout << "Tabulating range: "
+                  << " ; xmin = " << xmin
+                  << " ; xmax = " << xmax
+                  << " ; step = " << xstep
+                  << "\n";
+
+        for(double x = xmin; x <= xmax; x += xstep )
+        {
+             pArgs  = Py_BuildValue("(d)", x);
+             pResult = PyEval_CallObject(pObj, pArgs);
+             y = PyFloat_AsDouble(pResult);
+             if(PyErr_Occurred() != nullptr){
+                     PyErr_SetString(PyExc_RuntimeError, "Error: Invalid float point.");
+                     return nullptr;
+             }
+             std::cout << std::setw(8) << x << std::setw(10) << y  << "\n";
+        }
+        Py_RETURN_NONE;
+   }
+
+ #+END_SRC
+
+ Extract python callable object (callback) pObj and the parameters
+ xmin, xmax and xstep: 
+
+ #+BEGIN_SRC cpp 
+     PyObject* pObj = nullptr;
+     double xmin, xmax, xstep;
+     // Extract parameters 
+     // O => pObj 
+     // d => xmin 
+     // d => xmax 
+     if(!PyArg_ParseTuple(args, "Oddd", &pObj, &xmin, &xmax, &xstep))
+          return nullptr;
+ #+END_SRC
+
+ Annotated code block in the for-loop: 
+
+ #+BEGIN_SRC cpp 
+   // Argument (tuple object) of callable object 
+   pArgs  = Py_BuildValue("(d)", x);
+
+   // Call callable object (method __call__)
+   pResult = PyEval_CallObject(pObj, pArgs);
+
+   // Try extracting result as double 
+   y = PyFloat_AsDouble(pResult);
+
+   // Check whether any error has happened and abort the operation in this case. 
+   if(PyErr_Occurred() != nullptr){
+        PyErr_SetString(PyExc_RuntimeError, "Error: Invalid float point.");
+        return nullptr;
+   }
+   // Display table row 
+   std::cout << std::setw(8) << x << std::setw(10) << y  << "\n";
+ #+END_SRC
+*** Compiling and Running Native Module 
+
+  *Clone repository:*
+
+ #+BEGIN_SRC sh 
+   $ git clone https://gist.github.com/caiorss/bc7dc373d87b828029eb0e0ec048d91e python-module 
+   $ cd python-module 
+ #+END_SRC
+
+
+  *Manual Compilation* 
+
+ Compile the native module mymodule.so on Linux or any other Unix-like OS:
+
+ #+BEGIN_SRC sh 
   $ clang++ mymodule.cpp -o mymodule.so -g -std=c++1z -fPIC -shared -I/usr/include/python3.6m  
+ #+END_SRC
+
+ Compile the native module mymodule.pyd on Windows OS with Mingw compiler: 
+
+ #+BEGIN_SRC sh
+   $  g++ mymodule.cpp -o mymodule.pyd -g -std=c++1z -shared -fPIC \
+      -I"C:\Users\archbox\Miniconda3\pkgs\python-3.6.5-h0c2934d_0\include" \
+      C:\Users\archbox\Miniconda3\pkgs\python-3.6.5-h0c2934d_0\libs\Python36.lib
+ #+END_SRC
+
+  *Compilation with setup.py*
+
+ Build only: 
+
+  + $ python.exe setup.py build 
+
+
+ #+BEGIN_SRC sh 
+   $ python.exe setup.py build 
+
+   $ cd build\
+   lib.win-amd64-3.6\   temp.win-amd64-3.6\
+   F:\python-module (master -> origin)
+   λ cd build\lib.win-amd64-3.6\
+
+   $ ls
+   mymodule.cp36-win_amd64.pyd*
+
+   $ C:\Users\archbox\Miniconda3\python.exe
+   Python 3.6.5 |Anaconda, Inc.| (default, Mar 29 2018, 13:32:41) [MSC v.1900 64 bit (AMD64)] on win32
+   Type "help", "copyright", "credits" or "license" for more information.
+   >>>
+   >>> import mymodule as m
+    [TRACE] Python module DLL loaded by process PID = <620>
+    [TRACE] Attach the debugger with: $ gdb -pid=620
+
+ #+END_SRC
+
+ Install: 
+  
+   + $ python.exe setup.py install
+   + For uninstall see: [[https://stackoverflow.com/questions/1550226/python-setup-py-uninstall][question 1550226]]
+
+ #+BEGIN_SRC sh 
+  $ python.exe setup.py install
+
+   $ C:\Users\archbox\Miniconda3\python.exe setup.py install
+   running install
+   running build
+   running build_ext
+   building 'mymodule' extension
+   creating build\temp.win-amd64-3.6
+   creating build\temp.win-amd64-3.6\Release
+   C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Tools\MSVC\14.16.27023\bin\HostX86\x64\cl.exe /c /nologo /Ox
+    /W3 /GL /DNDEBUG /MD -IC:\Users\archbox\Miniconda3\include -IC:\Users\archbox\Miniconda3\include "-IC:\Program Files (x86)\Mi
+   crosoft Visual Studio\2017\Community\VC\Tools\MSVC\14.16.27023\ATLMFC\include" ... ... 
+   ... ....   ... ....   ... ....   ... ....   ... ....   ... ....   ... ....  
+   ... ....   ... ....   ... ....   ... ....   ... ....   ... ....   ... ....  
+   Finished generating code
+   running install_lib
+   copying build\lib.win-amd64-3.6\mymodule.cp36-win_amd64.pyd -> C:\Users\archbox\Miniconda3\Lib\site-packages
+   running install_egg_info
+   Writing C:\Users\archbox\Miniconda3\Lib\site-packages\mymodule-1.0-py3.6.egg-info
+ #+END_SRC
+
+
+ Check generated file on Linux: 
+
+ #+BEGIN_SRC sh 
+   $ file mymodule.so 
+
+   $ du -h mymodule.so 
+   136K	mymodule.so
+   136K	total
+ #+END_SRC
+
+ View symbols: 
+
+ #+BEGIN_SRC sh 
+   $ nm  mymodule.so 
+   0000000000209518 B __bss_start
+   0000000000005500 t __clang_call_terminate
+   0000000000209518 b completed.7347
+                    U __cxa_atexit@@GLIBC_2.2.5
+                    U __cxa_begin_catch@@CXXABI_1.3
+                    U __cxa_call_unexpected@@CXXABI_1.3
+                    U __cxa_end_catch@@CXXABI_1.3
+                    w __cxa_finalize@@GLIBC_2.2.5
+                    U __cxa_rethrow@@CXXABI_1.3
+   0000000000004160 t __cxx_global_var_initmymodule.cpp_
+   00000000000041a0 t __cxx_global_var_initmymodule.cpp_.1
+   00000000000041f0 t deregister_tm_clones
+   000000000020951a B dllinit_hook
+   .. ... ... ... ... ... ... ... 
+ #+END_SRC
+
+ Load module in Python 3 REPL:
+
+ #+BEGIN_SRC python 
+   $ python3
+   Python 3.7.1 (default, Dec 14 2018, 19:28:38) 
+   [GCC 7.3.0] :: Anaconda, Inc. on linux
+   Type "help", "copyright", "credits" or "license" for more information.
+   >>> 
+   >>> import mymodule as m
+    [TRACE] Python module DLL loaded by process PID = <5236> 
+    [TRACE] Attach the debugger with: $ gdb -pid=5236
+   >>> 
+   >>> 
+ #+END_SRC
+
+ Module Docstring (documentation): 
+
+ #+BEGIN_SRC python 
+   >>> help(m)
+   Help on module mymodule:
+
+   NAME
+       mymodule - A sample C++ native-code module for python3.
+
+   FUNCTIONS
+       computeStatistics(...)
+    
+       exposedFunction(...)
+           Documentation or docstring of function exposedFunction1.
+    
+       printRange(...)
+    
+       returnDictionary(...)
+    
+       returnTuple(...)
+    
+       tabulateFunction(...)
+           Tabulate some mathematical function or callable object
+    
+       taylorSeriesExp(...)
+           taylorSeriesExp(double x, size_t maxiter, double tol) -> double
+           Computes exponential of a given value with taylor serie approximation.
+           Formula reference:  https://www.mathsisfun.com/algebra/taylor-series.html
+    
+       testArguments(...)
+           Test python arguments: Signature testArguments(int, float, double, const char*)
+
+   DATA
+       version = 'version 0.1-Alpha'
+
+   FILE
+       /home/archbox/shared/python-module/mymodule.so
+ #+END_SRC
+
+ Module version: 
+
+ #+BEGIN_SRC python
+   >>> m.version
+   'version 0.1-Alpha'
+   >>> 
+ #+END_SRC
+
+ Call function exposedFunction()
+
+ #+BEGIN_SRC python 
+   >>> m.exposedFunction()
+    =>> Hello word Python from C++ side.
+   >>> 
+ #+END_SRC
+
+ Call function testArguments:
+
+ #+BEGIN_SRC python 
+   >>> s1 = m.testArguments(False, 100, 10.9361, 0.344, "from Python to C++")
+    Function: [testArguments] ==> Number of arguments = 5
+    Received Python Arguments 
+   abool[bool] = false
+    abool[int] = 0
+         aint  = 100
+        afloat = 10.9361
+       adouble = 0.344
+       aword   = 'Received string = from Python to C++'
+
+   >>> s1
+   "'Received string = from Python to C++'"
+   >>> 
+
+   >>> 
+   >>> s2 = m.testArguments(True, 90, -0.56e6, 9.344e5, "something else more")
+    Function: [testArguments] ==> Number of arguments = 5
+    Received Python Arguments 
+   abool[bool] = true
+    abool[int] = 1
+         aint  = 90
+        afloat = -560000
+       adouble = 934400
+       aword   = 'Received string = something else more'
+
+   >>> s2
+   "'Received string = something else more'"
+ #+END_SRC
+
+ Call function printRange()
+
+ #+BEGIN_SRC python
+   >>> m.printRange(5, 4.5)
+    =>> Printing numeric range 
+    k[0] = 4.5
+    k[1] = 7.5
+    k[2] = 10.5
+    k[3] = 13.5
+    k[4] = 16.5
+
+   >>> m.printRange(-5, 4.5)
+    =>> Printing numeric range 
+   Traceback (most recent call last):
+     File "<stdin>", line 1, in <module>
+   RuntimeError: Invalid argument: n supposed to be greater than zero.
+
+   >>> m.printRange(0, 4.5)
+    =>> Printing numeric range 
+   Traceback (most recent call last):
+     File "<stdin>", line 1, in <module>
+   RuntimeError: Invalid argument: n supposed to be greater than zero.
+ #+END_SRC
+
+ Calll function returnTuple:
+
+ #+BEGIN_SRC python 
+    >>> tpl = m.returnTuple(3.5, 4.2, 10)
+
+    >>> tpl
+    (49.0, 1.9000000000000004, 10, 'Result')
+
+    >>> tpl[0]
+    49.0
+
+    >>> tpl[1]
+    1.9000000000000004
+
+    >>> tpl[2]
+    10
+
+    >>> m.returnTuple(8.5, 4.2, 20)
+    (101.0, -3.1000000000000014, 20, 'Result')
+ #+END_SRC
+
+ Call functon returnDictionary: 
+
+ #+BEGIN_SRC python 
+    >>> d = m.returnDictionary(8.5, 8.62, 10)
+
+    >>> d
+    {'alpha': 103.19999999999999, 'size': 30, 'beta': 'Some string'}
+
+    >>> d["alpha"]
+    103.19999999999999
+
+    >>> d["beta"]
+    'Some string'
+
+    >>> d["size"]
+    30
+ #+END_SRC
+
+ Call function computeStatistics:
+
+ #+BEGIN_SRC python 
+    >>> xs = [4, 1.2, 9.5, 10.5, 3.4, 5.10, 6.0]
+
+    >>> xs
+    [4, 1.2, 9.5, 10.5, 3.4, 5.1, 6.0]
+
+    >>> m.computeStatistics(xs)
+     [TRACE] mymodule.cpp(268) - Calling function: computeStatistics
+     [TRACE] Arguments = ([4, 1.2, 9.5, 10.5, 3.4, 5.1, 6.0],)
+     [TRACE] numberOfElements = 7
+    item[0] = 4
+    item[1] = 1.2
+    item[2] = 9.5
+    item[3] = 10.5
+    item[4] = 3.4
+    item[5] = 5.1
+    item[6] = 6.0
+
+     (C++) Statics Result 
+    ---------------
+     Sum  = 39.7
+     Mean = 5.67143
+    >>> 
+ #+END_SRC
+
+ Call function taylorSerieExp: 
+
+ #+BEGIN_SRC python 
+   >>> help(m.taylorSeriesExp)
+   Help on built-in function taylorSeriesExp in module mymodule:
+
+   taylorSeriesExp(...)
+       taylorSeriesExp(double x, size_t maxiter, double tol) -> double
+       Computes exponential of a given value with taylor serie approximation.
+       Formula reference:  https://www.mathsisfun.com/algebra/taylor-series.html
+
+   >>> import math
+
+   # Exact value 
+   >>> math.exp(3.5)
+   33.11545195869231
+
+   # Approximation 
+   >>> m.taylorSeriesExp(3.5, 10, 0.001)
+    [ERROR] Series does not converge.
+   nan
+   >>> m.taylorSeriesExp(3.5, 100, 0.001)
+   33.10588185071678
+   >>> 
+
+   # Exact value 
+   >>> math.exp(5.0)
+   148.4131591025766
+
+   # Approximation 
+   >>> m.taylorSeriesExp(5.0, 100, 0.001)
+   148.37958007973663
+
+   >>> m.taylorSeriesExp(5.0, 100, 0.0001)
+   148.41021027504306
+   >>> 
+ #+END_SRC
+
+ Call function: tabulateFunction which takes a callable object as
+ argumet. 
+
+ #+BEGIN_SRC python 
+ >>> help(m.tabulateFunction)
+ Help on built-in function tabulateFunction in module mymodule:
+
+ tabulateFunction(...)
+     Tabulate some mathematical function or callable object
+ #+END_SRC
+
+ Pass ordinary functions: 
+  + Note: Python ordinary functions are objects with ~__call__~ method: 
+
+ #+BEGIN_SRC cpp 
+   import math 
+
+   >>> math.sqrt.__call__(25)
+   5.0
+
+   >>> math.sqrt.__call__(125)
+   11.180339887498949
+   >>> 
+
+   >>> m.tabulateFunction(math.exp, -5.0, 5.0, 1.0)
+   Tabulating range:  ; xmin = -5.0000 ; xmax = 5.0000 ; step = 1.0000
+    -5.0000    0.0067
+    -4.0000    0.0183
+    -3.0000    0.0498
+    -2.0000    0.1353
+    -1.0000    0.3679
+     0.0000    1.0000
+     1.0000    2.7183
+     2.0000    7.3891
+     3.0000   20.0855
+     4.0000   54.5982
+     5.0000  148.4132
+   >>> 
+
+   >>> a.tabulateFunction(math.sqrt, 0.0, 25.0, 5.0)
+   Tabulating range:  ; xmin = 0.0000 ; xmax = 25.0000 ; step = 5.0000
+     0.0000    0.0000
+     5.0000    2.2361
+    10.0000    3.1623
+    15.0000    3.8730
+    20.0000    4.4721
+    25.0000    5.0000
+ #+END_SRC
+
+ Pass lambda functions: 
+
+ #+BEGIN_SRC cpp 
+   >>> m.tabulateFunction(lambda x: x, 0.0, 25.0, 4.0)
+   Tabulating range:  ; xmin = 0.0000 ; xmax = 25.0000 ; step = 4.0000
+     0.0000    0.0000
+     4.0000    4.0000
+     8.0000    8.0000
+    12.0000   12.0000
+    16.0000   16.0000
+    20.0000   20.0000
+    24.0000   24.0000
+   >>> 
+
+   >>> m.tabulateFunction(lambda x: 3 * x + 5, 0.0, 25.0, 4.0)
+   Tabulating range:  ; xmin = 0.0000 ; xmax = 25.0000 ; step = 4.0000
+     0.0000    5.0000
+     4.0000   17.0000
+     8.0000   29.0000
+    12.0000   41.0000
+    16.0000   53.0000
+    20.0000   65.0000
+    24.0000   77.0000
+ #+END_SRC
+
+ Class LinearFun: 
+
+ #+BEGIN_SRC python 
+   class LinearFun:
+       def __init__(self, a, b):
+           self.a = a
+           self.b = b
+       def __call__(self, x):
+           return self.a * x + self.b
+       def eval(self, x):
+           return self.a * x + self.b
+ #+END_SRC
+
+ Pass a callable object: 
+
+ #+BEGIN_SRC python   
+   >>> lfun = LinearFun(5, 4)
+   >>> lfun(3)
+   19
+   >>> lfun(6)
+   34
+   >>> lfun.eval(3)
+   19
+   >>> lfun.eval(6)
+   34
+
+   >>> m.tabulateFunction(lfun, 0.0, 25.0, 4.0)
+   Tabulating range:  ; xmin = 0.0000 ; xmax = 25.0000 ; step = 4.0000
+     0.0000    4.0000
+     4.0000   24.0000
+     8.0000   44.0000
+    12.0000   64.0000
+    16.0000   84.0000
+    20.0000  104.0000
+    24.0000  124.0000
+   >>> 
+   >>> 
+
+   >>> a.tabulateFunction(lfun.eval, 0.0, 25.0, 4.0)
+   Tabulating range:  ; xmin = 0.0000 ; xmax = 25.0000 ; step = 4.0000
+     0.0000    4.0000
+     4.0000   24.0000
+     8.0000   44.0000
+    12.0000   64.0000
+    16.0000   84.0000
+    20.0000  104.0000
+    24.0000  124.0000
+
+   >>> lfun.a 
+   5
+   >>> lfun.a  = 0
+   >>> 
+   >>> m.tabulateFunction(lfun.eval, 0.0, 25.0, 4.0)
+   Tabulating range:  ; xmin = 0.0000 ; xmax = 25.0000 ; step = 4.0000
+     0.0000    4.0000
+     4.0000    4.0000
+     8.0000    4.0000
+    12.0000    4.0000
+    16.0000    4.0000
+    20.0000    4.0000
+    24.0000    4.0000
+ #+END_SRC
+
+** Native Modules or C++ binding with Pybind11 
+*** Overview 
+
+Pybind11 is a C++ header-only  library that simplifies the creation of
+Python binding to existing C++ libraries or creating Python native
+modules. This library is easier and less cumbersome to use than Python raw
+C API due to the library declarative and intuitive syntax and lots of
+C++ wrappers.
+
+Use cases: 
+ + Create high-performance python modules in C++
+ + Create binding to existing C or C++ libraries.
+ + Embed Python in a C++ application
+ + Access to operating system APIs not exposed in Python standard library
+
+Documentation: 
+ + https://pybind11.readthedocs.io/en/stable/
+
+Github Repository: 
+ + https://github.com/pybind/pybind11
+
+Conan package reference: 
+ + [[https://bintray.com/conan-community/conan/pybind11%253Aconan/2.2.4%253Astable][pybind11/2.2.4@conan/stable]]
+
+Headers:
+
+ + <pybind11/pybind11.h>
+   + Main header, that should be always included 
+
+ + <pybind11/stl.h>
+   + Provides implicit convesion from STL containers to Python types. 
+
+ + <pybind11/functional.h>
+
+*** Example 
+**** Overview 
+
+The following sample CMake/conan project contains many PyBind11
+examples about binding existing C++ functions and classes and access
+or call Python objects and APIs from C++. 
+
+ + https://github.com/caiorss/example-project-pybind11
+
+**** File: CMakeLists.txt 
+
+Note: In order to use this CMakeLists.txt file, it is necessary an
+installation of conan package manager available in $PATH environment
+variable, in other words, accessible from command line. 
+
+#+BEGIN_SRC cmake 
+  #      Author: Caio Rodrigues 
+  # Description:  Sample CMake + Conan + Pybind11 project
+  #        Note:  Requires Conan and Python Development files installed 
+  #----------------------------------------------------------
+
+  cmake_minimum_required(VERSION 2.8)
+  project(pybind11-experiments)
+  set(CMAKE_CXX_STANDARD 17)
+
+
+  # ============  Conan Boostrap  ======================#
+
+  # Download automatically, you can also just copy the conan.cmake file
+  if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan.cmake")
+     message(STATUS "Downloading conan.cmake from https://github.com/conan-io/cmake-conan")
+     file(DOWNLOAD "https://github.com/conan-io/cmake-conan/raw/v0.13/conan.cmake"
+                   "${CMAKE_BINARY_DIR}/conan.cmake")
+  endif()
+
+  include(${CMAKE_BINARY_DIR}/conan.cmake)
+
+  conan_cmake_run(REQUIRES   pybind11/2.2.4@conan/stable
+                  BASIC_SETUP
+                  BUILD missing)
+
+  #============ Additional Commands =============#
+
+  # Copy target file to current directory whenerver it is rebuilt
+  function(copy_after_build TARGET_NAME )
+      # Note: CMAKE_CURRENT_LIST_DIR is the directory where is this
+      # CMakeLists.txt file.
+      set(DESTDIR ${CMAKE_CURRENT_LIST_DIR}/bin/)
+      file(MAKE_DIRECTORY ${DESTDIR})
+
+      # Copy binary file to <CMakeLists.txt didctory>./bin
+      # after target is compiled.
+      add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy
+                                 $<TARGET_FILE:${TARGET_NAME}> ${DESTDIR}
+                                 )
+  endfunction()
+
+
+  #----------------------------------------------#
+  #    Target Configurations                     #
+  #----------------------------------------------#
+
+  find_package(pybind11 CONFIG REQUIRED)
+
+  pybind11_add_module(SampleModule SampleModule.cpp)
+  # Copy binary to ./bin directory after module is built
+  copy_after_build(SampleModule)
+
+  # Target1: cashflow - Python module basics
+  #.....................................
+  pybind11_add_module(cashflow cashflow.cpp)
+  copy_after_build(cashflow)
 #+END_SRC
-*** File: setup.py 
+**** File: SampleModule.cpp 
+***** Full Source 
 
-Python script used for building and installing the Python module.
+ + File: [[https://github.com/caiorss/example-project-pybind11][SampleModule.cpp]]
 
-#+CAPTION: File setup.py 
-#+BEGIN_SRC python 
-  from distutils.core import setup, Extension
+***** Header and Namespaces 
 
-  mymodule = Extension('mymodule', sources = ['mymodule.cpp'])
-
-  setup(
-      name        = 'mymodule',
-      version     = '1.0',
-      description = 'Sample python C-API exploration',
-      ext_modules = [mymodule]
-  )
-#+END_SRC
-
-*** File: mymodule.cpp 
-
-Heades: 
+ *Header files:*
 
 #+BEGIN_SRC cpp 
   #include <iostream>
   #include <string>
-  #include <functional>
+  #include <vector>
   #include <iomanip>
+  #include <cmath>
 
-  // Solve Mingw error: '::hyport' has not been declared 
-  #include <math.h>
-
-  //#define hypot _hypot
-
-  /// C-API header to Python Native Interface API, similar to Java JNI
-  /// (Java Native Interface)
-  #include <Python.h>
-
-  #ifdef _WIN32
-    #include <process.h> // Exports _getpid()
-  #else
-    #include <unistd.h>  // Exports getpid()
-  #endif
+  #include <pybind11/pybind11.h>
+  #include <pybind11/stl.h>
+  #include <pybind11/functional.h>
 #+END_SRC
 
-Global object for DLL initialization (optional): 
-
- + The global object dllinit_hook is used for logging to stdout when
-   the DLL is loaded or unloaded by the python process. 
+ *Namespaces:* 
 
 #+BEGIN_SRC cpp 
-  struct DLLInitialization
+  namespace py = pybind11;
+  using namespace pybind11::literals;
+#+END_SRC
+***** Bindings C++ Functions, enums and Classes 
+
+Bindings to C++ functions, enums and classes without any knowledge of
+Python API.
+
+ + Function add: 
+
+#+BEGIN_SRC cpp 
+  int add(int i, int j)
   {
-       DLLInitialization(){
-           int pid;
-           #ifdef _WIN32
-              pid = _getpid();
-           #else
-              pid = getpid();       
-           #endif 
-           std::cerr << " [TRACE] Python module DLL loaded by process PID = <"
-                             << pid << "> "
-                             << std::endl;
-           std::cerr << " [TRACE] Attach the debugger with: $ gdb -pid=" << pid << "\n";
-       }
-       ~DLLInitialization(){
-           std::cerr << " [TRACE] DLL native DLL unloaded OK." << std::endl;
-       }	
+      return i + j;
+  }
+#+END_SRC
+
+Registration: 
+
+#+BEGIN_SRC cpp 
+  PYBIND11_MODULE(SampleModule, m) {
+     // optional module docstring
+     m.doc() = "Sample Python built with C++ CeePlusPlus ";
+
+     // Register an ordinary C++ function
+     m.def("add",                                 // Function Name in Python side
+           &add,                                  // Function Pointer
+           "A function which adds two numbers",   // Docstring
+           py::arg("x"),                          // Name of argument 1
+           py::arg("y") = 10);                    // Name of argument 2 with default value
+   ... ...   ... ...   ... ...   ... ...   ... ... 
+  }
+#+END_SRC
+
+ + Function *vectorCumulativeSum*
+
+#+BEGIN_SRC cpp 
+  std::vector<double>
+  vectorCumulativeSum(std::vector<double> const& xs)
+  {
+      std::vector<double> out(xs.size());
+      double sum = 0.0;
+      for(size_t i = 0; i < xs.size(); i++)
+      {
+          sum += xs[i];
+          out[i] = sum;
+      }
+      return out;
+  }
+#+END_SRC
+
+Registration:
+
+#+BEGIN_SRC cpp 
+  PYBIND11_MODULE(SampleModule, m) {
+   ...   ...   ...   ...   ...
+    m.def("vectorCumulativeSum", &vectorCumulativeSum);    
+   ...   ...   ...   ...   ...
+  } 
+#+END_SRC
+
+ + Function *tabulate1*
+
+#+BEGIN_SRC cpp 
+  void tabulate1(double start, double stop, double step,
+                 std::function<double (double)> func)
+  {
+      if(start > stop || step <= 0)
+          throw std::runtime_error(" Error: Invalid domain "
+                                   "\n Expected: start < stop && step > 0 "
+                                   );
+
+      std::cout << std::setprecision(5) << std::fixed;
+      for(double x = start; x <= stop; x+= step)
+          std::cout << std::setw(10) << x
+                    << std::setw(10) << func(x)
+                    << std::endl;
+  }
+#+END_SRC
+
+Registration: 
+
+#+BEGIN_SRC cpp 
+  PYBIND11_MODULE(SampleModule, m) {
+   ...   ...   ...   ...   ...
+    m.def("tabulate1", &tabulate1);
+   ...   ...   ...   ...   ...
+  } 
+#+END_SRC
+
+
+ + Enum class MathErrorCode: 
+
+#+BEGIN_SRC cpp 
+  enum class MathErrorCode: std::uint32_t
+  {
+       OK           = 0x00
+     , OVERFLOW     = 0x01
+     , UNDERFLOW    = 0x04
+     , NOT_A_NUMBER = 0x08
   };
-
-  DLLInitialization dllinit_hook;
 #+END_SRC
 
-Exposed functions declarations: 
+Registration: 
 
 #+BEGIN_SRC cpp 
-  /** ======== List of functions exposed to Python =========== */
+  PYBIND11_MODULE(SampleModule, m) {
+   ...   ...   ...   ...   ...
 
-  PyObject*
-  exposedFunction(PyObject* self, PyObject* args);
-
-  PyObject* testArguments(PyObject* self, PyObject* args);
-
-  auto printRange(PyObject* self, PyObject* args) -> PyObject*;
-  auto taylorSeriesExp(PyObject* self, PyObject* args) -> PyObject*;
-  PyObject* returnTuple(PyObject* self, PyObject* args);
-  PyObject* returnDictionary(PyObject* self, PyObject* args);
-  PyObject* tabulateFunction(PyObject* self, PyObject* args);
-  PyObject* computeStatistics(PyObject* self, PyObject* args);
+    py::enum_<MathErrorCode>(m, "MathErrorCode", py::arithmetic())
+       .value("OK",           MathErrorCode::OK)
+       .value("OVERFLOW",     MathErrorCode::OVERFLOW)
+       .value("UNDEFLOW",     MathErrorCode::UNDERFLOW)
+       .value("NOT_A_NUMBER", MathErrorCode::NOT_A_NUMBER);
+      // .export_values();
+   ...   ...   ...   ...   ...
+  } 
 #+END_SRC
 
-Table of exported functions to the Python module: 
+ + Class *LinearFunctor*: 
 
 #+BEGIN_SRC cpp 
-  static PyMethodDef ModuleFunctions [] =
+
+  // Sample "function-object class"
+  class LinearFunctor
   {
-          { "exposedFunction", exposedFunction, METH_VARARGS,
-            "Documentation or docstring of function exposedFunction1." }
+  public:
+      double A = 0, B = 0;
 
-          ,{"testArguments", testArguments, METH_VARARGS,
-            "Test python arguments: Signature testArguments(int, float, double, const char*)"}
-	
-          // Function without docstring: printRange(int i, double x)
-          ,{ "printRange", printRange, METH_VARARGS, nullptr }
+      LinearFunctor();
+      LinearFunctor(double a, double b): A(a), B(b){ }
 
-          ,{ "taylorSeriesExp", &taylorSeriesExp, METH_VARARGS,
-             "taylorSeriesExp(double x, size_t maxiter, double tol) -> double"
-             "\n Computes exponential of a given value with taylor serie approximation."
-             "\n Formula reference:  https://www.mathsisfun.com/algebra/taylor-series.html"
-          }
-          ,{"returnTuple", &returnTuple, METH_VARARGS, nullptr}
-          ,{"returnDictionary", &returnDictionary, METH_VARARGS, nullptr}
-          ,{"computeStatistics", &computeStatistics, METH_VARARGS, nullptr}
-          ,{"tabulateFunction", tabulateFunction, METH_VARARGS,
-            "Tabulate some mathematical function or callable object"}
-          // Sentinel value used to indicate the end of function listing.
-          // All function listing must end with this value.
-          ,{nullptr, nullptr, 0, nullptr}									
+      double GetA() const   { return A; }
+      void   SetA(double a) { A = a; }
+      double GetB() const   { return B; }
+      void   SetB(double b) { B = b; }
+
+      void show() const
+      {
+          std::cout << " LinearFunction: y(x) = A * x + B" << std::endl;
+          std::cout << " => A = " << this->A << " ; B = " << this->B << std::endl;
+      }
+      std::string toString() const
+      {
+          std::stringstream ss;
+          ss << " LinearFunction: y(x) = A * x + B" << std::endl;
+          ss << " => A = " << this->A << " ; B = " << this->B << std::endl;
+          return ss.str();
+      }
+      // Function-call operator
+      double operator()(double x)
+      {
+          return A * x + B;
+      }
   };
 #+END_SRC
 
-Module definition: 
+Registration: 
 
 #+BEGIN_SRC cpp 
-  /* Module definition */
-  static struct PyModuleDef ModuleDefinitions {
-      PyModuleDef_HEAD_INIT,
-     // Module name as string 
-     "mymodule",
-     // Module documentation (docstring)
-     "A sample C++ native-code module for python3.",
-     -1,
-     // Functions exposed to the module 
-     ModuleFunctions
-  };
+  PYBIND11_MODULE(SampleModule, m) {
+    ... ...   ... ...   ... ...   ... .
 
+      // Register LinearFunction
+      py::class_<LinearFunctor>(m, "LinearFunctor")
+              .def(py::init<double, double>())             // Register overloaded consructor
+              .def("GetA", &LinearFunctor::GetA)            // Reister method GetA()
+              .def("GetB", &LinearFunctor::GetB)            // Register method GetB()
+              .def("SetA", &LinearFunctor::SetA)            // Reister method GetA()
+              .def("SetB", &LinearFunctor::SetB)            // Register method GetB()
+              .def("show", &LinearFunctor::show)            // Register method show
+              .def("call", &LinearFunctor::operator())      // Register function-call operator with name 'call'
+              .def("__call__", &LinearFunctor::operator ()) // Register fun-call operator
+              .def("__repr__", &LinearFunctor::toString)    // Register strin representation
+              .def_readwrite("A", &LinearFunctor::A)        // Register field A
+              .def_readwrite("B", &LinearFunctor::B);       // Register field B
+
+    ... ... 
+  }
 #+END_SRC
+***** Functions with knowledge of Python API 
 
-Module initialization function: 
-
- + Note: This function must contain the name in the format
-   ~PyInit_<MODULE NAME>~ where module name is the same name as the
-   module file name <MODULE NAME>.so (Linux) or <MODULE NAME>.pyd on
-   Windows. 
+ + Function *computeFormula*
+   + This function takes a Python tuple py::args as argument and
+     returns a Python dictionary py::dict 
 
 #+BEGIN_SRC cpp 
-  /** Module Initialization function: must have this name schema
-   ,*  PyInit_<ModuleName> where ModuleName is the same base name of the 
-   ,*  shared library ModuleName.so (on Linux) or ModuleName.pyd (on Windows)
-   ,*/
-  PyMODINIT_FUNC PyInit_mymodule(void)
+  // Sample function that takes a python tuple as argument and
+  // returns a dictionary.
+  py::dict
+  computeFormula(py::args args)
   {
-     Py_Initialize();
-     PyObject* pModule = PyModule_Create(&ModuleDefinitions);
-     PyModule_AddObject(pModule, "version", Py_BuildValue("s", "version 0.1-Alpha"));
-     return pModule;
+      py::print(" [INFO] Number of args = {s1} ; args = {s2}",
+                "s1"_a = args.size(), "s2"_a = args);
+      std::cout << " [INFO] Arguments are = " << py::str(args) << std::endl;
+      int    n = py::cast<int>(args[0]);
+      double x = py::cast<double>(args[1]);
+      double y = py::cast<double>(args[2]);
+
+      py::dict d{ "n"_a =  n, "2x"_a = 2.0 * x, "addxy"_a = (x + y)};
+      d["m"] = 5.0 * x + 4.5 * y;
+      py::print(" [INFO] Dictionary d = {d} ", "d"_a = d);
+      return d;
   }
 #+END_SRC
 
- *Module Functions Implementations*
-
-All functions exposed to the Python C-API must have the same type
-signature of the function pointer PyExposedFunction or the same type
-signature of the function MyExposedFunction.
+Registration: 
 
 #+BEGIN_SRC cpp 
-   using PyExposedFunction = PyObject* (*) (PyObject* self, PyObject* args)
-
-   // Example: 
-   PyObject* MyExposedFunction(PyObject* self, PyObject* args )
-   {
-      // On Failure return null 
-      return nullptr;  
- 
-      return /* Some instance of PyObject */;
-  }
+  m.def("computeFormula", &computeFormula);
 #+END_SRC
 
-Notes:
-
-  + The function takes always two arguments self, and args (tuple
-    object containing arguments passed to the function)
-  + The exposed function always return an object PyObject.
-  + All Python objects are heap-allocated.
-  + In Python everything is an object: integers, double, classes,
-    class instances, modules and functions and so on. All those types
-    have the same type PyObject in the C-API. 
-  + Functions exposed to Python runtime should not throw a C++
-    exceptions, instead they should return null (nullptr) that causes
-    a runtime error or exception on Python side. 
-
- *Function: exposedFunction*
-
-  + Function that takes a void argument and returns nothing.
+ + Function *showDictionary*
 
 #+BEGIN_SRC cpp 
-  PyObject*
-  exposedFunction(PyObject* self, PyObject* args)
+  // Function that takes a Python dictionary as argument
+  void showDictionary(py::dict map)
   {
-       std::cout << " =>> Hello word Python from C++ side." << "\n";
-       // All python functions that returns anything
-       // should end with this macro 
-       Py_RETURN_NONE;
+      std::cout << " ====== Show dictonary =========== " << std::endl;
+      for(auto const& item : map)
+          std::cout << " key = "
+                    << item.first << " ; "
+                    << item.second
+                    << std::endl;
   }
 #+END_SRC
 
- *Function: testArguments*
-
- + Function that takes many arguments used to demonstrate how to
-   extract tuple arguments. 
+Registration:
 
 #+BEGIN_SRC cpp 
-  PyObject* testArguments(PyObject* self, PyObject* args)
+  m.def("showDictionary",
+        &showDictionary,
+        "Display dictionary in console" );    
+#+END_SRC
+
+ + Function *pyFuncArgsKwargs*
+   + Sample function that takes a python tuple (py::args) and named
+     arguments py::kwargs.
+
+#+BEGIN_SRC cpp 
+
+  // Sample Python function taking a tuple and dictionary as argument
+  void pyFuncArgsKwargs(py::args args, py::kwargs kwargs)
   {
-        int         abool;
-        int         aint;
-        float       afloat;
-        double      adouble;
-        const char* aword;
-        // Parse function arguments 
-        if(!PyArg_ParseTuple(args, "pifds", &abool, &aint, &afloat, &adouble, &aword))
-            return nullptr;
+      double x = py::cast<double>(args[0]);
+      int    n = py::cast<double>(args[1]);
+      bool   verbose = false;
 
-        std::cerr << " Function: [" << __FUNCTION__ << "]" 
-                  << " ==> Number of arguments = " << PyTuple_GET_SIZE(args) << "\n";
+      py::print(" [TRACE]   args = ", args);
+      py::print(" [TRACE] kwargs = ", kwargs);
 
-        std::string str = aword;
-        str = "'Received string = " + str + "'";
+      std::cout << std::boolalpha;
 
-        std::cout << " Received Python Arguments " << "\n";
-        std::cout << std::boolalpha;
-        std::cout << "abool[bool] = " << (bool) abool << "\n"
-                          << " abool[int] = " << abool << "\n"
-                          << "      aint  = " << aint << "\n"
-                          << "     afloat = " << afloat << "\n"
-                          << "    adouble = " << adouble << "\n"
-                          << "    aword   = " << str << "\n"
-                          << "\n";		
-        return Py_BuildValue("s", str.data());
+      if(kwargs.contains("verbose"))
+      {
+          verbose = py::cast<bool>(kwargs["verbose"]);
+      }
+      std::cout << " [INFO] verbose option = "
+                << verbose << std::endl;
+
+      std::cout << " sqrt(x) = " << std::sqrt(x)
+                << " ; 2 * n = " << 2 * n
+                << std::endl;
   }
-
 #+END_SRC
 
-Function PyArg_ParseTuple:
-
- + The function PyArg_ParseTuple is used for extracting function
-   arguments from the tuple object (args).
-
- + The letters in the string parameter "pifds" means:
-   + p => Extract first argument from tuple object as boolean (integer
-     0 or 1) storing the value in the variable abool. 
-   + i => Extract second argument from tuple object as integer storing
-     the value in the variable 'aint'. 
-   + f => Extract third argument as float (float point 32 bits). The
-     value is then stored in the variable 'afloat'.
-   + d => Extract fourth argument as double (float point 64 bits)
-   + s => Extract fith argument as string.
-
- + If the function fails, it must return null which causes a runtime
-   error on Python side. 
+Registration: 
 
 #+BEGIN_SRC cpp 
-   int         abool;
-   int         aint;
-   float       afloat;
-   double      adouble;
-   const char* aword;
-   // Parse function arguments 
-   if(!PyArg_ParseTuple(args, "pifds", &abool, &aint, &afloat, &adouble, &aword))
-       return nullptr;
+  m.def("dictionaryArgument", &dictionaryArgument);
 #+END_SRC
 
-Function Py_BuildValue("s", str.data());
+ + Function: *dictionaryArgument*
 
- + This function is used for building return values to the python
-   side. It can return any python object, such as string, number,
-   class instance or multiple values as a tuple. 
- 
 #+BEGIN_SRC cpp 
-  // Return None in the python side 
-  return Py_BuildValue("");
+  // Sample function that takes a Python dictionary returning a
+  // Python tuple as argument.
+  py::tuple
+  dictionaryArgument(py::dict dict)
+  {
+      std::cout << " >> Dictionary = " << py::str(dict) << std::endl;
+      auto xx = dict["x"];
+      auto yy = dict["y"];
+      double x = py::cast<double>(xx);
+      double y = py::cast<double>(yy);
+      std::string name = py::cast<std::string>(dict["name"]);
+      double z = std::sqrt(x * x + y * y);
 
-  // Return a single value as string string 
-  return Py_BuildValue("s", str.data());
-  return Py_BuildValue("s", "A string to python side");
-
-  // Return integer 
-  return Py_BuildValue("i", 1000);
-
-  // Return float  
-  return Py_BuildValue("f", 3.465);
-
-  // Return double   
-  return Py_BuildValue("d", 140.346);
-
-  // Return a tuple with a single double value: (3.156)
-  return Py_BuildValue("(d)", 3.156);
-
-  // Return a tuple with a single double and integer: (3.156, 100)
-  return Py_BuildValue("(di)", 3.156, 100);
-
-  // Return a tuple with a single double, integer and string
-  // tuple object: (3.156, 100, "a string")
-  return Py_BuildValue("(dis)", 3.156, 100, "a string");
+      // Return a tuple on python side
+      py::tuple tpl = py::make_tuple(x, y, z, name);
+      py::print(" [INFO] Tuple = {} ", tpl);
+      return tpl;
+  }
 #+END_SRC
 
- *Function: printRange*
- 
- + Pseudo-Python signature: printRange(int n, float x) => void
+Registration: 
 
 #+BEGIN_SRC cpp 
-   auto printRange(PyObject* self, PyObject* args) -> PyObject*
-   {
-       std::cerr << " =>> Printing numeric range " << "\n";	
-       int    n;
-       float  x;
-       // Extract function argument from tuple argument object
-       // "if" => i - Extract integer
-       //      => f - Extract float (IEEE754 32 bits float point)
-       if(!PyArg_ParseTuple(args, "if", &n, &x)){
-           PyErr_SetString(PyExc_RuntimeError, "Invalid argument");
-           // Always return null on failure 
-           return nullptr; 
-       }
+  m.def("pyFuncArgsKwargs",
+        &pyFuncArgsKwargs,
+        "Sample Python function taking a tuple");
+#+END_SRC
 
-       if(n <= 0){
-           PyErr_SetString( PyExc_RuntimeError
-                           ,"Invalid argument: n supposed to be greater than zero.");
-           return nullptr;
-       }	
+ + Function: *callPyObjectMethod* 
+   + This funtion takes any Python object as argument and prints its
+     attributed .name and call its method named ".call". If the object
+     does not have those fields and methods, a runtime error will
+     happen. 
 
-       for(int k = 0; k < n; k++)
-          std::cout << " k[" << k << "] = " << 3 * k + x << "\n";	
-       Py_RETURN_NONE;
+#+BEGIN_SRC cpp 
+  // Call Python Objec's Method (Duck typing)
+  void callPyObjectMethod(py::object obj, double k)
+  {
+      // Print objec's name attribute
+      py::print(" [TRACE] obj.name = ", obj.attr("name"));
+
+      std::string name = py::cast<std::string>(obj.attr("name"));
+      std::cout << " [COUT] object.name = " << name << std::endl;
+
+      // Invoke object's method .call
+      auto call = obj.attr("call");
+      py::print(" [TRACE] obj.call(6.0) = ", call(6.0));
+      double x = py::cast<double>(call(k));
+      py::print(" [TRACE] 100.0 * objct.call(x) = ", 100.0 * x);
+  }
+#+END_SRC
+
+Registration: 
+
+#+BEGIN_SRC cpp 
+    m.def("callPyObjectMethod", &callPyObjectMethod);
+#+END_SRC
+
+
+***** Module Registration of Functions and classes
+
+#+BEGIN_SRC cpp 
+  PYBIND11_MODULE(SampleModule, m) {
+      // optional module docstring
+      m.doc() = "Sample Python built with C++ CeePlusPlus ";
+
+      //----------- Register C++ Functions --------//
+      //
+
+      // Register an ordinary C++ function
+      m.def("add",                                 // Function Name in Python side
+            &add,                                  // Function Pointer
+            "A function which adds two numbers",   // Docstring
+            py::arg("x"),                          // Name of argument 1
+            py::arg("y") = 10);                    // Name of argument 2 with default value
+
+      m.def("cppLambda"
+            ,[](double x, double y){ return 3.0 * x + y;}
+            ,"A C++ lambda object or functor"
+            //,py::arg("x"), py::args("y") = 15
+      );
+
+      m.def("vectorCumulativeSum", &vectorCumulativeSum);
+
+      m.def("tabulate1", &tabulate1);
+
+   ... ...  ... ...  ... ...  ... ...  ... ... 
    }
-
 #+END_SRC
+**** Compile and Running 
+***** Compile 
 
- *Function: returnTuple* 
+The project can be compiled from any IDE that supports CMake or from
+command line either by invoking CMake or a C++ compiler manually. All
+its need to build from an IDE is to open the CMakeList.txt.
 
- + Return multiple values as tuple. 
-
-#+BEGIN_SRC cpp 
-  /** Function that returns multiple values as tuple object */
-  PyObject* returnTuple(PyObject* self, PyObject* args)
-  {
-       double x;
-       double y;
-       int    n;
-       if(!PyArg_ParseTuple(args, "ddi", &x, &y, &n))
-               return nullptr;
-       // Build tuple object containing
-       // (d: double, d: double, i: integer, s: string)
-       return Py_BuildValue("(ddis)", 2 * x + y * n, x + 2 * y - n, n, "Result"); 
-  }
-#+END_SRC
-
- *Function: returnDictionary*
-
- + Return a dictionary (hash-table) 
-
-#+BEGIN_SRC cpp 
-  /** Return a dictionary object */
-  PyObject* returnDictionary(PyObject* self, PyObject* args)
-  {
-       double x;
-       double y;
-       int    n;
-       if(!PyArg_ParseTuple(args, "ddi", &x, &y, &n))
-               return nullptr;
-
-       // Create new dictionary object 
-       PyObject* pDict = PyDict_New();
-
-       PyObject* p = nullptr;
-       // Fill dictionary
-       p = Py_BuildValue("d", 2 * x + y * n);
-       PyDict_SetItemString(pDict, "alpha", p);
-       Py_DECREF(p);
-
-       p = Py_BuildValue("i", 3 * n) ;
-       PyDict_SetItemString(pDict, "size", p);
-       Py_DECREF(p);
-
-       p = Py_BuildValue("s", "Some string") ;
-       PyDict_SetItemString(pDict, "beta", p);
-       Py_DECREF(p);	
-
-       return pDict;
-  }
-#+END_SRC
-
- *Function: computeStatistics*
-
- + Computes statistics sum and mean for any iterable object containing
-   double values such as list.
-
-#+BEGIN_SRC cpp 
-  PyObject* computeStatistics(PyObject* self, PyObject* args)
-  {
-       std::cerr << " [TRACE] " << __FILE__ << "(" << __LINE__ << ") - "
-                         << "Calling function: " << __FUNCTION__ << "\n";
-
-       std::cerr << " [TRACE] Arguments = "; PyObject_Print(args, stdout, 0); std::cerr << "\n";
-
-       PyObject* pSeq;
-       // Parse function argument as sequence
-       if(!PyArg_ParseTuple(args, "O", &pSeq))
-               return nullptr;
-
-       pSeq = PySequence_Fast(pSeq, "Expected iterable arguments");
-       if(pSeq == nullptr) return nullptr;
-
-       int numberOfElements = PySequence_Fast_GET_SIZE(pSeq);
-       std::cerr << " [TRACE] numberOfElements = " << numberOfElements << "\n";
-
-       PyObject* pItem = nullptr;
-       double x;
-       double sum;
-
-       for(int n = 0; n < numberOfElements; n++)
-       {
-           pItem = PySequence_Fast_GET_ITEM(pSeq, n);
-           if(!pItem) {
-               Py_DECREF(pSeq);
-               return nullptr;
-           }
-           // Print item 
-           std::cout << "item[" << n << "] = ";
-           PyObject_Print(pItem, stdout, 0);
-           std::cout << "\n";
-
-           x = PyFloat_AsDouble(pItem);
-           if(PyErr_Occurred() != nullptr){
-                   PyErr_SetString(PyExc_TypeError, "Error: expected float point.");
-                   return nullptr;
-           }
-           sum += x;
-       }
-
-       double mean = sum / numberOfElements;
-       std::cout << "\n (C++) Statics Result " << "\n";
-       std::cout << "---------------" << "\n";
-       std::cout << " Sum  = " << sum << "\n";
-       std::cout << " Mean = " << mean << "\n";
-
-       Py_DECREF(pSeq);
-       return Py_BuildValue(""); // Return None 
-  }
-
-#+END_SRC
-
- *Function: taylorSeriesExp*
-
- + This function computes the exponential function approximation using its taylor
-   series expansion. Formula at: [[https://www.mathsisfun.com/algebra/taylor-series.html][taylor series]]
-
-#+BEGIN_SRC cpp 
-  auto taylorSeriesExp(PyObject* self, PyObject* args) -> PyObject*
-  {
-       double x;
-       size_t maxiter;  // Maximum number of iterations 
-       double tol;      // Tolerance
-
-       // Parse function arguments 
-       if(!PyArg_ParseTuple(args, "did", &x, &maxiter, &tol))
-               return nullptr;
-
-       // Validate function arguments
-
-       if(tol <= 0 || tol > 1.0){
-               PyErr_SetString( PyExc_RuntimeError
-                              ,"Invalid tolerance, expected in range (0, 1]");
-               return nullptr;
-       }
-
-       // Compute exponential taylor series available at
-       // https://www.mathsisfun.com/algebra/taylor-series.html
-       unsigned long factorial = 1;
-       double        xpower    = 1.0;
-       double        sum       = 0.0;
-       double        term      = 0.0;
-       size_t        idx       = 1;
-       do{
-            term      = xpower / factorial;
-            sum       = sum + term;
-            xpower    = xpower * x ;
-            factorial = factorial * idx;		
-            idx++;
-       } while(idx <= maxiter && std::abs(term) > std::abs(sum) * tol );
-       // Return float point constnat NAN (Not a Number)
-       if(idx >= maxiter){
-               std::cerr << " [ERROR] Series does not converge." << "\n";
-               return Py_BuildValue("d", NAN);
-       }
-       return Py_BuildValue("d", sum);
-  }
-#+END_SRC
-
- *Function: tabulateFunction* 
-
- + This function takes a callable object (callback) which can be a
-   function, lambda function, callable object (object with method ~__call__~) and so on.
-
-Pseudo Python method signature using C++ notation: 
-
-#+BEGIN_SRC cpp 
-  using Callback = std::function<double (double)>;
-  void tabulateFunction(Callback callback, double xmin, double xmax, double step)
-#+END_SRC
-
-Function code: 
-
-#+BEGIN_SRC cpp 
-  PyObject* tabulateFunction(PyObject* self, PyObject* args)
-  {
-       PyObject* pObj = nullptr;
-       double xmin, xmax, xstep;
-
-       if(!PyArg_ParseTuple(args, "Oddd", &pObj, &xmin, &xmax, &xstep))
-            return nullptr;
-       if(pObj == nullptr) {
-            PyErr_SetString(PyExc_RuntimeError, "Error: invalid None object.");
-            return nullptr;
-       }
-       PyObject* pArgs  = nullptr;
-       PyObject* pResult = nullptr;
-       double y = 0.0;
-
-       std::cout << std::fixed << std::setprecision(4);
-
-       std::cout << "Tabulating range: "
-                 << " ; xmin = " << xmin
-                 << " ; xmax = " << xmax
-                 << " ; step = " << xstep
-                 << "\n";
-
-       for(double x = xmin; x <= xmax; x += xstep )
-       {
-            pArgs  = Py_BuildValue("(d)", x);
-            pResult = PyEval_CallObject(pObj, pArgs);
-            y = PyFloat_AsDouble(pResult);
-            if(PyErr_Occurred() != nullptr){
-                    PyErr_SetString(PyExc_RuntimeError, "Error: Invalid float point.");
-                    return nullptr;
-            }
-            std::cout << std::setw(8) << x << std::setw(10) << y  << "\n";
-       }
-       Py_RETURN_NONE;
-  }
-
-#+END_SRC
-
-Extract python callable object (callback) pObj and the parameters
-xmin, xmax and xstep: 
-
-#+BEGIN_SRC cpp 
-    PyObject* pObj = nullptr;
-    double xmin, xmax, xstep;
-    // Extract parameters 
-    // O => pObj 
-    // d => xmin 
-    // d => xmax 
-    if(!PyArg_ParseTuple(args, "Oddd", &pObj, &xmin, &xmax, &xstep))
-         return nullptr;
-#+END_SRC
-
-Annotated code block in the for-loop: 
-
-#+BEGIN_SRC cpp 
-  // Argument (tuple object) of callable object 
-  pArgs  = Py_BuildValue("(d)", x);
-
-  // Call callable object (method __call__)
-  pResult = PyEval_CallObject(pObj, pArgs);
-
-  // Try extracting result as double 
-  y = PyFloat_AsDouble(pResult);
-
-  // Check whether any error has happened and abort the operation in this case. 
-  if(PyErr_Occurred() != nullptr){
-       PyErr_SetString(PyExc_RuntimeError, "Error: Invalid float point.");
-       return nullptr;
-  }
-  // Display table row 
-  std::cout << std::setw(8) << x << std::setw(10) << y  << "\n";
-#+END_SRC
-** Compiling and Running Native Module 
-
- *Clone repository:*
+Clone Repository: 
 
 #+BEGIN_SRC sh 
-  $ git clone https://gist.github.com/caiorss/bc7dc373d87b828029eb0e0ec048d91e python-module 
-  $ cd python-module 
+  $ cd /tmp 
+  $ git clone https://github.com/caiorss/example-project-pybind11 pybind11
+  $ cd pybind11 
+
+  $ tree .
+  .
+  ├── bin
+  │   └── test-script.py
+  ├── cashflow.cpp
+  ├── CMakeLists.txt
+  └── SampleModule.cpp
+
+  1 directory, 4 files
 #+END_SRC
 
-
- *Manual Compilation* 
-
-Compile the native module mymodule.so on Linux or any other Unix-like OS:
+Build from QTCreator IDE: 
+  + Just open the file CMakeLists.txt and click at the hammer button
+    or open this file from command line. Similar procedure can be used
+    with other IDEs. After compiled, the Python modules are copied to
+    directory ./bin.
 
 #+BEGIN_SRC sh 
- $ clang++ mymodule.cpp -o mymodule.so -g -std=c++1z -fPIC -shared -I/usr/include/python3.6m  
+ $ qtcreator CMakeLists.txt &
 #+END_SRC
 
-Compile the native module mymodule.pyd on Windows OS with Mingw compiler: 
+Build from command line: 
 
-#+BEGIN_SRC sh
-  $  g++ mymodule.cpp -o mymodule.pyd -g -std=c++1z -shared -fPIC \
-     -I"C:\Users\archbox\Miniconda3\pkgs\python-3.6.5-h0c2934d_0\include" \
-     C:\Users\archbox\Miniconda3\pkgs\python-3.6.5-h0c2934d_0\libs\Python36.lib
-#+END_SRC
-
- *Compilation with setup.py*
-
-Build only: 
-
- + $ python.exe setup.py build 
-
+ + Set configuration. Note: Debug build type has debugging symbols
+   enabled and optmization disabled. 
 
 #+BEGIN_SRC sh 
-  $ python.exe setup.py build 
+  $ cmake -H. -Bbuild -DCMAKE_BUILD_TYPE=Debug
 
-  $ cd build\
-  lib.win-amd64-3.6\   temp.win-amd64-3.6\
-  F:\python-module (master -> origin)
-  λ cd build\lib.win-amd64-3.6\
+  -- Conan: Automatic detection of conan settings from cmake
+  -- Conan: Settings= -s;build_type=Debug;-s;compiler=gcc;-s;compiler.version=7;-s;compiler.libcxx=libstdc++11
+   ...  ...  ...  ...  ...  ...  ...  ...  ...  ... 
+
+  -- Build files have been written to: /tmp/pybind11/build
+#+END_SRC
+
+ + Compile: 
+
+#+BEGIN_SRC sh 
+  $ cmake --build build --target
+
+  Scanning dependencies of target SampleModule [ 25%] Building CXX
+  object CMakeFiles/SampleModule.dir/SampleModule.cpp.o [ 50%] Linking
+  CXX shared module lib/SampleModule.cpython-37m-x86_64-linux-gnu.so [
+  50%] Built target SampleModule
+
+  ... ... ... ... ... ... ... ... ... ... 
+#+END_SRC
+
+ + The Cmake function *copy_after_build* copies the python native
+   modules (shared libraries *.so files on Linux or *.pyd on Windows)
+   to the directory ./bin 
+
+#+BEGIN_SRC sh 
+  # Module files 
+  $ ls bin/
+  cashflow.cpython-37m-x86_64-linux-gnu.so*      test-script.py
+  SampleModule.cpython-37m-x86_64-linux-gnu.so*
+
+  $ file bin/SampleModule.cpython-37m-x86_64-linux-gnu.so 
+  bin/SampleModule.cpython-37m-x86_64-linux-gnu.so: ELF 64-bit LSB shared object, x86-64, version 1 (GNU/Linux), dynamically linked, with debug_info, not stripped
+#+END_SRC
+***** Running 
+
+Enter at directory where is the Python native module SampleModule, in
+this case, the file: *SampleModule.cpython-37m-x86_64-linux-gnu.so*
+
+#+BEGIN_SRC sh 
+  $ cd bin/
 
   $ ls
-  mymodule.cp36-win_amd64.pyd*
+  cashflow.cpython-37m-x86_64-linux-gnu.so*      test-script.py
+  SampleModule.cpython-37m-x86_64-linux-gnu.so*
 
-  $ C:\Users\archbox\Miniconda3\python.exe
-  Python 3.6.5 |Anaconda, Inc.| (default, Mar 29 2018, 13:32:41) [MSC v.1900 64 bit (AMD64)] on win32
-  Type "help", "copyright", "credits" or "license" for more information.
-  >>>
-  >>> import mymodule as m
-   [TRACE] Python module DLL loaded by process PID = <620>
-   [TRACE] Attach the debugger with: $ gdb -pid=620
-
-#+END_SRC
-
-Install: 
-  
-  + $ python.exe setup.py install
-  + For uninstall see: [[https://stackoverflow.com/questions/1550226/python-setup-py-uninstall][question 1550226]]
-
-#+BEGIN_SRC sh 
- $ python.exe setup.py install
-
-  $ C:\Users\archbox\Miniconda3\python.exe setup.py install
-  running install
-  running build
-  running build_ext
-  building 'mymodule' extension
-  creating build\temp.win-amd64-3.6
-  creating build\temp.win-amd64-3.6\Release
-  C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Tools\MSVC\14.16.27023\bin\HostX86\x64\cl.exe /c /nologo /Ox
-   /W3 /GL /DNDEBUG /MD -IC:\Users\archbox\Miniconda3\include -IC:\Users\archbox\Miniconda3\include "-IC:\Program Files (x86)\Mi
-  crosoft Visual Studio\2017\Community\VC\Tools\MSVC\14.16.27023\ATLMFC\include" ... ... 
-  ... ....   ... ....   ... ....   ... ....   ... ....   ... ....   ... ....  
-  ... ....   ... ....   ... ....   ... ....   ... ....   ... ....   ... ....  
-  Finished generating code
-  running install_lib
-  copying build\lib.win-amd64-3.6\mymodule.cp36-win_amd64.pyd -> C:\Users\archbox\Miniconda3\Lib\site-packages
-  running install_egg_info
-  Writing C:\Users\archbox\Miniconda3\Lib\site-packages\mymodule-1.0-py3.6.egg-info
-#+END_SRC
-
-
-Check generated file on Linux: 
-
-#+BEGIN_SRC sh 
-  $ file mymodule.so 
-
-  $ du -h mymodule.so 
-  136K	mymodule.so
-  136K	total
-#+END_SRC
-
-View symbols: 
-
-#+BEGIN_SRC sh 
-  $ nm  mymodule.so 
-  0000000000209518 B __bss_start
-  0000000000005500 t __clang_call_terminate
-  0000000000209518 b completed.7347
-                   U __cxa_atexit@@GLIBC_2.2.5
-                   U __cxa_begin_catch@@CXXABI_1.3
-                   U __cxa_call_unexpected@@CXXABI_1.3
-                   U __cxa_end_catch@@CXXABI_1.3
-                   w __cxa_finalize@@GLIBC_2.2.5
-                   U __cxa_rethrow@@CXXABI_1.3
-  0000000000004160 t __cxx_global_var_initmymodule.cpp_
-  00000000000041a0 t __cxx_global_var_initmymodule.cpp_.1
-  00000000000041f0 t deregister_tm_clones
-  000000000020951a B dllinit_hook
-  .. ... ... ... ... ... ... ... 
-#+END_SRC
-
-Load module in Python 3 REPL:
-
-#+BEGIN_SRC python 
   $ python3
   Python 3.7.1 (default, Dec 14 2018, 19:28:38) 
   [GCC 7.3.0] :: Anaconda, Inc. on linux
   Type "help", "copyright", "credits" or "license" for more information.
-  >>> 
-  >>> import mymodule as m
-   [TRACE] Python module DLL loaded by process PID = <5236> 
-   [TRACE] Attach the debugger with: $ gdb -pid=5236
-  >>> 
-  >>> 
 #+END_SRC
 
-Module Docstring (documentation): 
-
-#+BEGIN_SRC python 
-  >>> help(m)
-  Help on module mymodule:
-
-  NAME
-      mymodule - A sample C++ native-code module for python3.
-
-  FUNCTIONS
-      computeStatistics(...)
-    
-      exposedFunction(...)
-          Documentation or docstring of function exposedFunction1.
-    
-      printRange(...)
-    
-      returnDictionary(...)
-    
-      returnTuple(...)
-    
-      tabulateFunction(...)
-          Tabulate some mathematical function or callable object
-    
-      taylorSeriesExp(...)
-          taylorSeriesExp(double x, size_t maxiter, double tol) -> double
-          Computes exponential of a given value with taylor serie approximation.
-          Formula reference:  https://www.mathsisfun.com/algebra/taylor-series.html
-    
-      testArguments(...)
-          Test python arguments: Signature testArguments(int, float, double, const char*)
-
-  DATA
-      version = 'version 0.1-Alpha'
-
-  FILE
-      /home/archbox/shared/python-module/mymodule.so
-#+END_SRC
-
-Module version: 
+Import SampleModule from REPL: 
 
 #+BEGIN_SRC python
-  >>> m.version
-  'version 0.1-Alpha'
-  >>> 
+  >>> import SampleModule as t
 #+END_SRC
 
-Call function exposedFunction()
-
-#+BEGIN_SRC python 
-  >>> m.exposedFunction()
-   =>> Hello word Python from C++ side.
-  >>> 
-#+END_SRC
-
-Call function testArguments:
-
-#+BEGIN_SRC python 
-  >>> s1 = m.testArguments(False, 100, 10.9361, 0.344, "from Python to C++")
-   Function: [testArguments] ==> Number of arguments = 5
-   Received Python Arguments 
-  abool[bool] = false
-   abool[int] = 0
-        aint  = 100
-       afloat = 10.9361
-      adouble = 0.344
-      aword   = 'Received string = from Python to C++'
-
-  >>> s1
-  "'Received string = from Python to C++'"
-  >>> 
-
-  >>> 
-  >>> s2 = m.testArguments(True, 90, -0.56e6, 9.344e5, "something else more")
-   Function: [testArguments] ==> Number of arguments = 5
-   Received Python Arguments 
-  abool[bool] = true
-   abool[int] = 1
-        aint  = 90
-       afloat = -560000
-      adouble = 934400
-      aword   = 'Received string = something else more'
-
-  >>> s2
-  "'Received string = something else more'"
-#+END_SRC
-
-Call function printRange()
+Get module help: 
 
 #+BEGIN_SRC python
-  >>> m.printRange(5, 4.5)
-   =>> Printing numeric range 
-   k[0] = 4.5
-   k[1] = 7.5
-   k[2] = 10.5
-   k[3] = 13.5
-   k[4] = 16.5
+   >>> help(t)
 
-  >>> m.printRange(-5, 4.5)
-   =>> Printing numeric range 
+   Help on module SampleModule:
+
+   NAME
+       SampleModule - Sample Python built with C++ CeePlusPlus
+
+   CLASSES
+       pybind11_builtins.pybind11_object(builtins.object)
+           LinearFunctor
+           MathErrorCode
+    ....      ....      ....      ....      ....     
+
+
+   FUNCTIONS
+       add(...) method of builtins.PyCapsule instance
+           add(x: int, y: int=10) -> int
+
+           A function which adds two numbers
+
+       callPyObjectMethod(...) method of builtins.PyCapsule instance
+           callPyObjectMethod(arg0: object, arg1: float) -> None
+
+       computeFormula(...) method of builtins.PyCapsule instance
+           computeFormula(*args) -> dict
+
+       cppLambda(...) method of builtins.PyCapsule instance
+           cppLambda(arg0: float, arg1: float) -> float
+
+           A C++ lambda object or functor
+
+       dictionaryArgument(...) method of builtins.PyCapsule instance
+
+    ... ...  ... ...  ... ...  ... ...  ... ...  ... ... 
+#+END_SRC
+
+  *Test function and classes without knowledge of Python API*
+
+ + Function add 
+
+#+BEGIN_SRC cpp 
+  >>> help(t.add)
+
+  add(...) method of builtins.PyCapsule instance
+      add(x: int, y: int=10) -> int
+
+      A function which adds two numbers
+
+
+  >>> t.add(20)
+  30
+  >>> t.add(100)
+  110
+  >>> t.add(15, 25)
+  40
+#+END_SRC
+
+ + Function vectorCumulativeSum
+
+#+BEGIN_SRC cpp 
+  >>> help(t.vectorCumulativeSum)
+
+  vectorCumulativeSum(...) method of builtins.PyCapsule instance
+      vectorCumulativeSum(arg0: List[float]) -> List[float]
+
+  >>> t.vectorCumulativeSum([1, 10, 5, -8, 25, 10])
+  [1.0, 11.0, 16.0, 8.0, 33.0, 43.0]
+#+END_SRC
+
+ + Function tabulate1 
+
+#+BEGIN_SRC cpp 
+  >>> t.tabulate1(0, 5, 1, lambda x: x * x - 5 * x  + 8)
+     0.00000   8.00000
+     1.00000   4.00000
+     2.00000   2.00000
+     3.00000   2.00000
+     4.00000   4.00000
+     5.00000   8.00000
+
+  >>> import math
+  >>> t.tabulate1(0, 5, 1, lambda x: math.exp(x))
+     0.00000   1.00000
+     1.00000   2.71828
+     2.00000   7.38906
+     3.00000  20.08554
+     4.00000  54.59815
+     5.00000 148.41316
+
+  >>> t.tabulate1(0, -5, 1, lambda x: x * x - 5 * x  + 8)
   Traceback (most recent call last):
     File "<stdin>", line 1, in <module>
-  RuntimeError: Invalid argument: n supposed to be greater than zero.
-
-  >>> m.printRange(0, 4.5)
-   =>> Printing numeric range 
-  Traceback (most recent call last):
-    File "<stdin>", line 1, in <module>
-  RuntimeError: Invalid argument: n supposed to be greater than zero.
+  RuntimeError:  Error: Invalid domain 
+   Expected: start < stop && step > 0 
 #+END_SRC
 
-Calll function returnTuple:
+ + Enum MathError
 
-#+BEGIN_SRC python 
-   >>> tpl = m.returnTuple(3.5, 4.2, 10)
+#+BEGIN_SRC cpp 
+  >>> status = t.MathErrorCode.OK
 
-   >>> tpl
-   (49.0, 1.9000000000000004, 10, 'Result')
+  >>> status == t.MathErrorCode.OK 
+  True
 
-   >>> tpl[0]
-   49.0
+  >>> status = t.MathErrorCode.OVERFLOW
 
-   >>> tpl[1]
-   1.9000000000000004
+  >>> status == t.MathErrorCode.OK 
+  False
 
-   >>> tpl[2]
-   10
+  >>> status == t.MathErrorCode.OVERFLOW
+  True
 
-   >>> m.returnTuple(8.5, 4.2, 20)
-   (101.0, -3.1000000000000014, 20, 'Result')
+  >>> int(t.MathErrorCode.OVERFLOW)
+  1
+
+  >>> int(t.MathErrorCode.NOT_A_NUMBER)
+  8
 #+END_SRC
 
-Call functon returnDictionary: 
+ + Class LinearFunctor 
 
-#+BEGIN_SRC python 
-   >>> d = m.returnDictionary(8.5, 8.62, 10)
+#+BEGIN_SRC cpp 
+   >>> lfun = t.LinearFunctor(10, 5)
 
-   >>> d
-   {'alpha': 103.19999999999999, 'size': 30, 'beta': 'Some string'}
+   >>> lfun
+    LinearFunction: y(x) = A * x + B
+    => A = 10 ; B = 5
 
-   >>> d["alpha"]
-   103.19999999999999
+   >>> lfun.show()
+    LinearFunction: y(x) = A * x + B
+    => A = 10.00000 ; B = 5.00000
+   >>> 
 
-   >>> d["beta"]
-   'Some string'
+   >>> lfun(4)
+   45.0
 
-   >>> d["size"]
-   30
-#+END_SRC
+   >>> lfun(5)
+   55.0
 
-Call function computeStatistics:
+   >>> lfun(10)
+   105.0
+   >>> 
 
-#+BEGIN_SRC python 
-   >>> xs = [4, 1.2, 9.5, 10.5, 3.4, 5.10, 6.0]
+   // Get coefficients 
+   //-----------------------
+   >>> lfun.A
+   10.0
 
-   >>> xs
-   [4, 1.2, 9.5, 10.5, 3.4, 5.1, 6.0]
+   >>> lfun.B
+   5.0
 
-   >>> m.computeStatistics(xs)
-    [TRACE] mymodule.cpp(268) - Calling function: computeStatistics
-    [TRACE] Arguments = ([4, 1.2, 9.5, 10.5, 3.4, 5.1, 6.0],)
-    [TRACE] numberOfElements = 7
-   item[0] = 4
-   item[1] = 1.2
-   item[2] = 9.5
-   item[3] = 10.5
-   item[4] = 3.4
-   item[5] = 5.1
-   item[6] = 6.0
+   >>> lfun.GetA()
+   10.0
 
-    (C++) Statics Result 
-   ---------------
-    Sum  = 39.7
-    Mean = 5.67143
+   >>> lfun.GetB()
+   5.0
+   >>> 
+
+   // Change coefficients
+   //-------------------
+   >>> lfun.SetA(-5)
+
+   >>> lfun.SetB(15)
+
+   >>> lfun
+    LinearFunction: y(x) = A * x + B
+    => A = -5 ; B = 15
+
+   >>> lfun.call(5.64)
+   -13.2
+
+   >>> lfun(5.64)
+   -13.2
    >>> 
 #+END_SRC
 
-Call function taylorSerieExp: 
 
-#+BEGIN_SRC python 
-  >>> help(m.taylorSeriesExp)
-  Help on built-in function taylorSeriesExp in module mymodule:
+   *Test function and classes with knowledge of Python API* 
 
-  taylorSeriesExp(...)
-      taylorSeriesExp(double x, size_t maxiter, double tol) -> double
-      Computes exponential of a given value with taylor serie approximation.
-      Formula reference:  https://www.mathsisfun.com/algebra/taylor-series.html
-
-  >>> import math
-
-  # Exact value 
-  >>> math.exp(3.5)
-  33.11545195869231
-
-  # Approximation 
-  >>> m.taylorSeriesExp(3.5, 10, 0.001)
-   [ERROR] Series does not converge.
-  nan
-  >>> m.taylorSeriesExp(3.5, 100, 0.001)
-  33.10588185071678
-  >>> 
-
-  # Exact value 
-  >>> math.exp(5.0)
-  148.4131591025766
-
-  # Approximation 
-  >>> m.taylorSeriesExp(5.0, 100, 0.001)
-  148.37958007973663
-
-  >>> m.taylorSeriesExp(5.0, 100, 0.0001)
-  148.41021027504306
-  >>> 
-#+END_SRC
-
-Call function: tabulateFunction which takes a callable object as
-argumet. 
-
-#+BEGIN_SRC python 
->>> help(m.tabulateFunction)
-Help on built-in function tabulateFunction in module mymodule:
-
-tabulateFunction(...)
-    Tabulate some mathematical function or callable object
-#+END_SRC
-
-Pass ordinary functions: 
- + Note: Python ordinary functions are objects with ~__call__~ method: 
+ + Function: *computeFormula*
 
 #+BEGIN_SRC cpp 
-  import math 
+  >>> result = t.computeFormula(100, 5.67, 9.71)
+   [INFO] Number of args = {s1} ; args = {s2}
+   [INFO] Arguments are = (100, 5.67, 9.71)
+   [INFO] Dictionary d = {d} 
 
-  >>> math.sqrt.__call__(25)
-  5.0
+  >>> result
+  {'n': 100, '2x': 11.34, 'addxy': 15.38, 'm': 72.04500000000002}
 
-  >>> math.sqrt.__call__(125)
-  11.180339887498949
-  >>> 
+  >>> result["n"]
+  100
 
-  >>> m.tabulateFunction(math.exp, -5.0, 5.0, 1.0)
-  Tabulating range:  ; xmin = -5.0000 ; xmax = 5.0000 ; step = 1.0000
-   -5.0000    0.0067
-   -4.0000    0.0183
-   -3.0000    0.0498
-   -2.0000    0.1353
-   -1.0000    0.3679
-    0.0000    1.0000
-    1.0000    2.7183
-    2.0000    7.3891
-    3.0000   20.0855
-    4.0000   54.5982
-    5.0000  148.4132
-  >>> 
-
-  >>> a.tabulateFunction(math.sqrt, 0.0, 25.0, 5.0)
-  Tabulating range:  ; xmin = 0.0000 ; xmax = 25.0000 ; step = 5.0000
-    0.0000    0.0000
-    5.0000    2.2361
-   10.0000    3.1623
-   15.0000    3.8730
-   20.0000    4.4721
-   25.0000    5.0000
+  >>> result["2x"]
+  11.34
 #+END_SRC
 
-Pass lambda functions: 
+ + Function: *showDictionary*
 
 #+BEGIN_SRC cpp 
-  >>> m.tabulateFunction(lambda x: x, 0.0, 25.0, 4.0)
-  Tabulating range:  ; xmin = 0.0000 ; xmax = 25.0000 ; step = 4.0000
-    0.0000    0.0000
-    4.0000    4.0000
-    8.0000    8.0000
-   12.0000   12.0000
-   16.0000   16.0000
-   20.0000   20.0000
-   24.0000   24.0000
+  >>> t.showDictionary({'x': 10.34, 'y': "numerical electronic integrator", "name": "ARM-CPU"})
+   ====== Show dictonary =========== 
+   key = x ; 10.34
+   key = y ; numerical electronic integrator
+   key = name ; ARM-CPU
   >>> 
 
-  >>> m.tabulateFunction(lambda x: 3 * x + 5, 0.0, 25.0, 4.0)
-  Tabulating range:  ; xmin = 0.0000 ; xmax = 25.0000 ; step = 4.0000
-    0.0000    5.0000
-    4.0000   17.0000
-    8.0000   29.0000
-   12.0000   41.0000
-   16.0000   53.0000
-   20.0000   65.0000
-   24.0000   77.0000
+  >>> t.showDictionary(100)
+  Traceback (most recent call last):
+    File "<stdin>", line 1, in <module>
+  TypeError: showDictionary(): incompatible function arguments. The following argument types are supported:
+      1. (arg0: dict) -> None
+
+  Invoked with: 100
 #+END_SRC
 
-Class LinearFun: 
+ + Function: *pyFuncArgsKwargs*
+
+#+BEGIN_SRC cpp 
+  >>> t.pyFuncArgsKwargs(2.7824, 200)
+   [TRACE]   args =  (2.7824, 200)
+   [TRACE] kwargs =  {}
+   [INFO] verbose option = false
+   sqrt(x) = 1.66805 ; 2 * n = 400
+
+  >>> t.pyFuncArgsKwargs(2.7824, 200, verbose = True)
+   [TRACE]   args =  (2.7824, 200)
+   [TRACE] kwargs =  {'verbose': True}
+   [INFO] verbose option = true
+   sqrt(x) = 1.66805 ; 2 * n = 400
+
+  >>> t.pyFuncArgsKwargs(2.7824, 200, verbose = False)
+   [TRACE]   args =  (2.7824, 200)
+   [TRACE] kwargs =  {'verbose': False}
+   [INFO] verbose option = false
+   sqrt(x) = 1.66805 ; 2 * n = 400
+
+
+  >>> t.pyFuncArgsKwargs(2.7824, 200, verbose = "aaa")
+   [TRACE]   args =  (2.7824, 200)
+   [TRACE] kwargs =  {'verbose': 'aaa'}
+  Traceback (most recent call last):
+    File "<stdin>", line 1, in <module>
+  RuntimeError: Unable to cast Python instance of type <class 'str'> to C++ type 'bool'
+#+END_SRC
+
+ + Function: *dictionaryArgument*
+
+#+BEGIN_SRC cpp 
+  >>> result = t.dictionaryArgument({'x': 10.5, 'y': 5.6, 'name': "DUMMY"});
+   >> Dictionary = {'x': 10.5, 'y': 5.6, 'name': 'DUMMY'}
+   [INFO] Tuple = {}  (10.5, 5.6, 11.899999999999999, 'DUMMY')
+
+  >>> result
+  (10.5, 5.6, 11.899999999999999, 'DUMMY')
+
+  >>> result[0]
+  10.5
+
+  >>> result[1]
+  5.6
+
+  >>> result[2]
+  11.899999999999999
+  >>> 
+#+END_SRC
+
+ + Function: *callPyObjectMethod* 
 
 #+BEGIN_SRC python 
-  class LinearFun:
-      def __init__(self, a, b):
-          self.a = a
-          self.b = b
-      def __call__(self, x):
-          return self.a * x + self.b
-      def eval(self, x):
-          return self.a * x + self.b
+   class Dummy:
+     def __init__(self, name):
+         self.name = name
+
+     def call(self, x):
+         print(" I was called by C++.")
+         return 4.5 * x + 10
+
+   >>> obj = Dummy("A dummy object")
+
+   >>> t.callPyObjectMethod(obj, 4.5)
+    [TRACE] obj.name =  A dummy object
+    [COUT] object.name = A dummy object
+    I was called by C++.
+    [TRACE] obj.call(6.0) =  37.0
+    I was called by C++.
+    [TRACE] 100.0 * objct.call(x) =  3025.0
+
+
+   >>> t.callPyObjectMethod(obj, 10.0)
+    [TRACE] obj.name =  A dummy object
+    [COUT] object.name = A dummy object
+    I was called by C++.
+    [TRACE] obj.call(6.0) =  37.0
+    I was called by C++.
+    [TRACE] 100.0 * objct.call(x) =  5500.0
 #+END_SRC
-
-Pass a callable object: 
-
-#+BEGIN_SRC python   
-  >>> lfun = LinearFun(5, 4)
-  >>> lfun(3)
-  19
-  >>> lfun(6)
-  34
-  >>> lfun.eval(3)
-  19
-  >>> lfun.eval(6)
-  34
-
-  >>> m.tabulateFunction(lfun, 0.0, 25.0, 4.0)
-  Tabulating range:  ; xmin = 0.0000 ; xmax = 25.0000 ; step = 4.0000
-    0.0000    4.0000
-    4.0000   24.0000
-    8.0000   44.0000
-   12.0000   64.0000
-   16.0000   84.0000
-   20.0000  104.0000
-   24.0000  124.0000
-  >>> 
-  >>> 
-
-  >>> a.tabulateFunction(lfun.eval, 0.0, 25.0, 4.0)
-  Tabulating range:  ; xmin = 0.0000 ; xmax = 25.0000 ; step = 4.0000
-    0.0000    4.0000
-    4.0000   24.0000
-    8.0000   44.0000
-   12.0000   64.0000
-   16.0000   84.0000
-   20.0000  104.0000
-   24.0000  124.0000
-
-  >>> lfun.a 
-  5
-  >>> lfun.a  = 0
-  >>> 
-  >>> m.tabulateFunction(lfun.eval, 0.0, 25.0, 4.0)
-  Tabulating range:  ; xmin = 0.0000 ; xmax = 25.0000 ; step = 4.0000
-    0.0000    4.0000
-    4.0000    4.0000
-    8.0000    4.0000
-   12.0000    4.0000
-   16.0000    4.0000
-   20.0000    4.0000
-   24.0000    4.0000
-#+END_SRC
-
-
 * R Language (RLang) Native Extension API 
 ** R Raw C API 
 *** Overview 
