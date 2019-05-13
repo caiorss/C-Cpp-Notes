@@ -3491,3 +3491,291 @@ Print map:
     dataset = [(AUD, 34.65), (BRL, 451.34), (CAD, 400.5), (USD, 200.3)]
    >>
 #+END_SRC
+
+** Cereal - Serialization Library
+
+Cereal is a lightweight header-only library for serialization which
+supports a wide variety of serialization formats such as binary, XML
+and JSON. The library also provides lots of facilities for serializing
+and deserializing STL containers.
+
+ + License: BSD
+
+ + Documentation and official web site:
+   * https://uscilab.github.io/cereal
+
+ + Github Repository:
+   * https://github.com/USCiLab/cereal
+
+ + Conan Reference:
+   * [[https://bintray.com/conan-community/conan/cereal%253Aconan/1.2.2%253Astable][cereal/1.2.2@conan/stable]]
+
+ *Serialization Challenges*
+
+Despite what it may look like, serialization is not easy, there are
+lots of serialization pitfalls that a library shoudl deal with:
+
+ + _Machine endianess_:
+   + The order that bytes of numeric data are loaded into memory
+     depends on the machine architecture, therefore a numeric data
+     stored in a binary file generated in a machine with a *little
+     endian* processor, may be read in a wrong way by a *big endian*
+     machine. So, in order to be portable, a binary file must use a
+     default endianess independent of the any processor.
+
+ + _Data Sizes_:
+   + C and C++ binary sizes of fundamental data types such
+     as int, long and long long are not constant across different
+     operating systems and machine architectures. So a value of long
+     type save in binary format in one machine may be read in a wrong
+     way in a machine where the long type has a different size in
+     bytes. The only way to ensure that the data type is portable and
+     avoid bad surprises is to use fixed width integers from header
+     <stdint> uint32_t, uint64_t and so on.
+
+ + _Data Versioning_
+   + In order to avoid data corruption, a serialization format should
+     support multiple versions of the data structure being
+     serialized and check the version of the data whenever it is
+     deserialized from any stream.
+
+ *Supported Serialization Formats:*
+
+ + XML
+ + JSON
+ + Binary
+
+ *Headers:*
+
+ * Serialization formats:
+   - Binary Format:
+     + <cereal/archives/binary.hpp>
+
+   - Portable Binary Format:
+     + <cereal/archives/portable_binary.hpp>
+
+   - XML
+     + <cereal/archives/xml.hpp>
+
+   - JSON - JavaScript Object Notation
+     + <cereal/archives/json.hpp>
+
+ * Support for serializing STL containers
+   + <cereal/types/vector.hpp> => STL Vector std::vector serialization
+
+ * Support for polymorphic types serialization
+   + <cereal/types/polymorphic.hpp>
+
+
+Sample Code:
+ + File: cereal_test.cpp
+
+#+BEGIN_SRC cpp
+  #include <iostream>
+  #include <iomanip>
+  #include <string>
+  #include <vector>
+  #include <fstream> // std::ofstream
+  #include <sstream> // std::stringstream
+
+  #include <cereal/archives/binary.hpp>
+  // #include <cereal/archives/portable_binary.hpp>
+  #include <cereal/archives/xml.hpp>
+  #include <cereal/archives/json.hpp>
+
+  // Allows std::vector serialization
+  #include <cereal/types/vector.hpp>
+
+  struct DummyClass
+  {
+      double x;
+      float  y;
+      size_t N;
+      std::vector<int> list;
+
+      DummyClass(): x(0), y(0), N(0){ }
+
+      DummyClass(double x, float y, size_t N)
+          : x(x), y(y), N(N){ }
+
+      void Add(int x)
+      {
+          list.push_back(x);
+      }
+
+      template<typename Archive>
+      void serialize(Archive& archive)
+      {
+          // Archive without name-value pair
+          //--------------------------------
+          // archive(x, y, N, list);
+
+          // Archive with name-value pair
+          //-------------------------------
+          archive(cereal::make_nvp("x", x),
+                  cereal::make_nvp("y", y),
+                  cereal::make_nvp("N", N),
+                  cereal::make_nvp("list", list)
+                  );
+      }
+
+      void show(std::ostream& os)
+      {
+          os << "DummyClass { x = " << x
+             << " ; y = " << y
+             << " ; N = " << N
+             << " } => ";
+          os << " List[ ";
+          for(auto const& e: list)
+              os << " " << e;
+          os << " ] " << "\n";
+      }
+  };
+
+
+  int main()
+  {
+      // ============ Binary Serialization ==================//
+
+      // Memory "file" simulating a disk file
+      auto mock_file = std::stringstream{};
+
+      std::cout << "\n=== Experiment 1 - Serialize object to binary file ===\n";
+      {
+          auto outArchive   = cereal::BinaryOutputArchive(mock_file);
+          DummyClass obj{100.6534, 45.5f, 100};
+          obj.Add(100); obj.Add(200); obj.Add(50); obj.Add(80);
+          outArchive(obj);
+          std::cout << " Content of mock-file =  " << mock_file.str() << std::endl;
+      }
+
+      std::cout << "\n=== Experiment 2 - Deserialize object from binary file ====\n" ;
+      {
+          auto inArchive = cereal::BinaryInputArchive(mock_file);
+          DummyClass cls;
+          inArchive(cls);
+          cls.show(std::cout);
+      }
+
+      //============= XML Serialization ============================//
+
+      // auto xmlFile = std::ofstream("/tmp/dataset.xml");
+      auto xmlFile = std::stringstream{};
+      std::cout << "\n=== Experiment 3 - Serialize object to XML file ====\n" ;
+      {
+          auto outArchive = cereal::XMLOutputArchive(xmlFile);
+          DummyClass obj1{200.0, -802.5f, 900};
+          obj1.Add(100); obj1.Add(200); obj1.Add(50); obj1.Add(80);
+          DummyClass obj2{400.0, -641.f, 300};
+          outArchive(obj1, obj2);
+      }
+      // Note: Cereal uses RAII to flush the archive output, so the output is only
+      // guaranteeed to be written to the stream when the archive go out of escope.
+      std::cout << " [TRACE] xmlFile = " << xmlFile.str() << std::endl;
+
+      std::cout << "\n=== Experiment 4 - Deserialize object from XML file ===\n" ;
+      {
+          auto inArchive = cereal::XMLInputArchive(xmlFile);
+          DummyClass obj1, obj2;
+          // Read two objects from stream
+          inArchive(obj1, obj2);
+          obj1.show(std::cout);
+          obj2.show(std::cout);
+      }
+
+      // ============= JSON Serialization =================================//
+
+
+      // auto xmlFile = std::ofstream("/tmp/dataset.xml");
+      auto jsonFile = std::stringstream{};
+      std::cout << "\n=== Experiment 5 - Serialize object to JSON file ====\n" ;
+      {
+          auto outArchive = cereal::JSONOutputArchive(jsonFile);
+          DummyClass obj1{200.0, -802.5f, 900};
+          obj1.Add(100); obj1.Add(200); obj1.Add(50); obj1.Add(80);
+          DummyClass obj2{400.0, -641.f, 300};
+          outArchive(cereal::make_nvp("object1", obj1),
+                     cereal::make_nvp("object2", obj2));
+      }
+      std::cout << " [TRACE] JSON File =\n" << jsonFile.str() << std::endl;
+
+      std::cout << "\n=== Experiment 6 - Deserialize object from JSON file ====\n" ;
+      {
+          auto inArchive = cereal::JSONInputArchive(jsonFile);
+          DummyClass obj1, obj2;
+          // Read two objects from stream
+          inArchive(obj1, obj2);
+          obj1.show(std::cout);
+          obj2.show(std::cout);
+      }
+
+      return 0;
+  }
+
+#+END_SRC
+
+Program output:
+
+#+BEGIN_SRC sh
+   $ ./cereal_test.bin
+
+   === Experiment 1 - Serialize object to binary file ===
+    Content of mock-file =  6�;N�)Y@  6Bd              d   �   2   P   
+
+   === Experiment 2 - Deserialize object from binary file ====
+   DummyClass { x = 100.653 ; y = 45.5 ; N = 100 } =>  List[  100 200 50 80 ]
+
+   === Experiment 3 - Serialize object to XML file ====
+    [TRACE] xmlFile = <?xml version="1.0" encoding="utf-8"?>
+   <cereal>
+           <value0>
+                   <x>200</x>
+                   <y>-802.5</y>
+                   <N>900</N>
+                   <list size="dynamic">
+                           <value0>100</value0>
+                           <value1>200</value1>
+                           <value2>50</value2>
+                           <value3>80</value3>
+                   </list>
+           </value0>
+           <value1>
+                   <x>400</x>
+                   <y>-641</y>
+                   <N>300</N>
+                   <list size="dynamic"/>
+           </value1>
+   </cereal>
+
+
+
+   === Experiment 4 - Deserialize object from XML file ===
+   DummyClass { x = 200 ; y = -802.5 ; N = 900 } =>  List[  100 200 50 80 ]
+   DummyClass { x = 400 ; y = -641 ; N = 300 } =>  List[  ]
+
+   === Experiment 5 - Serialize object to JSON file ====
+    [TRACE] JSON File =
+   {
+       "object1": {
+           "x": 200.0,
+           "y": -802.5,
+           "N": 900,
+           "list": [
+               100,
+               200,
+               50,
+               80
+           ]
+       },
+       "object2": {
+           "x": 400.0,
+           "y": -641.0,
+           "N": 300,
+           "list": []
+       }
+   }
+
+   === Experiment 6 - Deserialize object from JSON file ====
+   DummyClass { x = 200 ; y = -802.5 ; N = 900 } =>  List[  100 200 50 80 ]
+   DummyClass { x = 400 ; y = -641 ; N = 300 } =>  List[  ]
+#+END_SRC
