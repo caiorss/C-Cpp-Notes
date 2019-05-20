@@ -3491,7 +3491,6 @@ Print map:
     dataset = [(AUD, 34.65), (BRL, 451.34), (CAD, 400.5), (USD, 200.3)]
    >>
 #+END_SRC
-
 ** Cereal - Serialization Library
 
 Cereal is a lightweight header-only library for serialization which
@@ -3779,6 +3778,227 @@ Program output:
    DummyClass { x = 200 ; y = -802.5 ; N = 900 } =>  List[  100 200 50 80 ]
    DummyClass { x = 400 ; y = -641 ; N = 300 } =>  List[  ]
 #+END_SRC
+
+** GTest - Unit Testing Framework
+
+GTest or Google test is one of the most used and most popular test
+frameworks which supports many features such as mocks; test fixtures;
+parameterized tests; XML test report in JUnit / xUnit format; test
+discovery and integration with IDEs, namely Eclipse, QTCreator and
+Visual Studio.
+
+
+Official Web site:
+ + https://github.com/google/googletest
+
+Some Tutorial/Primers: 
+ + [[https://github.com/google/googletest/blob/master/googletest/docs/primer.md][Google Test Primer]] (Official)
+ + [[https://docs.microsoft.com/en-us/visualstudio/test/how-to-use-google-test-for-cpp?view=vs-2019][How to use Google Test for C++ - Visual Studio | Microsoft Docs]]
+ + [[http://www.yolinux.com/TUTORIALS/Cpp-GoogleTest.html][GoogleTest: C++ unit test framework]]
+ + [[https://developer.ibm.com/articles/au-googletestingframework/][A quick introduction to the Google C++ Testing Framework – IBM Developer]]
+
+Conan Reference: 
+ + [[https://bintray.com/conan-community/conan/gtest%253Aconan/1.8.0%253Astable][gtest/1.8.0@conan/stable]]
+
+Test Runner for GTest: 
+ + https://github.com/nholthaus/gtest-runner
+
+CMake Integration:
+ + [[https://cmake.org/cmake/help/latest/module/FindGTest.html][FindGTest — CMake 3.14.4 Documentation]]
+
+Fatal Assertions: 
+ + ASSERT_TRUE
+ + ASSERT_FALSE
+ + ASSERT_EQ(val1, val2)
+ + ASSERT_NE(val1, val2)
+ + ASSERT_LT
+ + ASSERT_GT
+ + ASSERT_GE 
+
+Non-fatal assertions Macros: 
+
+ + EXPECT_TRUE
+ + EXPECT_FALSE
+ + EXPECT_EQ
+ + EXPECT_NQ
+ + EXPECT_DOUBLE_EQ
+ + EXPECT_FLOAT_EQ
+ + EXPECT_NEAR(value1, value2, absolute_tolerance)
+ + TEST(<NAME>, ){ ... <BODY> .. }
+ + EXPECT_FLOAT_EQ 
+
+ *Example: Usage with CMake and QTCreator*
+
+Get the source code: 
+ + Gist: [[https://gist.github.com/caiorss/eb2fc15b7ed322ccac5ee496585e54e9][Sample Project CMake and GTest with Conan]]
+
+#+BEGIN_SRC sh 
+  $ git clone https://gist.github.com/caiorss/eb2fc15b7ed322ccac5ee496585e54e9 gist && cd gist
+  Cloning into 'gist'...
+  remote: Enumerating objects: 4, done.
+  remote: Counting objects: 100% (4/4), done.
+  remote: Compressing objects: 100% (4/4), done.
+  remote: Total 4 (delta 0), reused 0 (delta 0), pack-reused 0
+  Unpacking objects: 100% (4/4), done.
+
+  $ ls
+  CMakeLists.txt  gtest-experiment.cpp
+
+  # Open with QT Creator, Visual Studio or build from command line 
+  $ qtcreator CMakeList.txt 
+
+  # Open with Visual Studio 
+  $ devenv CMakeLists.txt 
+#+END_SRC
+
+ *File: gtest-experiment.cpp*
+
+Headers:
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+  #include <vector>
+  #include <cassert>
+
+  #include <gtest/gtest.h>
+#+END_SRC
+
+Implementations: 
+
+#+BEGIN_SRC cpp 
+  // ==================== Implementation ========================
+
+  int factorial(int n){
+      int prod = 1;
+      for(int i = 1; i <= n; i++)
+          prod *= i;
+      return prod;
+  }
+
+  struct Date
+  {
+      int year;
+      int month;
+      int day;
+      Date(){}
+      Date(int year, int month, int day)
+          : year(year)
+          , month(month)
+          , day(day)
+      { }
+
+      // Comparison operator required by  EXPECT_EQ
+      bool operator==(Date const& rhs) const
+      {
+          return year  == rhs.year
+              && month == rhs.month
+              && day   == rhs.day;
+      }
+      // Necessary for make class printable in GTest
+      friend std::ostream& operator<<(std::ostream& os, Date const& rhs)
+      {
+          return os << "Date { " << rhs.year << " ; "
+                    << rhs.month << " ; "
+                    << rhs.day << " } ";
+      }
+  };
+
+  Date GregorianEasterSunday(int y)
+  {
+      int c = y / 100;
+      int n = y - 19 * ( y / 19 );
+      int k = ( c - 17 ) / 25;
+      int i = c - c / 4 - ( c - k ) / 3 + 19 * n + 15;
+      i = i - 30 * ( i / 30 );
+      i = i - ( i / 28 ) * ( 1 - ( i / 28 )
+            ,* ( 29 / ( i + 1 ) )
+            ,* ( ( 21 - n ) / 11 ) );
+      int j = y + y / 4 + i + 2 - c + c / 4;
+      j = j - 7 * ( j / 7 );
+      int l = i - j;
+      int m = 3 + ( l + 40 ) / 44;
+      int d = l + 28 - 31 * ( m / 4 );
+      return Date(y, m, d);
+  }
+#+END_SRC
+
+Test code: 
+
+#+BEGIN_SRC cpp 
+  //=============== Tests ====================================//
+
+  TEST(FactorialTest, test1){
+      EXPECT_EQ(6,        factorial(3));
+      EXPECT_EQ(24,       factorial(4));
+      EXPECT_EQ(120,      factorial(5));
+      EXPECT_EQ(3628800,  factorial(10));
+      // Expect greater than
+      EXPECT_GT(10000000, factorial(10));
+      // Expect not equal
+      EXPECT_NE(25, factorial(4));
+  }
+
+  TEST(FactorialTestFailure, testFailure){
+      // Deliberately fails for demonstration purposes
+      EXPECT_EQ(6, factorial(3));
+      EXPECT_EQ(4, factorial(4));
+      EXPECT_EQ(6, factorial(2));
+  }
+
+  TEST(GregorianEaster, testdates){
+      EXPECT_EQ(Date(2005, 3, 27), GregorianEasterSunday(2005));
+      EXPECT_EQ(Date(2008, 3, 23), GregorianEasterSunday(2008));
+      EXPECT_EQ(Date(2010, 4, 4),  GregorianEasterSunday(2010));
+  }
+#+END_SRC
+
+  *File: CMakeLists.txt*
+
+#+BEGIN_SRC cmake 
+  cmake_minimum_required(VERSION 3.9)
+  project( GtestsExperiment
+           VERSION      0.1
+           DESCRIPTION  "Experiment with Gtest uni testing framework"
+          )
+  # ============= Conan Boosttrap =============================#
+
+  # Download automatically, you can also just copy the conan.cmake file
+  if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan.cmake")
+     message(STATUS "Downloading conan.cmake from https://github.com/conan-io/cmake-conan")
+     file(DOWNLOAD "https://github.com/conan-io/cmake-conan/raw/v0.13/conan.cmake"
+                   "${CMAKE_BINARY_DIR}/conan.cmake")
+  endif()
+
+  include(${CMAKE_BINARY_DIR}/conan.cmake)
+
+  conan_cmake_run(REQUIRES
+                  gtest/1.8.1@bincrafters/stable
+                  BASIC_SETUP
+                  BUILD missing
+                  )
+
+  #============= Find Packages ================================#
+
+  find_package(GTest REQUIRED)
+
+  #---------------------------------------------------#
+  #             Targets Settings                      #
+  #---------------------------------------------------#
+
+  add_executable(gtest-experiment gtest-experiment.cpp)
+  target_link_libraries(gtest-experiment GTest::GTest GTest::Main)
+  add_test(GTestExperiment gtest-experiment)
+#+END_SRC
+
+ *Test Output:*
+
+#+CAPTION: Test output in Command Line 
+[[file:images/gtest-framework-console.png][file:images/gtest-framework-console.png]]
+
+#+CAPTION: QTCreator Test Discovery 
+[[file:images/gtest-framework-qtcreator.png][file:images/gtest-framework-qtcreator.png]]
+
 ** Catch2 - Unit Testing Framework
 
 Advatanges over other test frameworks:
