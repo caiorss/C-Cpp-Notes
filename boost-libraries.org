@@ -4021,3 +4021,210 @@ Test runner output:
    test cases:  4 |  2 passed | 2 failed
    assertions: 13 | 11 passed | 2 failed
 #+END_SRC
+
+** Doctest - Unit Testing Framewok
+
+Doctest is a unit test framework based on catch2 test framework,
+however doctest has a much faster compile-time than many other
+unit-test frameworks.
+
+Advantages:
+ + Easy of use
+ + Faster compile-time
+ + Easy to integrate, header-only-library
+ + Operator based testing: CHECK(VALUE == EXPECTED), CHECK(x > 10)
+   instead of No need to use macros ASSERT_EQ, ASSERT_NEQ (not equal)
+   as in GTest.
+
+Disadvantages:
+ + No XML output with jUnit standard similar to GTest standard.
+ + No integration with IDE
+ + No data-driven test, aka parameterized test, or test with a list of value tuples.
+
+Repository:
+ + https://github.com/onqtam/doctest
+
+Conan Reference:
+ + [[https://bintray.com/bincrafters/public-conan/doctest%253Abincrafters/2.3.1%253Astable][doctest/2.3.1@bincrafters/stable]]
+
+Conan Package:
+ + https://github.com/bincrafters/conan-doctest
+
+Code Examples:
+ + https://github.com/onqtam/doctest/tree/master/examples
+
+Features:
+ + https://github.com/onqtam/doctest/blob/master/doc/markdown/features.md
+
+See:
+ + [[https://accu.org/index.php/journals/2343][ACCU - doctest – the Lightest C++ Unit Testing Framewor]]
+ + [[https://www.codeproject.com/Articles/1156938/doctest-the-lightest-Cplusplus-unit-testing-framew][doctest - the lightest C++ unit testing framework - CodeProject]]
+
+Video:
+ + [[https://www.youtube.com/watch?v=eH1CxEC29l8][CppCon 2017: Viktor Kirilov “Mix Tests and Production Code With Doctest...” - YouTube]]
+
+Usage:
+
+ + File: doctest_experiment.cpp
+
+#+BEGIN_SRC cpp
+  #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+  #include <doctest.h>
+
+  int formula(int x, int y)
+  {
+      return 4 * x + 2 * y;
+  }
+
+  TEST_CASE("Test function furmula A")
+  {
+      CHECK( formula(3, 4) == 20 );
+      CHECK( formula(4, 5) == 26 );
+      CHECK( formula(4, 5) < 100 );
+      CHECK( formula(4, 5) != 0 );
+  }
+
+  TEST_CASE("Test function formula B")
+  {
+      CHECK( formula(0, 0) == 0  );
+      // Intentionally fails
+      CHECK( formula(2, 5) == 10 );
+  }
+#+END_SRC
+
+ + File: CMakeLists.txt integrated with Conan
+
+#+BEGIN_SRC cmake
+  cmake_minimum_required(VERSION 3.9)
+  project( doctest_experiment
+           VERSION      0.1
+           DESCRIPTION  "A doctest experiment"
+          )
+  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+
+  # ============= Conan Boosttrap =============================#
+
+  # Download automatically, you can also just copy the conan.cmake file
+  if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan.cmake")
+     message(STATUS "Downloading conan.cmake from https://github.com/conan-io/cmake-conan")
+     file(DOWNLOAD "https://github.com/conan-io/cmake-conan/raw/v0.13/conan.cmake"
+                   "${CMAKE_BINARY_DIR}/conan.cmake")
+  endif()
+
+  include(${CMAKE_BINARY_DIR}/conan.cmake)
+
+  conan_cmake_run(REQUIRES
+                  doctest/2.3.1@bincrafters/stable
+                  BASIC_SETUP
+                  BUILD missing
+                  )
+
+  #============= Find Packages ================================#
+
+  find_package(doctest 2.3.1 REQUIRED)
+
+  #---------------------------------------------------#
+  #             Targets Settings                      #
+  #---------------------------------------------------#
+
+  add_executable(doctest_experiment doctest_experiment.cpp)
+  copy_after_build(doctest_experiment)
+  # target_link_libraries(doctest_experiment doctest::doctest)
+#+END_SRC
+
+Show options:
+
+#+BEGIN_SRC sh
+   $ bin/doctest_experiment -h
+   [doctest] doctest version is "2.3.1"
+   [doctest]
+   [doctest] boolean values: "1/on/yes/true" or "0/off/no/false"
+   [doctest] filter  values: "str1,str2,str3" (comma separated strings)
+   [doctest]
+   [doctest] filters use wildcards for matching strings
+   [doctest] something passes a filter if any of the strings in a filter matches
+   [doctest]
+   [doctest] ALL FLAGS, OPTIONS AND FILTERS ALSO AVAILABLE WITH A "dt-" PREFIX!!!
+   [doctest]
+   [doctest] Query flags - the program quits after them. Available:
+
+    -?,   --help, -h                      prints this message
+    -v,   --version                       prints the version
+    -c,   --count                         prints the number of matching tests
+    -ltc, --list-test-cases               lists all matching tests by name
+    -lts, --list-test-suites              lists all matching test suites
+    -lr,  --list-reporters                lists all registered reporters
+
+   [doctest] The available <int>/<string> options/filters are:
+
+    -tc,  --test-case=<filters>           filters     tests by their name
+    -tce, --test-case-exclude=<filters>   filters OUT tests by their name
+    -sf,  --source-file=<filters>         filters     tests by their file
+    -sfe, --source-file-exclude=<filters> filters OUT tests by their file
+    -ts,  --test-suite=<filters>          filters     tests by their test suite
+    -tse, --test-suite-exclude=<filters>  filters OUT tests by their test suite
+    -sc,  --subcase=<filters>             filters     subcases by their name
+    -sce, --subcase-exclude=<filters>     filters OUT subcases by their name
+    -r,   --reporters=<filters>           reporters to use (console is default)
+    -o,   --out=<string>                  output filename
+    -ob,  --order-by=<string>             how the tests should be ordered
+                                          <string> - by [file/suite/name/rand]
+    -rs,  --rand-seed=<int>               seed for random ordering
+    -f,   --first=<int>                   the first test passing the filters to
+                                          execute - for range-based execution
+    -l,   --last=<int>                    the last test passing the filters to
+                                          execute - for range-based execution
+    -aa,  --abort-after=<int>             stop after <int> failed assertions
+    -scfl,--subcase-filter-levels=<int>   apply filters for the first <int> levels
+
+   [doctest] Bool options - can be used like flags and true is assumed. Available:
+
+    -s,   --success=<bool>                include successful assertions in output
+    -cs,  --case-sensitive=<bool>         filters being treated as case sensitive
+    -e,   --exit=<bool>                   exits after the tests finish
+    -d,   --duration=<bool>               prints the time duration of each test
+    -nt,  --no-throw=<bool>               skips exceptions-related assert checks
+    -ne,  --no-exitcode=<bool>            returns (or exits) always with success
+    -nr,  --no-run=<bool>                 skips all runtime doctest operations
+    -nv,  --no-version=<bool>             omit the framework version in the output
+    -nc,  --no-colors=<bool>              disables colors in output
+    -fc,  --force-colors=<bool>           use colors even when not in a tty
+    -nb,  --no-breaks=<bool>              disables breakpoints in debuggers
+    -ns,  --no-skip=<bool>                don't skip test cases marked as skip
+    -gfl, --gnu-file-line=<bool>          :n: vs (n): for line numbers in output
+    -npf, --no-path-filenames=<bool>      only filenames and no paths in output
+    -nln, --no-line-numbers=<bool>        0 instead of real line numbers in output
+
+   [doctest] for more information visit the project documentation
+#+END_SRC
+
+Test runner test listing:
+
+#+BEGIN_SRC sh
+  $ bin/doctest_experiment --list-test-cases
+  [doctest] listing all test case names
+  ===============================================================================
+  Test function furmula A
+  Test function formula B
+  ================================================
+#+END_SRC
+
+Run tests: (Note: It is printed with colored output)
+
+#+BEGIN_SRC text
+  $ bin/doctest_experiment
+  [doctest] doctest version is "2.3.1"
+  [doctest] run with "--help" for options
+  ===============================================================================
+  /home/archbox/Documents/projects/fquant/doctest_experiment.cpp:21:
+  TEST CASE:  Test function formula B
+
+  /home/archbox/Documents/projects/fquant/doctest_experiment.cpp:25: ERROR: CHECK( formula(2, 5) == 10 ) is NOT correct!
+    values: CHECK( 18 == 10 )
+
+  ===============================================================================
+  [doctest] test cases:      2 |      1 passed |      1 failed |      0 skipped
+  [doctest] assertions:      6 |      5 passed |      1 failed |
+  [doctest] Status: FAILURE!
+#+END_SRC
