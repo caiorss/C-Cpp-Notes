@@ -3779,3 +3779,245 @@ Program output:
    DummyClass { x = 200 ; y = -802.5 ; N = 900 } =>  List[  100 200 50 80 ]
    DummyClass { x = 400 ; y = -641 ; N = 300 } =>  List[  ]
 #+END_SRC
+** Catch2 - Unit Testing Framework
+
+Advatanges over other test frameworks:
+
+ + Header-only library, so it requires no linking step or linking
+   dependencies.
+
+ + Uses C++ operators instead of many macros such as (X > 20) instead of
+   EXPECT_GT(X, 20) (expect grater than) as in GTest (Google's test)
+
+ + BDD - Behavior Driven Development
+
+ + Property-based testing - testing with several random values and
+   combination of random values.
+
+ + Test with multiple data or data table which frees the user from
+   writing lots boilerplate ASSERT_EQUAL(x, y). A single REQUIRE macro
+   can be used for test a whole list of cartesian pairs such as (x, y,z, expected)
+
+ + XML output in JUnit, xUnit format.
+
+Problem:
+ + Compile-time can be a bit slow due to the library be header-only.
+
+Repository:
+ + https://github.com/catchorg/Catch2
+
+Conan Reference:
+ + [[https://bintray.com/catchorg/Catch2/Catch2:catchorg/2.7.2:stable][Catch2/2.7.2@catchorg/stable]]
+
+Code Examples:
+ + https://github.com/catchorg/Catch2/tree/master/examples
+ + [[https://github.com/catchorg/Catch2/blob/master/projects/SelfTest/UsageTests/Generators.tests.cpp][Test Generators]] - testing with multiple data
+
+Tutorial:
+ + [[https://github.com/catchorg/Catch2/blob/master/docs/tutorial.md#top][Catch2/tutorial.md at master · catchorg/Catch2 · GitHub]]
+ + [[https://mariusbancila.ro/blog/2018/03/29/writing-cpp-unit-tests-with-catch2/][Writing C++ unit tests with Catch2]] - BDD - Behavior Driven Development.
+
+Misc:
+ + [[https://levelofindirection.com/blog/catch2-released.html][Catch2 Released : Level of Indirection]]
+ + [[https://codingnest.com/the-future-of-catch2/][The future of Catch2 — The Coding Nest]]
+
+Example simple test:
+
+File: testcatch2.cpp
+
+#+BEGIN_SRC cpp
+  #include <iostream>
+
+  #include <catch2/catch.hpp>
+
+
+  int formula(int x, int y)
+  {
+      return 4 * x + 2 * y;
+  }
+
+  TEST_CASE("Test function furmula A", "[tag1]")
+  {
+      REQUIRE( formula(3, 4) == 20 );
+      REQUIRE( formula(4, 5) == 26 );
+  }
+
+  TEST_CASE("Test function formula B", "[tag2]")
+  {
+      REQUIRE( formula(0, 0) == 0  );
+      // Intentionally fails
+      REQUIRE( formula(2, 5) == 10 );
+  }
+
+
+  struct TestData
+  {
+      int x, y, expected;
+  };
+
+
+  TEST_CASE("Testing with struct")
+  {
+      auto t = GENERATE( values<TestData>(
+      {
+          {3,  4, 20}
+         ,{4,  5, 26}
+         ,{0,  0,  0}
+         ,{-1, 4,  6} // Fails
+         ,{ 2, 2, 12}
+      }));
+      REQUIRE( formula(t.x, t.y) == t.expected);
+  }
+
+
+  TEST_CASE("Testing with structured bindings")
+  {
+      auto [x, y, z] = GENERATE( table<int, int, int>(
+      {
+          {3,  4, 20}
+         ,{4,  5, 26}
+         ,{0,  0,  0}
+         ,{2, 2, 12}
+      }));
+      REQUIRE( formula(x, y) == z);
+  }
+#+END_SRC
+
+File: CMakeLists.txt - CMake building script integrated with Conan.
+
+#+BEGIN_SRC cmake
+  cmake_minimum_required(VERSION 3.9)
+  project(Catch2_testing)
+
+  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+
+  # ============= Conan Boosttrap =============================#
+
+  # Download automatically, you can also just copy the conan.cmake file
+  if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan.cmake")
+     message(STATUS "Downloading conan.cmake from https://github.com/conan-io/cmake-conan")
+     file(DOWNLOAD "https://github.com/conan-io/cmake-conan/raw/v0.13/conan.cmake"
+                   "${CMAKE_BINARY_DIR}/conan.cmake")
+  endif()
+
+  include(${CMAKE_BINARY_DIR}/conan.cmake)
+
+  conan_cmake_run(REQUIRES
+                  Catch2/2.7.2@catchorg/stable
+                  BASIC_SETUP
+                  BUILD missing
+                  )
+  #============= Find Packages ================================#
+
+  find_package(Catch2 REQUIRED)
+
+  #---------------------------------------------------#
+  #             Targets Settings                      #
+  #---------------------------------------------------#
+
+  add_executable(testcatch2 testcatch2.cpp test-main.cpp)
+  target_link_libraries(testcatch2)
+#+END_SRC
+
+Test runner help option:
+
+#+BEGIN_SRC sh
+  $ ./testcatch2 -h
+
+  Catch v2.7.2
+  usage:
+    testcatch2 [<test name|pattern|tags> ... ] options
+
+  where options are:
+    -?, -h, --help                            display usage information
+    -l, --list-tests                          list all/matching test cases
+    -t, --list-tags                           list all/matching tags
+    -s, --success                             include successful tests in
+                                              output
+    -b, --break                               break into debugger on failure
+    -e, --nothrow                             skip exception tests
+    -i, --invisibles                          show invisibles (tabs, newlines)
+    -o, --out <filename>                      output filename
+    -r, --reporter <name>                     reporter to use (defaults to
+                                              console)
+    -n, --name <name>                         suite name
+    -a, --abort                               abort at first failure
+    -x, --abortx <no. failures>               abort after x failures
+    -w, --warn <warning name>                 enable warnings
+    -d, --durations <yes|no>                  show test durations
+    -f, --input-file <filename>               load test names to run from a
+                                              file
+    -#, --filenames-as-tags                   adds a tag for the filename
+    -c, --section <section name>              specify section to run
+    -v, --verbosity <quiet|normal|high>       set output verbosity
+    --list-test-names-only                    list all/matching test cases
+                                              names only
+    --list-reporters                          list all reporters
+    --order <decl|lex|rand>                   test case order (defaults to
+                                              decl)
+    --rng-seed <'time'|number>                set a specific seed for random
+                                              numbers
+    --use-colour <yes|no>                     should output be colourised
+    --libidentify                             report name and version according
+                                              to libidentify standard
+    --wait-for-keypress <start|exit|both>     waits for a keypress before
+                                              exiting
+    --benchmark-resolution-multiple           multiple of clock resolution to
+    <multiplier>                              run benchmarks
+
+  For more detailed usage please see the project docs
+
+
+#+END_SRC
+
+Test runner test list:
+
+#+BEGIN_SRC sh
+  $ ./testcatch2 --list-tests
+  All available test cases:
+    Test function furmula A
+        [tag1]
+    Test function formula B
+        [tag2]
+    Testing with struct
+    Testing with structured bindings
+  4 test cases
+
+#+END_SRC
+
+Test runner output:
+
+#+BEGIN_SRC text
+   $ ./testcatch2
+
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   testcatch2 is a Catch v2.7.2 host application.
+   Run with -? for options
+
+   -------------------------------------------------------------------------------
+   Test function formula B
+   -------------------------------------------------------------------------------
+   /home/archbox/Documents/projects/fquant/testcatch2.cpp:17
+   ...............................................................................
+
+   /home/archbox/Documents/projects/fquant/testcatch2.cpp:21: FAILED:
+     REQUIRE( formula(2, 5) == 10 )
+   with expansion:
+     18 == 10
+
+   -------------------------------------------------------------------------------
+   Testing with struct
+   -------------------------------------------------------------------------------
+   /home/archbox/Documents/projects/fquant/testcatch2.cpp:31
+   ...............................................................................
+
+   /home/archbox/Documents/projects/fquant/testcatch2.cpp:41: FAILED:
+     REQUIRE( formula(t.x, t.y) == t.expected )
+   with expansion:
+     4 == 6
+
+   ===============================================================================
+   test cases:  4 |  2 passed | 2 failed
+   assertions: 13 | 11 passed | 2 failed
+#+END_SRC
