@@ -5,7 +5,7 @@
 
  - [[wiki:index][Index]]
 
-* Shared Libraries - Binary Components
+* C-Interoperability and Shared Libraries - Binary Components
 ** Overview 
 
 Shared libraries are compiled object-code exporting functions, data
@@ -582,6 +582,297 @@ Higher order C-function to apply a function to each element:
  *See also:*
 
  + [[https://stackoverflow.com/questions/22797418/how-do-i-safely-pass-objects-especially-stl-objects-to-and-from-a-dll][c++ - How do I safely pass objects, especially STL objects, to and from a DLL? - Stack Overflow]]
+
+** Calling C++ from C 
+
+This section presents how to call a statically linked C++ cod from C.
+
+ + Complete code:  [[https://gist.github.com/caiorss/c236aedbbb514717ad26e856654bb063][Example GIST - calling C++ from C]]
+
+File: *cppcode.hpp* 
+ + Header file that can be used by a C or C++ code. All code between
+   #ifndef __cplusplus ... #edif is ignored by a C compiler. 
+
+#+BEGIN_SRC cpp 
+  #ifndef _CODECPP_
+  #define _CODECPP_
+
+  #ifdef __cplusplus
+    #define EXPORT_C extern "C"
+  #else
+    #define EXPORT_C
+  #endif
+
+  //============ C++ Only Header =================//
+  #ifdef __cplusplus  // Enabled only for C++ compilers 
+  #include <iostream>
+
+  class Runstat
+  {
+      /// Sum of sequence processed
+      double m_sum;
+      /// Sum of squares processed
+      double m_sumsq;
+      /// Size of sequence processed
+      size_t m_N;
+  public:
+      Runstat();
+      Runstat(Runstat const&)            = delete;
+      Runstat& operator=(Runstat const&) = delete;
+      ~Runstat();
+      void   add(double x);
+      void   reset();
+      size_t size() const;
+      double mean() const;
+      /// Standard deviation
+      double sdev() const;
+  };
+
+  #endif //-- End of __cplusplus definition //
+
+
+  // ========== C-interface for std::string container
+  typedef  void* hString;
+
+  EXPORT_C hString string_new();
+  EXPORT_C hString string_new1 (const char* text);
+  EXPORT_C hString string_copy (hString self);
+  EXPORT_C void    string_del  (hString self);
+  EXPORT_C void    string_add  (hString self, const char* text);
+  EXPORT_C void    string_disp (hString, const char* name);
+
+
+  //============ C-interface for class Runstat ============//
+
+  // Opaque pointer type alias for C-lang
+  typedef void* pStat;
+
+  EXPORT_C pStat   Runstat_new();
+  EXPORT_C void    Runstat_del (pStat self);
+  EXPORT_C void    Runstat_add (pStat self, double x);
+  EXPORT_C double  Runstat_mean(pStat self);
+  EXPORT_C double  Runstat_sdev(pStat self);
+  EXPORT_C size_t  Runstat_size(pStat self);
+
+  #endif
+#+END_SRC
+
+File: *cppcode.cpp* 
+ + Implementation of classes and C interface functions. 
+
+Implementation of class RunStat member functions: 
+
+#+BEGIN_SRC cpp 
+   ... ... ... ... 
+
+  Runstat::Runstat()
+  {
+      std::cout << " [TRACE] Object created Ok." << std::endl;
+      m_sum = 0.0;
+      m_sumsq = 0.0;
+      m_N = 0;
+  }
+
+  Runstat::~Runstat()
+  {
+      std::cout << " [TRACE] Object deleted OK" << std::endl;
+  }
+
+  void
+  Runstat::add(double x)
+  {
+      m_sum += x;
+      m_sumsq += x * x;
+      m_N++;
+  }
+
+  ...... ....   ...... ....   ...... .... 
+
+  Runstat::~Runstat()
+  {
+      std::cout << " [TRACE] Object deleted OK" << std::endl;
+  }
+
+  ...... ....   ...... ....   ...... .... 
+
+  void
+  Runstat::add(double x)
+  {
+      m_sum += x;
+      m_sumsq += x * x;
+      m_N++;
+  }
+
+ ... ...  ... ...  ... ...  ... ... 
+#+END_SRC
+
+Implementation of the C-interface functions for class std::string. 
+
+#+BEGIN_SRC cpp 
+  //--------- C-Interface for class std::string ------------------//
+
+  hString string_new()
+  {
+      return new std::string{};
+  }
+
+  hString string_new1(const char* text)
+  {
+      return new std::string(text);
+  }
+
+  // Copy constructor
+  hString string_copy(hString self)
+  {
+      std::string* p = reinterpret_cast<std::string*>(self);
+      return new std::string(*p);
+  }
+
+  void string_del(hString self)
+  {
+      delete reinterpret_cast<std::string*>(self);
+  }
+
+  void string_add(hString self, const char* text)
+  {
+      auto p = reinterpret_cast<std::string*>(self);
+      ,*p = *p + text;
+  }
+
+  void string_disp(hString self, const char* name)
+  {
+      auto p = reinterpret_cast<std::string*>(self);
+      std::cout << name << " / std::string{ " << *p << "} " << std::endl;
+  }
+#+END_SRC
+
+Implementation of the C-interface functions for class RunStat. 
+
+#+BEGIN_SRC cpp 
+  //---------- C-Interface for class Runstat ---------------------//
+
+  pStat Runstat_new()
+  {
+      return new (std::nothrow) Runstat();
+  }
+
+  void Runstat_del(pStat self)
+  {
+      delete reinterpret_cast<Runstat*>(self);
+  }
+
+  void Runstat_add(pStat self, double x)
+  {
+      auto p = reinterpret_cast<Runstat*>(self);
+      p->add(x);
+  }
+
+  double Runstat_mean(pStat self)
+  {
+      Runstat* p = reinterpret_cast<Runstat*>(self);
+      return p->mean();
+  }
+
+  double Runstat_sdev(pStat self)
+  {
+      Runstat* p = reinterpret_cast<Runstat*>(self);
+      return p->sdev();
+  }
+
+
+  size_t Runstat_size(pStat self)
+  {
+      Runstat* p = reinterpret_cast<Runstat*>(self);
+      return p->size();
+  }
+#+END_SRC
+
+ *File: main.c*  
+  + C client code that uses C-interface functions export by the C++ file cppcode. 
+
+#+BEGIN_SRC C
+  #include <stdio.h>
+  #include <stdlib.h>
+
+  #include "codecpp.hpp"
+
+  int main()
+  {
+      printf("\n == EXPERIMENT 1 - std::string C-wrapper ======\n");
+      hString str = string_new1("A C++ string in C");
+      string_disp(str, "str");
+      hString str2 = string_copy(str);
+      string_add(str, " - hello world");
+      string_disp(str, "str");
+      string_disp(str2, "str2");
+      string_del(str);
+      string_del(str2);
+
+      printf("\n == EXPERIMENT 2 - Class Runstat ======\n");
+      pStat obj = Runstat_new();
+      Runstat_add(obj, 10.0);
+      Runstat_add(obj, 4.0);
+      Runstat_add(obj, 25.0);
+      Runstat_add(obj, 16.0);
+
+      printf(" Number of Elements processed = %zu \n", Runstat_size(obj));
+      printf(" Mean = %.5f \n", Runstat_mean(obj));
+      printf(" Sdev = %.5f \n", Runstat_sdev(obj));
+
+      Runstat_add(obj, -50.0);
+      Runstat_add(obj, 80.0);
+      printf(" Mean = %.5f \n", Runstat_mean(obj));
+      printf(" Sdev = %.5f \n", Runstat_sdev(obj));
+      // Delete C++ Object
+      Runstat_del(obj);
+      return 0;
+  }
+#+END_SRC
+
+ *File: CMakeLists.txt* 
+
+#+BEGIN_SRC cpp 
+  cmake_minimum_required(VERSION 3.9)
+  project( CallCppFromC)
+
+  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+
+  add_executable(main main.c codecpp.cpp codecpp.hpp)
+#+END_SRC
+
+Manual compilation: 
+
+#+BEGIN_SRC sh 
+  # Generate object code codecpp.o 
+  $ g++ codecpp.cpp -o codecpp.o -c -std=c++1z -Wall -g
+
+  # Generate object-code main.o 
+  $ gcc main.c -o main.o -c -g 
+
+  # Link => generate main.bin 
+  $ g++ main.o codecpp.o -o main.bin    
+#+END_SRC
+
+Program output: 
+
+#+BEGIN_SRC sh 
+  ./main.bin 
+
+   == EXPERIMENT 1 - std::string C-wrapper ======
+  str / std::string{ A C++ string in C} 
+  str / std::string{ A C++ string in C - hello world} 
+  str2 / std::string{ A C++ string in C} 
+
+   == EXPERIMENT 2 - Class Runstat ======
+   [TRACE] Object created Ok.
+   Number of Elements processed = 4 
+   Mean = 13.75000 
+   Sdev = 8.95824 
+   Mean = 14.16667 
+   Sdev = 41.69612 
+   [TRACE] Object deleted OK
+#+END_SRC
 
 ** Cross platform Shared Library, C-Interfaces and Language Interoperability
 *** Overview 
@@ -2736,7 +3027,6 @@ View exported symbols demangled (without name mangling):
                    U std::ios_base::Init::Init()
                    U std::ios_base::Init::~Init()
 #+END_SRC
-
 ** Plugins and Dynamically Loading Classes 
 *** Overview  
 
