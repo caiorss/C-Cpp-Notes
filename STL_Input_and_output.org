@@ -490,7 +490,6 @@ Running:
 
 #+END_SRC
 
-
 ** Custom IO manipulators 
 
  *Example: 1* 
@@ -975,6 +974,75 @@ Restore buffer:
   pi = 3.14159 exp(3.5) 33.1155  
 
 #+END_SRC
+** Read whole input stream to string 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+  #include <sstream> 
+  #include <fstream> 
+
+  /** @brief Read whole input stream to a string and returns it 
+    ,* Requires headers: <iostream> and <sstream>
+    ,*/
+  std::string istreamToString(std::istream& is){
+      if(is.bad())
+          throw std::runtime_error("Error: stream has errors.");
+      std::stringstream ss;
+      ss << is.rdbuf();
+      return ss.str();
+  }
+#+END_SRC
+
+Read std::cin stream - console (stdin) 
+
+#+BEGIN_SRC cpp 
+  // Use types a text and types CTRL + D when he is done sending EOF character 
+  >> auto text = istreamToString(std::cin); 
+   A stdin input stream works like a "console file".      
+   In UNIX everything has a file interface, works with a file API, everything is a file.
+   Type CTRL + D to send EOF and close this stream.
+
+  >> std::cout << "text = " << text2 << std::endl;
+  text =  A stdin input stream works like a "console file".
+   In UNIX everything has a file interface, works with a file API, everything is a file.
+   Type CTRL + D to send EOF and close this stream.
+#+END_SRC
+
+Read file input stream: 
+
+#+BEGIN_SRC cpp 
+  >> auto ifs = std::ifstream("/proc/sys/kernel/osrelease")
+  (std::basic_ifstream<char, std::char_traits<char> > &) @0x7f3edbc0a688
+
+  >> auto os_release = istreamToString(ifs)
+  (std::basic_string<char, std::char_traits<char>, std::allocator<char> > &) "4.20.16-100.fc28.x86_64
+  "
+
+  >> std::cout << " =>> Linux-OS Release = " << os_release << std::endl;
+   =>> Linux-OS Release = 4.20.16-100.fc28.x86_64
+#+END_SRC
+
+Read stringstream - memory stream. 
+
+#+BEGIN_SRC cpp 
+  >> std::stringstream ms;
+  >> ms << " UNIX - Linux OS2 Mainframes AIX VxWorks QNX ";
+  >> ms << "\n network TCP IP UDP SOCKET packets";
+  >> ms << " \n binary bits octets speed 3G 4G 5G business flow currency";
+  >> ms << " \n technology price technology technology technology";
+  >> ms << std::flush;
+
+  // Type of txt => std::string 
+  >> auto txt = istreamToString(ms);
+
+  >> std::cout << "text = \n" << txt ;
+  text = 
+   UNIX - Linux OS2 Mainframes AIX VxWorks QNX 
+   network TCP IP UDP SOCKET packets 
+   binary bits octets speed 3G 4G 5G business flow currency 
+#+END_SRC
+
 ** Saving and restoring IO flags 
 *** Manual saving restoring  
 
