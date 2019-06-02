@@ -218,6 +218,279 @@ Flushing manipulators:
   sqrt(pi) = 1.77245 x = 2.5
   >> 
 #+END_SRC
+** Stdout and Stderr stream redirection 
+
+Every process, has the following standard streams: 
+
+ + *stdin* - Standard input (file descriptor 0) => encapsulated by
+   global object *std::cin* (derived class of std::istream)
+
+ + *stdout* - Standard output (file descriptor 1) => encapsulated by
+   global object *std::cout* (derived class of std::ostream)
+   + Normal program console output should use std::cout. 
+
+ + *stderr* - Standard error output (file descriptor 2) => encapsulated
+   by global object *std::cerr* (derived class of std::ostream)
+   + Diagnostics, error and logging should use std::cerr as this
+     approach allows separating logging and diagnostics from program
+     output and redirecting or discarding them.
+
+ *Example:*
+
+ + File: stream-redirect.cpp
+   + Sample program that solves the equation f(x) = x^3 - a = 0 using
+     newton raphson method.
+
+#+BEGIN_SRC cpp 
+  #include <iostream> // std::cout, std::cerr ...
+  #include <string>   // std::stod 
+  #include <cmath>    // std::sin, std::fabs, std::abs, ... 
+  #include <iomanip>  // std::seprecision, std::fixed 
+
+  int main(int argc, char** argv)
+  {
+       // 1e-6 or 6 digits tolerance 
+       double tolerance = 0.000001;
+       // Maximum number of iterationrs 
+       size_t itermax   = 200;
+
+       if(argc < 2)
+       {
+            std::cout << "Solves equation x^3 - a = 0 using Newton Raphson Method" << std::endl;
+            std::cout << " Error: input parameter not provided" << std::endl;
+            return EXIT_FAILURE;
+       }
+
+       //------- Parse Input Argument --------------
+       double a;
+       try {
+               a = std::stod(argv[1]);
+       } catch (std::exception const& ex) {
+               std::cerr << " [ERROR] " << ex.what() << std::endl;
+               return EXIT_FAILURE;
+       }
+
+       double dx, x = a;
+       std::cerr << std::fixed << std::setprecision(4);
+       int w = 10;
+
+       std::cerr << " [INFO] Solving equation f(x) = x^3 - a ; for a = " << a << "\n\n";
+
+       std::cerr << std::setw(w) << "Iter"
+                         << std::setw(w) << "x"
+                         << std::setw(w) << "AbsErr"
+                         << std::setw(w) << "RelErr%"
+                         << std::endl;	
+
+       // Find the cubic root by solving the following equation with
+       // Newton Raphson method: 
+       // =>> F(x) = x^3 - a = 0
+       for(auto iter = 0; iter < itermax; iter++)
+       {
+           dx  = (x * x * x - a ) / ( 2.0 * x * x);
+           x   = x - dx;
+
+           std::cerr << std::setw(w) << iter
+                     << std::setw(w) << x
+                     << std::setw(w) << std::fabs(dx)
+                     << std::setw(w) << 100.0 * std::fabs(dx / x)
+                     << std::endl;
+
+          if(std::fabs(dx) < tolerance * std::fabs(x))
+          {
+              std::cout << " Cubic root of a = " << a
+                        << " ; is approximately " << x
+                        << " number of iteratios is " << iter
+                        << std::endl;
+              return EXIT_SUCCESS;
+          }
+       }
+       std::cerr << " [FAILURE] Root does not converge" << std::endl;
+       return EXIT_FAILURE;
+  }
+#+END_SRC  
+
+Compiling: 
+
+#+BEGIN_SRC sh 
+ # GCC
+ $ g++     stream-redirect.cpp -o stream-redirect.bin -std=c++1z -g -O0 -Wall
+ # Clang / LLVM 
+ $ clang++ stream-redirect.cpp -o stream-redirect.bin -std=c++1z -g -O0 -Wall
+#+END_SRC
+
+Running: 
+
+ + Print all results - the standard streams stdcout (std::cout) and
+   stderr are redirected to console by default.
+ + Note: Stream redirectiion peformed on Bash shell on Linux.
+
+#+BEGIN_SRC text 
+  $ ./stream-redirect.bin 125.0 
+
+   [INFO] Solving equation f(x) = x^3 - a ; for a = 125.0000
+
+        Iter         x    AbsErr   RelErr%
+           0   62.5040   62.4960   99.9872
+           1   31.2680   31.2360   99.8977
+           2   15.6979   15.5701   99.1855
+           3    8.1026    7.5953   93.7396
+           4    5.0033    3.0993   61.9454
+           5    4.9984    0.0049    0.0985
+           6    5.0008    0.0025    0.0492
+           7    4.9996    0.0012    0.0246
+           8    5.0002    0.0006    0.0123
+           9    4.9999    0.0003    0.0062
+          10    5.0001    0.0002    0.0031
+          11    5.0000    0.0001    0.0015
+          12    5.0000    0.0000    0.0008
+          13    5.0000    0.0000    0.0004
+          14    5.0000    0.0000    0.0002
+          15    5.0000    0.0000    0.0001
+   Cubic root of a = 125 ; is approximately 5 number of iteratios is 15
+#+END_SRC
+
+ + Discard stderr standard error stream by redirecting it to
+   /dev/null. Note: valid for Unix-like OSes (Linux, BSD, OSX, QNX ...): 
+   * $ ./program 2> /dev/null 
+
+#+BEGIN_SRC text 
+  $ ./stream-redirect.bin 125.0 2> /dev/null
+   Cubic root of a = 125 ; is approximately 5 number of iteratios is 15
+#+END_SRC
+
+ + Discard stdout - standard output by redirecting it to /dev/null
+   (Unix-like OSes)
+   * $ ./program > /dev/null 
+
+#+BEGIN_SRC text 
+  $ ./stream-redirect.bin 125.0 > /dev/null
+   [INFO] Solving equation f(x) = x^3 - a ; for a = 125.0000
+
+        Iter         x    AbsErr   RelErr%
+           0   62.5040   62.4960   99.9872
+           1   31.2680   31.2360   99.8977
+           2   15.6979   15.5701   99.1855
+           3    8.1026    7.5953   93.7396
+           4    5.0033    3.0993   61.9454
+           5    4.9984    0.0049    0.0985
+           6    5.0008    0.0025    0.0492
+           7    4.9996    0.0012    0.0246
+           8    5.0002    0.0006    0.0123
+           9    4.9999    0.0003    0.0062
+          10    5.0001    0.0002    0.0031
+          11    5.0000    0.0001    0.0015
+          12    5.0000    0.0000    0.0008
+          13    5.0000    0.0000    0.0004
+          14    5.0000    0.0000    0.0002
+          15    5.0000    0.0000    0.0001
+#+END_SRC
+
+ + Redirecto stdout - standard output stream to a file.
+   + ./program > stdout.log 
+
+#+BEGIN_SRC sh 
+  $ ./stream-redirect.bin 125.0 > stdout.log
+   [INFO] Solving equation f(x) = x^3 - a ; for a = 125.0000
+
+        Iter         x    AbsErr   RelErr%
+           0   62.5040   62.4960   99.9872
+           1   31.2680   31.2360   99.8977
+           2   15.6979   15.5701   99.1855
+           3    8.1026    7.5953   93.7396
+           4    5.0033    3.0993   61.9454
+           5    4.9984    0.0049    0.0985
+           6    5.0008    0.0025    0.0492
+           7    4.9996    0.0012    0.0246
+           8    5.0002    0.0006    0.0123
+           9    4.9999    0.0003    0.0062
+          10    5.0001    0.0002    0.0031
+          11    5.0000    0.0001    0.0015
+          12    5.0000    0.0000    0.0008
+          13    5.0000    0.0000    0.0004
+          14    5.0000    0.0000    0.0002
+          15    5.0000    0.0000    0.0001
+
+  # Check file 
+  $ cat stdout.log 
+   Cubic root of a = 125 ; is approximately 5 number of iteratios is 15
+#+END_SRC
+
+ + Redirect stderr (std::cerr) - standard error stream to file.
+   * ./program 2> stderr.log 
+
+#+BEGIN_SRC sh 
+   $ ./stream-redirect.bin 125.0 2> stderr.log
+    Cubic root of a = 125 ; is approximately 5 number of iteratios is 15
+
+   # Show first 5 lines of log file 
+   $ head -n 5 stderr.log 
+    [INFO] Solving equation f(x) = x^3 - a ; for a = 125.0000
+
+         Iter         x    AbsErr   RelErr%
+            0   62.5040   62.4960   99.9872
+            1   31.2680   31.2360   99.8977
+
+   # Show last 5 lines of log file 
+   $ tail -n 5 stderr.log 
+           11    5.0000    0.0001    0.0015
+           12    5.0000    0.0000    0.0008
+           13    5.0000    0.0000    0.0004
+           14    5.0000    0.0000    0.0002
+           15    5.0000    0.0000    0.0001
+#+END_SRC
+
+ + Redirect both streams to different files: stdcout (std::cout) and
+   stderr (std:cerr)
+   + $ ./program > stdout.txt 2> stderr.txt 
+
+#+BEGIN_SRC sh 
+  $ ./stream-redirect.bin 125.0 > stdout.txt 2> stderr.txt
+
+  # Check stdout (std::cout) log file 
+  $ cat stdout.txt 
+   Cubic root of a = 125 ; is approximately 5 number of iteratios is 15
+
+  # Check stderr (std::cerr) log file 
+  $ tail -n 5 stderr.txt 
+          11    5.0000    0.0001    0.0015
+          12    5.0000    0.0000    0.0008
+          13    5.0000    0.0000    0.0004
+          14    5.0000    0.0000    0.0002
+          15    5.0000    0.0000    0.0001
+#+END_SRC
+
+ + Redirect both streams to the same log file.
+   + ./program > log.txt 2>&1
+
+#+BEGIN_SRC text 
+  $ ./stream-redirect.bin 125.0 > log.txt 2>&1 
+
+  $ cat log.txt 
+   [INFO] Solving equation f(x) = x^3 - a ; for a = 125.0000
+
+        Iter         x    AbsErr   RelErr%
+           0   62.5040   62.4960   99.9872
+           1   31.2680   31.2360   99.8977
+           2   15.6979   15.5701   99.1855
+           3    8.1026    7.5953   93.7396
+           4    5.0033    3.0993   61.9454
+           5    4.9984    0.0049    0.0985
+           6    5.0008    0.0025    0.0492
+           7    4.9996    0.0012    0.0246
+           8    5.0002    0.0006    0.0123
+           9    4.9999    0.0003    0.0062
+          10    5.0001    0.0002    0.0031
+          11    5.0000    0.0001    0.0015
+          12    5.0000    0.0000    0.0008
+          13    5.0000    0.0000    0.0004
+          14    5.0000    0.0000    0.0002
+          15    5.0000    0.0000    0.0001
+   Cubic root of a = 125 ; is approximately 5 number of iteratios is 15
+
+#+END_SRC
+
+
 ** Custom IO manipulators 
 
  *Example: 1* 
