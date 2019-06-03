@@ -4067,17 +4067,67 @@ References:
 
  + [[https://blog.lukhnos.org/2009-2012/166322529.html][A Very Short Note on Why C++ Is Not Suitable for Plug-In Architecture]]
 *** Processes and Operating Systems
+**** Protection mode, Kernel and User Spaces  
 
- + *Process*: A unique instance of a running program with its own PID
-   (Process Identifier), address-space, virtual memory and threads. 
+ *Real Mode* 
 
- + *Virtual Memory*: Portion of physical memory assigned to a process by
-   the operating system. In most operating systems, a process cannot
-   access the physical memory, all the memory that it can see and
-   referece is its virtual memory. For instance, the address of a
-   pointer to some variable is not the address of the variable in the
-   physical memory, instead it is the address of the variable in the
-   current process virtual memory.
+  + Old operating systems like Microsft MSDOS and Windows 95 ran in
+    *real mode*, which means that any programs can access the physical
+    memory (RAM memory), memory mapped IO and hardware directly
+    without any restriction which could result in security and
+    stability problems as any process could take down the whole
+    operating system. Summary: no separating between kernel and user
+    spaces. 
+
+ *Protected Mode* 
+
+  + Modern operating systems such as Windows, MacOSX and Linux run in
+    *protected mode*, which has the *kernel space* and *user space*.
+
+  + *User Space* - Programs running in user space, runs with less
+    privilege, they are not allowed to run some CPU machine
+    instructions and to access hardware devices or physical memory
+    directly. Applications in user space, can only a restricted
+    portion of the physical memory assigned by the operating system,
+    called *virtual memory*. This protection is enforced both by the
+    operating system and the processor.
+
+  + *Kernel Space* - Only programs running in kernel space can access
+    the whole physical memory, any process memory and execute all CPU
+    instructions.
+**** Processes ad Virtual Memory 
+
+ *Process* 
+
+  + A unique instance of a running program with its own PID (Process
+    Identifier), address-space, virtual memory and threads. Any
+    application, executable or program can have multiple processes
+    running on the same machine with different states.
+
+*Process State*  (PCB - Process Control Block) Every process has the following states.
+   + CPU Registers (IP Instruction pointer and stack pointer). A CPU
+     core only has a single IP Instruction pointer. However every
+     process has its own IP pointer because the operating system
+     switches between processes in a very fast way performing *context
+     switch*, saving and restoring the CPU register for every process
+     giving the illusion that multiple processes are running
+     simultaneously. 
+   + => PID - Unique Process ID (Identifier) number.
+   + => Command line arguments used to start the process.
+   + => Current directory.
+   + => Environment variables
+   + => One or more threads
+   + => File descriptors associated with the process.
+
+ *Virtual Memory* 
+
+ + Portion of physical memory assigned to a process by the operating
+   system's kernel. In most operating systems, a process cannot access
+   the physical memory, all the memory that it can see and referece is
+   its virtual memory. For instance, the address of a pointer to some
+   variable is not the address of the variable in the physical memory,
+   instead it is the address of the variable in the current process
+   virtual memory.
 
    + => C++ => Pointers to variables stores the numerical value of a
      virtual memory address. (Note: only for programs that runs on
@@ -4092,36 +4142,88 @@ References:
  + Virtual Address
 
  + Process Isolation: One of the purposes of the virtual memory is to
-   not allow a process read the memory of another process. 
+   not allow a user-space process to read the memory of another
+   process.
+   + Note: Operating systems provide APIs for reading and writing
+     process memory, otherwise debuggers would not exist.
 
- + Memory Segments: Every process, no matter the language it was
-   written, has the following memory segments in the virtual memory:
+ + *Virtual Memory Segments*: Every process, no matter the programming
+   language it was written, has the following memory segments in its
+   virtual memory:
 
-   + Stack segment => Stores stack frames, functions local variables and objects and
+   + *Stack segment* => Stores stack frames, functions local variables and objects and
      return addresses.  
 
-   + Heap segment (ak free store) => Dynamically allocated variable
+   + *Heap segment* (ak free store) => Dynamically allocated variable
      with C++ operator new or C function malloc.
 
-   + Data Segment => Stores initialized and non-initialized global
+   + *Data Segment* => Stores initialized and non-initialized global
      variables.
 
-   + Text Segment => Stores the program machine code that cannot be
+   + *Text Segment* => Stores the program machine code that cannot be
      modified. (read-only)
 
- + Process State: Every process has the following states.
-   + => PID - Unique Process ID (Identifier) number.
-   + => Command line arguments.
-   + => Current directory.
-   + => Environment variables
-   + => One or more threads
+ *Other Virtual Memory Segments*
 
- + Operating System APIs - Most operating systems are written in C and
-   their APIs (Application Programming Interfaces) and services are
-   exposed in C language, this API can be:
-   * System Calls => Documented on Linux, BSD and etc. Undocumented on Windows. 
-   * C-APIs basic services. (Win32 API)
+   + Memory Mapped Files (Inter process communication)
+     + Allows a disk file to be mapped into the virtual memory and be
+       accessed just as an ordinary memory through pointer
+       manipulation. This segment can be mapped the virtual memory of
+       many processes without incurring on copying overhead.
 
+   + Shared Memory - allows processes to shared data without copying.
+
+   + Dynamic Library Loading (DLLs)
+
+   + Thread Stack 
+**** System Calls and Operanting Systems C-APIs
+
+Operating System APIs - Most operating systems are written in C and
+processor-specific assembly. Their APIs (Application Programming
+Interfaces) and services are exposed in C language, this API can be:
+
+   + System Calls
+     + => Documented on Linux, BSD and etc. Undocumented on
+       Windows. Note: Linux has fixed number for every system call
+       which is documented and standardize. On Windows, the system
+       calls may change on every release, so it is only safe to rely
+       on the Win32 API encapsulating them.
+
+   + Basic C APIs that encapsulates system calls. Some those APIs are:
+     + Win32 API - Windows API
+     + POSIX API - Standardized UNIX API shared by most Unix-like
+       operating systems, Linux, BSD, MacOSX and so on.
+**** References 
+
+ + Linux System-calls table
+   + https://filippo.io/linux-syscall-table/
+
+ + Linux System Call Table for x86 with parameters
+   * https://thevivekpandey.github.io/posts/2017-09-25-linux-system-calls.html
+
+ + Lecture 2: System Calls &API Standards
+   * https://cw.fel.cvut.cz/old/_media/courses/ae3b33osd/osd-lec2-14.pdf
+
+ + Difference Between Reald and Protected Mode 
+   * https://www.geek.com/chips/difference-between-real-mode-and-protected-mode-574665/
+
+ + OS Segmentation
+   * https://alex.dzyoba.com/blog/os-segmentation/
+
+ + PC Hardware & Booting - IIT Madras 
+   * http://www.cse.iitm.ac.in/~chester/courses/15o_os/slides/3_Hardware.pdf
+
+ + Processes, Addresses Spaces and Context Switches - IIT Madras
+   + http://www.cse.iitm.ac.in/~chester/courses/15o_os/slides/6_Processes.pdf
+
+ + Context Switch – Software vs Hardware Approach
+   + https://shobhitsharda.wordpress.com/2011/05/31/context-switch-software-vs-hardware-approach/
+
+ + Instrumentation usign Free/Open Code 
+   * https://www.uio.no/studier/emner/matnat/fys/FYS3240/v16/lecture-notes/linux.pdf
+
+ + 10 Operating System Concepts Software Developers Need To Remember 
+   + https://medium.com/cracking-the-data-science-interview/the-10-operating-system-concepts-software-developers-need-to-remember-480d0734d710
 ** Common Acronyms, abbreviations and technologies
 
 |------------------------------------------+--------------------------------------------------------------------------------------------------------------|
