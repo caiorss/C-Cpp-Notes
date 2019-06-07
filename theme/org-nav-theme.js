@@ -111,13 +111,16 @@ var initMobileTocMenu = function(){
     
 	// Button top - scroll to page top 
 	//-----------------------------------------------
+	
     var btnTop = document.createElement("button")
+    //btnTop.className = "navButton";
     btnTop.textContent     = "Top";
     btnTop.style.top       = "20px";    
-    btnTop.style.left      = "100px";   
+    btnTop.style.left      = "100px";       
     btnTop.style.position  = "fixed";
     btnTop.style.color     = "white";
     btnTop.style.backgroundColor = "black";
+
     // button.style.zIndex = 10000;
 
     btnTop.addEventListener("click", function(){
@@ -127,10 +130,10 @@ var initMobileTocMenu = function(){
     
 	// Button bottom - scroll to page bottom 
 	//-------------------------------------------
-    var btnBottom = document.createElement("button")
-    btnBottom.textContent     = "Bottom";
-    btnBottom.style.top       = "20px";    
-    btnBottom.style.left      = "200px";   
+    var btnBottom = document.createElement("button");
+    btnBottom.textContent = "Bottom";
+    btnBottom.style.top   = "20px";   
+    btnBottom.style.left  = "200px";      
     btnBottom.style.position  = "fixed";
     btnBottom.style.color     = "white";
     btnBottom.style.backgroundColor = "black";    
@@ -187,8 +190,7 @@ var initMobileTocMenu = function(){
 
 
 var initDesktopMenu = function () {
-    var xoffset  =  50;
-    var btnWidth = "60px";
+    var xoffset  =  50;    
 
     var cont = document.querySelector("#content");
     var boundRectangle = cont.getBoundingClientRect();
@@ -196,15 +198,12 @@ var initDesktopMenu = function () {
     var body = document.querySelector("body");
 
     var makeMenuButton = function(caption, ypos){
-        var button = document.createElement("button")
-        body.appendChild(button);
+        var button = document.createElement("button");
+        body.appendChild(button);       
+        button.className = "navButton";        
         button.textContent     = caption;
-        button.style.width     = btnWidth;
         button.style.top       = ypos;
-        button.style.left      = xpos;
-        button.style.position  = "fixed";
-        button.style.backgroundColor = "black";
-        button.style.color = "white";
+        button.style.left      = xpos;                       
         return button
     };
 
