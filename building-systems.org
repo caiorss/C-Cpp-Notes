@@ -911,69 +911,99 @@ Project directory structure:
      + lib/lib2.cpp
      + lib/lib3.cpp
 
-CMakeLists.txt file for this hypothetical project.
 
-#+CAPTION: CMakeLists.txt file for a project with multiple targets. 
+  File: *CMakeLists.txt* file for this hypothetical project.
+
+Global configuration: 
+ + Note: Global settings such _add_definitions_ and _include_directories_
+   should be avoided.  
+
 #+BEGIN_SRC cmake 
-  # ========= Global Configuration  ===============#
-  # The global configuration is shared by all targets. 
+   # ========= Global Configuration  ===============#
+   # The global configuration is shared by all targets. 
+   cmake_minimum_required(VERSION 3.9)
+ 
+   project( SuperCADTool
+            # Note: the following fields are optional 
+            DESCRIPTION "Another CAD Computer Aided Design APP"
+            VERSION     1.0 
+            LANGUAGE    CXX 
+          )
+ 
+   set(CMAKE_CXX_STANDARD 17)     
+   set(CMAKE_VERBOSE_MAKEFILE ON)
 
-  cmake_minimum_required(VERSION 3.9)
-  project(SuperCADTool)
-  set(CMAKE_CXX_STANDARD 17)     
-  set(CMAKE_VERBOSE_MAKEFILE ON)
+  # Global compile definition
+  # Add compiled definition -DQT_QML_DEBUG for all target.s 
+  add_definitions(-DQT_QML_DEBUG)
 
+  # Global includes added to all targets 
+  include_directories("C:\\boost\\v1.67\\include"  "/home/someone/includes")
+ 
+   # Global linking directories which contains static (*.a) or shared
+   # libraries (*.so or *.dll files)
   link_directories(  
-    # C:\Users\DummyUser\libs
-    "C:\\Users\\DummyUser\\libs" # Windows paths with backward slash must be escaped with '\'
-    "C:/libs/Graphics"           # Windows paths with forward slash 
-    "/home/DummyUser/libs" 
-  )
-
-  # ======= Configuration per target =============#
- 
-  # Target: SampleApp executable 
-  #---------------------------------------------------------
-  add_executable(SampleApp src/main.cpp src/source1.cpp src/source2.cpp) 
-  target_compile_definitions(SampleApp PRIVATE VERBOSITY=100 Optimize foo=bar)
-  target_include_directories(SampleApp PUBLIC src/include1 /home/usr/include)
-
-  target_link_libraries(SampleApp  
-          GL blas opencv ole32 user32  # System libraries  /usr/lib/*.so files on Linux 
-                                       # or *.lib files for MSVC VC++/Windows compiler and DLLs 
-                                       # at C:\Windows\System32
-          SampleSharedLib              # Project shared library 
-          StaticLibrary                # Project static library 
-  )
-
- # Target: Executable2 
- #-----------------------------------------------------------------
- add_executable(Executable2 src/execMain.cpp src/source1.cpp src/source2.cpp src/source3.cpp) 
-
- # Target: SampleShared - Shared library dll, so 
- #-------------------------------------------------------------------
- add_library(SampleSharedLib SHARED  lib/lib1.cpp lib/lib2.cpp lib/lib3.cpp)
- target_include_directories(SampleSharedLib PRIVATE src/lib/include1)
-
- # Install binaries locally during development.
- # The binaries are installed in project's "${ROOT DIRECTORY}./bin" 
- #----------------------------------------------------------------------
- 
- # During the development install ./bin dir.  in project's root directory 
- # To install using CMAKE_INSTALL_PREFIX path, set this variable to 'OFF'
- set(INSTALL_LOCAL ON) 
-
- if(INSTALL_LOCAL ON)
-   # Overrides the default default install location that would be 
-   # ${CMAKE_INSTALL_PREFIX}/bin as ${CMAKE_CURRENT_LIST_DIR}/bin 
-   #
-   # Note: CMAKE_CURRENT_LIST_DIR is the directory where is CMakeLists.txt 
-   install(TARGETS SampleApp Executable2 SampleSharedLib DESTINATION  ${CMAKE_CURRENT_LIST_DIR}/bin)
- else()
-   # Install binary to directory probvided by the variable CMAKE_INSTALL_PREFIX 
-   install(TARGETS SampleApp Executable2 SampleSharedLib DESTINATION  bin)
- endif()
+     # C:\Users\DummyUser\libs
+     "C:\\Users\\DummyUser\\libs" # Windows paths with backward slash must be escaped with '\'
+     "C:/libs/Graphics"           # Windows paths with forward slash 
+     "/home/DummyUser/libs" 
+   )
 #+END_SRC
+
+Target Configurations: 
+
+#+BEGIN_SRC cmake 
+   # ======= Configuration per target =============#
+
+   # Target: SampleApp executable 
+   #---------------------------------------------------------
+   add_executable(SampleApp src/main.cpp src/source1.cpp src/source2.cpp) 
+   target_compile_definitions(SampleApp PRIVATE VERBOSITY=100 Optimize foo=bar)
+   target_include_directories(SampleApp PUBLIC src/include1 /home/usr/include)
+
+   target_link_libraries(SampleApp  
+           GL blas opencv ole32 user32  # System libraries  /usr/lib/*.so files on Linux 
+                                        # or *.lib files for MSVC VC++/Windows compiler and DLLs 
+                                        # at C:\Windows\System32
+           SampleSharedLib              # Project shared library 
+           StaticLibrary                # Project static library 
+   )
+
+  # Target: Executable2 
+  #-----------------------------------------------------------------
+  add_executable(Executable2 src/execMain.cpp src/source1.cpp src/source2.cpp src/source3.cpp) 
+
+  # Target: SampleShared - Shared library dll, so 
+  #-------------------------------------------------------------------
+  add_library(SampleSharedLib SHARED  lib/lib1.cpp lib/lib2.cpp lib/lib3.cpp)
+  target_include_directories(SampleSharedLib PRIVATE src/lib/include1)
+#+END_SRC
+
+Intallation commands: 
+
+#+BEGIN_SRC cmake 
+  # Install binaries locally during development.
+  # The binaries are installed in project's "${ROOT DIRECTORY}./bin" 
+  #----------------------------------------------------------------------
+
+  # During the development install ./bin dir.  in project's root directory 
+  # To install using CMAKE_INSTALL_PREFIX path, set this variable to 'OFF'
+  set(INSTALL_LOCAL ON) 
+
+  if(INSTALL_LOCAL ON)
+    # Overrides the default default install location that would be 
+    # ${CMAKE_INSTALL_PREFIX}/bin as ${CMAKE_CURRENT_LIST_DIR}/bin 
+    #
+    # Note: CMAKE_CURRENT_LIST_DIR is the directory where is CMakeLists.txt 
+    install(TARGETS SampleApp Executable2 SampleSharedLib DESTINATION  ${CMAKE_CURRENT_LIST_DIR}/bin)
+  else()
+    # Install binary to directory probvided by the variable CMAKE_INSTALL_PREFIX 
+    install(TARGETS SampleApp Executable2 SampleSharedLib DESTINATION  bin)
+  endif()
+#+END_SRC
+
+
+ *Compilation:*
 
 Once the project file CMakeLists.txt is opened in any supported IDE or
 an text editor such as QTCreator, the IDE will show all available
