@@ -218,7 +218,8 @@ Flushing manipulators:
   sqrt(pi) = 1.77245 x = 2.5
   >> 
 #+END_SRC
-** Stdout and Stderr stream redirection 
+** IO stream redirection  
+*** Stdout (cout) and Stderr (cerr) stream redirection
 
 Every process, has the following standard streams: 
 
@@ -238,7 +239,7 @@ Every process, has the following standard streams:
      is not so common as in Unix-like operating system as terminal
      application are not so used in Windows as in Unix-like platforms.
    + Note: A Windows application compiled for GUI subsystem will not
-     display any output stream even if it is run from the terminal.
+     display any output stream even if it is run from the terminal. 
 
  *Example:*
 
@@ -494,6 +495,171 @@ Running:
    Cubic root of a = 125 ; is approximately 5 number of iteratios is 15
 
 #+END_SRC
+
+*** Stdin (cin) stream redirection 
+
+ *File:* input-redirection.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream> // Import: std::cout, std::cin, std::cerr 
+  #include <iomanip>  // Import: std::setw 
+  #include <string>   // Import: std::string
+  #include <functional> // Import: std::function 
+
+  int main(int argc, char** argv)
+  {
+       if(argc > 1 && std::string(argv[1]) == "--help")
+       {
+           std::cout << "Count line numbers of some file." << std::endl;
+           std::cout << " Usage: \n"
+                     << "  $  " << argv[0] << " < file.txt \n"
+                     << "  $  cat file.txt | " << argv[0] << "\n\n";
+           // Early return 
+           return 0;
+       }	
+
+       std::string line;
+       long counter  = -1;
+
+       // Self-executable lambda used for returning a value from the if-else 
+       bool showLine = [&]{
+                             if(argc > 1 && std::string(argv[1]) == "--show-line")
+                                     return true;
+                             return false;
+                     }();
+
+       std::cerr << std::boolalpha << " [INFO] showLine = " << showLine << std::endl;
+
+       /* Note: The comma opeator evaluates first (counter++) and then 
+        ,* evaluates std::getline(std::cin, line) returning its value. 
+        ,*/
+       while(counter++, std::getline(std::cin, line)){
+            if(showLine)
+            {
+                    std::cout << "\n" << std::right << std::setw(4) << counter
+                                      << " "  << std::left  << std::setw(8) <<  line;
+            }
+       }
+
+       std::cout << "\n\n File has " << counter << " lines " << std::endl;	
+       return 0; 
+  }
+
+#+END_SRC
+
+ *Compiling:* 
+
+#+BEGIN_SRC sh 
+ # Clang 
+ $ clang++ input-redirection.cpp -o input-redirection.bin -std=c++1z -g -O0 -Wall
+ 
+ # GCC 
+ $ gcc++ input-redirection.cpp -o input-redirection.bin -std=c++1z -g -O0 -Wall
+#+END_SRC
+
+  *Usage*: 
+
+Display help: 
+
+#+BEGIN_SRC sh 
+  $ ./input-redirection.bin --help
+  Count line numbers of some file.
+   Usage: 
+    $  ./input-redirection.bin < file.txt 
+    $  cat file.txt | ./input-redirection.bin
+#+END_SRC
+
+Count number of line in input stream stdin (std::cin) typed by user: 
+ + Note: When the user is done, he types CTRL + D to send EOF (End Of
+   File) character to process. 
+
+#+BEGIN_SRC sh 
+  $ ./input-redirection.bin
+   [INFO] showLine = false
+  DXY index 
+    VIX implied volatility 
+       VAR VALUE AT RISK 
+       standard deviation commodity prices 
+           monte carlo simulations stochastic volatility
+
+    Finaly user types CTRL + D when he is done to send EOF signal character to process.
+
+   File has 7 lines 
+#+END_SRC
+
+Redirect output stream (stdout) of *echo* program to input stream
+(stdin) of input-redirection.bin: 
+
+#+BEGIN_SRC sh 
+  $ echo -e " line0\n line1\n line2" 
+   line0
+   line1
+   line2
+
+  $ echo -e " line0\n line1\n line2" | ./input-redirection.bin 
+   [INFO] showLine = false
+
+
+   File has 3 lines 
+
+
+  $ echo -e " line0\n line1\n line2" | ./input-redirection.bin --show-line
+   [INFO] showLine = true
+
+     0    line0
+     1    line1
+     2    line2
+
+   File has 3 lines 
+#+END_SRC
+
+Redirect file to input stream (stdin) of process
+input-redirection.bin: 
+
+#+BEGIN_SRC sh 
+   # Show test file 
+   #-------------------------------------------------
+   $ cat /etc/filesystems 
+   ext4
+   ext3
+   ext2
+   nodev proc
+   nodev devpts
+   iso9660
+   vfat
+   hfs
+   hfsplus
+   *
+
+   # Redirect test file to process' input stream without displaying lines 
+   #-------------------------------------------------
+   $ ./input-redirection.bin < /etc/filesystems 
+    [INFO] showLine = false
+
+
+    File has 10 lines 
+
+   # Redirect test file to process' input stream displaying its lines 
+   #-------------------------------------------------
+   $ ./input-redirection.bin --show-line < /etc/filesystems 
+    [INFO] showLine = true
+
+      0 ext4    
+      1 ext3    
+      2 ext2    
+      3 nodev proc
+      4 nodev devpts
+      5 iso9660 
+      6 vfat    
+      7 hfs     
+      8 hfsplus 
+      9 *       
+
+    File has 10 lines 
+#+END_SRC
+
+
+
 
 ** Custom IO manipulators 
 
