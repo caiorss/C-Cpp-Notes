@@ -2528,7 +2528,7 @@ List installed library in local cache:
            libcurl/7.61.1@bincrafters/stable
 #+END_SRC
 
-** Example CMake Project with Conan 
+** Example CMake/Conan project  
 **** Project Files
 
 Gist: https://gist.github.com/caiorss/5067e2981488aff1b5765b02adbfdffc 
@@ -2979,6 +2979,316 @@ Run the executable bin/poco
    hopopt	0	HOPOPT		# hop-by-hop options for ipv6
 
    ... .... ... ... .... ... ... .... ... ... .... ... ... .... ... 
+#+END_SRC
+** Example CMake/Conan project with conan-cmake module 
+**** Project Files 
+
+This sample project uses the CMake wrapper [[https://github.com/conan-io/cmake-conan][cmake-conan]] for integrating
+Conan and CMake without the file conanfile.txt or running conan from
+command line before using CMake. 
+
+CMake Module cmake-conan: 
+ + https://github.com/conan-io/cmake-conan
+
+Project Gist: 
+ + https://gist.github.com/caiorss/7b0732f5de5ebc40981521e63a122d8e
+
+Packages used in this sample project: (Conan reference)
+ + [[https://bintray.com/bincrafters/public-conan/gtest%253Abincrafters/1.8.1%253Astable][gtest/1.8.1@bincrafters/stable]]
+ + [[https://bintray.com/pocoproject/conan/Poco%253Apocoproject/1.9.0%253Astable][Poco/1.9.0@pocoproject/stable]]
+
+This project can be downloaded with: 
+
+#+BEGIN_SRC sh 
+  # Clone repository 
+  $ git clone https://gist.github.com/caiorss/7b0732f5de5ebc40981521e63a122d8e gist 
+  $ cd gist 
+ 
+  # Open in QTCreator IDE 
+  $ qtcrator CMakeLists.txt 
+#+END_SRC
+
+ *File: CMakeLists.txt* 
+
+#+BEGIN_SRC cmake 
+  cmake_minimum_required(VERSION 3.9)
+
+  #========== Global Configurations =============#
+  #----------------------------------------------#
+  project(ConanTesting CXX)
+  set(CMAKE_CXX_STANDARD 17)     
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+
+  # ============= Conan Bootstrap =============================#
+
+  # Download automatically, you can also just copy the conan.cmake file
+  if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan.cmake")
+     message(STATUS "Downloading conan.cmake from https://github.com/conan-io/cmake-conan")
+     file(DOWNLOAD "https://github.com/conan-io/cmake-conan/raw/v0.13/conan.cmake"
+                   "${CMAKE_BINARY_DIR}/conan.cmake")
+  endif()
+
+  include(${CMAKE_BINARY_DIR}/conan.cmake)
+
+  conan_cmake_run(REQUIRES
+
+                  # Libraries to be installed locally
+                  Poco/1.9.0@pocoproject/stable
+                  gtest/1.8.1@bincrafters/stable
+
+                  BASIC_SETUP
+                  BUILD missing
+                  )
+
+  #========== Find Packages =====================#
+
+  find_package(GTest REQUIRED)
+
+  # find_package(Poco  REQUIRED Foundation)
+
+  #========== Targets Configurations ============#
+
+
+  # ==> Target for testing POCO Libraries 
+  add_executable(poco demo-poco.cpp)
+  target_link_libraries(poco PRIVATE ${CONAN_LIBS})
+
+  # ==> Target for testing GogleTest 
+  add_executable(agtest demo-gtest.cpp)
+  target_link_libraries(agtest PRIVATE GTest::GTest GTest::Main)
+  add_test(MyGoogleTest agtest)
+
+  install(TARGETS poco agtest  DESTINATION ./bin)
+#+END_SRC
+
+ *File: demog-gtest.cpp* 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <Poco/Process.h>
+  #include <gtest/gtest.h>
+
+  auto FunctionObject = [](int n){ return 5 * n + 4; };
+
+  TEST(testA, FunctionObject)
+  {
+          EXPECT_EQ(19, FunctionObject(3));
+  }
+
+  TEST(testC, FunctionObject)
+  {
+          EXPECT_EQ(123, FunctionObject(5));
+  }
+
+  TEST(testB, FunctionObject)
+  {
+          EXPECT_EQ(24, FunctionObject(4));
+  }
+#+END_SRC
+
+ *File: poco-test.cpp* 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <Poco/Process.h>
+
+  int main()
+  {
+      std::cout << "Running POCO Libraries Launch." << std::endl;
+      std::cout << "Poco Libraries are AWESOME!" << std::endl;
+
+      #if !defined(_WIN32)
+        std::cerr << " [INFO] I am running on some Unix-like Operating System." << std::endl;
+            Poco::Process::launch("cat", {"/etc/protocols"});
+          #else
+        std::cerr << " [INFO] I am running on Windows." << std::endl;
+            Poco::Process::launch("notepad.exe", {});
+      #endif
+
+          return 0;
+  }
+#+END_SRC
+
+**** Building on Linux/Unix 
+
+Clone repository: 
+
+#+BEGIN_SRC sh 
+  $ git clone https://gist.github.com/caiorss/7b0732f5de5ebc40981521e63a122d8e gist 
+  Cloning into 'gist'...
+  remote: Enumerating objects: 8, done.
+  remote: Counting objects: 100% (8/8), done.
+  remote: Compressing objects: 100% (8/8), done.
+  remote: Total 8 (delta 1), reused 0 (delta 0), pack-reused 0
+  Unpacking objects: 100% (8/8), done.
+#+END_SRC
+
+Show project files: 
+
+#+BEGIN_SRC sh 
+  $ ls gist/
+  CMakeLists.txt  demo-gtest.cpp  demo-poco.cpp
+#+END_SRC
+
+CMake - configuration => Generate project files. 
+
+ + $ cmake -Hgist -Bcache -GNinja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=.
+   * -Hgist
+     * => Set source code location to directory ./gist
+   * -Bcache
+     * => Set binary output directory to ./cache
+   * -GNinja
+     + => Use Ninja build instead of Makefile
+   * -DCMAKE_BUILD_TYPE=Debug
+     + => Enable debug build which generates debugging symbols and disable optimization.
+   * -DCMAKE_INSTALL_PREFIX=.
+     + => Set install directory to current directory (PWD)
+
+#+BEGIN_SRC sh 
+  $ cmake -Hgist -Bcache -GNinja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=. 
+
+  -- The CXX compiler identification is GNU 8.3.1
+  -- Check for working CXX compiler: /usr/lib64/ccache/c++
+  -- Check for working CXX compiler: /usr/lib64/ccache/c++ -- works
+  -- Detecting CXX compiler ABI info
+  -- Detecting CXX compiler ABI info - done
+  -- Detecting CXX compile features
+  -- Detecting CXX compile features - done
+  -- Downloading conan.cmake from https://github.com/conan-io/cmake-conan
+  -- Conan: Automatic detection of conan settings from cmake
+  -- Conan: Settings= -s;build_type=Debug;-s;compiler=gcc;-s;compiler.version=8;-s;compiler.libcxx=libstdc++11
+  -- Conan executing: conan install . -s build_type=Debug -s compiler=gcc -s compiler.version=8 -s compiler.libcxx=libstdc++11 -g=cmake --build=missing
+  -- Configuration:
+  [settings]
+  arch=x86_64
+  arch_build=x86_64
+  build_type=Debug
+  compiler=gcc
+  compiler.libcxx=libstdc++11
+  compiler.version=8
+  os=Linux
+  os_build=Linux
+  [options]
+  [build_requires]
+  [env]
+
+  conanfile.txt: Installing package
+  Requirements
+      OpenSSL/1.0.2o@conan/stable from 'conan-center' - Cache
+      Poco/1.9.0@pocoproject/stable from 'conan-center' - Cache
+      gtest/1.8.1@bincrafters/stable from 'conan-center' - Cache
+      zlib/1.2.11@conan/stable from 'conan-center' - Cache
+  Packages
+      OpenSSL/1.0.2o@conan/stable:9c111a8074926a7147291383e3d366f41bac77b3 - Cache
+      Poco/1.9.0@pocoproject/stable:5d73f6d80f86b797938bd4121e0ee66b325e7063 - Cache
+      gtest/1.8.1@bincrafters/stable:884a98ecd973519f5d71b74c29f9e7ddcbd902d4 - Cache
+      zlib/1.2.11@conan/stable:761432f3453a17c960259b5b2605153e3bcffd7d - Cache
+
+  gtest/1.8.1@bincrafters/stable: Already installed!
+  zlib/1.2.11@conan/stable: Already installed!
+  OpenSSL/1.0.2o@conan/stable: Already installed!
+  Poco/1.9.0@pocoproject/stable: Already installed!
+  conanfile.txt: Generator cmake created conanbuildinfo.cmake
+  conanfile.txt: Generator txt created conanbuildinfo.txt
+  conanfile.txt: Generated conaninfo.txt
+  conanfile.txt: Generated graphinfo
+
+  -- Conan: Loading conanbuildinfo.cmake
+  -- Conan: Adjusting output directories
+  -- Conan: Using cmake global configuration
+  -- Conan: Adjusting default RPATHs Conan policies
+  -- Conan: Adjusting language standard
+  -- Current conanbuildinfo.cmake directory: /home/archbox/projects/cache
+  -- Conan: Compiler GCC>=5, checking major version 8
+  -- Conan: Checking correct version: 8
+  -- Found GTest: /home/archbox/.conan/data/gtest/1.8.1/bincrafters/stable/package/884a98ecd973519f5d71b74c29f9e7ddcbd902d4/lib/libgtestd.a  
+  -- Looking for C++ include pthread.h
+  -- Looking for C++ include pthread.h - found
+  -- Looking for pthread_create
+  -- Looking for pthread_create - not found
+  -- Looking for pthread_create in pthreads
+  -- Looking for pthread_create in pthreads - not found
+  -- Looking for pthread_create in pthread
+  -- Looking for pthread_create in pthread - found
+  -- Found Threads: TRUE  
+  -- Configuring done
+  -- Generating done
+  -- Build files have been written to: /home/archbox/projects/cache
+
+#+END_SRC
+
+Show cache directory: 
+
+#+BEGIN_SRC sh 
+  $ tree -L 2 cache
+  cache
+  ├── bin
+  │   ├── agtest
+  │   └── poco
+  ├── build.ninja
+  ├── CMakeCache.txt
+  ├── CMakeFiles
+  │   ├── 3.14.3
+  │   ├── agtest.dir
+  │   ├── CheckLibraryExists
+  │   ├── cmake.check_cache
+  │   ├── CMakeError.log
+  │   ├── CMakeOutput.log
+  │   ├── CMakeTmp
+  │   ├── feature_tests.bin
+  │   ├── feature_tests.cxx
+  │   ├── poco.dir
+  │   └── TargetDirectories.txt
+  ├── cmake_install.cmake
+  ├── conanbuildinfo.cmake
+  ├── conanbuildinfo.txt
+  ├── conan.cmake
+  ├── conanfile.txt
+  ├── conaninfo.txt
+  ├── graph_info.json
+  └── rules.ninja
+
+  7 directories, 18 files
+#+END_SRC
+
+Build all targets: 
+
+#+BEGIN_SRC sh 
+  $ cmake --build cache --target 
+  [4/4] Linking CXX executable bin/agtest
+#+END_SRC
+
+Run executable agtest (GoogleTest)
+
+#+BEGIN_SRC sh 
+ $ cache/bin/agtest  
+#+END_SRC
+
+Run executable poco
+
+#+BEGIN_SRC sh 
+  $ cache/bin/poco 
+#+END_SRC
+
+Install: 
+
+#+BEGIN_SRC sh 
+  $ cmake --build cache --target install
+  [0/1] Install the project...
+  -- Install configuration: "Debug"
+  -- Installing: /home/archbox/projects/./bin/poco
+  -- Set runtime path of "/home/archbox/projects/./bin/poco" to ""
+  -- Installing: /home/archbox/projects/./bin/agtest
+  -- Set runtime path of "/home/archbox/projects/./bin/agtest" to ""
+
+ $ ls bin/
+ agtest*  poco*
+
+ # Run app ./agtest 
+ $ bin/agtest 
+  
+ # Run app poco 
+ $ bin/poco 
 #+END_SRC
 * Vcpkg package manager 
 ** Documentation 
