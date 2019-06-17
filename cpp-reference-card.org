@@ -388,7 +388,6 @@ Better:
 
  + [[https://root.cern.ch/blog/rootrwhy][ROOT::RWhy! | ROOT a Data analysis Framework]]
 
-
 ** Standard Library, STL and language features Map 
 *** Standard Library Documentation 
 
@@ -3318,7 +3317,8 @@ Output example:
 #+BEGIN_SRC sh 
    math1.cpp:10: ; x * x + 10 = 19
 #+END_SRC
-*** Macros for Assertion 
+*** Custom Assertion Macro 
+**** Macro 1 
 
 Example: 
 
@@ -3354,6 +3354,52 @@ When the assertion fails, it prints the message:
    [ASSERTION] scractch.cpp:33: Assumption: x > 200
   scractch.bin: scractch.cpp:33: int main(): Assertion `x > 200' failed.
 
+#+END_SRC
+**** Macro 2 
+
+This assertion macro provides more context information than *assert* 
+from <cassert> header. When the predicate of an assertion failure
+happens, this assertion macro prints the file name, line, function and
+assertion predicate where the failure happened and then terminates the
+program calling std::terminate. 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+
+  #define ENABLE_ASSERT
+
+  #ifdef ENABLE_ASSERT
+  #define M_ASSERT(expr) \
+        { \
+           if(!(expr)){ \
+              std::cerr << "ASSERTION FAILURE: \n"; \
+              std::cerr << " => Condition: " << #expr << "\n"; \
+              std::cerr << " =>  Function: " << __FUNCTION__ << "\n"; \
+              std::cerr << __FILE__ << ":" << __LINE__ << ":" << "\n"; \
+              std::terminate(); \
+           } \
+        }
+  #else
+  #define M_ASSERT(expr)
+  #endif
+#+END_SRC
+
+Usage: 
+
+#+BEGIN_SRC cpp 
+    XMLElement* node = elem->FirstChildElement("CubeX");
+    M_ASSERT(node != nullptr);
+#+END_SRC
+
+Program output when assertion fails:  
+
+#+BEGIN_SRC sh 
+  ... ... ... ... 
+  ASSERTION FAILURE: 
+   => Condition: node != nullptr
+   =>  Function: main
+  tinyxml2-test.cpp:64:
+  terminate called without an active exception
 #+END_SRC
 
 *** Tips and guidelines for writing macros 
