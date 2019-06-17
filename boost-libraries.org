@@ -3780,6 +3780,329 @@ Program output:
    DummyClass { x = 400 ; y = -641 ; N = 300 } =>  List[  ]
 #+END_SRC
 
+** TinyXML2 - Lightweight XML parser 
+
+Simple and ligtweight C++ library for parsing XML files.
+
+Site:
+ + http://leethomason.github.io/tinyxml2/
+
+Repository:
+ + https://github.com/leethomason/tinyxml2
+
+Conan Reference: 
+ + [[https://bintray.com/nicolastagliani/tinyxml2/tinyxml2%253Anicolastagliani/7.0.1%253Astable][tinyxml2/7.0.1@nicolastagliani/stable]] 
+
+Conan package repository: 
+ + https://github.com/nicolastagliani/conan-tinyxml2/
+
+ *Example:*
+
+Full Project Code: 
+
+ + https://gist.github.com/caiorss/351e291b8df2b0fc8e1bba5c86b7ee4d
+
+
+ File: *tinyxml2-test.cpp*
+
+ + This file parses the XML taken from [[https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml][eurofxref-daily.xml]] which
+   contains a set of FX exchange rates. 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <iomanip>
+
+  #include <tinyxml2.h>
+
+  #define ENABLE_ASSERT
+
+  #ifdef ENABLE_ASSERT
+  #define M_ASSERT(expr) \
+        { \
+           if(!(expr)){ \
+              std::cerr << "ASSERTION FAILURE: \n"; \
+              std::cerr << " => Condition: " << #expr << "\n"; \
+              std::cerr << " =>  Function: " << __FUNCTION__ << "\n"; \
+              std::cerr << __FILE__ << ":" << __LINE__ << ":" << "\n"; \
+              std::terminate(); \
+           } \
+        }
+  #else
+  #define M_ASSERT(expr)
+  #endif
+
+  using tinyxml2::XMLText;
+  using tinyxml2::XMLElement;
+  using tinyxml2::XMLNode;
+
+  extern const char* exchangeRatesXML;
+
+  int main()
+  {
+
+      std::cout << " [INFO] Running TinyXMl2 " << std::endl;
+
+      tinyxml2::XMLDocument doc;
+
+      if(doc.Parse( exchangeRatesXML) != tinyxml2::XML_SUCCESS)
+      {
+          std::cout << " [ERROR] Failed to parse XML" << std::endl;
+          return EXIT_FAILURE;
+      }
+      std::cout << " [OK] XML parsed successfully" << std::endl;
+
+
+      tinyxml2::XMLPrinter printer;
+      doc.Print(&printer);
+
+      std::cout << "Value: doc.FirstChild()->Value() = " << doc.FirstChild()->Value() << std::endl;
+
+      XMLElement* elem = doc.FirstChildElement("gesmes:Envelope");
+      M_ASSERT(elem != nullptr);
+      if(elem){
+          std::cout << " Element found. OK " << std::endl;
+          std::cout << " =>> Element Name = " << elem->Name() << std::endl;
+
+      }
+
+      XMLElement* elem1 = elem->FirstChildElement("Cube");
+      M_ASSERT(elem1 != nullptr);
+
+      std::cout << " =>> Found Node Name: " << elem1->ToElement()->Name() << "\n";
+
+      XMLElement* elem2 = elem1->FirstChildElement("Cube");
+      M_ASSERT(elem2 != nullptr);
+
+      const char* time = elem2->Attribute("time");
+      M_ASSERT(time != nullptr);
+
+      // XML node with: <Cube time = 'xxxx-xx-xx'>
+      std::cout << " => Time = " << time << "\n\n";
+      std::cout << std::fixed << std::setprecision(3);
+
+      std::cout << " ===== Exchange rates in Euros ====" << std::endl;
+
+      for(XMLElement* e = elem2->FirstChildElement("Cube")
+               ; e != nullptr; e = e->NextSiblingElement("Cube") )
+      {
+          std::cout << std::setw(10) << e->Attribute("currency")
+                    << std::setw(15) << std::stod(e->Attribute("rate"))
+                    << std::endl;
+      }
+
+
+      return doc.ErrorID();
+  }
+
+  // Source: https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml
+  const char* exchangeRatesXML = R"(
+     <?xml version="1.0" encoding="UTF-8"?>
+     <gesmes:Envelope 
+                  xmlns:gesmes="http://www.gesmes.org/xml/2002-08-01" 
+                  xmlns="http://www.ecb.int/vocabulary/2002-08-01/eurofxref">
+
+             <gesmes:subject>Reference rates</gesmes:subject>
+             <gesmes:Sender>
+                     <gesmes:name>European Central Bank</gesmes:name>
+             </gesmes:Sender>
+             <Cube>
+                     <Cube time='2019-06-14'>
+                             <Cube currency='USD' rate='1.1265'/>
+                             <Cube currency='JPY' rate='121.90'/>
+                             <Cube currency='BGN' rate='1.9558'/>
+                             <Cube currency='CZK' rate='25.540'/>
+                             <Cube currency='DKK' rate='7.4676'/>
+                             <Cube currency='GBP' rate='0.89093'/>
+                             <Cube currency='HUF' rate='321.53'/>
+                             <Cube currency='PLN' rate='4.2534'/>
+                             <Cube currency='RON' rate='4.7233'/>
+                             <Cube currency='SEK' rate='10.6390'/>
+                             <Cube currency='CHF' rate='1.1211'/>
+                             <Cube currency='ISK' rate='141.50'/>
+                             <Cube currency='NOK' rate='9.7728'/>
+                             <Cube currency='HRK' rate='7.4105'/>
+                             <Cube currency='RUB' rate='72.3880'/>
+                             <Cube currency='TRY' rate='6.6427'/>
+                             <Cube currency='AUD' rate='1.6324'/>
+                             <Cube currency='BRL' rate='4.3423'/>
+                             <Cube currency='CAD' rate='1.5018'/>
+                             <Cube currency='CNY' rate='7.7997'/>
+                             <Cube currency='HKD' rate='8.8170'/>
+                             <Cube currency='IDR' rate='16128.10'/>
+                             <Cube currency='ILS' rate='4.0518'/>
+                             <Cube currency='INR' rate='78.6080'/>
+                             <Cube currency='KRW' rate='1333.60'/>
+                             <Cube currency='MXN' rate='21.6073'/>
+                             <Cube currency='MYR' rate='4.6981'/>
+                             <Cube currency='NZD' rate='1.7241'/>
+                             <Cube currency='PHP' rate='58.539'/>
+                             <Cube currency='SGD' rate='1.5403'/>
+                             <Cube currency='THB' rate='35.101'/>
+                             <Cube currency='ZAR' rate='16.6529'/>
+                     </Cube>
+             </Cube>
+     </gesmes:Envelope>
+  )";
+#+END_SRC
+
+ File: *CMakeLists.txt* 
+
+#+BEGIN_SRC cmake 
+  cmake_minimum_required(VERSION 3.9)
+  project(tinyxml2-test)
+
+  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+
+  #=========== Conan Bootstrap =================#
+
+  # Download automatically, you can also just copy the conan.cmake file
+  if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan.cmake")
+     message(STATUS "Downloading conan.cmake from https://github.com/conan-io/cmake-conan")
+     file(DOWNLOAD "https://github.com/conan-io/cmake-conan/raw/v0.13/conan.cmake"
+                   "${CMAKE_BINARY_DIR}/conan.cmake")
+  endif()
+
+  include(${CMAKE_BINARY_DIR}/conan.cmake)
+  set(CONAN_PROFILE default)
+
+  conan_cmake_run( REQUIRES
+                   tinyxml2/7.0.1@nicolastagliani/stable
+                   BASIC_SETUP
+                   BUILD missing )
+
+  #=========== Find Package ================#
+
+  include(tinyxml2_helper.cmake)
+               
+  #=========== Targets =====================# 
+
+  add_executable(tinyxml2-test tinyxml2-test.cpp)
+  target_link_libraries(tinyxml2-test PRIVATE ${tinyxml2_LIBRARY})
+#+END_SRC
+
+ File: *tinyxml2_helper.cmake* 
+
+#+BEGIN_SRC cmake 
+  # Credits: https://github.com/nicolastagliani/conan-tinyxml2/issues/3
+  include( FindPackageHandleStandardArgs )
+
+  find_path( tinyxml2_INCLUDE_DIR
+    NAMES
+      tinyxml2.h
+    PATHS
+      ${CONAN_INCLUDE_DIRS_TINYXML2}
+  )
+
+  find_library( tinyxml2_LIBRARY
+    NAMES
+      ${CONAN_LIBS_TINYXML2}
+    PATHS
+      ${CONAN_LIB_DIRS_TINYXML2}
+  )
+
+  find_package_handle_standard_args( tinyxml2 DEFAULT_MSG
+    tinyxml2_INCLUDE_DIR
+  )
+
+  if( tinyxml2_FOUND )
+    set( tinyxml2_INCLUDE_DIRS ${tinyxml2_INCLUDE_DIR} )
+    set( tinyxml2_LIBRARIES ${tinyxml2_LIBRARY} )
+
+    get_filename_component( tinyxml2_CONFIG_PATH ${CONAN_TINYXML2_ROOT} DIRECTORY )
+    get_filename_component( tinyxml2_HASH ${CONAN_TINYXML2_ROOT} NAME )
+    get_filename_component( tinyxml2_CONFIG_PATH ${tinyxml2_CONFIG_PATH} DIRECTORY )
+    set( tinyxml2_CONFIG_PATH  ${tinyxml2_CONFIG_PATH}/build/${tinyxml2_HASH} )
+    set( tinyxml2_CONFIG_FILENAME tinyxml2Config.cmake )
+
+    find_file( tinyxml2_CONFIG_DIR
+        ${tinyxml2_CONFIG_FILENAME}
+      HINTS
+        ${tinyxml2_CONFIG_PATH}
+    )
+
+    if( tinyxml2_CONFIG_DIR-NOTFOUND )
+      set( tinyxml2_CONFIG "" )
+    else()
+      set( tinyxml2_CONFIG ${tinyxml2_CONFIG_DIR} )
+    endif()
+
+    mark_as_advanced(
+      tinyxml2_INCLUDE_DIR
+      tinyxml2_LIBRARY
+      tinyxml2_DIR
+      tinyxml2_CONFIG
+    )
+  else()
+    set( tinyxml2_DIR "" CACHE STRING
+      "An optional hint to a tinyxml2 directory"
+    )
+  endif()
+#+END_SRC
+
+ *Build* 
+
+#+BEGIN_SRC sh 
+  $ git clone https://gist.github.com/caiorss/351e291b8df2b0fc8e1bba5c86b7ee4d gist 
+  $ cd gist 
+
+  # Build with QT Creator 
+  $ qtcreator CMakeLists.txt 
+
+  # Build from command line 
+  $ cmake -H. -Bbuild -DCMAKE_BUILD_TYPE=Debug
+  $ cmake --build build --target
+#+END_SRC
+
+ *Program Output:* 
+
+#+BEGIN_SRC sh 
+   $ build/bin/tinyxml2-test 
+
+    [INFO] Running TinyXMl2 
+    [OK] XML parsed successfully
+   Value: doc.FirstChild()->Value() = xml version="1.0" encoding="UTF-8"
+    Element found. OK 
+    =>> Element Name = gesmes:Envelope
+    =>> Found Node Name: Cube
+    => Time = 2019-06-14
+
+    ===== Exchange rates in Euros ====
+          USD          1.127
+          JPY        121.900
+          BGN          1.956
+          CZK         25.540
+          DKK          7.468
+          GBP          0.891
+          HUF        321.530
+          PLN          4.253
+          RON          4.723
+          SEK         10.639
+          CHF          1.121
+          ISK        141.500
+          NOK          9.773
+          HRK          7.410
+          RUB         72.388
+          TRY          6.643
+          AUD          1.632
+          BRL          4.342
+          CAD          1.502
+          CNY          7.800
+          HKD          8.817
+          IDR      16128.100
+          ILS          4.052
+          INR         78.608
+          KRW       1333.600
+          MXN         21.607
+          MYR          4.698
+          NZD          1.724
+          PHP         58.539
+          SGD          1.540
+          THB         35.101
+          ZAR         16.653
+#+END_SRC
+
+
 ** GTest - Unit Testing Framework
 
 GTest or Google test is one of the most used and most popular test
