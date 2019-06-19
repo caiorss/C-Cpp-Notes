@@ -306,7 +306,7 @@ Every process, has the following standard streams:
           {
               std::cout << " Cubic root of a = " << a
                         << " ; is approximately " << x
-                        << " number of iteratios is " << iter
+                        << " number of iteratios is " << iter + 1
                         << std::endl;
               return EXIT_SUCCESS;
           }
@@ -331,9 +331,9 @@ Running:
    stderr are redirected to console by default.
  + Note: Stream redirectiion peformed on Bash shell on Linux.
 
-#+BEGIN_SRC text 
-  $ ./stream-redirect.bin 125.0 
 
+#+BEGIN_SRC text 
+  $ ./stream-redirection.bin 125.0
    [INFO] Solving equation f(x) = x^3 - a ; for a = 125.0000
 
         Iter         x    AbsErr   RelErr%
@@ -353,8 +353,9 @@ Running:
           13    5.0000    0.0000    0.0004
           14    5.0000    0.0000    0.0002
           15    5.0000    0.0000    0.0001
-   Cubic root of a = 125 ; is approximately 5 number of iteratios is 15
+   Cubic root of a = 125 ; is approximately 5 number of iteratios is 16
 #+END_SRC
+
 
  + Discard stderr standard error stream by redirecting it to
    /dev/null. Note: valid for Unix-like OSes (Linux, BSD, OSX, QNX ...): 
@@ -362,7 +363,7 @@ Running:
 
 #+BEGIN_SRC text 
   $ ./stream-redirect.bin 125.0 2> /dev/null
-   Cubic root of a = 125 ; is approximately 5 number of iteratios is 15
+   Cubic root of a = 125 ; is approximately 5 number of iteratios is 16
 #+END_SRC
 
  + Discard stdout - standard output by redirecting it to /dev/null
@@ -419,7 +420,7 @@ Running:
 
   # Check file 
   $ cat stdout.log 
-   Cubic root of a = 125 ; is approximately 5 number of iteratios is 15
+   Cubic root of a = 125 ; is approximately 5 number of iteratios is 16
 #+END_SRC
 
  + Redirect stderr (std::cerr) - standard error stream to file.
@@ -427,7 +428,7 @@ Running:
 
 #+BEGIN_SRC sh 
    $ ./stream-redirect.bin 125.0 2> stderr.log
-    Cubic root of a = 125 ; is approximately 5 number of iteratios is 15
+    Cubic root of a = 125 ; is approximately 5 number of iteratios is 16
 
    # Show first 5 lines of log file 
    $ head -n 5 stderr.log 
@@ -455,7 +456,7 @@ Running:
 
   # Check stdout (std::cout) log file 
   $ cat stdout.txt 
-   Cubic root of a = 125 ; is approximately 5 number of iteratios is 15
+   Cubic root of a = 125 ; is approximately 5 number of iteratios is 16
 
   # Check stderr (std::cerr) log file 
   $ tail -n 5 stderr.txt 
@@ -492,8 +493,74 @@ Running:
           13    5.0000    0.0000    0.0004
           14    5.0000    0.0000    0.0002
           15    5.0000    0.0000    0.0001
-   Cubic root of a = 125 ; is approximately 5 number of iteratios is 15
+   Cubic root of a = 125 ; is approximately 5 number of iteratios is 16
+#+END_SRC
 
+ *Capturing process stdout and stderr with Python subprocess module* 
+
+Run C++ program _stream-redirect.bin_ as subprocess: 
+ + [[https://docs.python.org/3.6/library/subprocess.html][Subprocess documentation]]
+
+#+BEGIN_SRC python 
+  $ python3
+  Python 3.6.8 (default, Mar 21 2019, 10:08:12) 
+  [GCC 8.3.1 20190223 (Red Hat 8.3.1-2)] on linux
+  Type "help", "copyright", "credits" or "license" for more information.
+  >>> 
+
+  #  Process result 
+  >>> r = sp.run(["./stream-redirection.bin", "125"], stdout = sp.PIPE, stderr = sp.PIPE)
+  >>> 
+#+END_SRC
+
+Check status code: 
+ + Process status code => Numeric value returned by int main(....){ ... }
+ + 0 => Status code means successful return 
+
+#+BEGIN_SRC python 
+  >>> r.returncode
+  0
+#+END_SRC
+
+Check captured stdout: 
+
+#+BEGIN_SRC python 
+  # =============== Stdout => Standarde Output Stream =====================#
+
+  >>> type(r.stdout)
+  <class 'bytes'>
+
+  >>> r.stdout
+  b' Cubic root of a = 125 ; is approximately 5 number of iteratios is 16\n'
+  >>> 
+
+  >>> print(r.stdout.decode('utf-8'))
+   Cubic root of a = 125 ; is approximately 5 number of iteratios is 16
+#+END_SRC
+
+Check captured stderr: 
+
+#+BEGIN_SRC python 
+  # => Type is a byte array 
+  >>> type(r.stderr)
+  <class 'bytes'>
+
+  # => Type is a python string 
+  >>> type(r.stderr.decode('utf-8'))
+  <class 'str'>
+  >>> 
+
+  >>> print(r.stderr.decode('utf-8'))
+   [INFO] Solving equation f(x) = x^3 - a ; for a = 125.0000
+
+        Iter         x    AbsErr   RelErr%
+           0   62.5040   62.4960   99.9872
+           1   31.2680   31.2360   99.8977
+           2   15.6979   15.5701   99.1855
+
+         ... ... .... .... ... ... ... .... .... 
+
+          15    5.0000    0.0000    0.0001
 #+END_SRC
 
 *** Stdin (cin) stream redirection 
@@ -657,7 +724,6 @@ input-redirection.bin:
 
     File has 10 lines 
 #+END_SRC
-
 
 
 
