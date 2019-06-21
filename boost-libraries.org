@@ -80,7 +80,163 @@ Note:
    pointers and pointer to member variables.
 
 See:
- + [[https://stackoverflow.com/questions/7241993/is-it-smart-to-replace-boostthread-and-boostmutex-with-c11-equivalents][c++ - Is it smart to replace boost::thread and boost::mutex with c++11 equivalents? - Stack Overflow]]
+ + [[https://stackoverflow.com/questions/7241993/is-it-smart-to-replace-boostthread-and-boostmutex-with-c11-equivalents][c++ -
+   Is it smart to replace boost::thread and boost::mutex with c++11
+   equivalents? - Stack Overflow]]
+** Compiling with Boost and CMake 
+
+Some boost libraries are not header-only and requires linking against
+a pre-compiled static or shared library. The compilation procedure can
+be simplified with the CMake module [[https://cmake.org/cmake/help/latest/module/FindBoost.html][FindBoost.]]
+
+Some non header-only Boost libraries are:
+ + date_time 
+ + iostream 
+ + filesystem
+ + program_options
+ + system (for Boost ASIO)
+
+ *Sample project:*
+
+File: CMakeLists.txt 
+  + Note: It is assumed that Boost is already installed in the system.
+
+#+BEGIN_SRC cmake 
+  cmake_minimum_required(VERSION 3.9)
+  project(cmake-boost)
+  #======================================#
+
+  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+
+  set(Boost_USE_STATIC_LIBS ON)
+
+  find_package(Boost REQUIRED date_time serialization )
+
+  add_executable(boost-app main.cpp)
+  target_link_libraries(boost-app Boost::date_time Boost::serialization)
+#+END_SRC
+
+File: main.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <fstream>
+  #include <string>
+
+  #include <boost/date_time/gregorian/gregorian.hpp> include
+  #<boost/archive/text_oarchive.hpp> include
+  #<boost/archive/text_iarchive.hpp>
+
+  namespace gr = boost::gregorian;
+  namespace dt = boost::date_time;
+
+  class Waypoint{
+  private:
+      std::string m_name;
+      double      m_latitude;
+      double      m_longitude;
+
+      // Required by boost to access private data of this class
+      friend class boost::serialization::access;
+
+  public:
+
+      Waypoint(std::string const& name, double latitude, double longitude):
+          m_name(name)
+        , m_latitude(latitude)
+        , m_longitude(longitude)
+      {
+      }
+
+      Waypoint(): Waypoint("<EMPTY>", 0.0, 0.0)
+      {
+      }
+
+      friend std::ostream& operator<<(std::ostream& os, Waypoint const& rhs)
+      {
+          return os << " Waypoint{ location = "
+                    << rhs.m_name << " ; lat = "
+                    << rhs.m_latitude << " ; long = "
+                    << rhs.m_longitude << " } ";
+      }
+
+  private:
+
+      // Required by boost serialize
+      template<typename Archive>
+      void serialize(Archive& ar, const unsigned int version)
+      {
+          ar & m_name;
+          ar & m_latitude;
+          ar & m_longitude;
+      }
+  };
+
+
+  int main()
+  {
+      std::puts("=========== Boost Date Time ===============\n");
+
+      auto d1 = gr::date(2009, 10, 20);
+      std::cout << " date1 = " << d1 << std::endl;
+
+      auto mdate = gr::date(2012, 06, 21);
+      std::string text = " Date mdate is equal to: " + gr::to_iso_string(mdate) + "\n";
+      std::cout << " Text => " << text;
+
+      std::puts("=========== Boost Serialization ===============\n");
+
+      // Note: this stream fs could be replaced by a real file stream.
+      //  std::ofstream fs("archive.dat");
+      std::stringstream fs; // Mock-file
+
+      // Serialization
+      {
+          Waypoint wp1{"Frankfurt", 50.1109, 8.6821};
+          Waypoint wp2{"Bern",      40.9480, 7.4474};
+
+          // The stream buffer is only written to the destination when
+          // this object goes out of scope and the destructor is called.
+          boost::archive::text_oarchive archive(fs);
+          archive << wp1 << wp2;
+      }
+      std::cout << "Serialized data in 'disk' = " << fs.str() << std::endl;
+
+
+      std::puts("=========== Boost Deserialization ===============\n");
+
+      // Note: Here fs could be replaced by a real input file stream
+      // std::ifstream
+      {
+          Waypoint wpA, wpB;
+          boost::archive::text_iarchive archive(fs);
+          archive >> wpA >> wpB;
+          std::cout << "wpA = " << wpA << std::endl;
+          std::cout << "wpB = " << wpB << std::endl;
+      }
+
+      return 0;
+  }
+#+END_SRC
+
+Program output: 
+
+#+BEGIN_SRC sh 
+   =========== Boost Date Time ===============
+
+    date1 = 2009-Oct-20
+    Text =>  Date mdate is equal to: 20120621
+   =========== Boost Serialization ===============
+
+   Serialized data in 'disk' = 22 serialization::archive 16 0 0 9 Frankfurt 5.01109000000000009e+01 8.68210000000000015e+00 4 Bern 4.09480000000000004e+01 7.44740000000000002e+00
+
+   =========== Boost Deserialization ===============
+
+   wpA =  Waypoint{ location = Frankfurt ; lat = 50.1109 ; long = 8.6821 } 
+   wpB =  Waypoint{ location = Bern ; lat = 40.948 ; long = 7.4474 } 
+#+END_SRC
+
 ** Boost Format 
 
 The boost library format provides a type-safe printf-like notation
