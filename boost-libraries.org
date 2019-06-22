@@ -2581,7 +2581,6 @@ Add months to a date:
     date_a + 5 months  = 2006-Feb-25
 #+END_SRC
 
-
 ** Library Map 
 *** Math 
 
@@ -3789,6 +3788,147 @@ Print map:
     dataset = [(AUD, 34.65), (BRL, 451.34), (CAD, 400.5), (USD, 200.3)]
    >>
 #+END_SRC
+** CLI11 Command Liner Parser Library 
+
+CLI11 is a small and lightweight header-only library for command line
+parsing.
+
+Repository: 
+ + https://github.com/CLIUtils/CLI11 
+
+Documentation: 
+ + https://cliutils.gitlab.io/CLI11Tutorial/
+
+Doxygen API docs: 
+ + https://cliutils.github.io/CLI11/
+
+Conan reference: 
+ + [[https://bintray.com/cliutils/CLI11/CLI11%253Acliutils/1.8.0%253Astable][CLI11/1.8.0@cliutils/stable]]
+
+
+ *Sample Project:*
+
+File: CMakeLists.txt 
+
+#+BEGIN_SRC cmake 
+  cmake_minimum_required(VERSION 2.8)
+  project(cli11-app)
+
+  #========================================#
+
+  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+
+  #=========== Conan Bootstrap =================#
+
+  # Download automatically, you can also just copy the conan.cmake file
+  if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan.cmake")
+     message(STATUS "Downloading conan.cmake from https://github.com/conan-io/cmake-conan")
+     file(DOWNLOAD "https://github.com/conan-io/cmake-conan/raw/v0.13/conan.cmake"
+                   "${CMAKE_BINARY_DIR}/conan.cmake")
+  endif()
+
+  include(${CMAKE_BINARY_DIR}/conan.cmake)
+  set(CONAN_PROFILE default)
+
+  conan_cmake_run( REQUIRES
+                   CLI11/1.8.0@cliutils/stable
+                   BASIC_SETUP
+                   BUILD missing )
+
+  #=========== Find Package ================#
+
+  find_package(CLI11 REQUIRED)
+
+  #=========== Targets ======================#
+
+  # Note: CLI11 is a header-only library and does not need Linking
+  add_executable(httpserver main.cpp)
+#+END_SRC
+
+File: *main.cpp* 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <fstream>
+  #include <string>
+
+  #include <CLI/CLI.hpp>
+
+  int main(int argc, char** argv)
+  {
+      CLI::App app{ "C++ http Web Server"};
+      app.footer("\n Creator: Somebody else.");
+
+      // Sets the current path that will be served by the http server
+      std::string dir = "default";
+      app.add_option("directory", dir, "Directory served")->required();
+
+      // Sets the port that the server will listen to
+      int port = 8080;
+      app.add_option("-p,--port", port, "TCP port which the server will bind/listen to");
+
+      // Set the the hostname that the server will listen to
+      // Default: 0.0.0.0 => Listen all hosts
+      std::string host = "0.0.0.0";
+      app.add_option("--host", host, "Host name that the sever will listen to.");
+
+       app.validate_positionals();
+      CLI11_PARSE(app, argc, argv);
+
+      std::cout << "Running server at port = " << port
+                << "\n and listen to host = " << host
+                << "\n serving directory = " << dir << "\n";
+
+      return 0;
+  }
+#+END_SRC
+
+Sample program output: 
+
+ + Display help: 
+
+#+BEGIN_SRC sh 
+  $ ./httpserver -h
+  C++ http Web Server
+  Usage: ./httpserver [OPTIONS] directory
+
+  Positionals:
+    directory TEXT REQUIRED     Directory served
+
+  Options:
+    -h,--help                   Print this help message and exit
+    -p,--port INT               TCP port which the server will bind/listen to
+    --host TEXT                 Host name that the sever will listen to.
+
+   Creator: Somebody else.
+#+END_SRC
+
+ + Run app. 
+
+#+BEGIN_SRC sh 
+  $ ./httpserver 
+  directory is required
+  Run with --help for more information.
+
+  $ ./httpserver /var/data/www
+  Running server at port = 8080
+   and listen to host = 0.0.0.0
+   servind directory = /var/data/www
+
+
+  $ ./httpserver /var/data/www --port=9090
+  Running server at port = 9090
+   and listen to host = 0.0.0.0
+   serving directory = /var/data/www
+
+
+  $ ./httpserver --port=9090 --host=localhost /home/user/pages
+  Running server at port = 9090
+   and listen to host = localhost
+   serving directory = /home/user/pages
+#+END_SRC
+
 ** Cereal - Serialization Library
 
 Cereal is a lightweight header-only library for serialization which
@@ -4398,7 +4538,6 @@ Full Project Code:
           THB         35.101
           ZAR         16.653
 #+END_SRC
-
 
 ** GTest - Unit Testing Framework
 
