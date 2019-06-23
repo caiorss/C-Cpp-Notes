@@ -4539,6 +4539,207 @@ Full Project Code:
           ZAR         16.653
 #+END_SRC
 
+** MuParser - Math expression parser 
+
+MuParser is a simple math expression parser library without any
+dependencies.
+
+Web Site: 
+ + https://beltoforion.de/article.php?a=muparser
+
+Repository: 
+ + https://github.com/beltoforion/muparser/
+
+Conan Reference: 
+ + [[https://bintray.com/conan-community/conan/muparser%253Aconan/2.2.6%253Astable][muparser/2.2.6@conan/stable]]
+
+ *Sample Project*
+
+File: *CMakeLists.txt*
+
+#+BEGIN_SRC cmake 
+  cmake_minimum_required(VERSION 3.9)
+  project(cppexperiments)
+
+  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+
+  # ============= Conan Bootstrap =============================#
+
+  # Download automatically, you can also just copy the conan.cmake file
+  if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan.cmake")
+     message(STATUS "Downloading conan.cmake from https://github.com/conan-io/cmake-conan")
+     file(DOWNLOAD "https://github.com/conan-io/cmake-conan/raw/v0.13/conan.cmake"
+                   "${CMAKE_BINARY_DIR}/conan.cmake")
+  endif()
+
+  include(${CMAKE_BINARY_DIR}/conan.cmake)
+
+  # Possible values "default" and "llvm8"
+  set(CONAN_PROFILE default)
+
+  conan_cmake_run(REQUIRES
+                  muparser/2.2.6@conan/stable
+                  BASIC_SETUP
+                  BUILD missing)
+
+   #======= Targets Settings ===============+#
+
+  add_executable(muparser1_formula muparser1_formula.cpp)
+  target_link_libraries(muparser1_formula muparser)
+#+END_SRC
+
+File: *muparser1_formula.cpp*
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+  #include <cmath>
+
+  #include <muParser.h>
+
+  // Defined for UNIX-like: Linux, Mac OSX, QNX, ...
+  #if __unix__
+    #include <unistd.h>
+  #endif
+
+  bool isTTY_terminal()
+  {
+     #if __unix__
+        return ::ttyname(STDIN_FILENO) != nullptr;
+     #else
+        return false;
+     #endif
+  }
+
+  double future_value(double PV, double rate, double nper)
+  {
+      return PV * std::pow(1 + rate / 100.0, nper);
+  }
+
+  int main()
+  {
+
+      mu::Parser p1;
+
+      std::puts("\n====== EXPERIMENT 1 - Simple math expression =======");
+      p1.SetExpr("2^1 + 2^3 + 2^4");
+      std::cout << " [*] p1-A value: "
+                << p1.GetExpr() << " = " << p1.Eval() << std::endl;
+
+      p1.SetExpr("3.5 * 10 - sin(3.1415) * 2.0 + sqrt(10) / 100.0 + 2^3");
+      std::cout << " [*] p1-B value: "
+                << p1.GetExpr() << " = " << p1.Eval() << std::endl;
+
+      std::puts("\n====== EXPERIMENT 2 - Expression with variables =======");
+      p1.DefineConst("pi", 3.1415);
+      double x = 10.0, y = 4.5;
+      p1.DefineVar("x", &x);
+      p1.DefineVar("y", &y);
+      p1.SetExpr(" 3 * pi + sin(pi) + 4 * x + y - 5");
+      std::cout << " [*] p1-C value: "
+                << p1.GetExpr() << " = " << p1.Eval() << std::endl;
+
+      std::puts("\n====== EXPERIMENT 3 - Expression with custom function =======");
+
+      p1.DefineFun("fv", &future_value);
+
+      p1.DefineFun("payoff", [](double S, double K){
+          return std::max(S - K, 0.0);
+      });
+
+      p1.SetExpr("fv(100, 2, 8) + payoff(100, 90)");
+      std::cout << " [*] p1-D value: " << p1.GetExpr() << " = " << p1.Eval() << std::endl;
+
+
+      std::puts("\n====== EXPERIMENT 4 - Parser error handling =======");
+
+      // When an error happens it throws an exception: mu::ParserError
+      try{
+          p1.SetExpr("10.2 * 5.0 + a * 3");
+          double value = p1.Eval();
+          std::cout << " [*] p1-E value: " << value << std::endl;
+      } catch (mu::ParserError const& ex)
+      {
+          std::cerr << " [ERROR] p1-C Parser error: " << ex.GetMsg() << std::endl;
+      }
+
+
+      std::puts("\n====== EXPERIMENT 5 - Calutor Interactive Shell ======");
+
+      if(isTTY_terminal())
+      {
+          std::cout << " === Calculator Started OK. =====" << std::endl;
+
+          mu::Parser p2;
+          double ans = 0.0;
+          p2.DefineVar("ans", &ans);
+          std::string line;
+
+          while(std::cin.good())
+          {
+              std::cout << " EXPR => ";
+              std::getline(std::cin, line);
+
+              if(line == "")
+                  continue;
+
+              if(line == "quit")
+                  break;
+
+              p2.SetExpr(line);
+              try {
+                  ans = p2.Eval();
+                  std::cout << " => ans = " << ans << "\n\n";
+              } catch(mu::ParserError const& ex)
+              {
+                  std::cerr << " [ERROR] Parser error " << ex.GetMsg() << std::endl;
+              }
+          }
+
+      }
+
+  #if _WIN32
+      std::cout << "Enter RETURN to exit. " << std::endl;
+      std::cin.get();
+  #endif
+      return 0;
+  }
+#+END_SRC
+
+ *Program output:*
+
+#+BEGIN_SRC sh 
+   $ ./muparser1_formula 
+
+   ====== EXPERIMENT 1 - Simple math expression =======
+    [*] p1-A value: 2^1 + 2^3 + 2^4  = 26
+    [*] p1-B value: 3.5 * 10 - sin(3.1415) * 2.0 + sqrt(10) / 100.0 + 2^3  = 43.0314
+
+   ====== EXPERIMENT 2 - Expression with variables =======
+    [*] p1-C value:  3 * pi + sin(pi) + 4 * x + y - 5  = 48.9246
+
+   ====== EXPERIMENT 3 - Expression with custom function =======
+    [*] p1-D value: fv(100, 2, 8) + payoff(100, 90)  = 127.166
+
+   ====== EXPERIMENT 4 - Parser error handling =======
+    [ERROR] p1-C Parser error: Unexpected token "a" found at position 13.
+
+   ====== EXPERIMENT 5 - Calutor Interactive Shell ======
+    === Calculator Started OK. =====
+    EXPR => 9.81 * sin(3.1415 / 2.0) + 100 * sqrt(285.6) + exp(3.65)
+    => ans = 1738.26
+
+    EXPR => ans / 100.0 - 80.0
+    => ans = -62.6174
+
+    EXPR => ans * ans
+    => ans = 3920.94
+
+    EXPR => 
+
+#+END_SRC
+
 ** GTest - Unit Testing Framework
 
 GTest or Google test is one of the most used and most popular test
