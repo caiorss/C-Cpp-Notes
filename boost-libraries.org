@@ -733,6 +733,272 @@ Split string:
   >> split_vector
   (std::vector<std::string> &) { " -100.23 ", " 577.15 ", " 99.34 ", " 1003.5" }
 #+END_SRC
+** Boost Program Options 
+
+Boost program options is a boost library for parsing and handling
+command line options.
+ + Note: This library is non-header only and requires linking. 
+
+Documentation:
+ + https://www.boost.org/doc/libs/1_70_0/doc/html/program_options.html
+
+See: 
+ + [[https://iscinumpy.gitlab.io/post/comparing-cli11-and-boostpo/][Comparing CLI11 and Boost Program Options]]
+
+ *Example*:
+
+ File: *boost_program_options.cpp* 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+  #include <cstdint>
+  #include <vector>
+
+  #include <boost/program_options.hpp>
+
+  namespace po = boost::program_options;
+
+  int main(int argc, char** argv)
+  {
+
+      // Positional argument values
+      std::string              server_name;
+      std::vector<std::string> server_paths;
+      // Optional argument values
+      std::uint16_t            server_port = 8080;
+      std::string              server_host = "0.0.0.0";
+      bool                     server_show_file = false;
+
+      // ===== Positional Arguments =====================//
+
+      po::variables_map vmap;
+      po::options_description desc { "Small IOT Web Server" };
+
+      po::positional_options_description pos;
+      pos.add("name", 1);
+      pos.add("path", -1);
+
+      //==== Optional Arguments =========================//
+
+      desc.add_options()
+          ("help,h", "Show this help message")
+          ("port,p",       po::value<std::uint16_t>(&server_port), "Set web server port [default 8080]")
+          ("host",         po::value<std::string>(&server_host),   "Allowed host [default 0.0.0.0]")
+          ("show",         po::bool_switch(&server_show_file),     "Show directory files [default false]")
+          ("version,v",                                            "Show version and exit")
+          // ---- Positional Arguments ----//
+          ("name", po::value<std::string>(),                       "Web Server Name")
+          ("path", po::value<std::vector<std::string>>(),          "Paths that will be served")
+          ;
+
+      //==== Parse Command Line Arguments ===============//
+
+      try
+      {
+        auto parsed = po::command_line_parser(argc, argv)
+                            .options(desc)
+                            .positional(pos)
+                           // .allow_unregistered()
+                            .run();
+        po::store(parsed, vmap);
+        po::notify(vmap);
+      }
+      catch(boost::program_options::error const& ex)
+      {
+          std::cout << " [ERROR] " << ex.what() << std::endl;
+          return EXIT_FAILURE;
+      }
+
+      //=== Handle help command line options =============//
+
+      /* Print help to user if he passes no option -h or --help */
+      if(vmap.empty() || vmap.count("help"))
+      {
+          std::cout << "USAGE: " << argv[0] << " <OPTIONS> <NAME> [<PATH> ...]" << std::endl;
+          desc.print(std::cout);
+          return EXIT_SUCCESS;
+      }
+
+      /* Show program version when user passes --version or -v */
+      if(vmap.count("version"))
+      {
+          std::cout << " Small Http Server version 1.5 PREMIUM " << std::endl;
+          return EXIT_SUCCESS;
+      }
+
+      //=== Handle main command line options =============//
+
+
+      if(!vmap.count("name"))
+      {
+          std::cout << " Error: missing positional argument [name] - server name" << std::endl;
+          return EXIT_FAILURE;
+      }
+      if(!vmap.count("path"))
+      {
+          std::cout << " Error: missing positional arguments [path] - server path" << std::endl;
+          return EXIT_FAILURE;
+      }
+
+
+      server_name = vmap["name"].as<std::string>();
+      server_paths = vmap["path"].as<std::vector<std::string>>();
+
+
+      std::cout <<" ······································" << std::endl;
+      std::cout << " Server running listening => "
+                << "host " << server_host
+                << " at port " << server_port
+                << std::endl;
+      std::cout << std::boolalpha;
+      std::cout << "       Server name: " << server_name << std::endl;
+      std::cout << " Show files option: " << server_show_file << std::endl;
+
+      std::cout << " Server paths: ";
+      for(auto const& p: server_paths)
+      {
+          std::cout << " " << p ;
+      }
+      std::cout << std::endl;
+
+
+      return EXIT_SUCCESS;
+  }
+
+#+END_SRC
+
+ File: CMakeLists.txt 
+
+#+BEGIN_SRC cmake 
+   cmake_minimum_required(VERSION 3.9)
+   project(cppexperiments)
+
+   set(CMAKE_CXX_STANDARD 17)
+   set(CMAKE_VERBOSE_MAKEFILE ON)
+
+   # Copy target file to current directory whenerver it is rebuilt
+   function(copy_after_build TARGET_NAME )
+       # Note: CMAKE_CURRENT_LIST_DIR is the directory where is this
+       # CMakeLists.txt file.
+       set(DESTDIR ${CMAKE_CURRENT_LIST_DIR}/bin/)
+       file(MAKE_DIRECTORY ${DESTDIR})
+
+       # Copy binary file to <CMakeLists.txt didctory>./bin
+       # after target is compiled.
+       add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
+         COMMAND ${CMAKE_COMMAND} -E copy
+                                  $<TARGET_FILE:${TARGET_NAME}> ${DESTDIR}
+                                  )
+   endfunction()
+
+
+   # ============= Conan Boosttrap =============================#
+
+   set(Boost_USE_STATIC_LIBS ON)
+   find_package(Boost REQUIRED program_options)
+
+    #======= Targets Settings ===============+#
+   add_executable(boost_program_options boost_program_options.cpp)
+   target_link_libraries(boost_program_options Boost::program_options)
+
+   # Optional => Copy the binary (executable) to directory 
+   # ${THIS DIRECTORY}/bin for easy access from command line 
+   copy_after_build(boost_program_options)
+#+END_SRC
+
+Build from command line: 
+
+#+BEGIN_SRC sh 
+  $ g++ boost_program_options.cpp -o boost_program_options -std=c++1z -Wall -lboost_program_options -O0 -g 
+  
+  $ file boost_program_options
+
+  boost_program_options: ELF 64-bit LSB executable, x86-64, version 1 (GNU/Linux), 
+  dynamically linked, interpreter /lib64/l, for GNU/Linux 3.2.0, 
+  BuildID[sha1]=3137721ab242577ffad4ec7b70eb48c86c041c69, with debug_info, not stripped
+#+END_SRC
+
+Build with Cmake from command line: 
+
+#+BEGIN_SRC sh 
+  $ cmake -Bbuild -H. -GNinja -DCMAKE_BUILD_TYPE=Debug
+  
+  $ cmake --build build --target
+  [2/2] Linking CXX executable boost_program_options
+
+  $ cd bin 
+
+  $ ls 
+  boost_program_options*
+#+END_SRC
+
+Show program help: 
+
+#+BEGIN_SRC sh 
+  $ ./boost_program_options 
+ Error: missing positional argument [name] - server name
+
+  $ ./boost_program_options --help
+  USAGE: ./boost_program_options <OPTIONS> <NAME> [<PATH> ...]
+  Small IOT Web Server:
+    -h [ --help ]         Show this help message
+    -p [ --port ] arg     Set web server port [default 8080]
+    --host arg            Allowed host [default 0.0.0.0]
+    --show                Show directory files [default false]
+    -v [ --version ]      Show version and exit
+    --name arg            Web Server Name
+    --path arg            Paths that will be served
+#+END_SRC
+
+Run with default settings: 
+
+#+BEGIN_SRC sh 
+  $ ./boost_program_options tinyHTTP /var/www/data /var/www /home/user/storage
+   ······································
+   Server running listening => host 0.0.0.0 at port 8080
+         Server name: tinyHTTP
+   Show files option: false
+   Server paths:  /var/www/data /var/www /home/user/storage
+#+END_SRC
+
+Run setting port to 9090 
+
+#+BEGIN_SRC sh 
+   $ ./boost_program_options tinyHTTP /var/www/data /var/www --port 9090
+    ······································
+    Server running listening => host 0.0.0.0 at port 9090
+          Server name: tinyHTTP
+    Show files option: false
+    Server paths:  /var/www/data /var/www
+#+END_SRC
+
+Run setting port to 9080 and host to 127.0.0.1 (localhost)
+
+#+BEGIN_SRC sh 
+   $ ./boost_program_options tinyHTTP /var/www/data /var/www --port 9080 --host 127.0.0.1
+    ······································
+    Server running listening => host 127.0.0.1 at port 9080
+          Server name: tinyHTTP
+    Show files option: false
+    Server paths:  /var/www/data /var/www
+
+
+   $ ./boost_program_options tinyHTTP /var/www --port=9080 --host=127.0.0.1
+    ······································
+    Server running listening => host 127.0.0.1 at port 9080
+          Server name: tinyHTTP
+    Show files option: false
+    Server paths:  /var/www
+
+   $ ./boost_program_options tinyHTTP /var/www --port=9080 --host=127.0.0.1 --show
+    ······································
+    Server running listening => host 127.0.0.1 at port 9080
+          Server name: tinyHTTP
+    Show files option: true
+    Server paths:  /var/www
+#+END_SRC
+
 ** Boost Lambda 
 
  + Documentation: [[https://www.boost.org/doc/libs/1_69_0/doc/html/lambda.html#introduction][Boost.Lambda]]
