@@ -646,7 +646,7 @@ instance: Code Blocks.
   1 directory, 4 files
 #+END_SRC
 
-** Project with multiple targets 
+** Project with multiple targets and a single CMakeLists
 *** Adding and setting multiple targets  
 
 This section provides shows how to set up a project with additional
@@ -660,6 +660,18 @@ executables, shared libraries or static libraries.
 #+BEGIN_SRC cmake  
    add_executable(SampleApp main.cpp source1.cpp source2.cpp)
 #+END_SRC
+
+Header files can also be added to the target in order to make them
+easier to access in an IDE such as Visual Studio. 
+
+#+BEGIN_SRC cmake  
+   add_executable( SampleApp 
+                   main.cpp 
+                   class1.cpp class2.hpp 
+                   class1.cpp lcass2.hpp
+                 )
+#+END_SRC
+
 
  *Set target defines #define or -D<DEFINITION>=VALUE or /D<DEFINTION>=<VALUE>*
 
@@ -733,7 +745,11 @@ Static librarie file extension:
 #+BEGIN_SRC cmake  
    # Project shared library SampleSharedLib.so (Linux, Unix) or 
    # SampleSharedLib.dll on Windows. 
-   add_library(SampleSharedLib SHARED  lib1.cpp lib2.cpp lib3.cpp)
+   add_library( SampleSharedLib SHARED  
+                tools.cpp      tools.hpp 
+                CShell.cpp     CShell.hpp 
+                FileSystem.cpp FileSystem.hpp
+              )
    # Configuration of target SampleSharedLib
    target_include_directories(SampleSharedLib PRIVATE src/lib/include1)
 
@@ -935,15 +951,18 @@ Global configuration:
    set(CMAKE_CXX_STANDARD 17)     
    set(CMAKE_VERBOSE_MAKEFILE ON)
 
+  # AVOID! 
   # Global compile definition
   # Add compiled definition -DQT_QML_DEBUG for all target.s 
   add_definitions(-DQT_QML_DEBUG)
 
+  # AVOID!
   # Global includes added to all targets 
   include_directories("C:\\boost\\v1.67\\include"  "/home/someone/includes")
- 
-   # Global linking directories which contains static (*.a) or shared
-   # libraries (*.so or *.dll files)
+
+  # AVOID! 
+  # Global linking directories which contains static (*.a) or shared
+  # libraries (*.so or *.dll files)
   link_directories(  
      # C:\Users\DummyUser\libs
      "C:\\Users\\DummyUser\\libs" # Windows paths with backward slash must be escaped with '\'
@@ -972,9 +991,12 @@ Target Configurations:
            StaticLibrary                # Project static library 
    )
 
-  # Target: Executable2 
+  # Target: Executable2 - Add header files to make them visible in the IDE 
   #-----------------------------------------------------------------
-  add_executable(Executable2 src/execMain.cpp src/source1.cpp src/source2.cpp src/source3.cpp) 
+  add_executable(Executable2 src/execMain.cpp 
+                             src/source1.cpp src/source1.hpp 
+                             src/source2.cpp src/source2.hpp 
+                 ) 
 
   # Target: SampleShared - Shared library dll, so 
   #-------------------------------------------------------------------
