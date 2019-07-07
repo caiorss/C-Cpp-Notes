@@ -650,6 +650,139 @@ Testing:
   >> z
   (double) 0.0000000
 #+END_SRC
+** Boost Tokenizer 
+
+Boost.tokenizer header-only library allows iterating over words or
+tokens of a string. 
+
+Documentation: 
+ + https://www.boost.org/doc/libs/1_66_0/libs/tokenizer/introduc.htm
+
+Example: 
+ 
+ + File: tokenizer.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+  #include <iomanip>
+
+  #include <boost/tokenizer.hpp>
+
+  int main()
+  {
+      namespace b = boost;
+
+      std::cout << "\n======= EXPERIMENT 1 ===============\n\n";
+      {
+          std::string line1 = " 10.243, 9, \"game theory\", 200, \"zero sum game\", risk, return, payoff";
+          b::tokenizer<> tok{line1};
+          for(auto const& tk: tok)
+          {
+              std::cout << tk << std::endl;
+          }
+      }
+      std::cout << "\n======= EXPERIMENT 2 ===============\n\n";
+      {
+          std::string line = " \"risk reward\" , 200 , \"volatility payoff\" , 98.341 ,timing ";
+          b::tokenizer<b::escaped_list_separator<char>> tok{line};
+
+          for(auto const& tk: tok)
+          {
+              std::cout << tk << std::endl;
+          }
+      }
+
+      std::cout << "\n======= EXPERIMENT 3 - Old Iterator for-loop API =============\n\n";
+      {
+          std::string line = "934, \"boost tokenizer\", C++,   \"C++17 C++20\", rust, \"ada core\" ";
+
+          using tokenizer_t = b::tokenizer<b::escaped_list_separator<char>>;
+
+          tokenizer_t tok{line};
+          for(tokenizer_t::const_iterator it = tok.begin(); it != tok.end(); it++)
+          {
+              std::cout << *it << std::endl;
+          }
+
+      }
+
+      std::cout << "\n======= EXPERIMENT 4 ===============\n\n";
+      {
+          std::string line = " 100.34, -9.341, 8.62 ,89.235 , 79.513 , 896.2";
+
+          using tokenizer_t = b::tokenizer<b::escaped_list_separator<char>>;
+          tokenizer_t tok (line);
+          std::vector<double> data;
+
+          for(auto const& w: tok)
+          {
+              data.push_back(std::stod(w));
+          }
+
+          for(auto const& x: data)
+          {
+              std::cout << x * 100 << " " << std::endl;
+          }
+          std::cout << "\n";
+      }
+
+
+      return 0;
+  }
+#+END_SRC
+
+Compiling: 
+
+#+BEGIN_SRC sh 
+  $ g++ tokenizer.cpp -o tokenizer.bin --std=c++1z -g -O0 -Wall && ./tokenizer.bin 
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC text 
+  ======= EXPERIMENT 1 ===============
+
+  10
+  243
+  9
+  game
+  theory
+  200
+  zero
+  sum
+  game
+  risk
+  return
+  payoff
+
+  ======= EXPERIMENT 2 ===============
+
+   risk reward 
+   200 
+   volatility payoff 
+   98.341 
+  timing 
+
+  ======= EXPERIMENT 3 - Old Iterator for-loop API =============
+
+  934
+   boost tokenizer
+   C++
+     C++17 C++20
+   rust
+   ada core 
+
+  ======= EXPERIMENT 4 ===============
+
+  10034 
+  -934.1 
+  862 
+  8923.5 
+  7951.3 
+  89620 
+#+END_SRC
+
 ** Boost string algo 
 
 Provides lots of useful string utility functions that are missing in
