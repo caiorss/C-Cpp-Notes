@@ -1467,7 +1467,6 @@ Finding targets defined by spdlog and CppUtest libraries:
 #+END_SRC
 
 
-
 ** Common Variables 
 *** CMAKE_CURRENT_LIST_DIR - Directory where is CMakeLists.txt 
 
@@ -1953,7 +1952,7 @@ Output:
 
 #+END_SRC
 
-** Windows OS Specifick Snippets
+** Windows OS Specific Snippets
 *** Executable Target with resource icon
 
 This section provides an example about how to add a resource icon to a
@@ -1988,6 +1987,90 @@ CMakeLists.txt
    target_include_directories(ProgramWithICON  ./includes)
   # .... Omit additional configuration ... #
 #+END_SRC
+*** Build executable for console or window subsystem 
+
+The following CMakeLists.txt file defines two executables targets
+built with the same source file main.cpp. The target
+_app_console_subsystem.exe_ is compiled for the Windows' *console subsystem* and 
+the target _app_window_subsystem.exe_ for the *window subsystem*. 
+
+Applications compiled for the console subsystem opens a terminal when
+clicked and prints the std::cout and std::cerr output to it while
+applications built for the window subsystem do not open any terminal
+and do not print any std::cout or std::cerr output. 
+
+An window-subsystem application can perform logging by using the
+Windows API function [[https://docs.microsoft.com/en-us/windows/win32/api/debugapi/nf-debugapi-outputdebugstringw][OutputDebugString]], writing to a file or
+redirecting the std::cout and std::cerr streams to file stream
+object such as std::ofstream. 
+
+File: CMakeLists.txt 
+
+#+BEGIN_SRC cmake 
+  cmake_minimum_required(VERSION 2.8)
+  project(cppwindows)
+
+  #=======================================
+
+  # Copy target file to current directory whenerver it is rebuilt
+  function(copy_after_build TARGET_NAME )
+      # Note: CMAKE_CURRENT_LIST_DIR is the directory where is this
+      # CMakeLists.txt file.
+      set(DESTDIR ${CMAKE_CURRENT_LIST_DIR}/bin/)
+      file(MAKE_DIRECTORY ${DESTDIR})
+
+      # Copy binary file to <CMakeLists.txt didctory>./bin
+      # after target is compiled.
+      add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy
+                                 $<TARGET_FILE:${TARGET_NAME}> ${DESTDIR}
+                                 )
+  endfunction()
+
+  #----------------------------------------
+
+  # Build the executable: app_console_subsystem.exe which opens a
+  # terminal when clicked
+  add_executable(app_console_subsystem main.cpp)
+  copy_after_build(app_console_subsystem)
+
+  # Builds the executable: app_window_subsystem.exe
+  # which does not open a terminal when clicked, it only shows
+  # a message box
+  add_executable(app_window_subsystem WIN32 main.cpp)
+  copy_after_build(app_window_subsystem)
+#+END_SRC
+
+File: main.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <windows.h>
+
+  int main()
+  {
+      std::cout << "Hello World Windows Console and Window subsystem!" << std::endl;
+      OutputDebugStringA("Output of applications built for Window Subsystem");
+
+      // Show messagebox window
+      DWORD const infoboxOptions  = MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND;
+      MessageBoxA( nullptr, "Messagebox text", "MessageBox title", infoboxOptions);
+
+      std::cout << "Exit application " << std::endl;
+      OutputDebugStringA("Exit application");
+
+      std::cin.get();
+      std::cout << " => Enter RETURN to exit" << std::endl;
+      return 0;
+  }
+#+END_SRC
+
+#+CAPTION: Application app_console_subsystem.exe (Console subsystem)
+[[file:images/cmake_console_subsystem1.png][file:images/cmake_console_subsystem1.png]]
+
+#+CAPTION: Application app_window_subsystem.exe (Window subsystem)
+[[file:images/cmake_window_subsystem1.png][file:images/cmake_window_subsystem1.png]]
+
 *** Set target subsystem: console/window
 
 Set target subsystem. 
@@ -2009,91 +2092,6 @@ Taken from:
  + [[https://stackoverflow.com/questions/33873735/correctly-set-visual-studio-linker-flag-subsystem-in-cmake][c++ -
    Correctly set Visual Studio linker flag /SUBSYSTEM in CMAKE - Stack
    Overflow]]
-** Force Settings 
-*** Force generation of debugging symbols 
-
-This snippet forces the generation of debugging symbols regardless of
-the build type. It is a useful setting when building from command
-line. 
-
-Add the following line to the CMake file: 
-
-#+BEGIN_SRC cpp 
- set(CMAKE_BUILD_TYPE Debug) # Force debug build
-#+END_SRC
-
-After the line is added, the file CMakeLists.txt becomes:
-
-#+BEGIN_SRC cmake
-  #========= Global Configuration ===============# 
-  cmake_minimum_required(VERSION 3.9)
-  project(Demo_cpp_plugin)
-  set(CMAKE_CXX_STANDARD 17)     
-  set(CMAKE_VERBOSE_MAKEFILE ON)
-
-  # Force debug build
-  set(CMAKE_BUILD_TYPE Debug) # Force debug build
-
-  #========== Targets Configurations ============#
-
-  add_executable(app ... )
-  .. ... ... ... 
-#+END_SRC
-*** Force Compiler to Clang 
-
-Despite C++ language remarkable improvements, C++ compiler error
-messages of most compilers still cryptic and hard to grasp. Even for
-silly syntax mistakes, C++ compilers can fill the screen with error
-messages providing little context about the compiler error. 
-
-Such cryptic errors can be better diagnosed by switching the compiler
-to Clang that provides much better error messages that other compilers.
-The compiler can be temporarily switched by using the IDE, by setting
-environment variables or by setting CMake variables to force using an
-specific compiler.
-
-
-Example: CMakeLists.txt forcing compiler to Clang.
-
-#+BEGIN_SRC cmake 
-  cmake_minimum_required(VERSION 3.9)
-  project(NumericalMethods)
-  set(CMAKE_CXX_STANDARD 17)     
-  set(CMAKE_VERBOSE_MAKEFILE ON)
-
-  set(FORCE_CLANG ON)
-  # Force compiler to Clang++
-  if(FORCE_CLANG)
-      set(CMAKE_C_COMPILER clang)
-      set(CMAKE_CXX_COMPILER clang++)
-  endif()
-
-  #========== Targets Configurations ============#
-
-  # TARGET: rootFinding1.cpp 
-  add_executable(rootFinding1 rootFinding1.cpp)
-#+END_SRC
-
- *Explanation:*
-
-This next line sets the variable FORCE_CLANG:
-
-#+BEGIN_SRC cmake 
-   set(FORCE_CLANG ON)   # Force using clang compiler 
-   set(FORCE_CLANG OFF)  # Use default compiler 
-#+END_SRC
-
-When the variable FORCE_CLANG is set, the commands within the if-endif
-block set the C and C++ compiler to Clang and Clang++.
-
-#+BEGIN_SRC cmake 
-  # Force compiler to Clang++
-  if(FORCE_CLANG)
-      set(CMAKE_C_COMPILER clang)
-      set(CMAKE_CXX_COMPILER clang++)
-  endif()
-#+END_SRC
-
 ** Snippets 
 *** Debug Information for diagnosing problems
 
@@ -2526,6 +2524,90 @@ current directory (project top-level directory ./).
 References: 
  + https://stackoverflow.com/questions/31277186
  + https://stackoverflow.com/questions/15694347/
+** Force Settings 
+*** Force generation of debugging symbols 
+
+This snippet forces the generation of debugging symbols regardless of
+the build type. It is a useful setting when building from command
+line. 
+
+Add the following line to the CMake file: 
+
+#+BEGIN_SRC cpp 
+ set(CMAKE_BUILD_TYPE Debug) # Force debug build
+#+END_SRC
+
+After the line is added, the file CMakeLists.txt becomes:
+
+#+BEGIN_SRC cmake
+  #========= Global Configuration ===============# 
+  cmake_minimum_required(VERSION 3.9)
+  project(Demo_cpp_plugin)
+  set(CMAKE_CXX_STANDARD 17)     
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+
+  # Force debug build
+  set(CMAKE_BUILD_TYPE Debug) # Force debug build
+
+  #========== Targets Configurations ============#
+
+  add_executable(app ... )
+  .. ... ... ... 
+#+END_SRC
+*** Force Compiler to Clang 
+
+Despite C++ language remarkable improvements, C++ compiler error
+messages of most compilers still cryptic and hard to grasp. Even for
+silly syntax mistakes, C++ compilers can fill the screen with error
+messages providing little context about the compiler error. 
+
+Such cryptic errors can be better diagnosed by switching the compiler
+to Clang that provides much better error messages that other compilers.
+The compiler can be temporarily switched by using the IDE, by setting
+environment variables or by setting CMake variables to force using an
+specific compiler.
+
+
+Example: CMakeLists.txt forcing compiler to Clang.
+
+#+BEGIN_SRC cmake 
+  cmake_minimum_required(VERSION 3.9)
+  project(NumericalMethods)
+  set(CMAKE_CXX_STANDARD 17)     
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+
+  set(FORCE_CLANG ON)
+  # Force compiler to Clang++
+  if(FORCE_CLANG)
+      set(CMAKE_C_COMPILER clang)
+      set(CMAKE_CXX_COMPILER clang++)
+  endif()
+
+  #========== Targets Configurations ============#
+
+  # TARGET: rootFinding1.cpp 
+  add_executable(rootFinding1 rootFinding1.cpp)
+#+END_SRC
+
+ *Explanation:*
+
+This next line sets the variable FORCE_CLANG:
+
+#+BEGIN_SRC cmake 
+   set(FORCE_CLANG ON)   # Force using clang compiler 
+   set(FORCE_CLANG OFF)  # Use default compiler 
+#+END_SRC
+
+When the variable FORCE_CLANG is set, the commands within the if-endif
+block set the C and C++ compiler to Clang and Clang++.
+
+#+BEGIN_SRC cmake 
+  # Force compiler to Clang++
+  if(FORCE_CLANG)
+      set(CMAKE_C_COMPILER clang)
+      set(CMAKE_CXX_COMPILER clang++)
+  endif()
+#+END_SRC
 * Conan package Manager
 ** Main Web Sites
 
