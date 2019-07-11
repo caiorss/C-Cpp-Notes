@@ -1251,6 +1251,222 @@ CMake can consume libraries or external dependencies in many different ways:
       * conan requires a Python installation, although it is not a big
         issue since there are many tools using Python as an embedded
         scripting language such GNU Debugger GDB or Windows Debugger.
+*** Consuming libraries with CMake add_subdirectory
+
+External libraries or sub-projects can be consumed with CMake command
+add_subdirectory(<PATH-TO/LIB-DIRECTORY>) which builds the project and
+the library source code <LIB-DIRECTORY> containing a
+CMakeLists.txt. The benefits of this approach is that libraries are:
+
+ * Libraries does not need to be installed in the system before
+   usage.
+
+ * No ABI incompatibility issue as the compiler used for building the
+   application and library are the same. 
+
+ * Better tracking of dependencies and no dependency hell as
+   different versions of the same library can be used in many project
+   without disrupting each other.
+
+Drawbacks:
+
+ + Higher disk space usage as every project needs a copy of the
+   library sources.
+
+ + Libraries need to use CMake as building system and contain a
+   CMakeLists.txt file at root directory, otherwise, it will not be
+   possible to use add_subdirectory command.
+
+ + Possible complexity of git add submodule. 
+
+ *Libraries used:*
+
+ + [[https://github.com/gabime/spdlog][spdlog]]
+ + [[https://github.com/cpputest/cpputest][cpputest]]
+
+  *Creating project* 
+
+ + Create project
+
+#+BEGIN_SRC sh 
+  $ git init .
+  Initialized empty Git repository in /home/user/projects/cmake-experiment/.git/
+
+  $ git add CMakeLists.txt main.cpp 
+
+  $ git commit -m started
+  [master (root-commit) 8e60c5c] started
+   2 files changed, 16 insertions(+)
+   create mode 100644 CMakeLists.txt
+   create mode 100644 main.cpp
+#+END_SRC
+
+2. Add external libraries to the project by copying them manually or via git
+   submodule. 
+
+#+BEGIN_SRC sh 
+  $ git submodule add  https://github.com/gabime/spdlog extern/spdlog
+  $ git submodule add https://github.com/cpputest/cpputest extern/cpputest
+#+END_SRC
+
+3. Show current directory: 
+
+#+BEGIN_SRC sh 
+  $ tree -L 2 .
+  .
+  ├── CMakeLists.txt
+  ├── CMakeLists.txt.user
+  ├── extern
+  │   ├── cpputest
+  │   └── spdlog
+  └── main.cpp
+
+  3 directories, 3 files
+#+END_SRC
+
+
+ *File: CMakeLists.txt*
+
+#+BEGIN_SRC cmake 
+   cmake_minimum_required(VERSION 2.8)
+   project(cmake-experiment)
+
+   set(CMAKE_CXX_STANDARD 17)
+   set(CMAKE_VERBOSE_MAKEFILE ON)
+
+   add_subdirectory(extern/spdlog)
+   add_subdirectory(extern/cpputest)
+
+   add_executable(app main.cpp)
+   target_link_libraries(app spdlog::spdlog CppUTest)
+#+END_SRC
+
+ + The command [[https://cmake.org/cmake/help/latest/command/add_subdirectory.html][add_subdirectory]] adds the sources of the library spdlog
+   to the current build by processing the file
+   extern/spdlog/CMakeLists.txt.
+
+ + Libraries can be made easier to use and consume by listing in their
+   documentation the _targets they define_ which client codes can link
+   against with _add_library_. If the those targets are not mentioned
+   the user has to inspect all libraries CMakeLists.txt files which
+   can be cumbersome in libraries with many nested directories.  
+
+Finding targets defined by spdlog and CppUtest libraries:
+
+ + The file extern/spdlog/CMakeLists.txt contains the following lines
+   that defines library targets which the top-level CMakeLists.txt
+   file can consume:
+
+#+BEGIN_SRC cmake
+  add_library(spdlog INTERFACE)
+  add_library(spdlog::spdlog ALIAS spdlog)
+#+END_SRC
+
+ + The file extern/CppUtest/CMakeLists.txt contains the following
+   lines which builds the extern/CppUtest/src/CppUtest/CMakeLists.txt
+   as a sub-project.
+
+#+BEGIN_SRC cmake 
+  include_directories(${CppUTestRootDirectory}/include)
+  add_subdirectory(src/CppUTest)
+#+END_SRC
+
+ + The file extern/CppUtest/src/CppUtest/CMakeLists.txt contains the
+   following lines which defines the target CppUtest which the top
+   level CMakeLists.txt that has add_subdirectory(extern/cpputest)
+   can link against: 
+
+#+BEGIN_SRC cmake 
+   add_library( CppUTest
+               CommandLineArguments.cpp
+               MemoryLeakWarningPlugin.cpp
+               TestHarness_c.cpp
+               ... ... ... ... 
+              )
+#+END_SRC
+
+ *File: main.cpp*
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <spdlog/spdlog.h>
+  #include <CppUTest/CommandLineTestRunner.h>
+  #include <CppUTest/Utest.h>
+  #include <CppUTest/TestHarness.h>
+
+  double func(double x)
+  {
+      return 3 * x * x - 21.0 * x + 36.0;
+  }
+
+  TEST_GROUP(MainTest)
+  {
+  };
+
+  TEST(MainTest, functionPoints)
+  {
+      spdlog::info("Running functionPointsTest.");
+
+      DOUBLES_EQUAL(0.0, func(4.0), 0.001);
+      DOUBLES_EQUAL(0.0, func(3.0), 0.001);
+      DOUBLES_EQUAL(0.0, func(3.0), 0.001);
+      DOUBLES_EQUAL(10.0, func(126.0), 0.001);
+
+      // Supposed to fail
+      DOUBLES_EQUAL(1.0, func(18.0), 0.001);
+
+      spdlog::info("Ending functionPointsTest.");
+  };
+
+  int main(int argc, char** argv)
+  {
+      SPDLOG_TRACE("Entering function");
+      spdlog::info("Starting server OK.");
+      spdlog::error("Server crashed. ");
+      spdlog::info("Received request from 192.168.10.1 at port 9090");
+      spdlog::info("Sending response to client 192.168.100.1 connection ID 10");
+      SPDLOG_TRACE("Exit application");
+
+      std::cout << "========== Running Tests ============" << std::endl;
+
+      return RUN_ALL_TESTS(argc, argv);
+  }
+#+END_SRC
+
+ *Build on Command Line* 
+
+#+BEGIN_SRC sh 
+  $ cmake -H. -B_build -GNinja -DCMAKE_BUILD_TYPE=Debug
+   ... ... ... ... ... ... 
+  -------------------------------------------------------
+
+  -- Configuring done
+  -- Generating done
+  -- Build files have been written to: /home/archbox/projects/cmake-experiment/_build
+
+  $ cmake --build _build --target
+#+END_SRC
+
+ *Running* 
+
+#+BEGIN_SRC sh 
+  $ _build/app 
+  [2019-07-11 17:24:59.450] [info] Starting server OK.
+  [2019-07-11 17:24:59.450] [error] Server crashed. 
+  [2019-07-11 17:24:59.450] [info] Received request from 192.168.10.1 at port 9090
+  [2019-07-11 17:24:59.451] [info] Sending response to client 192.168.100.1 connection ID 10
+  ========== Running Tests ============
+  [2019-07-11 17:24:59.451] [info] Running functionPointsTest.
+
+  ../main.cpp:23: error: Failure in TEST(MainTest, functionPoints)
+          expected <10>
+          but was  <45018> threshold used was <0.001>
+
+  .
+  Errors (1 failures, 1 tests, 1 ran, 4 checks, 0 ignored, 0 filtered out, 1 ms)
+#+END_SRC
+
+
 
 ** Common Variables 
 *** CMAKE_CURRENT_LIST_DIR - Directory where is CMakeLists.txt 
