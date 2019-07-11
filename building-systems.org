@@ -398,7 +398,6 @@ Makefile rules:
     + This example project contains a Python3 native module written in
       C++ with the help of CMake and Pybind11, vcpkg (C++) Package
       manager. 
-
 ** Useful CMake Modules 
 
  * *Cotire* [BEST]
@@ -1163,6 +1162,96 @@ Install Dependencies - Shared Libraries:
  + [[https://cmake.org/pipermail/cmake/2009-June/030205.html][Install of library sub-project prior to building application]]
 
  + [[http://cmake.3232098.n2.nabble.com/Copying-Shared-Libraries-DLLs-Next-to-the-Executable-td7597163.html][Copying Shared Libraries (DLLs) Next to the Executable]]
+** Consuming Libraries or Dependencies 
+*** Overview 
+
+Note: 
+ + object-code => Here means any compiled machine code, any file with
+   the extensions: ~*.exe, *.o, *.obj, *.so, *.dylib~
+
+CMake can consume libraries or external dependencies in many different ways: 
+
+  * *Library Installation with building system* 
+    + Installing the libraries with CMake, GNU Make, GNU autotools or
+      any building systems and consuming them via find_package(LIB) and
+      target_link_libraries( ....).
+    + Disadvantages:
+      * As C++ compilers do not have a standard and stable ABI -
+        Application Binary Interface, the library needs to be
+        installed for every different compiler and different version
+        of the same compiler, otherwise it will not be possible to
+        build an application that links against a library built with
+        different compiler. 
+      * Installing multiple versions of the same library may result in
+        dependency hell breaking dynamic-linked applications depending
+        on it.
+
+  * *Library installation from operating system's package manager*
+    + Installing libraries with a package manager such as Linux
+      Fedora (dnf), Ubuntu (apt-get or Mac OSX (brew) and consuming
+      them via find_package(LIB) and target_link_libraries(...).      
+    + Disadvantages:
+      * The installation is not reproducible in other platforms and
+        often, it is not possible to install multiple versions of the
+        same library and it may not be available in all package
+        managers.
+
+  * *CMake add_subdirectory(lib/<LIBRARY_DIR>)*
+    + The library directory containing the source code is added to the
+      project either via CMake [[https://cmake.org/cmake/help/latest/module/ExternalProject.html][ExternalProject]], manual copy or via git
+      add submodule. The library is consumed in the project by adding
+      a line: add_subdirectory(lib/<LIBRARY_DIR>) to the file
+      CMaklists.txt. And the applications links against the library
+      with target_link_libraries(app lib::libname).
+    + Advantages:
+      * No ABI issues as the library is built with the same compiler
+        as the application.
+      * Better for static linking.
+      * More simple as it does not require the library maintainer to
+        provide a CMake module for find_package.
+      * Better reproducibility and easier compilation on different
+        operating systems and also easier cross-compilation for
+        embedded targets.
+      * No dependency hell: As multiple versions of the library can be
+        used in different projects without disrupting each other.
+    + Disadvantages:
+      * Longer compile-time
+      * More disk space spending
+      * The library is recompiled for every project.
+
+  * *C++-specific Package Manager with CMake Integration*
+    * Package managers automates the process of downloading libraries'
+      source code and compiling them alongside the project. It is no
+      possible to generalize C++ package managers as there are many differences
+      among them. In the case of Conan package manager, it builds and
+      installs the library object-code and header files to the Conan's
+      cache directory where the library can be reused on many projects
+      and recompiled on-demand if the compiler used to build the
+      project is not ABI-compatible with the compiler used to build
+      the libraries object codes.
+    * Note: there are other package managers built as CMake scripts,
+      but they fall short when dealing with libraries using other
+      building systems such as GNU autotools or GNU Makefiles.
+    * Advantages:
+      * Automates the process of getting and installing libraries.
+      * Saves disk space.
+      * Shorter compile-time as library-object codes can be reused in
+        other projects.
+      * No ABI issues
+      * No dependency hell 
+      * Better for static linking and cross-compilation for embedded
+        systems.
+      * Reproducible on many different operating systems.
+      * Makes easier to install big libraries, frameworks or libraries
+        with many dependencies such as Boost and Poco libraries which
+        depends on openssl which is problematic to build on Windows.
+    * Disadvantages:
+      * conan is not mainstream and there are still many competing
+        package managers.
+      * conan requires a Python installation, although it is not a big
+        issue since there are many tools using Python as an embedded
+        scripting language such GNU Debugger GDB or Windows Debugger.
+
 ** Common Variables 
 *** CMAKE_CURRENT_LIST_DIR - Directory where is CMakeLists.txt 
 
@@ -1309,7 +1398,7 @@ Notes:
  + The default value of the variable CMAKE_INSTALL_PREFIX are:
    + Windows:        C:/Program Files/${PROJECT_NAME}
    + Unix-like OS:   /usr/local
-** Build a project from command line.
+** Build a project from command line - detailed 
 
 A project using Cmake as building system contains a build script at
 top level directory named CMakeLists.txt. To build a project with
