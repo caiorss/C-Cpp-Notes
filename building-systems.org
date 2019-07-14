@@ -1251,7 +1251,7 @@ CMake can consume libraries or external dependencies in many different ways:
       * conan requires a Python installation, although it is not a big
         issue since there are many tools using Python as an embedded
         scripting language such GNU Debugger GDB or Windows Debugger.
-*** Consuming libraries with CMake add_subdirectory
+*** Consuming dependencies with CMake add_subdirectory
 
 External libraries or sub-projects can be consumed with CMake command
 add_subdirectory(<PATH-TO/LIB-DIRECTORY>) which builds the project and
@@ -1281,8 +1281,8 @@ Drawbacks:
 
  *Libraries used:*
 
- + [[https://github.com/gabime/spdlog][spdlog]]
- + [[https://github.com/cpputest/cpputest][cpputest]]
+   + [[https://github.com/gabime/spdlog][spdlog]]
+   + [[https://github.com/cpputest/cpputest][cpputest]]
 
   *Creating project* 
 
@@ -1465,6 +1465,217 @@ Finding targets defined by spdlog and CppUtest libraries:
   .
   Errors (1 failures, 1 tests, 1 ran, 4 checks, 0 ignored, 0 filtered out, 1 ms)
 #+END_SRC
+*** Consuming dependencies with CMake FetchContent module 
+
+The CMake module [[https://cmake.org/cmake/help/v3.15/module/FetchContent.html][FetchContent]] can fetch dependencies at configuration
+time from many possible sources such as GIT remote repositories, http
+servers (URLs) and compressed files such as *.tar, *.tgz, *.zip and so
+on.
+
+Documentation: 
+ + https://cmake.org/cmake/help/v3.15/module/FetchContent.html 
+
+See also: 
+ + https://cmake.org/cmake/help/latest/module/ExternalProject.html
+ + https://blog.kitware.com/cmake-superbuilds-git-submodules/
+
+ *Example:* 
+
+File: CMakeLists.txt 
+
+#+BEGIN_SRC cmake 
+  cmake_minimum_required(VERSION 3.14 FATAL_ERROR)
+  project(cmake-experiment)
+
+  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+
+  # See documentation at: https://cmake.org/cmake/help/latest/module/FetchContent.html
+  include(FetchContent)
+
+  #========== Fetch cpputest ============================#
+
+  if(TRUE)
+  FetchContent_Declare(
+      cpputest
+      GIT_REPOSITORY  "https://github.com/cpputest/cpputest.git"
+      GIT_TAG         "v3.8"
+  )
+  FetchContent_GetProperties(cpputest)
+  if(NOT cpputest_POPULATED)
+      FetchContent_Populate(cpputest)
+      message(" [INFO] cpputest_SOURCE_DIR = ${cpputest_SOURCE_DIR} ")
+      message(" [INFO] cpputest_BINARY_DIR = ${cpputest_BINARY_DIR} ")
+
+      # Optional => From: https://github.com/cpputest/cpputest/blob/master/CMakeLists.txt
+      set(TEST OFF)
+      set(TEST_DETAILED OFF)
+
+      add_subdirectory(${cpputest_SOURCE_DIR} ${cpputest_BINARY_DIR})
+
+      # Note: this path was found by trial and error, it is library-specific
+      include_directories(${cpputest_SOURCE_DIR}/include)
+  endif()
+  endif()
+
+  #===== Fetch spdlog as archive ====================#
+
+  FetchContent_Declare(
+      spdlog
+      URL       "https://github.com/gabime/spdlog/archive/v1.3.1.zip"
+  )
+  FetchContent_GetProperties(spdlog)
+  if(NOT spdlog_POPULATED)
+      FetchContent_Populate(spdlog)
+      # message(" [INFO] spdlog_SOURCE_DIR = ${spdlog_SOURCE_DIR} ")
+      # message(" [INFO] spdlog_BINARY_DIR = ${spdlog_BINARY_DIR} ")
+
+      # Optional => Set library build options
+      # Build options at: https://github.com/gabime/spdlog/blob/v1.x/CMakeLists.txt
+      set(SPDLOG_BUILD_EXAMPLES OFF)
+      set(SPDLOG_BUILD_BENCH    OFF)
+      set(SPDLOG_BUILD_TESTS    OFF)
+
+      add_subdirectory(${spdlog_SOURCE_DIR} ${spdlog_BINARY_DIR})
+  endif()
+
+  # ========= Target Settings ==========================#
+  add_executable(app main.cpp)
+  target_link_libraries(app  CppUTest spdlog::spdlog)
+#+END_SRC
+
+File: main.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <spdlog/spdlog.h>
+  #include <CppUTest/CommandLineTestRunner.h>
+  #include <CppUTest/Utest.h>
+  #include <CppUTest/TestHarness.h>
+
+  double func(double x)
+  {
+      return 3 * x * x - 21.0 * x + 36.0;
+  }
+
+  TEST_GROUP(MainTest)
+  {
+  };
+
+  TEST(MainTest, functionPoints)
+  {
+      spdlog::info("Running functionPointsTest.");
+
+      DOUBLES_EQUAL(0.0, func(4.0), 0.001);
+      DOUBLES_EQUAL(0.0, func(3.0), 0.001);
+      DOUBLES_EQUAL(0.0, func(3.0), 0.001);
+      DOUBLES_EQUAL(10.0, func(126.0), 0.001);
+
+      // Supposed to fail
+      DOUBLES_EQUAL(1.0, func(18.0), 0.001);
+
+      spdlog::info("Ending functionPointsTest.");
+  };
+
+  int main(int argc, char** argv)
+  {
+      SPDLOG_TRACE("Entering function");
+      spdlog::info("Starting server OK.");
+      spdlog::error("Server crashed. ");
+      spdlog::info("Received request from 192.168.10.1 at port 9090");
+      spdlog::info("Sending response to client 192.168.100.1 connection ID 10");
+      SPDLOG_TRACE("Exit application");
+
+      std::cout << "========== Running Tests ============" << std::endl;
+
+      return RUN_ALL_TESTS(argc, argv);
+  }
+#+END_SRC
+
+ *Building and running from command line:*
+
+Configuration step 
+
+#+BEGIN_SRC sh 
+   $ cmake -H. -Bbuild -DCMAKE_BUILD_TYPE=Debug
+   -- The C compiler identification is GNU 8.3.1
+   -- The CXX compiler identification is GNU 8.3.1
+   -- Check for working C compiler: /usr/lib64/ccache/cc
+   -- Check for working C compiler: /usr/lib64/ccache/cc -- works
+
+    ... .... ... ... ... ... ... ... ... ... 
+
+   -- Configuring done
+   -- Generating done
+   -- Build files have been written to: /home/user/projects/cmake-experiment/build
+#+END_SRC
+
+Building step 
+
+#+BEGIN_SRC sh  
+  $ cmake --build build --target
+#+END_SRC
+
+Check build directory: 
+
+#+BEGIN_SRC sh 
+  $ tree -L 2 build
+  build
+  ├── app
+  ├── CMakeCache.txt
+  ├── CMakeFiles
+  │   ├── 3.14.3
+  │   ├── app.dir
+  │   ├── cmake.check_cache
+  │   ├── CMakeDirectoryInformation.cmake
+  │   ├── CMakeError.log
+  │   ├── CMakeOutput.log
+  │   ├── CMakeRuleHashes.txt
+  │   ├── CMakeTmp
+  │   ├── feature_tests.bin
+  │   ├── feature_tests.c
+  │   ├── feature_tests.cxx
+  │   ├── Makefile2
+  │   ├── Makefile.cmake
+  │   ├── progress.marks
+  │   └── TargetDirectories.txt
+  ├── cmake_install.cmake
+  ├── _deps
+  │   ├── cpputest-build
+  │   ├── cpputest-src
+  │   ├── cpputest-subbuild
+  │   ├── spdlog-build
+  │   ├── spdlog-src
+  │   └── spdlog-subbuild
+  ├── Makefile
+  ├── spdlogConfigVersion.cmake
+  └── spdlog.pc
+
+  11 directories, 18 files
+
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC sh 
+   $ build/app 
+   [2019-07-14 01:16:58.305] [info] Starting server OK.
+   [2019-07-14 01:16:58.305] [error] Server crashed. 
+   [2019-07-14 01:16:58.305] [info] Received request from 192.168.10.1 at port 9090
+   [2019-07-14 01:16:58.305] [info] Sending response to client 192.168.100.1 connection ID 10
+   ========== Running Tests ============
+   [2019-07-14 01:16:58.305] [info] Running functionPointsTest.
+
+   /home/archbox/projects/cmake-experiment/main.cpp:23: error: Failure in TEST(MainTest, functionPoints)
+           expected <10>
+           but was  <45018> threshold used was <0.001>
+
+   .
+   Errors (1 failures, 1 tests, 1 ran, 4 checks, 0 ignored, 0 filtered out, 0 ms)
+#+END_SRC
+
+
+
 
 ** Common Variables 
 *** CMAKE_CURRENT_LIST_DIR - Directory where is CMakeLists.txt 
