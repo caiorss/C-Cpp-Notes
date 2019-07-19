@@ -232,7 +232,7 @@ Comparative table:
  + Reddit /r/cpp - [[https://www.reddit.com/r/cpp/comments/40cfbk/hunter_crossplatform_package_manager_for_c/][Hunter - Cross-platform package manager for C++]]
  + [[https://news.ycombinator.com/item?id=16915195][Announcing a single C++ library manager for Linux, macOS and Windows: Vcpkg]]
 
-* CMake - Reference Card
+* CMake
 ** Overview 
 
  *Motivation* 
@@ -1251,7 +1251,7 @@ CMake can consume libraries or external dependencies in many different ways:
       * conan requires a Python installation, although it is not a big
         issue since there are many tools using Python as an embedded
         scripting language such GNU Debugger GDB or Windows Debugger.
-*** Consuming dependencies with CMake add_subdirectory
+*** Dependencies with CMake add_subdirectory
 
 External libraries or sub-projects can be consumed with CMake command
 add_subdirectory(<PATH-TO/LIB-DIRECTORY>) which builds the project and
@@ -1465,7 +1465,7 @@ Finding targets defined by spdlog and CppUtest libraries:
   .
   Errors (1 failures, 1 tests, 1 ran, 4 checks, 0 ignored, 0 filtered out, 1 ms)
 #+END_SRC
-*** Consuming dependencies with CMake FetchContent module 
+*** Dependencies with FetchContent module 
 
 The CMake module [[https://cmake.org/cmake/help/v3.15/module/FetchContent.html][FetchContent]] can fetch dependencies at configuration
 time from many possible sources such as GIT remote repositories, http
@@ -1495,7 +1495,6 @@ File: CMakeLists.txt
 
   #========== Fetch cpputest ============================#
 
-  if(TRUE)
   FetchContent_Declare(
       cpputest
       GIT_REPOSITORY  "https://github.com/cpputest/cpputest.git"
@@ -1515,7 +1514,6 @@ File: CMakeLists.txt
 
       # Note: this path was found by trial and error, it is library-specific
       include_directories(${cpputest_SOURCE_DIR}/include)
-  endif()
   endif()
 
   #===== Fetch spdlog as archive ====================#
@@ -1674,8 +1672,147 @@ Running:
    Errors (1 failures, 1 tests, 1 ran, 4 checks, 0 ignored, 0 filtered out, 0 ms)
 #+END_SRC
 
+*** Dependencies with FetchContent module - simplified usage 
+
+The usage of the CMake module FetchContent can be simplified by
+defining functions and macros encapsulating its functionalities.
+
+Libraries Used: 
+ + [[https://github.com/tplgy/cppcodec][cppcodec]]
+ + [[https://github.com/gabime/spdlog][spdlog]]
+
+Example: 
+
+ File: CMakeLists.txt 
+
+#+BEGIN_SRC cmake 
+   cmake_minimum_required(VERSION 3.14 FATAL_ERROR)
+   project(cmake-experiment)
+
+   set(CMAKE_CXX_STANDARD 17)
+   set(CMAKE_VERBOSE_MAKEFILE ON)
+
+   # See documentation at: https://cmake.org/cmake/help/latest/module/FetchContent.html
+
+   #========== Macros for automating Library Fetching =============#
+   include(FetchContent)
+
+   # Download library from Github and add it as sub-project
+   #
+   macro(Download_Library_Git  NAME TAG REPOSITORY_URL)
+       FetchContent_Declare(
+           ${NAME}
+           GIT_REPOSITORY  ${REPOSITORY_URL}
+           GIT_TAG         ${TAG}
+       )
+       FetchContent_GetProperties(${NAME})
+       if(NOT cpputest_POPULATED)
+           FetchContent_Populate(${NAME})
+           message("${NAME}_SOURCE_DIR} = ${${NAME}_SOURCE_DIR}")
+           add_subdirectory(${${NAME}_SOURCE_DIR} ${${NAME}_BINARY_DIR})
+       endif()
+   endmacro()
+
+   macro(Download_Library_Github LIBRARY_NAME TAG USER PROJECT )
+       Download_Library_Git(
+           ${LIBRARY_NAME}
+           ${TAG}
+           "https://github.com/${USER}/${PROJECT}.git"
+           )
+   endmacro()
 
 
+   # Download library from URL
+   macro(Download_Library_Url NAME URL)
+       FetchContent_Declare(${NAME} URL  ${URL})
+       FetchContent_GetProperties(spdlog)
+       if(NOT spdlog_POPULATED)
+           FetchContent_Populate(${NAME})
+           add_subdirectory(${${NAME}_SOURCE_DIR} ${${NAME}_BINARY_DIR})
+       endif()
+   endmacro()
+
+   # Add path header files to the include path of all targets.
+   # => NAME => Library name added with any Download_Library command.
+   # => RELATIVE_PATH => Path to header files relative to library root directory
+   #
+   function(include_headers_directory NAME REALATIVE_PATH)
+       include_directories("${${NAME}_SOURCE_DIR}/${RELATIVE_PATH}")
+   endfunction()
+
+   #============== Library Download =========================#
+
+   Download_Library_Url(
+       spdlog
+       "https://github.com/gabime/spdlog/archive/v1.3.1.zip"
+       )
+
+   Download_Library_Github(
+       cppcodec  # Library name - arbitrary
+       v0.2      # Git tag
+       tplgy     # Github user name
+       cppcodec  # Name of project that will be cloned.
+                 # Note: It is does not always have the same name as the library.
+       )
+
+   # Only use it if CMake cannot find the headers or the library is not
+   # set properly.
+   include_headers_directory(cppcodec ./cppcodec)
+
+   # ========= Targets Settings ==========================#
+
+   add_executable(mainapp main.cpp)
+   target_link_libraries(mainapp cppcodec spdlog::spdlog)
+#+END_SRC
+
+ *File:* main.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <spdlog/spdlog.h>
+
+  #include <cppcodec/base32_crockford.hpp>
+  #include <cppcodec/base64_rfc4648.hpp>
+
+
+  int main(int argc, char** argv)
+  {
+      SPDLOG_TRACE("Entering function");
+
+      spdlog::info("Starting server OK.");
+
+      spdlog::info("Received request from 192.168.10.1 at port 9090");
+      spdlog::info("Sending response to client 192.168.100.1 connection ID 10");
+
+      using base32 = cppcodec::base32_crockford;
+      using base64 = cppcodec::base64_rfc4648;
+
+      std::vector<uint8_t> decoded = base64::decode("YW55IGNhcm5hbCBwbGVhc3VyZQ==");
+      std::cout << "decoded size (\"any carnal pleasure\"): " << decoded.size() << '\n';
+      std::cout << base32::encode(decoded) << std::endl; // "C5Q7J833C5S6WRBC41R6RSB1EDTQ4S8"
+
+
+      SPDLOG_TRACE("Exit application");
+
+      return 0;
+  }
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC sh 
+  $ cd proejct_directory 
+  $ cmake -B_build -H. -DCMAKE_BUILD_TYPE=Debug
+  $ cmake --build _build --target
+
+  # Run 
+  $ _build/mainapp 
+  [2019-07-19 17:46:56.306] [info] Starting server OK.
+  [2019-07-19 17:46:56.306] [info] Received request from 192.168.10.1 at port 9090
+  [2019-07-19 17:46:56.306] [info] Sending response to client 192.168.100.1 connection ID 10
+  decoded size ("any carnal pleasure"): 19
+  C5Q7J833C5S6WRBC41R6RSB1EDTQ4S8
+#+END_SRC
 
 ** Common Variables 
 *** CMAKE_CURRENT_LIST_DIR - Directory where is CMakeLists.txt 
