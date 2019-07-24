@@ -792,6 +792,243 @@ Proces stderr:
   >>> 
 #+END_SRC
 
+** Generic Input Stream - read data from file, console and memory 
+
+File: readInventory.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream> // std::cout, std::cin, std::istream, std::ostream ...
+  #include <fstream>  // std::ifstream, std::ofstream
+  #include <string>
+  #include <sstream>  // Import: std::stringstream
+  #include <iomanip>  // Import: std::quoted
+  #include <vector>
+
+  struct InventoryItem{
+      /// Database id
+      unsigned int id;
+      /// Produce name
+      std::string  name;
+      /// Price per unit
+      double       price;
+      /// Quanity
+      unsigned int quantity;
+
+      InventoryItem(): id{0}, name{""}, price{0.0}, quantity{0}
+      { }
+  };
+
+  using Inventory = std::vector<InventoryItem>;
+
+  void      showInventory(Inventory const& inventory);
+  Inventory readInventory(std::istream& is);
+  Inventory readInventoryFromFile(std::string const& file);
+
+  extern const char* sampleData;
+
+  int main(int argc, char** argv)
+  {
+      if(argc < 2)
+      {
+          std::cout << "Usage: " << "\n"
+                    << "$ " << argv[0]   << " file [FILE] " << "\n"
+                    << "$ " << argv[0]   << " memory" << "\n"
+                    << "$ " << argv[0]   << " console" << "\n";
+          return EXIT_FAILURE;
+      }
+
+      std::string cmd = argv[1];
+
+      // Self  test - read memory stream
+      if(cmd == "memory")
+      {
+          auto ss        = std::stringstream{sampleData};
+          auto inventory = readInventory(ss);
+          showInventory(inventory);
+          return EXIT_SUCCESS;
+      }
+
+      // Read user file
+      if(argc == 3 && cmd == "file")
+      {
+          std::string file = argv[2];
+          std::cout << " Reading file: " << file << std::endl;
+          Inventory inventory = readInventoryFromFile(file);
+          showInventory(inventory);
+          return EXIT_SUCCESS;
+      }
+
+      // Read console
+      if(cmd == "console")
+      {
+          std::cout << "Type the inventory and then type Ctlr + D when you are done."
+                    << std::endl;
+          auto inventory = readInventory(std::cin);
+          std::cout << " ---- Inventory Value ---------" << std::endl;
+          showInventory(inventory);
+          return EXIT_SUCCESS;
+      }
+
+      std::cerr << " [ERROR] Invalid command line option." << std::endl;
+      return EXIT_FAILURE;
+  }
+
+  // --------------------------------------------------------------//
+
+  const char* sampleData = R"(
+  297  "Current sensor"           9.60    300
+  871  "Pressure transducer"     90.00     50
+  751  "Temperature SPI sensor"  40.25     20
+  652  "Gyroscope"              220.50     45
+  )";
+
+
+  void showInventory(Inventory const& inventory)
+  {
+      std::cout << std::setprecision(2) << std::fixed;
+
+      std::cout << std::right << std::setw(5)  << "ID"
+                << std::right << std::setw(5)  << " "
+                << std::left  << std::setw(30) << "Name"
+                << std::right << std::setw(10)  << "Price"
+                << std::right << std::setw(12) << "Quantity"
+                << std::right << std::setw(12) << "Value"
+                << "\n";
+
+      double total = 0.0;
+      for(auto const& item: inventory)
+      {
+          std::cout << std::right << std::setw(5)  << item.id
+                    << std::right << std::setw(5)  << " "
+                    << std::left  << std::setw(30) << item.name
+                    << std::right << std::setw(10)  << item.price
+                    << std::right << std::setw(12)  << item.quantity
+                    << std::right << std::setw(12)  << item.quantity * item.price
+                    << "\n";
+          total += item.quantity * item.price;
+      }
+      std::cout << "\n Total inventory value: " << total << "\n";
+  }
+
+  /** Read inventory from any input stream (derived class from std::istream) such
+   ,*  as std::ifstream, std::cin, std::sstringstream.
+   ,*/
+  Inventory
+  readInventory(std::istream& is)
+  {
+      InventoryItem currentItem;
+      std::vector<InventoryItem> inventory;
+
+      std::string       line;
+      std::stringstream sline;
+      while(std::getline(is, line))
+      {
+          if(line == "") { continue; }
+          // Reset sline status flags
+          sline.clear();
+          // Reset the value of sline stringstream
+          sline.str(line);
+          // Read line fields
+          sline >> currentItem.id >> std::quoted(currentItem.name)
+              >> currentItem.price >> currentItem.quantity;
+
+          // Check error flags and stop on error
+          if(!sline)
+          {
+              auto error_message =
+                  std::string("Error: invalid line: ") + line;
+              throw  std::runtime_error(error_message);
+          }
+          inventory.push_back(currentItem);
+      }
+      return inventory;
+  }
+
+  Inventory
+  readInventoryFromFile(std::string const& file)
+  {
+      auto ifs = std::ifstream(file);
+      if(!ifs)
+      {
+          std::cerr << " Error: file not found." << std::endl;
+          std::terminate();
+      }
+      return readInventory(ifs);
+  }
+    
+#+END_SRC
+
+File: inventory1.txt 
+
+#+BEGIN_SRC txt 
+   200  "diode"                  3.40         100
+   300  "blue led"               5.10         200 
+   100  "power supply 5 Volts"  20.50          15
+   256  "battery 12 volts pack" 12.50          50
+   901  "light sensor"          60.00          40
+#+END_SRC
+
+Building: 
+
+#+BEGIN_SRC sh 
+ $ g++ readInventory.cpp -o readInventory.bin -std=c++1z -O0 -g
+#+END_SRC
+
+Show options: 
+
+#+BEGIN_SRC sh 
+  $ ./readInventory.bin 
+  Usage: 
+  $ ./readInventory.bin file [FILE] 
+  $ ./readInventory.bin memory
+  $ ./readInventory.bin console
+#+END_SRC
+
+Read and display inventory data from memory (std::stringstream): 
+
+#+BEGIN_SRC sh 
+  $ ./readInventory.bin memory
+     ID     Name                               Price    Quantity       Value
+    297     Current sensor                      9.60         300     2880.00
+    871     Pressure transducer                90.00          50     4500.00
+    751     Temperature SPI sensor             40.25          20      805.00
+    652     Gyroscope                         220.50          45     9922.50
+
+   Total inventory value: 18107.50
+#+END_SRC
+
+Read and display inventory data from console: 
+
+#+BEGIN_SRC sh 
+  $ ./readInventory.bin console
+  Type the inventory and then type Ctlr + D when you are done.
+  982 "IMU 6 axis" 300.0 25
+  751 "Temperature sensor I2C" 45.0 200
+  231 "Current transducer XYZWK" 78.50 35
+   ---- Inventory Value ---------
+     ID     Name                               Price    Quantity       Value
+    982     IMU 6 axis                        300.00          25     7500.00
+    751     Temperature sensor I2C             45.00         200     9000.00
+    231     Current transducer XYZWK           78.50          35     2747.50
+
+   Total inventory value: 19247.50
+#+END_SRC
+
+Read and display inventory data from file: 
+
+#+BEGIN_SRC sh 
+  $ ./readInventory.bin file inventory1.txt 
+   Reading file: inventory1.txt
+     ID     Name                               Price    Quantity       Value
+    200     diode                               3.40         100      340.00
+    300     blue led                            5.10         200     1020.00
+    100     power supply 5 Volts               20.50          15      307.50
+    256     battery 12 volts pack              12.50          50      625.00
+    901     light sensor                       60.00          40     2400.00
+
+   Total inventory value: 4692.50
+#+END_SRC
+
 ** Custom IO manipulators 
 
  *Example: 1* 
