@@ -792,7 +792,196 @@ Proces stderr:
   >>> 
 #+END_SRC
 
-** Generic Input Stream - read data from file, console and memory 
+** Printf - format specifiers and examples
+*** Specifiers
+
+|-------------+-------------------------------------------------------------------+--------------|
+| Specifier   | Description                                                       |      Example |
+|-------------+-------------------------------------------------------------------+--------------|
+| *Escape*      |                                                                   |              |
+|-------------+-------------------------------------------------------------------+--------------|
+| %%  or \%   | Print a percent sign (%)                                          |              |
+|             |                                                                   |              |
+| *Misc*        |                                                                   |              |
+|-------------+-------------------------------------------------------------------+--------------|
+| %c          | Print a single character                                          |              |
+| %s          | Print a string                                                    |              |
+| %p          | Print the address stored in a pointer in hexadecimal base.        |              |
+|             |                                                                   |              |
+| *Integers*    |                                                                   |              |
+|-------------+-------------------------------------------------------------------+--------------|
+| %u          | Print unsigned integer                                            |              |
+| %d  or %i   | Print signed integer in standard notation                         |              |
+| %o          | Print signed integer in octal base                                |              |
+| %x          | Print signed integer in hexadecimal base (lower case letters)     |              |
+| %X          | Print signed integer in hexadecimal base (upper case letters)     |              |
+|             |                                                                   |              |
+| *Float Point* |                                                                   |              |
+|-------------+-------------------------------------------------------------------+--------------|
+| %f          | Print using standard notation                                     | 12391.647808 |
+| %a          | Print using hexadecimal notation                                  |              |
+|             |                                                                   |              |
+| %e          | Print using scientific notation (lower case 'e)                   | 1.239165e+04 |
+| %E          | Print using scientific notation (upper case 'E')                  | 1.239165E+04 |
+|             |                                                                   |              |
+| %g          | Print using scientific notation only when needed (lower case 'e') | 1.239165e+04 |
+| %G          | Print using scientific notation only when needed (upper case 'E') | 1.239165E+04 |
+|             |                                                                   |              |
+|             |                                                                   |              |
+| %.3f        | Print using std. notation with 3 digits precision                 |    12391.649 |
+| %.3E        | Print using scientific notation with 3 digits precision           |    1.240E+04 |
+|             |                                                                   |              |
+
+
+WARNING: Despite the simplicity, printf is not type-safe and has some
+potential vulnerabilities:
+
+ + [[https://en.wikipedia.org/wiki/Uncontrolled_format_string][Uncontrolled format string]]
+ + [[https://www.owasp.org/index.php/Format_string_attack][Format string attack]]
+
+*** Examples
+
+Headers:
+
+#+BEGIN_SRC cpp
+  // For C use <stdio.h>
+  #include <cstdio>  // for printf
+  #include <cmath>   // sin, cos, exp
+#+END_SRC
+
+Print integer:
+
+#+BEGIN_SRC cpp
+  int x = 2951;
+
+  >> printf(" => x = %d\n", x);
+   => x = 2951
+
+  // Print integer in octal format
+  >> printf(" => x = %o [Octal format - base 8]\n", x);
+   => x = 5607 [Octal format - base 8]
+
+  // Print integer in hexadecimal format (lower case)
+  >> printf(" => x = 0x%x [Hexadecimal]\n", x);
+   => x = 0xb87 [Hexadecimal]
+
+  // Print integer in hexadecimal format (upper case)
+  >> printf(" => x = 0x%X [Hexadecimal]\n", x);
+   => x = 0xB87 [Hexadecimal]
+#+END_SRC
+
+ *Print address of a pointer*
+
+#+BEGIN_SRC cpp
+  >> printf(" => address_of(x) = %p\n", &x)
+   => address_of(x) = 0x7f0279845010
+#+END_SRC
+
+ *Print float point*
+
+Print float point in standard notation with any precision:
+
+#+BEGIN_SRC cpp
+  >> double PI = 4.0 * atan2(1, 1)
+  (double) 3.1415927
+
+  // Print with any precision
+  >> printf("PI = %f exp(3 * PI) = %f \n", PI, std::exp(3 * PI));
+  PI = 3.141593 exp(3 * PI) = 12391.647808
+#+END_SRC
+
+Print float point in standard notation with 3 digits precision:
+
+#+BEGIN_SRC cpp
+  // Print with 3 digits precision
+  >> printf("PI = %.3f exp(3 * PI) = %.3f \n", PI, std::exp(3 * PI));
+  PI = 3.142 exp(3 * PI) = 12391.648
+#+END_SRC
+
+Print in scientific notation with any precision:
+
+#+BEGIN_SRC cpp
+  >> printf("PI = %e exp(3 * PI) = %e \n", PI, std::exp(3 * PI));
+  PI = 3.141593e+00 exp(3 * PI) = 1.239165e+04
+#+END_SRC
+
+Print in scientific notation with 3 digits precision:
+
+#+BEGIN_SRC cpp
+  >> printf("PI = %.3E exp(3 * PI) = %.3E \n", PI, std::exp(3 * PI));
+  PI = 3.142E+00 exp(3 * PI) = 1.239E+04
+#+END_SRC
+
+Print with scientific only when needed (for large numbers).
+
+#+BEGIN_SRC cpp
+   >> printf("PI = %G exp(2 + 3 * PI) = %G \n", PI, std::exp(2 + 3 * PI));
+   PI = 3.14159 exp(2 + 3 * PI) = 91562.6
+
+   >> printf("PI = %G exp(6 + 3 * PI) = %G \n", PI, std::exp(6 + 3 * PI));
+   PI = 3.14159 exp(6 + 3 * PI) = 4.99915E+06
+#+END_SRC
+
+Print with scientific only when needed with 4 digits precision:
+
+#+BEGIN_SRC cpp
+  >> printf("PI = %.4G exp(2 + 3 * PI) = %.4G \n", PI, std::exp(2 + 3 * PI));
+  PI = 3.142 exp(2 + 3 * PI) = 9.156E+04
+#+END_SRC
+
+Print with hexadecimal notation:
+
+#+BEGIN_SRC cpp
+  >> printf("PI = %a exp(PI) = %a \n", PI, std::exp(PI));
+  PI = 0x1.921fb54442d18p+1 exp(PI) = 0x1.724046eb09339p+4
+#+END_SRC
+
+Print table of float points:
+
+#+BEGIN_SRC cpp
+  >> for(double x = 0; x <= 10.0; x+= 1.0) printf("%8.3f %10.3f\n", x, exp(x))
+     0.000      1.000
+     1.000      2.718
+     2.000      7.389
+     3.000     20.086
+     4.000     54.598
+     5.000    148.413
+     6.000    403.429
+     7.000   1096.633
+     8.000   2980.958
+     9.000   8103.084
+    10.000  22026.466
+
+  >> for(double x = 0; x <= 10.0; x+= 1.0) printf("%8.3f %10.2E\n", x, exp(x))
+     0.000   1.00E+00
+     1.000   2.72E+00
+     2.000   7.39E+00
+     3.000   2.01E+01
+     4.000   5.46E+01
+     5.000   1.48E+02
+     6.000   4.03E+02
+     7.000   1.10E+03
+     8.000   2.98E+03
+     9.000   8.10E+03
+    10.000   2.20E+04
+
+  >> for(double x = 0; x <= 10.0; x+= 1.0) printf("%8.3f %10.5E\n", x, exp(x))
+     0.000 1.00000E+00
+     1.000 2.71828E+00
+     2.000 7.38906E+00
+     3.000 2.00855E+01
+     4.000 5.45982E+01
+     5.000 1.48413E+02
+     6.000 4.03429E+02
+     7.000 1.09663E+03
+     8.000 2.98096E+03
+     9.000 8.10308E+03
+    10.000 2.20265E+04
+#+END_SRC
+
+
+
+** Read data from generic Input Stream - read data from file, console and memory
 
 File: readInventory.cpp 
 
