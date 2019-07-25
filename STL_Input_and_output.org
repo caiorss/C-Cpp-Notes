@@ -1218,6 +1218,382 @@ Read and display inventory data from file:
    Total inventory value: 4692.50
 #+END_SRC
 
+** Reading ELF binary files 
+*** Overview  
+
+Most Unix-like operating systems such as Linux, Android, BSD Variants,
+AIX and IRIX use [[https://en.wikipedia.org/wiki/Executable_and_Linkable_Format][ELF]] Executable Linkable Format binary file format for
+their executables and shared libraries (aka shared object). While the
+following code is specific for ELF files, it can be reused with any
+other type of binary file if the layout is known.
+
+ + Note: Although Mac OSX is an Unix-like operating system, it does
+   not use ELF file format for its executables, instead it uses
+   [[https://en.wikipedia.org/wiki/Mach-O][Mach-O]] file format.
+
+Parts of an ELF object: 
+
+   1. File Header
+   2. Section Table*
+   3. Program Header Table
+   4. Sections and Segments
+
+The most relevant sections for an ELF object-code file are: 
+
+|---------+-------------------------------------|
+| Section | Description                         |
+|---------+-------------------------------------|
+| *.text*   | Contains the compiled machine code. |
+| .data   | Initialized data                    |
+| .bss    | Non-initialized data                |
+| .got    | Global Offset Table                 |
+| .debug  | Debug Symbols                       |
+|---------+-------------------------------------|
+
+*** Checking an ELF test file
+
+Identify an ELF file: 
+
+#+BEGIN_SRC sh 
+   $ file /bin/bash
+   /bin/bash: ELF 64-bit LSB shared object, x86-64, version 1 (SYSV), dynamically linked, interpreter 
+   /lib64/l, for GNU/Linux 3.2.0, BuildID[sha1]=01497fbe04f926fce1493834b3d208f82ab29788, stripped, too many notes (256)
+#+END_SRC
+
+ *Check magic number*  
+
+The first bytes must be ~\0x7f ELF~ or the sequence of bytes: 0x7f 0x45
+0x4c 0x46.
+
+#+BEGIN_SRC sh 
+  $ od -t x1 -N 8 /bin/bash
+  0000000 7f 45 4c 46 02 01 01 00
+  0000010
+
+  $  hexdump -C /bin/bash | head -n 2
+  00000000  7f 45 4c 46 02 01 01 00  00 00 00 00 00 00 00 00  |.ELF............|
+  00000010  03 00 3e 00 01 00 00 00  b0 e4 02 00 00 00 00 00  |..>.............|
+#+END_SRC
+
+ *Show ELF header:*
+
+#+BEGIN_SRC sh 
+  $ readelf -h /bin/bash
+  ELF Header:
+    Magic:   7f 45 4c 46 02 01 01 00 00 00 00 00 00 00 00 00 
+    Class:                             ELF64
+    Data:                              2's complement, little endian
+    Version:                           1 (current)
+    OS/ABI:                            UNIX - System V
+    ABI Version:                       0
+    Type:                              DYN (Shared object file)
+    Machine:                           Advanced Micro Devices X86-64
+    Version:                           0x1
+    Entry point address:               0x2e4b0
+    Start of program headers:          64 (bytes into file)
+    Start of section headers:          1192776 (bytes into file)
+    Flags:                             0x0
+    Size of this header:               64 (bytes)
+    Size of program headers:           56 (bytes)
+    Number of program headers:         11
+    Size of section headers:           64 (bytes)
+    Number of section headers:         30
+    Section header string table index: 29
+#+END_SRC
+
+ *Show sections:* 
+
+#+BEGIN_SRC sh 
+  $ readelf --sections /bin/bash
+  There are 30 section headers, starting at offset 0x123348:
+
+  Section Headers:
+    [Nr] Name              Type             Address           Offset
+         Size              EntSize          Flags  Link  Info  Align
+    [ 0]                   NULL             0000000000000000  00000000
+         0000000000000000  0000000000000000           0     0     0
+    [ 1] .interp           PROGBITS         00000000000002a8  000002a8
+         000000000000001c  0000000000000000   A       0     0     1
+    [ 2] .note.ABI-tag     NOTE             00000000000002c4  000002c4
+         0000000000000020  0000000000000000   A       0     0     4
+    [ 3] .note.gnu.propert NOTE             00000000000002e8  000002e8
+         0000000000000030  0000000000000000   A       0     0     8
+    [ 4] .note.gnu.build-i NOTE             0000000000000318  00000318
+         0000000000000024  0000000000000000   A       0     0     4
+    [ 5] .gnu.hash         GNU_HASH         0000000000000340  00000340
+         00000000000049ac  0000000000000000   A       6     0     8
+    [ 6] .dynsym           DYNSYM           0000000000004cf0  00004cf0
+         000000000000de18  0000000000000018   A       7     1     8
+    [ 7] .dynstr           STRTAB           0000000000012b08  00012b08
+         00000000000092be  0000000000000000   A       0     0     1
+    [ 8] .gnu.version      VERSYM           000000000001bdc6  0001bdc6
+         0000000000001282  0000000000000002   A       6     0     2
+    [ 9] .gnu.version_r    VERNEED          000000000001d048  0001d048
+         00000000000000b0  0000000000000000   A       7     2     8
+    [10] .rela.dyn         RELA             000000000001d0f8  0001d0f8
+         000000000000da10  0000000000000018   A       6     0     8
+    [11] .rela.plt         RELA             000000000002ab08  0002ab08
+         0000000000001470  0000000000000018  AI       6    23     8
+    [12] .init             PROGBITS         000000000002bf78  0002bf78
+         0000000000000017  0000000000000000  AX       0     0     4
+    [13] .plt              PROGBITS         000000000002bf90  0002bf90
+         0000000000000db0  0000000000000010  AX       0     0     16
+    [14] .text             PROGBITS         000000000002cd40  0002cd40
+         00000000000a59e1  0000000000000000  AX       0     0     16
+    [15] .fini             PROGBITS         00000000000d2724  000d2724
+         0000000000000009  0000000000000000  AX       0     0     4
+    [16] .rodata           PROGBITS         00000000000d2740  000d2740
+         0000000000018fd8  0000000000000000   A       0     0     32
+    [17] .eh_frame_hdr     PROGBITS         00000000000eb718  000eb718
+         00000000000042dc  0000000000000000   A       0     0     4
+
+    ... ...   ... ...   ... ...   ... ...   ... ...   ... ...   ... ... 
+
+  Key to Flags:
+    W (write), A (alloc), X (execute), M (merge), S (strings), I (info),
+    L (link order), O (extra OS processing required), G (group), T (TLS),
+    C (compressed), x (unknown), o (OS specific), E (exclude),
+    l (large), p (processor specific)
+#+END_SRC
+
+*** Sample program 
+
+File: *read_elf.cpp* 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <fstream>
+  #include <cstdint>
+  #include <vector>
+  #include <iomanip>
+  #include <cassert>
+  #include <map>
+
+  using ByteArray = std::vector<std::uint8_t>;
+
+  /** Print byte array as string and non-printable chars as hexadecimal */
+  std::ostream& operator<<(std::ostream& os, const ByteArray& str);
+  bool operator==(ByteArray const& rhs, ByteArray const& lhs);
+  template<typename T> auto readbin_at(std::istream& is, long offset) -> T;
+  template<typename T> void show_num_at(std::istream& is, long offset, const char* name);
+
+  extern std::map<uint8_t, const char*> isa_type_database;
+
+  enum class Endianess
+  {
+      little_endian = 1
+    , big_endian    = 2
+  };
+
+  enum WordSize
+  {
+      word32bits = 1
+     ,word64bits = 2
+  };
+
+  int main()
+  {
+      const char* elf_file = "/usr/bin/bash";
+
+      // Create input stream object to read ELF binary file
+      auto ifs = std::ifstream (elf_file, std::ios::in | std::ios::binary );
+
+      if(!ifs){
+          std::cerr << " [ERROR] Unable to open file." << std::endl;
+          return EXIT_FAILURE;
+      }
+
+      // ==== Read magic header 0x7F ELF at offset 0x00 ===============================//
+
+      ByteArray elf_header(4, 0x00);
+      // Read 4 bytes at offset 0x00
+      ifs.read(reinterpret_cast<char*>(&elf_header[0])
+                   , elf_header.size() * sizeof (std::uint8_t));
+      std::cout << " elf_header = " << elf_header << std::endl;
+
+      // Check wheter magic bytes are equal to '0x7f E L F'
+      if(elf_header != ByteArray{ 0x7f, 0x45, 0x4c, 0x46 })
+      {
+          std::cerr << " Error: not an ELF unix executable file." << std::endl;
+          std::exit(EXIT_FAILURE);
+      }
+
+      // ==== Read field EI_CLASS at 0x04 ============================================//
+      //
+      auto ei_class = readbin_at<uint8_t>(ifs, 0x04);
+      printf(" ei_class = 0x%X \n", ei_class);
+      WordSize wordsize = static_cast<WordSize>(ei_class);
+      printf(" Executable type (word size): %s \n", (ei_class == 2 ? "64 bits" : " 32 bits"));
+
+      //==== Read field EI_DATA at offset 0x05 ====================================//
+      auto ei_data = readbin_at<uint8_t>(ifs, 0x05);
+      printf(" ei_data = 0x%X \n", ei_data);
+      Endianess endianess = static_cast<Endianess>(ei_data);
+
+      if(endianess == Endianess::big_endian)
+          printf(" => Processor is BIG ENDIAN \n");
+
+      if(endianess == Endianess::little_endian)
+          printf(" => Processor is LITTLE ENDIAN\n");
+
+      //==== Read field EI_OSABI at offset 0x07 ======================================//
+      //
+      auto ei_osabi = readbin_at<uint8_t>(ifs, 0x07);
+      printf(" ei_osabi = 0x%X \n", ei_osabi);
+
+
+      //=== Read ISA - Instruction Set Architecture type ===========================//
+      auto ei_machine = readbin_at<uint8_t>(ifs, 0x12);
+      printf(" ei_machine = 0x%X \n", ei_machine);
+      printf(" Architecture(ISA): %s \n", isa_type_database.at(ei_machine));
+
+      //=== Read e_phnum, e_shentsize, e_shnum and e_shstrndx ====================//
+      // Note: assumes ELF 64 bits
+      //
+      auto e_shnum = readbin_at<uint16_t>(ifs, 0x3C);
+      printf(" Number of sections of the ELF file = %d \n", e_shnum);
+
+      show_num_at<uint32_t>(ifs, 0x30, "e_hsize");
+      show_num_at<uint16_t>(ifs, 0x36, "e_shentsize");
+      show_num_at<uint16_t>(ifs, 0x38, "e_phnum");
+      show_num_at<uint16_t>(ifs, 0x3A, "e_shentsize");
+      show_num_at<uint16_t>(ifs, 0x3C, "e_shnum");
+
+      //=== Read entry point field ================================================//
+      uint64_t ei_entry;
+
+      if(wordsize == WordSize::word32bits)
+          ei_entry = readbin_at<uint32_t>(ifs, 0x18);
+
+      if(wordsize == WordSize::word64bits)
+          ei_entry = readbin_at<uint64_t>(ifs, 0x18);
+
+      printf(" Entry point 0x%X \n", ei_entry);
+
+      return 0;
+  }
+
+  // ***************************************************************//
+
+  std::ostream& operator<<(std::ostream& os, const ByteArray& str)
+  {
+      for(const auto& ch: str)
+      {
+          if(std::isprint(ch))
+              os << ch << "";
+          else
+              os << "\\0x" << std::hex << std::setw(2) << std::setfill('0')
+                 << static_cast<int>(ch) << " "
+                 << std::dec;
+      }
+      return os;
+  }
+
+  bool operator==(ByteArray const& rhs, ByteArray const& lhs)
+  {
+      if(rhs.size() != lhs.size()) {
+          return false;
+      }
+      return std::equal(rhs.begin(), rhs.end(), lhs.begin());
+  }
+
+  /** @brief Read some value T at some offset of a binary input stream.
+    ,*
+    ,* @tparam T      - type which will be read
+    ,* @param  is     - Input stream opened in binary mode
+    ,* @param  offset - Offset or position where data will be read.
+    ,*/
+  template<typename T>
+  auto readbin_at(std::istream& is, long offset) -> T
+  {
+      T value{};
+      if(offset > 0) { is.seekg(offset); }
+      is.read(reinterpret_cast<char*>(&value), sizeof (T));
+      return value;
+  }
+
+  template<typename T>
+  void show_num_at(std::istream& is, long offset, const char* name)
+  {
+      T data = readbin_at<T>(is, offset);
+      printf(" => Field [%s] = %d \n", name, data);
+  }
+
+
+  // Instruction set ISA type database
+  std::map<uint8_t, const char*> isa_type_database =
+      {
+           {0x00, "No specified"}
+          ,{0x02, "Sparc"}
+          ,{0x03, "x86"}
+          ,{0x08, "MIPS"}
+          ,{0x14, "Power PC"}
+          ,{0x16, "S390"}
+          ,{0x28, "ARM"}
+          ,{0x2A, "SuperH"}
+          ,{0x3E, "x86-64"}
+          ,{0xB7, "AArch64"}
+          ,{0xF3, "RISC-V"}
+     };
+#+END_SRC
+
+Compile: 
+
+#+BEGIN_SRC sh 
+  $ g++ read_elf.cpp -o read_elf.bin -std=c++1z -Wall -g -O0 
+#+END_SRC
+
+Running and sample output: 
+
+#+BEGIN_SRC sh 
+  $ ./read_elf.bin 
+   elf_header = \0x7f ELF
+   ei_class = 0x2 
+   Executable type (word size): 64 bits 
+   ei_data = 0x1 
+   => Processor is LITTLE ENDIAN
+   ei_osabi = 0x0 
+   ei_machine = 0x3E 
+   Architecture(ISA): x86-64 
+   Number of sections of the ELF file = 30 
+   => Field [e_hsize] = 0 
+   => Field [e_shentsize] = 56 
+   => Field [e_phnum] = 11 
+   => Field [e_shentsize] = 64 
+   => Field [e_shnum] = 30 
+   Entry point 0x2E4B0 
+#+END_SRC
+
+*** References
+
+   * *Exectuable Linkable Format (ELF)*
+     + <https://www.cs.cmu.edu/afs/cs/academic/class/15213-s00/doc/elf.pdf> 
+
+   * *Executable Linkable Format - wikpedia*
+     + <https://en.wikipedia.org/wiki/Executable_and_Linkable_Format> 
+
+   * *Executable and Linkable Format 101 - Part 1 Sections and Segments*
+     + <https://www.intezer.com/executable-linkable-format-101-part1-sections-segments/> 
+
+   * *The 101 of ELF files on Linux: Understanding and Analysis* 
+     + <https://linux-audit.com/elf-binaries-on-linux-understanding-and-analysis/> 
+
+   * *Chapter 8. Behind the process*
+     + <https://www.bottomupcs.com/elf.xhtml>
+
+   * *C compiler. Memory Map. Program in RAM*
+     + <https://www.ele.uva.es/~jesus/hardware_empotrado/Compiler.pdf>
+
+   * *Analyzing the Linker Map file with a little help from the ELF and the DWARF*
+     + <https://www.embeddedrelated.com/showarticle/900.php>
+
+   * *Lab 03 - Executables. Static Analysis*
+     + <https://ocw.cs.pub.ro/courses/cns/labs/lab-03>
+
+   * *Inside ELF Symbol Table*
+     + <https://blogs.oracle.com/solaris/inside-elf-symbol-tables-v2>
+
+
 ** Custom IO manipulators 
 
  *Example: 1* 
@@ -1704,6 +2080,11 @@ Restore buffer:
 #+END_SRC
 ** Read whole input stream to string 
 
+Note: It is advisable to not use the function istreamToString with
+large files >= 1GB, otherwise it can cost 1GB of RAM. Large files
+should be processed chunk-by-chunk in order to not consume an
+unnecessary amount of memory.
+
 #+BEGIN_SRC cpp 
   #include <iostream>
   #include <string>
@@ -1714,8 +2095,9 @@ Restore buffer:
     ,* Requires headers: <iostream> and <sstream>
     ,*/
   std::string istreamToString(std::istream& is){
-      if(is.bad())
+      if(is.bad()){ 
           throw std::runtime_error("Error: stream has errors.");
+      }
       std::stringstream ss;
       ss << is.rdbuf();
       return ss.str();
