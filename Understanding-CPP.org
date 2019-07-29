@@ -11878,7 +11878,7 @@ Define a function at some namespace:
   }
 #+END_SRC
 
-** Error Handling and Exceptions 
+** Exceptions and Error Handling 
 *** Overview 
 
  *C++ has several error Handling approaches:*
@@ -12321,6 +12321,196 @@ Testing:
    Finish successfully
 
  #+END_SRC
+
+*** Exception Safety Guarantees 
+
+Exception-Safety Concept: 
+
+ + According to [[http://www.stroustrup.com/except.pdf][Stroustrup]], an operation is said to be _exception-safe_
+   it it leaves the object in a valid and well-defined state after its
+   termination when an exception is thrown.
+
+ + An Exception-Safe code should:
+
+   + Left the the program in a valid state after an exception
+     happens.
+
+   + avoid memory leaks => always release the allocated memory when an
+     exception happens or no longer needed. 
+
+   + avoid resource leaks => always release acquired resources such as
+     socket handlers, file descriptors, database connection handlers,
+     locks and so on when an exception happens or no longer needed.
+
+   + not allow data structures being corrupted.
+
+
+ *Levels of Excpetion-Safety Guarantees* 
+
+Exception-safety guarantees are a set of promises made by class or
+library to a client code allowing better reasoning about exceptions. A
+library or code can provide the following _exception-safety guarantees_,
+aka _levels of exception-safety guarantees_:
+
+ + _basic exception-safety guarantees_ (aka _no-leak guarantee_)
+
+   * No resources are leaked and the invariants of the component are
+     preserved.
+
+   * The component must be in a valid state after the exception is
+     thrown, but it does not mean that its state was kept.
+
+   * This is the minimum standard that a library, component, container
+     or class should implement.
+
+ + _strong exception-safety guarantees_ (aka _commit or rollback semantics_)
+
+   * Some functions from standard library with strong exception safety guarantee:
+     * Member functions for several containers: push_back, push_front
+       and rehash.
+
+   * The component state is kept the same as it was before the
+     operation has been completed successfuly or thrown an exception.
+
+   * Summary: if an operation fails, it has no effects.
+
+ + _no-throw guarantees_ (aka _no-fail_ or _failure transparency_)
+
+   * The operation does not throw an exception and all operations are
+     guaranteed to complete successfully with any exception handled
+     internally, therefore not affecting any client code.
+
+   * Some functions from standard library with no-throw exception-safe guarantee.
+     * Member functions of several containers: erase, pop_back,
+       pop_front and clear.
+     * Function: _std::swap_ 
+
+   * Functions with no-throw guarantee can be explicitly annotated
+     with [[https://en.cppreference.com/w/cpp/language/noexcept_spec][noexcept]] specifier.
+
+   * The *noexcepet* specifier annotation for copy constructor and move
+     constructor allows many functions from the C++ standard library
+     to choose the most efficient function overloading based on this
+     annotation. For instance, if the move constructor of a given type
+     *M* is not marked with _noexcept_ specfier, the member function
+     push_back of std::vector container will not use this constructor,
+     instead it will use the copy constructor incurring on a copy
+     overhead and less efficiency. If the annotation is used, the
+     push_back member function will use move-constructor which makes
+     the operation more efficient.
+
+   * Note: If a function or member function is annotated with
+     noexcept and throws any exception, the function std::terminate is
+     called terminating the process immediately. 
+
+ + _No exception safety_
+   * Non guarantees are provided and the object or container may be in
+     a corrupt state. No exception-safety should be avoided.
+
+ + _Exception neutral_ (additional exception-safety level)
+   + An exception neutral code does not throw or catch exception. It
+     only forwards exceptions thrown in the code that it calls to the
+     client code. 
+
+
+ *Principles for exception-safe code*
+
+ * Avoid resouce leaks and memory leaks. 
+
+ * Always keep an object in valid state when an exception is thrown.
+
+ * Do not destroy a piece of data before its replacement can be
+   store. 
+
+ *Language features for exception safety* 
+
+ * try-catch block
+
+ * RAII Idiom - Resource Acquisition Is Initialization technique.
+
+   + Resources, which can be heap-allocated memory, socket handlers,
+     file descriptiors, database handlers and so on, are acquired in
+     constructor and released at destructor which are determinstic and
+     always called when an exception happens.
+
+   + The C++ language guarantees that a destructor always will be
+     called at the end of scope where the object is defined or when an
+     exception happens.
+
+   + Note: A destructor should always catch all exceptions and never
+     allow them to propagate from them, otherwise, the program will be
+     terminated immediately.
+
+ * Copy-and-swap idiom
+
+References: 
+ 
+ + *Exception Safety: Concepts and Techniques*  - Bjarne Stroutrup [BEST]
+   + <http://www.stroustrup.com/except.pdf>
+
+ + *Progamming with Exceptions* - Bjarne Stroustrup
+   + <http://www.informit.com/articles/article.aspx?p=21084> 
+
+ + *Standard Library Exception Safety*  - Bjarne Stroustrup  [BEST]
+   + <https://www.cise.ufl.edu/~manuel/stroustrup/ex.pdf> 
+
+ + *Exception Safety in Generic Components* - David Abrahams
+   + <https://www.boost.org/community/exception_safety.html>
+
+ + *Exception Safety Analysis* - Andrei Alexandrescu
+   + <http://www.drdobbs.com/exception-safety-analysis/184401728>
+
+ + *C++ Core Guidelines: Rules for Error Handling* - Rainer Grimm [BEST]
+   + <https://www.modernescpp.com/index.php/c-core-guidelines-rules-to-error-handling>
+
+ + *Design Patterns in C++ - Safety to exceptions* - Giuseppe Lipari [BEST]   
+   + <http://retis.sssup.it/~lipari/courses/oosd2010-2/09.exception_safety.pdf>
+
+ + *Using Exception in C++ - a practical guide* - Zibigniew Skowron [BEST]
+   + <http://cpp.mimuw.edu.pl/files/Using%20Exceptions%20in%20C++.pdf>
+
+ + *5 Exception Safety - Handling Errors and Exceptions* - University of Hellsinki [BEST]
+   + <https://www.cs.helsinki.fi/u/vihavain/s08/cpp/slides/CppCh5_2.pdf>
+
+ + *C++ Exception Safety* - Ali Çehreli [BEST]
+   + <http://acehreli.org/turkcecpp/exception_safety.pdf>
+
+ + *Part 9 - Exception Safety*
+   + <https://wiki.ifs.hsr.ch/CppAdvanced/files/lecture_09_exception_safety.pdf> 
+
+ + *Make Move Constructor No-Throw*
+   + <http://blogs.microsoft.co.il/sasha/2014/08/08/make-move-constructors-no-throw/>
+
+ + *How to: Design for Exception Safety* - Microsoft [BEST]
+   + <https://docs.microsoft.com/en-us/cpp/cpp/how-to-design-for-exception-safety?view=vs-2019>
+
+ + *Generic: Change the Way you write Exception-Safe Code - Forever* -
+   Andrei Alexandrescu and Petru Marginean
+   + <http://www.drdobbs.com/cpp/generic-change-the-way-you-write-excepti/184403758>
+
+ + *Effective C++ item 29: Strive For Exception-safe Code*
+   + <http://blog.ycshao.com/2017/11/15/effective-c-item-29-strive-for-exception-safe-code/>
+
+ + *Making Operations on standard library containers strong exception safe*
+   + <https://pdfs.semanticscholar.org/2a6a/30b9f7cd82ef29b64fbecae10463d533a6da.pdf>
+
+ + *Exceptions* - CppReference
+   + <https://en.cppreference.com/w/cpp/language/exceptions>
+
+ + *ERR56-CPP. Guarantee exception safety*
+   + <https://wiki.sei.cmu.edu/confluence/display/cplusplus/ERR56-CPP.+Guarantee+exception+safety>
+
+ + *Exception Safety* - QT Documentation
+   + <https://doc.qt.io/qt-5/exceptionsafety.html>
+
+ + Question - *Do you (really) write exception safe code?*
+   + <https://stackoverflow.com/questions/1853243/do-you-really-write-exception-safe-code>
+
+ + *Exception Safety* - Wikipedia
+   + <https://en.wikipedia.org/wiki/Exception_safety>
+
+ + *Copy-and-Swap Pattern*
+   + <https://cpppatterns.com/patterns/copy-and-swap.html> 
 
 ** C++11 Tuples 
 *** Overview  
