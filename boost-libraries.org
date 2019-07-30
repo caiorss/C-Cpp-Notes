@@ -1895,6 +1895,177 @@ Experiment 2: Boost ptr_vector
   std::cout << " ============= END =================" << "\n";
 #+END_SRC
 
+** Boost CPU Timer  
+
+Boost CPU timer is library used for measuring the CPU time spend on
+some computation, the time is reported to the user after the timer
+object is destroyed at the current scope.
+
+ + Documentation: [[https://www.boost.org/doc/libs/1_70_0/libs/timer/doc/cpu_timers.html][cpu_timers]]
+
+ *Code Example* 
+
+The boost cpu timer library is used to measure the time for computing
+[[https://en.wikipedia.org/wiki/Fibonacci_number][fibonacci]] numbers using recursive and non-recursive functions.
+
+File: CMakeLists.txt 
+
+#+BEGIN_SRC cmake 
+  cmake_minimum_required(VERSION 3.14 FATAL_ERROR)
+  project(boost-cpu-time-test)
+
+  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+
+  find_package(Boost REQUIRED timer)
+  add_executable(cputime cputime.cpp)
+  target_link_libraries(cputime Boost::timer)
+#+END_SRC
+
+File: cputime.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <random>
+  #include <cmath>
+
+  #include <boost/timer/timer.hpp>
+
+  // Macro for displaying variables
+  #define DISP_EXPR(expr)  std::cout << "\n [INFO] " << #expr << " = " << (expr)  << "\n"
+
+  using ulong = unsigned long;
+
+  auto fibonacci_recursive(unsigned long n) -> ulong;
+  auto fibonacci_non_recursive(ulong n) -> ulong;
+
+  int main()
+  {
+
+      std::puts(" =========== Iterations: 30 ======== ");
+      {
+          // starts measuring time here when object 't' is constructed.
+          boost::timer::auto_cpu_timer t;
+          DISP_EXPR( fibonacci_non_recursive(30) );
+          // report timer when object (t) is destroyed (RAII)
+      }
+
+      {
+          boost::timer::auto_cpu_timer t;
+          DISP_EXPR( fibonacci_recursive(30) );
+      }
+
+      std::puts(" =========== Iterations: 40 ========= ");
+      {
+          boost::timer::auto_cpu_timer t;
+          DISP_EXPR( fibonacci_non_recursive(40) );
+      }
+
+      {
+          boost::timer::auto_cpu_timer t;
+          DISP_EXPR( fibonacci_recursive(40) );
+      }
+
+      std::puts(" =========== Iterations: 50 ========= ");
+      {
+          boost::timer::auto_cpu_timer t;
+          DISP_EXPR( fibonacci_non_recursive(50) );
+      }
+
+      {
+          boost::timer::auto_cpu_timer t;
+          DISP_EXPR( fibonacci_recursive(50) );
+      }
+
+      return 0;
+  }
+
+  // ----------------------------------------------------------//
+
+  auto fibonacci_recursive(unsigned long n) -> ulong
+  {
+      if(n < 2) { return 1; }
+      return fibonacci_recursive(n - 1) + fibonacci_recursive(n - 2);
+  }
+
+  auto fibonacci_non_recursive(ulong n) -> ulong
+  {
+      ulong a = 0, b = 1, next = 0;
+      for(auto i = 0UL; i < n; ++i)
+      {
+          next = a + b;
+          a = b;
+          b = next;
+      }
+      return next;
+  }
+#+END_SRC
+
+Command line compilation: 
+
+#+BEGIN_SRC sh 
+  # Debug build => Debug symbols ON and optimizations disabled 
+  $ g++ cputime.cpp -o cputime.bin -std=c++1z -g -O0 -Wall -Wextra -lboost_timer
+
+  # Release build => Debug symbols OFF and optimizations enabled 
+  $ g++ cputime.cpp -o cputime.bin -std=c++1z -O3 -funroll-loops -flto -Wall -Wextra -lboost_timer
+#+END_SRC
+
+Output for debug build: 
+
+#+BEGIN_SRC sh 
+  $ ./cputime.bin 
+   =========== Iterations: 30 ======== 
+
+   [INFO] fibonacci_non_recursive(30) = 1346269
+   0.000104s wall, 0.000000s user + 0.000000s system = 0.000000s CPU (n/a%)
+
+   [INFO] fibonacci_recursive(30) = 1346269
+   0.045962s wall, 0.050000s user + 0.000000s system = 0.050000s CPU (108.8%)
+   =========== Iterations: 40 ========= 
+
+   [INFO] fibonacci_non_recursive(40) = 165580141
+   0.000031s wall, 0.000000s user + 0.000000s system = 0.000000s CPU (n/a%)
+
+   [INFO] fibonacci_recursive(40) = 165580141
+   0.833593s wall, 0.830000s user + 0.000000s system = 0.830000s CPU (99.6%)
+   =========== Iterations: 50 ========= 
+
+   [INFO] fibonacci_non_recursive(50) = 20365011074
+   0.000003s wall, 0.000000s user + 0.000000s system = 0.000000s CPU (n/a%)
+
+   [INFO] fibonacci_recursive(50) = 20365011074
+   102.039261s wall, 101.750000s user + 0.000000s system = 101.750000s CPU (99.7%)
+
+#+END_SRC
+
+Output for release build: 
+
+#+BEGIN_SRC sh 
+  $ ./cputime.bin 
+   =========== Iterations: 30 ======== 
+
+   [INFO] fibonacci_non_recursive(30) = 1346269
+   0.000161s wall, 0.000000s user + 0.000000s system = 0.000000s CPU (n/a%)
+
+   [INFO] fibonacci_recursive(30) = 1346269
+   0.020816s wall, 0.020000s user + 0.000000s system = 0.020000s CPU (96.1%)
+   =========== Iterations: 40 ========= 
+
+   [INFO] fibonacci_non_recursive(40) = 165580141
+   0.000031s wall, 0.000000s user + 0.000000s system = 0.000000s CPU (n/a%)
+
+   [INFO] fibonacci_recursive(40) = 165580141
+   0.399674s wall, 0.400000s user + 0.000000s system = 0.400000s CPU (100.1%)
+   =========== Iterations: 50 ========= 
+
+   [INFO] fibonacci_non_recursive(50) = 20365011074
+   0.000005s wall, 0.000000s user + 0.000000s system = 0.000000s CPU (n/a%)
+
+   [INFO] fibonacci_recursive(50) = 20365011074
+   46.683056s wall, 46.410000s user + 0.040000s system = 46.450000s CPU (99.5%) 
+#+END_SRC
+
 ** Boost Interprocess 
 *** Overview  
 
