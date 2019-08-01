@@ -5,7 +5,7 @@
 
  - [[wiki:index][Index]]
 
-* C++ IO  Input and Output System 
+* C++ IO Input and Output System 
 ** IO Class Hierarchy
 
  *C++ IO Features:*
@@ -792,7 +792,7 @@ Proces stderr:
   >>> 
 #+END_SRC
 
-** Printf - format specifiers and examples
+** C-legacy -Printf - format specifiers and examples
 *** Specifiers
 
 |-------------+-------------------------------------------------------------------+--------------|
@@ -1650,200 +1650,8 @@ Relevant Member function of class std::istream for binary file:
 
    * *Inside ELF Symbol Table*
      + <https://blogs.oracle.com/solaris/inside-elf-symbol-tables-v2>
-
-** Custom IO manipulators 
-
- *Example: 1* 
-
-Custom IO manipulator to print integers in hexadecimal format without
-affecting IO global state.
-
-#+BEGIN_SRC cpp 
-  #include <iostream>
-  #include <iomanip>
-
-  template<typename Numeric> struct to_hex {
-       Numeric m_value;
-       to_hex(Numeric value): m_value(value){ }
-
-       friend std::ostream& operator<<(std::ostream& os, to_hex const& rhs)
-       {
-           return os << "0x" << std::uppercase << std::hex
-                     << rhs.m_value << std::nouppercase << std::dec ;
-       }
-  };
-#+END_SRC
-
-Usage: 
-
-#+BEGIN_SRC cpp 
-  >> std::cout << "x = " << to_hex<int>(2561) << " y = " << 246 << "\n";
-  x = 0xA01 y = 246
-
-  >> std::cout << "x = " << to_hex<int>(255) << " y = " << 246 << "\n";
-  x = 0xFF y = 246
-#+END_SRC
-
- *Example 2* Custom IO manipulators for numerical tables. 
-
-#+BEGIN_SRC cpp 
-  #include <iostream>
-  #include <iomanip>
-  #include <type_traits>
-
-  // Requires headers:  <iostream>, <iomanip>, <type_traits>
-  template< 
-     typename Numeric,
-     // Used for restricting the types of arguments that can be used. 
-     // It will generate a compiler error for non-float arguments. 
-     typename std::enable_if<std::is_floating_point<Numeric>::value, void>::type* = nullptr
-     >
-  struct to_fix {
-      Numeric m_value;
-      size_t  m_precision;
-      size_t  m_field_size;
-
-      to_fix(Numeric value, size_t fieldSize = 8, size_t precision = 4)
-      {
-          m_value       = value;
-          m_field_size  = fieldSize;
-          m_precision	  = precision;
-      }
-
-      friend std::ostream& operator<<(std::ostream& os, to_fix const& rhs)
-      {
-          size_t prec = os.precision();
-          std::ios config{nullptr};
-          config.copyfmt(std::cout);	
-          os << std::fixed << std::setprecision(rhs.m_precision)
-             << std::setw(rhs.m_field_size) << rhs.m_value;
-          std::cout.copyfmt(config);
-          return os;
-   }
-
-  };
-#+END_SRC
-
-Experiment 1: 
-
-#+BEGIN_SRC cpp 
-  for(double x = 0.0; x < 4.0; x += 0.5) {
-       using T = double;
-       double y = std::sqrt(x);
-       std::cout << to_fix<T>(x) << to_fix<T>(y) << "\n";
-  }
-#+END_SRC
-
-Experiment 1 Output: 
-
-#+BEGIN_SRC text 
-  0.0000  0.0000
-  0.5000  0.7071
-  1.0000  1.0000
-  1.5000  1.2247
-  2.0000  1.4142
-  2.5000  1.5811
-  3.0000  1.7321
-  3.5000  1.8708
-#+END_SRC
-
-Experiment 2: 
-
-#+BEGIN_SRC cpp 
-  for(double x = 0.0; x < 100.0; x += 10.0) {
-       using T = double;
-       double y = std::sqrt(x);
-       std::cout << to_fix<T>(x, 8, 2) << to_fix<T>(y, 9, 5) << "\n";
-  }
-#+END_SRC
-
-Experiment 2 output: 
-
-#+BEGIN_SRC text 
-    0.00  0.00000
-   10.00  3.16228
-   20.00  4.47214
-   30.00  5.47723
-   40.00  6.32456
-   50.00  7.07107
-   60.00  7.74597
-   70.00  8.36660
-   80.00  8.94427
-   90.00  9.48683
-#+END_SRC
-
-Experiment 3: Print table to file.
-
-#+BEGIN_SRC cpp 
-  std::ofstream report("/tmp/report.txt");
-
-  for(double x = 0.0; x < 100.0; x += 10.0) {
-       using T = double;
-       double y = std::sqrt(x);
-       report << to_fix<T>(x, 8, 2) << to_fix<T>(y, 9, 5) << "\n";
-  }
-
-  // Sync buffer with IO 
-  // force buffer to be written to IO 
-  report.flush();
-
-  // Force close
-  report.close();
-
-  // Run shell command to check file 
-  >> .! head -n 3 /tmp/report.txt
-      0.00  0.00000
-     10.00  3.16228
-     20.00  4.47214
-  >> 
-
-  >> .! tail -n 3 /tmp/report.txt
-     70.00  8.36660
-     80.00  8.94427
-     90.00  9.48683
-  >> 
-#+END_SRC
-
 ** IO - Insertion << and extraction >> operators
-*** Operators insertion insertion for STL std::vector<double> 
-
-Operator insertion (<<) for type std::vector<double>: 
-
- + Code: [[https://wandbox.org/permlink/UX67EPtHSKpmXCR7][Wandbox Online Compiler]]
-
-#+BEGIN_SRC cpp 
-  #include <iostream>
-  #include <vector> 
-
-  std::ostream& 
-  operator<<(std::ostream& os, std::vector<double> const& xs )
-  {
-      os << "[" << xs.size() << "]( ";
-      for(const auto&  x: xs)
-              os << x << ", ";
-      return os << " )";
-  }
-#+END_SRC
-
-Function main: 
-
-#+BEGIN_SRC cpp 
-    std::vector<double> xs;
-    xs = {};
-    std::cout << "xs = " << xs << std::endl;
-    xs = {1.0, 5.0, 4.6, 1e4, 9.8};    
-    std::cout << "xs = " << xs << std::endl;
-    return 0;
-#+END_SRC
-
-Output: 
-
-#+BEGIN_SRC text 
-  xs = [0](  )
-  xs = [5]( 1, 5, 4.6, 10000, 9.8,  )
-#+END_SRC
-
-*** Operators insertion insertion for STL std::vector<T> 
+*** Operators insertion insertion for std::vector<T> 
 
  + Code: [[https://wandbox.org/permlink/NQN0loqv21td60P3][Wandbox Online Compiler]]
 
@@ -2069,6 +1877,159 @@ Output:
     prod =  234 "Fresh atum 1kg" 25.9 ;  price = 25.9
    Enter product: 461 "Cappucino coffee" 25.60        
     prod =  461 "Cappucino coffee" 25.6 ;  price = 25.6
+#+END_SRC
+
+** Custom IO manipulators 
+
+ *Example: 1* 
+
+Custom IO manipulator to print integers in hexadecimal format without
+affecting IO global state.
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <iomanip>
+
+  template<typename Numeric> struct to_hex {
+       Numeric m_value;
+       to_hex(Numeric value): m_value(value){ }
+
+       friend std::ostream& operator<<(std::ostream& os, to_hex const& rhs)
+       {
+           return os << "0x" << std::uppercase << std::hex
+                     << rhs.m_value << std::nouppercase << std::dec ;
+       }
+  };
+#+END_SRC
+
+Usage: 
+
+#+BEGIN_SRC cpp 
+  >> std::cout << "x = " << to_hex<int>(2561) << " y = " << 246 << "\n";
+  x = 0xA01 y = 246
+
+  >> std::cout << "x = " << to_hex<int>(255) << " y = " << 246 << "\n";
+  x = 0xFF y = 246
+#+END_SRC
+
+ *Example 2* Custom IO manipulators for numerical tables. 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <iomanip>
+  #include <type_traits>
+
+  // Requires headers:  <iostream>, <iomanip>, <type_traits>
+  template< 
+     typename Numeric,
+     // Used for restricting the types of arguments that can be used. 
+     // It will generate a compiler error for non-float arguments. 
+     typename std::enable_if<std::is_floating_point<Numeric>::value, void>::type* = nullptr
+     >
+  struct to_fix {
+      Numeric m_value;
+      size_t  m_precision;
+      size_t  m_field_size;
+
+      to_fix(Numeric value, size_t fieldSize = 8, size_t precision = 4)
+      {
+          m_value       = value;
+          m_field_size  = fieldSize;
+          m_precision	  = precision;
+      }
+
+      friend std::ostream& operator<<(std::ostream& os, to_fix const& rhs)
+      {
+          size_t prec = os.precision();
+          std::ios config{nullptr};
+          config.copyfmt(std::cout);	
+          os << std::fixed << std::setprecision(rhs.m_precision)
+             << std::setw(rhs.m_field_size) << rhs.m_value;
+          std::cout.copyfmt(config);
+          return os;
+   }
+
+  };
+#+END_SRC
+
+Experiment 1: 
+
+#+BEGIN_SRC cpp 
+  for(double x = 0.0; x < 4.0; x += 0.5) {
+       using T = double;
+       double y = std::sqrt(x);
+       std::cout << to_fix<T>(x) << to_fix<T>(y) << "\n";
+  }
+#+END_SRC
+
+Experiment 1 Output: 
+
+#+BEGIN_SRC text 
+  0.0000  0.0000
+  0.5000  0.7071
+  1.0000  1.0000
+  1.5000  1.2247
+  2.0000  1.4142
+  2.5000  1.5811
+  3.0000  1.7321
+  3.5000  1.8708
+#+END_SRC
+
+Experiment 2: 
+
+#+BEGIN_SRC cpp 
+  for(double x = 0.0; x < 100.0; x += 10.0) {
+       using T = double;
+       double y = std::sqrt(x);
+       std::cout << to_fix<T>(x, 8, 2) << to_fix<T>(y, 9, 5) << "\n";
+  }
+#+END_SRC
+
+Experiment 2 output: 
+
+#+BEGIN_SRC text 
+    0.00  0.00000
+   10.00  3.16228
+   20.00  4.47214
+   30.00  5.47723
+   40.00  6.32456
+   50.00  7.07107
+   60.00  7.74597
+   70.00  8.36660
+   80.00  8.94427
+   90.00  9.48683
+#+END_SRC
+
+Experiment 3: Print table to file.
+
+#+BEGIN_SRC cpp 
+  std::ofstream report("/tmp/report.txt");
+
+  for(double x = 0.0; x < 100.0; x += 10.0) {
+       using T = double;
+       double y = std::sqrt(x);
+       report << to_fix<T>(x, 8, 2) << to_fix<T>(y, 9, 5) << "\n";
+  }
+
+  // Sync buffer with IO 
+  // force buffer to be written to IO 
+  report.flush();
+
+  // Force close
+  report.close();
+
+  // Run shell command to check file 
+  >> .! head -n 3 /tmp/report.txt
+      0.00  0.00000
+     10.00  3.16228
+     20.00  4.47214
+  >> 
+
+  >> .! tail -n 3 /tmp/report.txt
+     70.00  8.36660
+     80.00  8.94427
+     90.00  9.48683
+  >> 
 #+END_SRC
 ** Redirect IO .rdbuf()
 
