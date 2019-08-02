@@ -5269,6 +5269,304 @@ File: *muparser1_formula.cpp*
 
 #+END_SRC
 
+** Pistache - REST Http Web Server
+
+Pistache is C++11 a web, http and rest framework, in other words, a
+C++ toolkit for building standalone web servers. This library is easy
+to use and fast to compile without any external dependency.
+
+Web Site: 
+ + http://pistache.io/guide/
+
+Repository: 
+  + https://github.com/oktal/pistache
+
+Conan Coordinate: 
+  + [[https://bintray.com/conan-community/conan/pistache%253Aconan/d5608a1%253Astable][pistache/d5608a1@conan/stable]] 
+
+ *Example:* 
+
+File: CMakeLists.txt 
+
+#+BEGIN_SRC cmake 
+  cmake_minimum_required(VERSION 3.14 FATAL_ERROR)
+  project(pistache-web-server)
+
+  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+
+  # ============= Conan Bootstrap =============================#
+
+  # Download automatically, you can also just copy the conan.cmake file
+  if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan.cmake")
+     message(STATUS "Downloading conan.cmake from https://github.com/conan-io/cmake-conan")
+     file(DOWNLOAD "https://github.com/conan-io/cmake-conan/raw/v0.13/conan.cmake"
+                   "${CMAKE_BINARY_DIR}/conan.cmake")
+  endif()
+
+  include(${CMAKE_BINARY_DIR}/conan.cmake)
+
+  conan_cmake_run(REQUIRES
+                  pistache/d5608a1@conan/stable
+                  BASIC_SETUP
+                  BUILD missing
+                  )
+
+  # ========= Target Configurations =========================// 
+
+  add_executable(pistache-server pistache-server.cpp)
+  target_link_libraries(pistache-server pistache)
+#+END_SRC
+
+File: pistache-server.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+  #include <pistache/endpoint.h>
+
+  namespace ps = Pistache;
+  namespace Http = Pistache::Http;
+  namespace Header = Pistache::Http::Header;
+
+  // using namespace Pistache;
+
+  std::ostream&
+  operator<<(std::ostream& os, Http::Request const& req)
+  {
+      return os << " Method " << req.method()
+                << "; route =  " << req.resource()
+                << "; body = " << req.body();
+
+  }
+
+  struct HttpTransaction : public ps::Http::Handler
+  {
+      HTTP_PROTOTYPE(HttpTransaction)
+
+      void
+      onRequest(Http::Request const& req, Http::ResponseWriter res) override
+      {
+          std::cout << " Request: " << req << std::endl;
+
+          // Set response headers
+          res.headers().add<Header::Server>("CeePlusPlusWebServer");
+
+          // Route: / => Root
+          if(req.method() == Http::Method::Get && req.resource() == "/")
+          {
+              res.send(Http::Code::Ok, " ==> Welcome to my C++ Web Server, Enjoy it");
+              return;
+          }
+
+          // Route: /demo1
+          if(req.method() == Http::Method::Get && req.resource() == "/demo1")
+          {
+              res.send(ps::Http::Code::Ok,
+                       R"(
+                        <html>
+                           <h1> C++ blazing fast web server. </h1>
+                           <img src='https://www.howtogeek.com/wp-content/uploads/2018/09/bin_lede.png.pagespeed.ce.cyJdjIBBg2.png' />
+                        </html>
+                       )");
+              return;
+          }
+
+          // Route: /file => Serve Linux file /etc/protcols to client side
+          if(req.method() == Http::Method::Get && req.resource() == "/file")
+          {
+              // Allows client side download the text file /etc/protocols
+              Http::serveFile(res, "/etc/protocols");
+              return;
+          }
+
+          res.send(Http::Code::Not_Found, "Error: page not found in this server");
+
+      }
+  };
+
+  int main()
+  {
+      std::puts(" [INFO] Starting server. ");
+
+      auto addr = ps::Address{
+          // Allows connections from any IP address
+          ps::Ipv4::any(),
+          // Listen port 9080, aka bind to port 9080
+          ps::Port(9080)
+      };
+
+      auto ops = ps::Http::Endpoint::options()
+                     .threads(4)
+                     .flags( ps::Tcp::Options::ReuseAddr);
+
+
+      ps::Http::Endpoint server(addr);
+      server.init(ops);
+
+      server.setHandler(Http::make_handler<HttpTransaction>());
+
+      try
+      {
+          // Attempt to bind server to port
+          server.serve();
+      } catch(std::runtime_error const& ex)
+      {
+          std::cout << " [ERROR] Unable to start server. => \n"
+                    << ex.what() << std::endl;
+      }
+
+      std::puts("Exit application. OK.");
+      return 0;
+
+  } // --- End of Main() ---------------------//
+#+END_SRC
+
+  *Running server:*
+
+#+BEGIN_SRC sh 
+  $ ./bin/pistache-server 
+   [INFO] Starting server. 
+#+END_SRC
+
+ *Server route:* /
+
+ + Http request to URL: ~http://localhost:9080/~
+
+#+BEGIN_SRC sh 
+   $ curl  localhost:9080
+   Welcome to my C++ Web Server, Enjoy it
+
+  $ curl -v localhost:9080
+  * Rebuilt URL to: localhost:9080/
+  *   Trying ::1...
+  * TCP_NODELAY set
+  * connect to ::1 port 9080 failed: Connection refused
+  *   Trying 127.0.0.1...
+  * TCP_NODELAY set
+  * Connected to localhost (127.0.0.1) port 9080 (#0)
+  > GET / HTTP/1.1
+  > Host: localhost:9080
+  > User-Agent: curl/7.59.0
+  > Accept: */*
+  > 
+  < HTTP/1.1 200 OK
+  < Server: CeePlusPlusWebServer 
+  < Connection: Keep-Alive
+  < Content-Length: 38
+  < 
+  * Connection #0 to host localhost left intact
+  Welcome to my C++ Web Server, Enjoy it
+#+END_SRC
+
+ + Server log: 
+
+#+BEGIN_SRC sh 
+ Request:  Method GET; route =  /; body = 
+#+END_SRC
+
+ *Server route: /errorrout* 
+
+ + Http request to URL: ~http://localhost:9080/errorroute~
+
+#+BEGIN_SRC sh 
+  $ curl  http://localhost:9080/errorroute
+  Error: page not found in this server
+
+  $ curl -v  http://localhost:9080/errorroute
+  *   Trying ::1...
+  * TCP_NODELAY set
+  * connect to ::1 port 9080 failed: Connection refused
+  *   Trying 127.0.0.1...
+  * TCP_NODELAY set
+  * Connected to localhost (127.0.0.1) port 9080 (#0)
+  > GET /errorroute HTTP/1.1
+  > Host: localhost:9080
+  > User-Agent: curl/7.59.0
+  > Accept: */*
+  > 
+  < HTTP/1.1 404 Not Found
+  < Server: CeePlusPlusWebServer 
+  < Connection: Keep-Alive
+  < Content-Length: 36
+  < 
+  * Connection #0 to host localhost left intact
+  Error: page not found in this server
+
+#+END_SRC
+
+ *Server route: /demo1* 
+
+  +  Http request to URL: ~http://localhost:9080/demo1~
+
+#+BEGIN_SRC sh 
+   $ curl http://localhost:9080/demo1
+
+                         <html>
+                            <h1> C++ blazing fast web server. </h1>
+                            <img src='https://www.howtogeek.com/wp-content/uploads/2018/09/bin_lede.png.pagespeed.ce.cyJdjIBBg2.png' />
+                         </html>
+
+
+   $ curl -v  http://localhost:9080/demo1
+   *   Trying ::1...
+   * TCP_NODELAY set
+   * connect to ::1 port 9080 failed: Connection refused
+   *   Trying 127.0.0.1...
+   * TCP_NODELAY set
+   * Connected to localhost (127.0.0.1) port 9080 (#0)
+   > GET /demo1 HTTP/1.1
+   > Host: localhost:9080
+   > User-Agent: curl/7.59.0
+   > Accept: */*
+   > 
+   < HTTP/1.1 200 OK
+   < Server: CeePlusPlusWebServer 
+   < Connection: Keep-Alive
+   < Content-Length: 279
+   < 
+
+                         <html>
+                            <h1> C++ blazing fast web server. </h1>
+                            <img src='https://www.howtogeek.com/wp-content/uploads/2018/09/bin_lede.png.pagespeed.ce.cyJdjIBBg2.png' />
+                         </html>
+   * Connection #0 to host localhost left intact
+#+END_SRC
+
+ *Server route: /file* 
+
+ + Http request to URL: ~http://localhost:9080/file~
+
+#+BEGIN_SRC sh 
+   $ curl http://localhost:9080/file
+   # /etc/protocols:
+   # $Id: protocols,v 1.12 2016/07/08 12:27 ovasik Exp $
+   #
+   # Internet (IP) protocols
+   #
+   #	from: @(#)protocols	5.1 (Berkeley) 4/17/89
+   #
+   # Updated for NetBSD based on RFC 1340, Assigned Numbers (July 1992).
+   # Last IANA update included dated 2011-05-03
+   #
+   # See also http://www.iana.org/assignments/protocol-numbers
+
+   ip	0	IP		# internet protocol, pseudo protocol number
+   hopopt	0	HOPOPT		# hop-by-hop options for ipv6
+
+     ... ...   ... ...   ... ...   ... ...   ... ...   ... ... 
+     ... ...   ... ...   ... ...   ... ...   ... ...   ... ... 
+
+   hip	139	HIP		# Host Identity Protocol
+   shim6	140	Shim6		# Shim6 Protocol
+   wesp	141	WESP		# Wrapped Encapsulating Security Payload
+   rohc	142	ROHC		# Robust Header Compression
+   #   143-252 Unassigned                                       [IANA]
+   #   253     Use for experimentation and testing           [RFC3692]
+   #   254     Use for experimentation and testing           [RFC3692]
+   #   255                 Reserved                             [IANA]
+#+END_SRC
+
 ** GTest - Unit Testing Framework
 
 GTest or Google test is one of the most used and most popular test
