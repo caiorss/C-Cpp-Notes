@@ -11878,6 +11878,217 @@ Define a function at some namespace:
   }
 #+END_SRC
 
+** Move Semantics 
+*** r-value and l-values
+
+ *Lvalues X Rvalues* 
+
+The names LValues and RValues come from C, "L-value" name comes from
+the left-hand side from an assignment operation referring to a memory
+location from which it is possible to take the address.  The "R-value"
+name come from the right-hand side from an assignment expression and
+is a temporary value from which it is not possible to take the
+address.
+
+#+BEGIN_SRC text 
+  <Lvalue> = <Rvalue>; 
+      |         |
+      |         \+-------->> R-value: right-hand side of assignment, 
+      \                      non-addressable. Not possible to take address, 
+       \                     temporary object.
+        \ 
+         +----------------->> L-value: left-hand side of assignment, 
+                              addressable memory location. 
+#+END_SRC
+
+So: 
+
+ + *Lvalue* => value with an addressable and identifiable memory
+   location from which is possible to take the address with the
+   ampersand operator (&), set or assign a new value. 
+
+ + *Rvalue* => literal, expression or temporary object from which it is
+   not possible to take the address with ampersand operator(&) or
+   set a new value. For short, it can be said that, everything that is
+   not an L-value, is an R-value.
+
+ + More at: [[https://en.cppreference.com/w/cpp/language/value_category][value category]] (CppReference)
+
+Examples: 
+
+#+BEGIN_SRC cpp 
+   // x => is a Lvalue, 10 is an Rvalue   
+   int x = 10;                             
+
+   // str1 is a Lvalue and "hello world" is a 
+   std::string str1 = "hello world";       
+
+   // str2 is a Lvalue and the right-hand side (str1 + " - rvalue") is a r-value 
+   std::string str2 = str1 + " - rvalue;";
+
+   class A{
+   public:
+      A() { ... }
+   };
+
+   void Function(){ 
+      A a; 
+      .... ... 
+      return a; 
+   }
+
+   A obj; 
+
+   //  obj is an L-value, while the object returned by 'Function()' is
+   //  a R-value (temporary object).
+   obj = Function(); 
+#+END_SRC
+*** r-value references and r-value references 
+
+ *LValue Reference* 
+
+A L-value reference is an alias to a non-temporary object with a
+defined memory location, which is similar to a constant pointer.
+
+#+BEGIN_SRC cpp 
+  // 'x' is a Lvalue => 10 is a R-value 
+  >> int x = 10;
+
+  // refx is a L-value reference bound to 'x', in other words, refers to 'x'. 
+  >> int& refx = x;
+  >> 
+  >> refx
+  (int) 10
+
+  // An L-value reference has the same address as the variable that the
+  // reference it is bound to.
+  >> if(&refx == &x) printf(" [INFO] Have the same address Ok.\n");
+   [INFO] Have the same address Ok.
+  
+  >> refx = 50
+  (int) 50
+  >> x
+  (int) 50
+#+END_SRC
+
+An L-value reference cannot bind to R-values or temporary objects: 
+
+#+BEGIN_SRC cpp 
+  >> 
+  >> int& refy = x + 10;
+  ROOT_prompt_6:1:6: error: non-const lvalue reference to type 'int' cannot bind to a temporary of type
+        'int'
+  int& refy = x + 10;
+       ^      ~~~~~~
+#+END_SRC
+
+ *Rvalue References* 
+
+RValue references are references which binds to temporary
+objects. They were introduced in C++11 for enabling move semantics and
+move-member functions, namely, move constructor and move assignment
+operator which allow to reuse resources from temporary objects by
+performing shallow copy instead of deep copy, which would be performed
+by the copy-constructor and copy assignment operator. Therefore, as a
+shallow copy is much less expansive than a deep copy, move semantics
+can provide significant performance improvements eliminating wasteful
+copies of temporary objects.
+
+ + Example 1: Rvalue binding.
+
+#+BEGIN_SRC cpp 
+  >> int x = 10;
+
+  // R-value reference
+  >> int&& rv = x + 10;
+
+  >> rv
+  (int) 20
+
+  >> rv = 25
+  (int) 25
+
+  // Compile-time error! R-value references cannot bind to L-values.
+  >> int&& rv2 = x;
+  ROOT_prompt_22:1:7: error: rvalue reference to type 'int' cannot bind to lvalue of type 'int'
+  int&& rv2 = x;
+        ^     ~
+#+END_SRC
+
+ + Example 2: Lvalue X Rvalue and function overload. 
+
+Attempt to use the L-value reference overload of the function
+printLines with a L-value and R-value.
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string> 
+  #include <fstream> 
+
+  // Overload of printLine taking an L-value reference as parameter 
+  void printLines(std::istream& is){
+     std::cout << " [INFO] L-value reference overload" << std::endl;
+     std::string line; 
+     std::getline(is, line); 
+     std::cout << " line1 =: " << line << std::endl;
+     std::getline(is, line); 
+     std::cout << " line2 =: " << line << std::endl;
+  }
+
+  >> std::ifstream fd1 {"/etc/protocols"};
+
+  // Use the function with an L-value reference 
+  >> printLines(fd1)
+   [INFO] L-value reference overload
+   line1 =: # /etc/protocols:
+   line2 =: # $Id: protocols,v 1.12 2016/07/08 12:27 ovasik Exp $
+#+END_SRC
+
+Attempt to pass an R-value (temporary object in this case): 
+
+#+BEGIN_SRC cpp 
+  // 'std::ifstream{"/etc/protocols"}' is an R-value (temporary object)
+  // It is not possible to take address of this expression. 
+  // If the code was compiled, it would result in compile-time error. 
+  >> printLines(std::ifstream{"/etc/protocols"})
+
+  ROOT_prompt_10:1:1: error: no matching function for call to 'printLines'
+  printLines(std::ifstream{"/etc/protocols"})
+  ^~~~~~~~~~
+  ROOT_prompt_0:1:6: note: candidate function not viable: no known conversion from 'std::ifstream' (aka
+        'basic_ifstream<char>') to 'std::istream &' (aka 'basic_istream<char> &')
+        for 1st argument
+  void printLines(std::istream& is){
+      ^
+#+END_SRC
+
+Solution, create a new overload of the function 'printLines' that
+takes an r-value reference as parameter.
+
+#+BEGIN_SRC cpp 
+  // Overload of printLine taking an R-value reference as parameter 
+  void printLines(std::istream&& is){
+     std::cout << " [INFO] R-value reference overload" << std::endl;
+     std::string line; 
+     std::getline(is, line); 
+     std::cout << " line1 =: " << line << std::endl;
+     std::getline(is, line); 
+     std::cout << " line2 =: " << line << std::endl;
+  }
+
+  >> printLines(std::ifstream{"/etc/protocols"})
+   [INFO] R-value reference overload
+   line1 =: # /etc/protocols:
+   line2 =: # $Id: protocols,v 1.12 2016/07/08 12:27 ovasik Exp $
+#+END_SRC
+
+
+
+
+
+
+
+
 ** Exceptions and Error Handling 
 *** Overview 
 
