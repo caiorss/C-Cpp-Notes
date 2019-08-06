@@ -84,18 +84,10 @@ public:
     // Unique_ptr cannot be copied, they only can be moved.
     // The std::move, transfers the ownership of the supplied std::unique_ptr
     // to this class.
-    SomeCar(std::unique_ptr<IEngine>& engine)
+    SomeCar(std::unique_ptr<IEngine> engine)
         : m_engine(std::move(engine))
     {
-        std::puts(" [INFO] Called SomeCar L-value reference constructor");
     }
-
-    SomeCar(std::unique_ptr<IEngine>&& engine)
-        : m_engine(std::move(engine))
-    {
-        std::puts(" [INFO] Called SomeCar R-value reference constructor");
-    }
-
 
     void run_engine(){
         std::puts(" [INFO] Run car engine.");
@@ -192,7 +184,8 @@ int main()
         // Not recommended using new!
         std::unique_ptr<IEngine> engineA(new ElectricEngine);
 
-        SomeCar carA(engineA);
+        // Note: engineA is not copiable, can only be moved
+        SomeCar carA(std::move(engineA));
         std::cout << " carA.has_engine() = " << carA.has_engine() << "\n";
         std::cout << " carA.engine_type() = " << carA.engine_type() << "\n";
         carA.run_engine();
