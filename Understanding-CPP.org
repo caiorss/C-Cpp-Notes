@@ -12576,6 +12576,749 @@ Functions std::swap:
 
  + *Copying and assigning objects in C++*
    + <https://www.ics.uci.edu/~thornton/ics46/Notes/MoveSemantics/> 
+** Smart Pointers 
+*** Overview 
+
+  *Problems of Raw Pointer* 
+
+ Raw pointers to dynamically allocated objects, (objects allocated with
+ _new_ and disposed with _delete_ operator) are responsible for a broad
+ range of problems such as memory leaks, double free and dangling
+ pointers that affected many old codebases. Some of the problems and
+ pontential bugs of raw pointers are: 
+
+  + _memory leak_
+    + => The dynamically allocated object was not disposed. For every
+      object allocated with _AType* ptr = new AType()_, there should be a
+      matching _delete_ operator. A memory leak happens when a call to
+      this operator is missing. It can happen due to be hard to keep
+      track of the onership of an owning raw pointer in large codebase;
+      code refactoring and early return from functions.
+
+  + _dangling pointer_
+    + => An owning pointer is still being used after the object has
+      been deleted, for instance, _AType* ptr = new AType_, the object is
+      deleted, the pointer was not set nullptr and later some part of
+      the code calls ptr->MemberFunction().
+
+  + _double free_
+    + => The pointer to a dynamically-allocated object was deleted more
+      than once and was not set null or nullptr after it was deleted
+      at the first time. 
+
+  + _lack of exception safety_
+    + => If an exception happens after a heap-allocated object was
+      instantiaded, the matching delete operator will not be called,
+      therefore a memory leak will happen.
+
+  + _lack of clear ownership_
+    + => Ownership is the responbility to dispose a heap-allocated
+      object and keep it alive while it is being used. Raw pointers doe
+      not provide clear ownership, it is not possible to know if there
+      are any other objects still using the pointer and the ones that
+      will responsible for disposing the resource.
+
+
+  *Smart Pointers* 
+
+ Smart pointers are classes that manages the lifetime and ownership of
+ heap-allocated objects by wrapping raw pointers and emulating them
+ through overloading of dereference operators (*) and (->). They intend
+ to solve the raw owning pointers issues by making the ownership clear
+ and providing proper resource cleanup ensuring exception safety.
+
+ Note: 
+
+  + Smart pointers should be used for _polymorphic objects_ (objects
+    with at least one virtual member function) or large objects that
+    cannot fit on the stack.
+
+  + Smart pointers *should* not be used for stack-allocated or static
+    objects (global objects). They should only be used with objects
+    that would be instantiated with _new_ operator. 
+
+  *Smart Pointers in the C++ Standard*
+
+  * +std::auto_ptr+ - Deprecated (Removed in C++17) => Replace it for
+    *std::unique_ptr* 
+
+  * std::unique_ptr
+    + predecessor: boost:unique_ptr
+    + Features:
+      + Single ownership
+      + Non-copiable and movable-only.
+      + No runtime overhead over raw pointers and costs less than a
+        shared_ptr.  
+    + Use Cases:
+      + PIMPL design pattern
+      + Heap-allocated object is refered by a single parent object.
+      + Factory functions that instatiates dynamically allocated
+        polymorphic objects. In this case, it is recommeded to use
+        unique_ptr as it is easier to convert to shared_ptr than the
+        other way around. 
+
+  * std::shared_ptr
+    + predecessor: boost::shared_ptr
+    + Features: Shared ownership with reference counting.
+    + Use Case:
+      + More than one object need a copy of the pointer to
+        polymorphic dynamically allocated object and also need to keep
+        the object alive while it is being used.
+
+  * std::weak_ptr
+    + predecessor: boost::weak_ptr
+    + Feature: No ownership.
+    + Use Case:
+      + Solves shared_ptr cyclic reference problems.
+
+  *Other Smart Pointer Implementations* 
+
+  + [[https://www.boost.org/doc/libs/1_69_0/libs/smart_ptr/doc/html/smart_ptr.html#scoped_ptr][boost::scoped_ptr]]
+
+  + QSharedPointer
+
+  + QWeakPointer
+
+  + QScopedPointer 
+
+  *Documentation Links* 
+
+ Header File: 
+  + [[https://en.cppreference.com/w/cpp/memory][<memory>]]
+
+ Smart Pointer Classes: 
+
+   + [[https://en.cppreference.com/w/cpp/memory/unique_ptr][std::unique_ptr]]
+
+   + [[https://en.cppreference.com/w/cpp/memory/shared_ptr][std::shared_ptr]]
+
+   + [[https://en.cppreference.com/w/cpp/memory/weak_ptr][std::weak_ptr]]
+
+ Helper Functions for Smart Pointer Instatitation: 
+
+  + [[https://en.cppreference.com/w/cpp/memory/unique_ptr/make_unique][std::make_unique]] - Prefered way of instantiating unique ptr.
+
+  + [[https://en.cppreference.com/w/cpp/memory/shared_ptr/make_shared][std::make_shared]] - Function for instantiating shared pointers.
+
+  + [[https://en.cppreference.com/w/cpp/memory/shared_ptr/pointer_cast][Pointer casting function]]
+    + Functions:
+      + std::static_pointer_cast
+      + std::dynamic_pointer_cast
+      + std::const_pointer_cast
+      + std::reinterpret_pointer_cast 
+
+ Related Concepts: 
+
+  + [[https://en.cppreference.com/w/cpp/language/pimpl][pimpl idiom]]
+
+  + [[https://en.cppreference.com/w/cpp/language/type#Incomplete_type][Incomplete type]]
+
+  + [[https://en.cppreference.com/w/cpp/language/destructor#Virtual_destructors][Virtual Destructors]]
+
+*** std::unique_ptr 
+
+ Single ownership, movable-only and non-copiable smart pointer. 
+
+   + Header file: [[https://en.cppreference.com/w/cpp/memory][<memory>]]
+   + Documentation: [[https://en.cppreference.com/w/cpp/memory/unique_ptr][unique_ptr]]
+
+  *Use Cases* 
+
+   + Factory functions that instantiates dynamically allocated
+     polymorphic objects.
+
+   + The lifetime of the managed object depends only on the lifetime of
+     a single object or only a single objects need a copy of the
+     pointer, one to one relationship. 
+
+   + Pimpl design pattern. 
+
+
+  *Class template declaration* 
+
+ #+BEGIN_SRC cpp 
+   template< typename T
+            ,typename Deleter = std::default_delete<T>
+            >
+   class std::unique_ptr; 
+
+
+   template< typename T
+            ,typename Deleter = std::default_delete<T>
+            >
+   class std::unique_ptr<T [], Deleter; 
+ #+END_SRC
+
+  *Member Function Table* 
+
+ Member functions of ~std::unique_ptr<T, Deleter>~
+
+ |--------------------------------+--------+---------------------------------------------------------------------------------|
+ | Function signature             | Return | Description                                                                     |
+ | with parameters                | type   |                                                                                 |
+ |--------------------------------+--------+---------------------------------------------------------------------------------|
+ | *Constructor*                    |        |                                                                                 |
+ | unique_ptr() noexcept          | -      | Default constructor                                                             |
+ | unique_ptr(nullptr) noexcept   |        |                                                                                 |
+ | unique_ptr(T* pointer)         | -      |                                                                                 |
+ | ... ... ... ..                 | -      | Many others                                                                     |
+ |                                |        |                                                                                 |
+ | *Observers*                      |        |                                                                                 |
+ |--------------------------------+--------+---------------------------------------------------------------------------------|
+ | get() const noexcept           | T*     | Return pointer to managed object or nullptr if it owns no object.               |
+ |                                |        |                                                                                 |
+ |                                |        |                                                                                 |
+ | *Modifiers*                      |        |                                                                                 |
+ |--------------------------------+--------+---------------------------------------------------------------------------------|
+ | release() noexcept             | T*     | Deletes the managed object, release the memory allocated for it.                |
+ | reset(T* ptr)                  | void   | Replaces the managed object by a new one, deleting the old object.              |
+ | swap(unique_ptr<T>& other)     | void   | Swaps the managed objects of two unique_ptr's                                   |
+ |                                |        |                                                                                 |
+ | *Operators*                      |        |                                                                                 |
+ |--------------------------------+--------+---------------------------------------------------------------------------------|
+ | operator*() const              | T&     | Dereference: Get reference to managed object                                    |
+ | operator->() const noexcept    | T*     | Dereference: Access managed object member functions.                            |
+ | operator bool() const noexcept | bool   | Returns true if there is a managed object. Used for if(ptr) { ... not null ...} |
+ |                                |        |                                                                                 |
+
+ Helper functions (not member Functions): 
+
+ |-----------------------------------------+-------------+---------------------------------------------------|
+ | Function signature                      | Return Type | Description                                       |
+ |-----------------------------------------+-------------+---------------------------------------------------|
+ | std::make_unique<T>(Args ...)           | UP<T>       | Creates a new unique_ptr (preferred.)             |
+ | std::allocate_shared                    | -           | Same as make_unique, but with a custom allocator. |
+ | std::swap(UP<T>& lhs, UP<T>& rhs)       | void        | Swap managed objects of two unique_ptr's          |
+ | operator <<(OS& os, std::unique_ptr<T>) | OS&         | Print managed object to output stream (C++20)     |
+ |                                         |             |                                                   |
+
+ Note: The following type synonym were used to describe the signatures
+ in a concise way: 
+
+ #+BEGIN_SRC cpp 
+   template <typename T> using UP = std::unique_ptr<T>; 
+   using OS = std::ostream;
+ #+END_SRC
+
+  *Member Functions* 
+
+  + Default constructor - initialized to nullptr. 
+
+ #+BEGIN_SRC cpp 
+    std::unique_ptr<Type> ptr;
+ #+END_SRC
+
+  + Constructors: 
+
+ #+BEGIN_SRC cpp 
+    std::unique_ptr<Type> ptr(new Type{args ...});
+ #+END_SRC  
+
+  + *std::make_unique* - alternaitve to constructor
+  + Intialization through helper function std::make_unique (C++14)
+    + Note: It is not recomended to initialized a smart pointer
+      directly through constructor.
+
+ Allocating single object: 
+
+ #+BEGIN_SRC cpp 
+    // Args are constructor arguments.
+    std::unique_ptr<Type> ptr = std::make_unique<Type>(args, ....);
+ #+END_SRC
+
+ Allocating array: 
+
+ #+BEGIN_SRC cpp 
+    std::unique_ptr<Type[]> ptr = std::make_unique<Type[]>();
+ #+END_SRC
+
+
+ Or: 
+
+ #+BEGIN_SRC cpp 
+    auto ptr = std::make_unique<Type>(args, ....);
+ #+END_SRC
+
+ Definition: 
+
+ #+BEGIN_SRC cpp 
+   template <typename T, typename... Args>
+   std::unique_ptr<T> make_unique(Args &&... args) 
+   {
+       return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
+   }
+ #+END_SRC
+
+  + Move constructor: 
+
+ #+BEGIN_SRC cpp 
+     std::unique_ptr<Type> old_ptr(new Type{args ...});
+
+     // Move ctor initialized from an old pointer. 
+     std::unique_ptr<Type> ptr{std::move(old_ptr)};
+ #+END_SRC
+
+  + Move assignment. 
+
+ #+BEGIN_SRC cpp 
+     std::unique_ptr<Type> old_ptr(new Type{args ...});
+
+     std::unique_ptr<Type> ptr;
+   
+     ptr = std::move(old_ptr);
+ #+END_SRC
+
+  + Delete pointed object, releasing its memory. 
+
+ #+BEGIN_SRC cpp 
+   auto ptr = std::make_unique<Type>(args, ....);   
+
+   ptr.reset(); // Delete heap-allocated object releasing memory and
+                // resetting the pointer.
+ #+END_SRC
+
+  + Check whether the pointer is null or not. 
+
+ #+BEGIN_SRC cpp 
+   auto ptr = std::make_unique<Type>(args, ....);   
+
+   if(ptr) {
+      std::puts("Pointer is null");
+   } else {
+      std::puts("Pointer is not null");
+   }
+
+   if(ptr == nullptr) {
+      std::puts("Pointer is null");
+   } else {
+      std::puts("Pointer is not null");
+   }
+ #+END_SRC
+*** Example: std::unique_ptr 
+
+ Example: 
+
+  + A car object has  only one engine, multiple cars cannot have the
+    same engine and the engine is destroyed when the car object is destroyed.
+
+  + The engine is polymorphic object implementing the interface
+    IEngine.
+
+  + The car object can replace the engine at runtime. 
+
+ Full code: 
+  + [[file:src/smart_ptr_unique1.cpp][file:src/smart_ptr_unique1.cpp]] 
+
+
+Headers: 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+
+  #include <type_traits>
+
+  // Provide std::unique_ptr and std::shared_ptr
+  #include <memory>
+#+END_SRC
+
+Interface: IEngine
+
+#+BEGIN_SRC cpp 
+  // Car Engine Interface
+  class IEngine{
+  public:
+      virtual std::string type() const = 0;
+      virtual void        run()  = 0;
+      // virtual void        shutdown() = 0;
+      virtual ~IEngine() = default;
+  };
+#+END_SRC
+
+Class DieselEngine implemeting the interface IEngine.
+
+#+BEGIN_SRC cpp 
+  class DieselEngine: public IEngine
+  {
+  public:
+      DieselEngine()
+      {
+          std::puts(" [INFO] Diesel Engine created.");
+      }
+
+      ~DieselEngine()
+      {
+          std::puts(" [INFO] Diesel Engine deleted.");
+      }
+
+      std::string type() const override
+      {
+          return "diesel engine";
+      }
+
+      void run() override
+      {
+          std::puts(" Running a super powerful diesel Engine!!");
+      }
+  };
+#+END_SRC
+
+Class ElectricEngine implemeting the interface IEngine: 
+
+#+BEGIN_SRC cpp 
+  class ElectricEngine: public IEngine
+  {
+  public:
+      ElectricEngine()
+      {
+          std::puts(" [INFO] Electrict Engine created.");
+      }
+
+      ~ElectricEngine()
+      {
+          std::puts(" [INFO] Electric Engine deleted.");
+      }
+
+      std::string type() const override
+      {
+          return "electric engine";
+      }
+
+      void run() override
+      {
+          std::puts(" =>> Running a silent and clean electric engine!!");
+      }
+  };
+#+END_SRC
+
+Class SomeCar that contains an engine object implemeting the IEngine
+interface. 
+
+#+BEGIN_SRC cpp 
+
+  class SomeCar{
+  private:
+      std::unique_ptr<IEngine> m_engine;
+  public:
+
+      SomeCar(): m_engine(nullptr) { }
+
+      // Constructor: Dependency injection
+      // => the dependency is supplied and instantiated
+      // by an external code rather than being instantiated by this class.
+      SomeCar(IEngine* obj): m_engine(obj){ }
+
+      // Unique_ptr cannot be copied, they only can be moved.
+      // The std::move, transfers the ownership of the supplied std::unique_ptr
+      // to this class.
+      SomeCar(std::unique_ptr<IEngine>& engine)
+          : m_engine(std::move(engine))
+      {
+          std::puts(" [INFO] Called SomeCar L-value reference constructor");
+      }
+
+      SomeCar(std::unique_ptr<IEngine>&& engine)
+          : m_engine(std::move(engine))
+      {
+          std::puts(" [INFO] Called SomeCar R-value reference constructor");
+      }
+
+
+      void run_engine(){
+          std::puts(" [INFO] Run car engine.");
+          // Unique_ptr can be used just as an ordinary pointer
+          m_engine->run();
+      }
+
+      // Set a new engine.
+      void set_engine(IEngine* engine)
+      {
+          // Disposes the old engine and sets a new one
+          m_engine.reset(engine);
+      }
+
+      void set_engine(std::unique_ptr<IEngine> engine)
+      {
+          // Calls move assingment operator disposing the old engine
+          m_engine  = std::move(engine);
+      }
+
+      std::string engine_type() {
+          return m_engine->type();
+      }
+
+      void remove_engine() {
+          // Delete wrapped heap-allocated object
+          m_engine.release();
+      }
+
+      // Check if the car has an engine
+      bool has_engine(){
+          return m_engine != nullptr;
+      }
+
+      ~SomeCar(){
+          std::puts(" [INFO] object of class SomeCar disposed. OK");
+      }
+
+  };
+#+END_SRC
+
+Factory function: 
+
+#+BEGIN_SRC cpp 
+  std::unique_ptr<IEngine>
+  factoryFunction(char code)
+  {
+      if(code == 'e') { return std::make_unique<ElectricEngine>(); }
+      if(code == 'd') { return std::make_unique<DieselEngine>(); }
+      return nullptr;
+  }
+#+END_SRC
+
+ *Main Function* - int main() 
+
+ + Main Function - Experiment 0 
+
+#+BEGIN_SRC cpp 
+  std::cout << "\n ***** EXPERIENT 0 === Type Traits *********************\n";
+  std::cout << "---------------------------------------------------------------\n";
+  std::cout << std::boolalpha;
+  {
+
+      std::cout << " is_abstract<IEngine>() = "
+                << std::is_abstract<IEngine>() << "\n";
+
+      std::cout << " is_abstract<ElectricEngine>() = "
+                << std::is_abstract<ElectricEngine>() << "\n";
+
+      std::cout << " is_fundamental<ElectricEngine>() = "
+                << std::is_fundamental<ElectricEngine>() << "\n";
+
+      std::cout << " is_polymorphic<ElectricEngine>() = "
+                << std::is_polymorphic<ElectricEngine>() << "\n";
+
+      std::cout << " is_trivially_copiable<ElectricEngine() = "
+                << std::is_trivially_copyable<ElectricEngine>() << "\n";
+
+      std::cout << " is_trivially_move_constructible<ElectricEngine() = "
+                << std::is_trivially_move_constructible<ElectricEngine>() << "\n";
+
+  }
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC text 
+   ,***** EXPERIENT 0 === Type Traits *********************
+   ---------------------------------------------------------------
+    is_abstract<IEngine>() = true
+    is_abstract<ElectricEngine>() = false
+    is_fundamental<ElectricEngine>() = false
+    is_polymorphic<ElectricEngine>() = true
+    is_trivially_copiable<ElectricEngine() = false
+    is_trivially_move_constructible<ElectricEngine() = false
+#+END_SRC
+
+
+ + Main function - Experiment 1 
+
+#+BEGIN_SRC cpp 
+  std::cout << "\n ***** EXPERIMENT 1 = Instatiate a car with new operator ****\n ";
+  std::cout << "---------------------------------------------------------------\n";
+  {
+      // Note: note recommended using 'new', instead use std::make_unique
+      SomeCar car1(new DieselEngine);
+      std::cout << " car1.has_engine() = " << car1.has_engine() << "\n";
+      std::cout << " car1.engine_type() = " << car1.engine_type() << "\n";
+      car1.run_engine();
+
+      // Car and engine deleted at the end of this scope or at this bracket.
+  }
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC text 
+   ,***** EXPERIMENT 1 = Instatiate a car with new operator ****
+   ---------------------------------------------------------------
+   [INFO] Diesel Engine created.
+   car1.has_engine() = true
+   car1.engine_type() = diesel engine
+   [INFO] Run car engine.
+   Running a super powerful diesel Engine!!
+   [INFO] object of class SomeCar disposed. OK
+   [INFO] Diesel Engine deleted.
+#+END_SRC
+
+ + Main function - Experiment 2 
+
+#+BEGIN_SRC cpp 
+  std::cout << "\n **** EXPERIMENT 2 = Instatiate a car with an exising unique_ptr ****\n ";
+  std::cout << "---------------------------------------------------------------\n";
+  {
+      // Not recommended using new!
+      std::unique_ptr<IEngine> engineA(new ElectricEngine);
+
+      SomeCar carA(engineA);
+      std::cout << " carA.has_engine() = " << carA.has_engine() << "\n";
+      std::cout << " carA.engine_type() = " << carA.engine_type() << "\n";
+      carA.run_engine();
+
+      // Remove engine of carA and sell it at the market
+      carA.remove_engine();
+      std::cout << " After removal of carA's engine." << "\n";
+      std::cout << " car1.has_engine() = " << carA.has_engine() << "\n";
+
+      std::cout << "\n After removing engine of CarA" << "\n";
+      carA.set_engine(new DieselEngine);
+      std::cout << " carA.engine_type() = " << carA.engine_type() << "\n";
+      carA.run_engine();
+  }
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC text 
+  ,**** EXPERIMENT 2 = Instatiate a car with an exising unique_ptr ****
+   ---------------------------------------------------------------
+   [INFO] Electrict Engine created.
+   [INFO] Called SomeCar L-value reference constructor
+   carA.has_engine() = true
+   carA.engine_type() = electric engine
+   [INFO] Run car engine.
+   =>> Running a silent and clean electric engine!!
+   After removal of carA's engine.
+   car1.has_engine() = false
+
+   After removing engine of CarA
+   [INFO] Diesel Engine created.
+   carA.engine_type() = diesel engine
+   [INFO] Run car engine.
+   Running a super powerful diesel Engine!!
+   [INFO] object of class SomeCar disposed. OK
+   [INFO] Diesel Engine deleted.
+#+END_SRC
+
+ + Main function - Experiment 3 
+
+#+BEGIN_SRC cpp 
+    std::cout << "\n **** EXPERIMENT 3 = Using std::make_unique ****\n ";
+    std::cout << "---------------------------------------------------------------\n";
+    {
+        SomeCar carA(std::make_unique<DieselEngine>());
+        std::cout << " carA.has_engine() = " << carA.has_engine() << "\n";
+        std::cout << " carA.engine_type() = " << carA.engine_type() << "\n";
+        carA.run_engine();
+
+
+        std::cout << "\n [TRACE] After setting a new engine for CarA" << "\n";
+        auto engine = std::make_unique<ElectricEngine>();
+        std::cout << " ?? engine == nullptr " << (engine == nullptr) << std::endl;
+
+        carA.set_engine(std::move(engine));
+
+        std::cout << " carA.engine_type() = " << carA.engine_type() << "\n";
+        carA.run_engine();
+
+        std::cout << "\n [TRACE] After setting a new engine again for CarA" << "\n";
+        carA.set_engine( std::make_unique<DieselEngine>() );
+        std::cout << " carA.engine_type() = " << carA.engine_type() << "\n";
+        carA.run_engine();
+
+    }
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC text 
+   ,**** EXPERIMENT 3 = Using std::make_unique ****
+   ---------------------------------------------------------------
+   [INFO] Diesel Engine created.
+   [INFO] Called SomeCar R-value reference constructor
+   carA.has_engine() = true
+   carA.engine_type() = diesel engine
+   [INFO] Run car engine.
+   Running a super powerful diesel Engine!!
+
+   [TRACE] After setting a new engine for CarA
+   [INFO] Electrict Engine created.
+   ?? engine == nullptr false
+   [INFO] Diesel Engine deleted.
+   carA.engine_type() = electric engine
+   [INFO] Run car engine.
+   =>> Running a silent and clean electric engine!!
+
+   [TRACE] After setting a new engine again for CarA
+   [INFO] Diesel Engine created.
+   [INFO] Electric Engine deleted.
+   carA.engine_type() = diesel engine
+   [INFO] Run car engine.
+   Running a super powerful diesel Engine!!
+   [INFO] object of class SomeCar disposed. OK
+   [INFO] Diesel Engine deleted.
+#+END_SRC
+
+ + Main function - Experiment 4 
+
+#+BEGIN_SRC cpp 
+  std::cout << "\n **** EXPERIMENT 4 = Factory Function ****\n ";
+  std::cout << "---------------------------------------------------------------\n";
+  {
+      SomeCar car;
+      auto engine1 = factoryFunction('x');
+
+      // If the pointer is not nullptr (null) evalutes to true
+      if(engine1){
+          std::cout << " Engine created from factory function. Ok. \n";
+      } else {
+          car.set_engine(std::move(engine1));
+      }
+      std::cout << " ??? car.has_engine() = " << car.has_engine() << std::endl;
+
+      std::cout << "\n Set engine to DIESEL engine.\n";
+      car.set_engine(factoryFunction('d'));
+      std::cout << " ??? car.has_engine() = " << car.has_engine() << std::endl;
+      std::cout << " Engine type = " << car.engine_type() << "\n";
+      car.run_engine();
+
+      std::cout << "\n Set engine to ELECTRIC engine.\n";
+      car.set_engine(factoryFunction('e'));
+      std::cout << " ??? car.has_engine() = " << car.has_engine() << std::endl;
+      std::cout << " Engine type = " << car.engine_type() << "\n";
+      car.run_engine();
+  }
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC text 
+    ,**** EXPERIMENT 4 = Factory Function ****
+    ---------------------------------------------------------------
+    ??? car.has_engine() = false
+
+    Set engine to DIESEL engine.
+    [INFO] Diesel Engine created.
+    ??? car.has_engine() = true
+    Engine type = diesel engine
+    [INFO] Run car engine.
+    Running a super powerful diesel Engine!!
+
+    Set engine to ELECTRIC engine.
+    [INFO] Electrict Engine created.
+    [INFO] Diesel Engine deleted.
+    ??? car.has_engine() = true
+    Engine type = electric engine
+    [INFO] Run car engine.
+    =>> Running a silent and clean electric engine!!
+    [INFO] object of class SomeCar disposed. OK
+    [INFO] Electric Engine deleted.
+#+END_SRC
+
+
+
+
+
 ** Exceptions and Error Handling 
 *** Overview 
 
