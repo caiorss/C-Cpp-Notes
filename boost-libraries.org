@@ -5219,6 +5219,179 @@ Program output:
          HRK     7.410
 #+END_SRC
 
+** cpptoml configuration parser 
+
+cpptoml is a single-file header-only library for parsing [[https://github.com/toml-lang/toml][TOML]] 
+configuration files that resembles the Windows INI files and are more
+lightweight than XML and JSON.
+
+Repository: 
+ + https://github.com/skystrife/cpptoml
+
+Download the library: 
+
+#+BEGIN_SRC sh 
+  $ cd <PROJECT_DIR> 
+  $ curl -O -L https://raw.githubusercontent.com/skystrife/cpptoml/v0.1.1/include/cpptoml.h
+#+END_SRC
+
+File: main.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+  #include <sstream>
+
+  #include <cpptoml.h>
+
+  template <typename T>
+  using sh = std::shared_ptr<T>;
+
+  extern const char* tomlData;
+
+
+  void parseConfiguration(std::istream& is)
+  {
+      cpptoml::parser p{is};
+      sh<cpptoml::table> config = p.parse();
+
+      std::cout << "\n --- TOML Configuration data read from input stream ------\n";
+
+      int loglevel  = config->get_qualified_as<int>("INFO.loglevel").value_or(0);
+      auto userName = config->get_qualified_as<std::string>("INFO.user").value_or("unnamed");
+      auto file     = config->get_qualified_as<std::string>("INFO.file").value_or("");
+      auto port     = config->get_qualified_as<int>("SERVER.port").value_or(8080);
+      std::cout << " => loglevel = " << loglevel << "\n"
+                << " => userName = " << userName << "\n"
+                << " => file     = " << file << "\n"
+                << " => port     = " << port << "\n";
+
+      auto locations = config->get_qualified_array_of<std::string>("SERVER.directories");
+      if(!locations)
+      {
+          std::cerr << " [ERROR] SERVER.directories not found." << std::endl;
+      }
+      for(auto const& path: *locations)
+      {
+          std::cout << " path: " << path << std::endl;
+      }
+
+  }
+
+  int main(int argc, char** argv)
+  {
+      if(argc == 1){
+          std::cerr << " Error: invalid option " << std::endl;
+          return EXIT_FAILURE;
+      }
+
+      std::string cmd = argv[1];
+      if(cmd == "-stream")
+      {
+          auto is = std::stringstream(tomlData);
+          parseConfiguration(is);
+
+          return EXIT_SUCCESS;
+      }
+
+      if(cmd == "-file"  && argc == 3)
+      {
+          auto is = std::ifstream(argv[2]);
+          if(!is){
+              std::cerr << "Error: file not found." << std::endl;
+              std::exit(EXIT_FAILURE);
+          }
+          parseConfiguration(is);
+          return EXIT_SUCCESS;
+      }
+
+      std::cerr << " Error: invalid option. " << std::endl;
+
+      return 0;
+  }
+
+  const char* tomlData = R"(
+  [INFO]
+   loglevel = 10
+   user     = "Dummy user"
+   file     = "C:\\Users\\somebody\\storage\\data.log"
+
+  [SERVER]
+    host = "127.0.0.1"
+    port = 9090
+    directories = [
+        "C:\\Users\\somebody\\Document"
+       ,"C:\\Users\\somebody\\Upload"
+       ,"C:\\Users\\somebody\\Pictures"
+    ]
+
+  )";
+#+END_SRC
+
+File: server.conf 
+
+#+BEGIN_SRC text 
+  [INFO]
+   loglevel = 0 
+   user     = "Admin User"
+   file     = "C:\\Users\\admin\\files\\log.txt"
+
+  [SERVER]
+    host = "0.0.0.0"
+    port = 9060
+    directories = [
+        "/Users/admin/Desktop"
+        ,"/Applications"
+        ,"/Frameworks"
+        ,"/tmp"
+    ]
+#+END_SRC
+
+Building: 
+
+#+BEGIN_SRC sh 
+  $ g++ main.cpp -o main.bin -std=c++1z -g -O0 -Wall -Wextra -pedantic
+
+  # Mesaure compile-time 
+  $ time g++ main.cpp -o main.bin -std=c++1z -g -O0 -Wall -Wextra -pedantic
+
+  real	0m2.462s
+  user	0m2.262s
+  sys	0m0.172s
+#+END_SRC
+
+Parse internal data (std::istream): 
+
+#+BEGIN_SRC text 
+  $ ./main.bin -stream
+
+   --- TOML Configuration data read from input stream ------
+   => loglevel = 10
+   => userName = Dummy user
+   => file     = C:\Users\somebody\storage\data.log
+   => port     = 9090
+   path: C:\Users\somebody\Document
+   path: C:\Users\somebody\Upload
+   path: C:\Users\somebody\Pictures
+
+#+END_SRC
+
+Parse file (std::ifstream): 
+
+#+BEGIN_SRC text 
+  $ ./main.bin -file server.conf
+
+   --- TOML Configuration data read from input stream ------
+   => loglevel = 0
+   => userName = Admin User
+   => file     = C:\Users\admin\files\log.txt
+   => port     = 9060
+   path: /Users/admin/Desktop
+   path: /Applications
+   path: /Frameworks
+   path: /tmp
+#+END_SRC
+
 ** MuParser - Math expression parser 
 
 MuParser is a simple math expression parser library without any
