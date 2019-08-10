@@ -12760,7 +12760,7 @@ Smart Pointers
             >
    class std::unique_ptr; 
 
-
+   // Array version 
    template< typename T
             ,typename Deleter = std::default_delete<T>
             >
@@ -12818,7 +12818,80 @@ Smart Pointers
    using OS = std::ostream;
  #+END_SRC
 
-  *Member Functions* 
+
+  *Simplified Member Functions Signatures*
+
+#+BEGIN_SRC cpp 
+  template< typename T
+           ,typename Deleter = std::default_delete<T>
+           >
+  class unique_ptr
+  {
+      // Internal raw owning pointer that points to a heap-allocated object.
+      T* m_ptr = nullptr;
+  public:
+
+      //----- Constructors --------------------------//
+      //---------------------------------------------//
+
+      // Default ctor
+      unique_ptr();
+
+      // Overload ctor1 - construct from a owning pointer
+      unique_ptr(T* ptr);
+
+      //--- Special Member Functions ----------------//
+      //---------------------------------------------//
+
+      // Move ctor
+      unique_ptr(unique_ptr&& rhs);
+      // Move assignment operator deleted
+      unique_ptr& operator=(unique_ptr&& r) noexcept;
+
+      // Copy ctor deleted => Smart pointer non-copiable
+      unique_ptr(unique_ptr const& rhs) = delete;
+      // Copy assignment operator deleted => Smart pointer non-copiable
+      unique_ptr& operator=(unique_ptr const& r) = delete;
+
+      // Destructor
+      ~unique_ptr();
+
+      //--- Operator Overloading Member Functions ------//
+      //-----------------------------------------------//
+
+      // Dereference operator (*): Returns reference to managed object
+      T& operator*() const;
+
+      // Dereference operator (->): allows accessing member functions.
+      // std::unique_ptr<ClassA> ptr = std::make_unique<ClassA>();
+      // ptr->MemberFunctionOfA();
+      //
+      T* operator->() const noexcept;
+
+      // Conversion operator to check whether the pointer is nullptr (null)
+      // std::unique_ptr<ClassA> ptr = std::make_unique<ClassA>();
+      // if(ptr) { .... do something ... }
+      operator bool() const;
+
+      //---- Ordinary Member Functions -----------------//
+      //------------------------------------------------//
+
+      // Return a pointer to managed object or nullptr if the pointer owns no object.
+      T* get() const noexcept;
+
+      // Delete managed object setting internal pointer m_ptr to nullptr.
+      // Returns a pointer to the managed object before deleting it.
+      T* release() noexcept;
+
+      // Deletes the current managed object and replaces it by a new one.
+      void reset(T* new_object) noexcept;
+
+      // Swaps the managed object and deleter of *this and another unique_ptr object (rhs)
+      void swap(unique_ptr<T>& rhs) noexcept;
+  };
+#+END_SRC
+
+  *Member Functions in Detail*
 
   + Default constructor - initialized to nullptr. 
 
