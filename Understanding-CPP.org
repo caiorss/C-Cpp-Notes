@@ -12979,11 +12979,21 @@ two parts, a pointer to the managed object (heap-allocated object) and
 a heap-allocated control block which is shared by all smart pointers
 owning the same object and contains a reference counter. 
 
-Whenver a copy of the smart happens, the reference counter in the
+Whenever a copy of the smart happens, the reference counter in the
 shared control block is incremented by one. Whenever any smart pointer,
 that manages a common object, is deleted when it goes out scope, the
 reference counter is decremented by one. When reference counter
 reaches zero, the owned object and the control block are disposed. 
+
+Use cases: 
+
+  + Emulate the experience of a language with garbage collection.
+
+  + Polymorphic object that will be referred by many other objects, in
+    other words, many other objects need a copy of the pointer to the
+    polymorphic object.
+
+  + Instantiation of large objects that cannot fit in the stack. 
 
  *Header* 
 
@@ -13222,6 +13232,113 @@ Note:
   copy1 = nullptr;
   assert(copy.use_count() == 0);
 #+END_SRC
+*** Best practices and things to avoid for std::shared_ptr
+
+  *Initialization of shared_ptr* 
+
+Instead of: 
+
+#+BEGIN_SRC cpp 
+   std::shared_ptr<SomeType> ptr{new SomeType(arg0, arg1, ..., argN)};
+#+END_SRC
+
+Better: 
+
+#+BEGIN_SRC cpp 
+   std::shared_ptr<SomeType> ptr = std::make_shared<SomeType>(arg0, arg1, ..., argN);
+#+END_SRC
+
+Or even better: 
+
+#+BEGIN_SRC cpp 
+   auto ptr = std::make_shared<SomeType>(arg0, arg1, ..., argN);
+#+END_SRC
+
+
+  *Polymorphic objects and containers* 
+
+#+BEGIN_SRC cpp 
+  class IBase(){
+  public:
+     virtual void method1() = 0;
+     ~IInterface() = default;
+  };
+
+  class ClassA: public IBase {
+       ... ... 
+  }; 
+
+  class ClassB: public IBase {
+      .. ... ...
+  }; 
+     ... ... ... .. 
+#+END_SRC
+ 
+Instead of: 
+
+#+BEGIN_SRC cpp 
+   std::vector<IBase> dataset { new ClassA(), new ClasB(param0, param1, ...), new Class C, ... }
+   dataset.push_back(new ClassA(param0, param1, ..., paramN));
+   dataset.push_back(new ClassB(param0, param1, ..., paramN));
+
+  // ········ omit ··· ··· ···· 
+  
+  // Dispose: 
+  for(auto ptr: dataset) { delete ptr; }
+#+END_SRC
+
+Better: 
+
+#+BEGIN_SRC cpp 
+   std::vector<std::shared_ptr<IBase>> dataset { 
+        std::make_shared<ClassA>(), 
+        std::make_shared<ClassB>(param0, param1, ...),
+        std::make_shared<ClassC>(), 
+        ... 
+  };
+  dataset.push_back(std::make_shared<ClassA>(param0, param1, ..., paramN);
+  dataset.push_back(std::make_shared<ClassB>(param0, param1, ..., paramN);
+
+  for(auto cosnt& ptr: dataset){
+     // iterate over a container with polymorphic objects ... 
+     ... ... ... ... ... 
+  }
+
+  // .... Disposed automatically ... 
+#+END_SRC
+
+Or simplified with: 
+
+#+BEGIN_SRC cpp 
+  // Type alias 
+  template<typename T>
+  using sh = std::shared_ptr<T>;
+
+  std::vector<sh<IBase>> dataset { 
+        std::make_shared<ClassA>(), 
+        std::make_shared<ClassB>(param0, param1, ...),
+        std::make_shared<ClassC>(), 
+        ... 
+  }; 
+   ... ... ... ... ... 
+#+END_SRC
+
+It could also be written as:
+
+#+BEGIN_SRC cpp 
+  template<typename T>
+  using shared_vector = std::vector<std::shared_ptr<T>>;
+
+  shared_vector<T> dataset { 
+        std::make_shared<ClassA>(), 
+        std::make_shared<ClassB>(param0, param1, ...),
+        std::make_shared<ClassC>(), 
+        ... 
+  }; 
+
+  // ... ... ... // 
+#+END_SRC
+
 
   *Free Functions and member parameter passing* 
 
@@ -13397,7 +13514,6 @@ Create an instance of class A:
       ptr_b->methodExclusiveofB(); 
    }
 #+END_SRC
-
 
 
 *** Example: std::unique_ptr 
