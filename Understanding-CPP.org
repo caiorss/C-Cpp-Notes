@@ -12672,7 +12672,10 @@ Functions std::swap:
 
 Boost: 
 
-  + [[https://www.boost.org/doc/libs/1_69_0/libs/smart_ptr/doc/html/smart_ptr.html#scoped_ptr][boost::scoped_ptr]]
+  + [[https://www.boost.org/doc/libs/1_69_0/libs/smart_ptr/doc/html/smart_ptr.html#scoped_ptr][boost::scoped_ptr]] - Similar to unique_ptr, but no-copiable and
+    no-copiable.
+
+  + [[https://www.boost.org/doc/libs/1_70_0/libs/smart_ptr/doc/html/smart_ptr.html#intrusive_ptr][Boost.Intrusive_ptr]] - Similar to shared_ptr.
 
 QT Framework:
 
@@ -12992,6 +12995,8 @@ reaches zero, the owned object and the control block are disposed.
 
    + [[https://docs.microsoft.com/en-us/cpp/standard-library/shared-ptr-class?view=vs-2019][std::shared_ptr]] (Microsft)
 
+   + [[https://docs.microsoft.com/en-us/cpp/cpp/how-to-create-and-use-shared-ptr-instances?view=vs-2019][How to: Create and Use shared_ptr Instances]] (Microsft)
+
    + [[https://www.boost.org/doc/libs/1_70_0/libs/smart_ptr/doc/html/smart_ptr.html#shared_ptr][boost:shared_ptr]] (Predecessor, pre-C++11)
 
 
@@ -13123,9 +13128,23 @@ Note:
     returns 1. 
 
 #+BEGIN_SRC cpp 
+  class AClass{ 
+  public:
+     ... ... ... 
+     void method1(){ ... .}
+     void method2(){ .... .. }
+  }; 
+
   // Not: recommended (AVOID)
   std::shared_ptr<AClass> cls(new AClass>(arg0, arg1, arg2 ...));
   assert(ptr.use_count() == 1);
+
+  // Call methods just like it would be with an ordinary pointer 
+  ptr->method1(); 
+  ptr->method2(); 
+
+  // Get a reference to the object: 
+  AClass ref& = *ptr;
 
   // Best 
   std::shared_ptr<AClass> cls =  std::make_shared<AClass>(arg0, arg1, arg2 ...);
@@ -13203,6 +13222,108 @@ Note:
   copy1 = nullptr;
   assert(copy.use_count() == 0);
 #+END_SRC
+
+  *Free Functions and member parameter passing* 
+
+If the function only needs to query or modify the managed object and
+does not need to know anything about the shared_ptr, pass by
+reference, const reference or by pointer in the case that null pointer
+is acceptable. 
+
+#+BEGIN_SRC cpp 
+   void someModifierFunction(AType& obj1)
+   {
+      std::cout << " id = " << obj1.id() << std::endl; 
+      obj1.setName(new_name); 
+      obj1.display();
+   }
+
+   void someConstFunction(AType const& obj1)
+   {
+      std::cout << " id = " << obj1.id() << std::endl; 
+   }
+
+   void somePointerFunction(AType* pobj1)
+   {
+      if(!pobj1){
+          std::cout << " Supplied null pointer"  << std::endl;
+          return; 
+      }
+      std::cout << " id = " << pobj1->id() << std::endl; 
+   }
+
+   auto ptr = std::make_shared_ptr<AType>(Arg0, Arg1, ... ArgN); 
+
+   // Passing ptr to functions 
+   someModifierFunction(*ptr);
+   someConstFunction(*ptr);
+   somePointerFunction(ptr,get());
+#+END_SRC
+
+Avoid passing the shared pointer by value, if taking ownership, in
+other words, storing a copy of the pointer is not needed as the copy
+increments the reference counter incurring on a performance overhead. 
+
+#+BEGIN_SRC cpp 
+   // AVOID 
+   void someFunction(std::shared_ptr<T> ptr)
+   {
+       // ... incremente atomic reference counter ... 
+       // ... . .. // 
+   }
+#+END_SRC
+
+Only pass by reference to shared_ptr if the function need to know
+about the pointer without taking any ownership (storing a copy). 
+
+#+BEGIN_SRC cpp 
+   void function_that_needs_to_know_about_ptr(std::shared_ptr<T> const& ptr)
+   {
+      std::cout << " Ref count value = " << ptr.use_count() << "\n";
+      std::cout << " Address = " << ptr.get() << "\n";
+      std::cout << " Value returned by object's member function = " << ptr->memberFunction() << "\n";
+   }
+#+END_SRC
+
+  *Factory functions* 
+
+It is better to return std::unique_ptr from factory functions rather
+than shared_ptr as the first is easily turned into the later and
+opposite is more difficult. 
+
+#+BEGIN_SRC cpp 
+  class IInterface(){
+  public:
+     virtual void method1() = 0;
+     ~IInterface() = default;
+  };
+
+  class ImplementationA: public IInterface {
+     void method1() override { 
+        ... ... .. 
+     }
+  }; 
+
+  class ImplementationB: public IInterface {
+     void method1() override { 
+        ... ... .. 
+     }
+  }; 
+
+  auto factoryFunction(int id) -> std::unique_ptr<IInterface> 
+  {
+     if(id == 1) { return std::make_unique<ImplementationA>(); }
+     if(id == 2) { return std::make_unique<ImplementationB>(); }
+     return nullptr;
+  }
+
+  // ----------- Usage ----------------------------
+  std::shared_ptr<IInterface> p_int1 = factoryFunction(1); 
+  std::shared_ptr<IInterface> p_int2 { factoryFunction(1) };
+#+END_SRC
+  
+
+
 
 
 *** Example: std::unique_ptr 
