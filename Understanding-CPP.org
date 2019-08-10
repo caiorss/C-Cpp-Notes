@@ -12699,6 +12699,18 @@ Smart Pointers
 
   + [[https://docs.microsoft.com/en-us/cpp/cpp/com-ptr-t-class?view=vs-2017][_com_ptr_t]]
 
+VTK Smart Pointers: 
+
+  + [[https://vtk.org/Wiki/VTK/Tutorials/SmartPointers][Vtk SmartPointers]]
+
+Poco Framework 
+
+  + [[https://pocoproject.org/docs/Poco.SharedPtr.html][Poco.SharedPtr]]
+
+ARM Mbed 
+
+  + [[https://os.mbed.com/docs/mbed-os/v5.13/apis/shared-pointer.html][Shared Pointer]] 
+
 *** Documentation Links
 
  Header File: 
@@ -12830,63 +12842,34 @@ Smart Pointers
       // Internal raw owning pointer that points to a heap-allocated object.
       T* m_ptr = nullptr;
   public:
-
       //----- Constructors --------------------------//
       //---------------------------------------------//
-
       // Default ctor
       unique_ptr();
-
       // Overload ctor1 - construct from a owning pointer
       unique_ptr(T* ptr);
-
-      //--- Special Member Functions ----------------//
-      //---------------------------------------------//
-
       // Move ctor
       unique_ptr(unique_ptr&& rhs);
       // Move assignment operator deleted
       unique_ptr& operator=(unique_ptr&& r) noexcept;
-
       // Copy ctor deleted => Smart pointer non-copiable
       unique_ptr(unique_ptr const& rhs) = delete;
       // Copy assignment operator deleted => Smart pointer non-copiable
       unique_ptr& operator=(unique_ptr const& r) = delete;
-
       // Destructor
       ~unique_ptr();
 
       //--- Operator Overloading Member Functions ------//
       //-----------------------------------------------//
-
-      // Dereference operator (*): Returns reference to managed object
-      T& operator*() const;
-
-      // Dereference operator (->): allows accessing member functions.
-      // std::unique_ptr<ClassA> ptr = std::make_unique<ClassA>();
-      // ptr->MemberFunctionOfA();
-      //
+      T& operator*()  const;
       T* operator->() const noexcept;
-
-      // Conversion operator to check whether the pointer is nullptr (null)
-      // std::unique_ptr<ClassA> ptr = std::make_unique<ClassA>();
-      // if(ptr) { .... do something ... }
       operator bool() const;
 
       //---- Ordinary Member Functions -----------------//
       //------------------------------------------------//
-
-      // Return a pointer to managed object or nullptr if the pointer owns no object.
-      T* get() const noexcept;
-
-      // Delete managed object setting internal pointer m_ptr to nullptr.
-      // Returns a pointer to the managed object before deleting it.
-      T* release() noexcept;
-
-      // Deletes the current managed object and replaces it by a new one.
-      void reset(T* new_object) noexcept;
-
-      // Swaps the managed object and deleter of *this and another unique_ptr object (rhs)
+      T*   get()                    const noexcept;
+      T*   release()                noexcept;
+      void reset(T* new_object)     noexcept;
       void swap(unique_ptr<T>& rhs) noexcept;
   };
 #+END_SRC
@@ -12985,6 +12968,243 @@ Smart Pointers
       std::puts("Pointer is not null");
    }
  #+END_SRC
+*** std::shared_ptr 
+
+shared_ptr is a smart pointer that provides shared ownership semantics
+and memory management through reference counting. This class contains
+two parts, a pointer to the managed object (heap-allocated object) and
+a heap-allocated control block which is shared by all smart pointers
+owning the same object and contains a reference counter. 
+
+Whenver a copy of the smart happens, the reference counter in the
+shared control block is incremented by one. Whenever any smart pointer,
+that manages a common object, is deleted when it goes out scope, the
+reference counter is decremented by one. When reference counter
+reaches zero, the owned object and the control block are disposed. 
+
+ *Header* 
+
+  + [[https://en.cppreference.com/w/cpp/memory][<memory>]]
+
+ *Documentation* 
+
+   + [[https://en.cppreference.com/w/cpp/memory/shared_ptr][std::shared_ptr]] (Cppreference)
+
+   + [[https://docs.microsoft.com/en-us/cpp/standard-library/shared-ptr-class?view=vs-2019][std::shared_ptr]] (Microsft)
+
+   + [[https://www.boost.org/doc/libs/1_70_0/libs/smart_ptr/doc/html/smart_ptr.html#shared_ptr][boost:shared_ptr]] (Predecessor, pre-C++11)
+
+
+  *Simplified Member Functions* of std::shared_ptr<T>
+
+|-----------------------------------------+--------+-----------------------------------------------------------------|
+| Member function                         | Return | Description                                                     |
+|                                         | type   |                                                                 |
+|-----------------------------------------+--------+-----------------------------------------------------------------|
+| *Most relevant constructors*              |        |                                                                 |
+|-----------------------------------------+--------+-----------------------------------------------------------------|
+| shared_ptr()                            |        | Default constructor, initialize with nullptr.                   |
+| shared_ptr( std::nullptr_t )            |        |                                                                 |
+| shared_ptr(T* )                         |        | Initialize with _new_ keyword.                                    |
+| std::shared_ptr(std::unique_ptr<T>&& r) |        | Initialize with a unique_ptr R-value.                           |
+|                                         |        |                                                                 |
+| *Observers*                               |        |                                                                 |
+|-----------------------------------------+--------+-----------------------------------------------------------------|
+| get() const                             | T*     | Return pointer to owned object.                                 |
+| use_count()                             | long   | Value of reference counter                                      |
+|                                         |        |                                                                 |
+| operator bool()                         | bool   | Checks whether the pointer is not null. if(ptr) { ... }         |
+| operator*() const                       | T&     | Dereference operator. Return reference to owned object.         |
+| operator->() const                      | T*     | Dereference operator. Access member function of managed object. |
+|                                         |        |                                                                 |
+|-----------------------------------------+--------+-----------------------------------------------------------------|
+| *Modifier*                                |        |                                                                 |
+|-----------------------------------------+--------+-----------------------------------------------------------------|
+| reset()                                 | void   | Replace the current managed object by this pointer by nullptr.  |
+| reset(T* ptr)                           | void   | Replace the current managed object by this pointer by ptr.      |
+|                                         |        |                                                                 |
+
+Note: 
+
+ + use_count() returns the number of shared_ptr managing the same
+   heap-allocated object, in other words, it returns the value of the
+   reference counter. When it reaches zero, the shared_ptr object owns
+   no object or does not manage any object.
+
+ + reset() and reset(T*) members only deletes the current managed
+   object, if there are any other std::shared_ptr using it. 
+
+
+ *Simplified Member Functions Signature* 
+
+#+BEGIN_SRC cpp 
+  template<typename T>
+  class shared_ptr
+  {
+      // ..... omit private part  ... //
+  public:
+
+      //----- Constructors --------------------------//
+      //---------------------------------------------//
+      // Default ctor
+      shared_ptr();
+      // Overload ctor1 - construct from a owning pointer
+      shared_ptr(T* ptr);
+
+      // Move ctor
+      shared_ptr(shared_ptr&& rhs);
+      // Move assignment operator
+      shared_ptr& operator=(shared_ptr&& r);
+      // Copy ctor
+      shared_ptr(shared_ptr const& rhs);
+      // Copy assignment operator
+      shared_ptr& operator=(shared_ptr const& r);
+      // Destructor
+      ~shared_ptr();
+
+      //--- Operator Overloading Member Functions ------//
+      //-----------------------------------------------//
+      T& operator*()  const;
+      T* operator->() const noexcept;    
+      operator bool() const;
+
+      //---- Ordinary Member Functions -----------------//
+      //------------------------------------------------//
+
+      long  use_count()              const noexcept;
+      T*    get()                    const noexcept;
+      T*    release()                noexcept;
+      void  reset(T* new_object)     noexcept;
+      void  swap(shared_ptr<T>& rhs) noexcept;
+  };
+#+END_SRC
+
+ *Non Member Functions* 
+
+#+BEGIN_SRC cpp 
+  template< class T, class... Args >
+  shared_ptr<T> make_shared( Args&&... args );   // Since C++11 
+
+  template<class T>
+  shared_ptr<T> make_shared( std::size_t N );   // Since C++20 
+
+   // ... many other operators ... // 
+
+  template< class T >
+  bool operator==( std::nullptr_t lhs, const shared_ptr<T>& rhs ) noexcept;
+
+  template < class T, class U > 
+  bool operator==( const shared_ptr<T>& lhs, const shared_ptr<U>& rhs ) noexcept;
+#+END_SRC
+
+ *Basics - How it works* 
+
+  + When a shared_ptr owns not object or is default initialized or
+    initialized with nullptr, the reference counter is set to zero.
+
+#+BEGIN_SRC cpp 
+  // Reference counter is zero 
+  std::shared_ptr<AClass> ptr1;
+  // .use_counter => Return the value of the reference counter.
+  assert(ptr.use_counter() == 0) ; 
+
+  // Reference counter is zero, the ptr2 object owns anything
+  std::shared_ptr<AClass> ptr2 = nullptr;
+  assert(ptr2.use_counter() == 0) ; 
+
+  // Reference counter is zero 
+  std::shared_ptr<AClass> ptr2{nullptr};
+  assert(ptr2.use_counter() == 0) ; 
+#+END_SRC
+
+  + When a shared_ptr is initialized (not default initialized, copy or
+    move initialization) with _new_ keyword or std::make_shared, the
+    reference counter is set to 1, the member function _use_count_
+    returns 1. 
+
+#+BEGIN_SRC cpp 
+  // Not: recommended (AVOID)
+  std::shared_ptr<AClass> cls(new AClass>(arg0, arg1, arg2 ...));
+  assert(ptr.use_count() == 1);
+
+  // Best 
+  std::shared_ptr<AClass> cls =  std::make_shared<AClass>(arg0, arg1, arg2 ...);
+  assert(ptr.use_count() == 1);
+  
+  // Best 
+  auto cls =  std::make_shared<AClass>(arg0, arg1, arg2 ...);
+  assert(ptr.use_count() == 1);
+#+END_SRC
+
+   + When a copy of a shared_ptr object is performed, the reference
+     counter is incremented and when a copy object goes out of scope,
+     the reference counter is decremented. 
+
+#+BEGIN_SRC cpp 
+  std::shared_ptr<AClass> cls =  std::make_shared<AClass>(arg0, arg1, arg2 ...);
+  assert(ptr.use_count() == 1);
+
+  cls->CallMethod1OfAClass();
+
+  { 
+     // Copy constructor of std::shared_ptr<T> called 
+     // => Incremente reference counter by 1 
+     auto copy1 =  cls; 
+     assert(ptr.use_count() == 2);   
+     assert(copy1.use_count() == 2);   
+
+    {
+       std::shared_ptr<AClass> copy2; 
+       assert(copy2.use_count() == 0);
+   
+       // Call move assignment operator of std::shared<T> 
+       // Increment reference counter. 
+       copy2 = cls;
+       assert(copy2.use_count() == 3);
+    }
+    // Object: copy2 => Destroyed here, decremente ref counter by 1 
+    assert(cls.use_count() == 2);
+  }
+  // Object copy1 destroyed here (end of its scope), decremente 
+  // counter by one. 
+  assert(cls.use_count() == 1);  
+   
+  // Decremente control block by 1, when it reaches zero, 
+  // the control block and the managed object are destroyed.
+  cls = nullptr;
+  assert(cls.use_count() == 0);  
+  // Or: 
+  cls.reset(); 
+  assert(cls.use_count() == 0);  
+#+END_SRC
+ 
+   + The shared managed object and the control block are only disposed
+     when the number of shared_ptr objects owning the managed objects
+     is zero, in other words, the reference counter equal to zero.
+
+#+BEGIN_SRC cpp 
+  auto cls =  std::make_shared<AClass>(arg0, arg1, arg2 ...);
+  assert(ptr.use_count() == 1);
+
+  std::shared_ptr<AClass> copy1{cls}; 
+  assert(cls.use_count() == 2);
+  assert(copy1.use_count() == 2);
+
+  // Reference counter decremented and cls set nullptr. 
+  // However, the shared control block and the managed object 
+  // were not deleted as they are still used by object 'copy1'. 
+  cls = nullptr; 
+  assert(cls.use_count() == 0);
+  assert(copy1.use_count() == 1);
+
+  // Reference counter decremented, now it reaches zero and both the
+  // control block and the managed (heap-allocated) object are deleted
+  // as they are no longer used by any other shared_ptr.
+  copy1 = nullptr;
+  assert(copy.use_count() == 0);
+#+END_SRC
+
+
 *** Example: std::unique_ptr 
 
  Example: 
@@ -13400,11 +13620,38 @@ Output:
 #+END_SRC
 *** Additional Reading 
 
+ *General:*
+
   + *Five Popular Miths about C++*
     + <http://www.stroustrup.com/Myths-final.pdf> 
 
   + StackOverflow - *Why do C++ libraries and frameworks never use smart pointers?*
     + <https://stackoverflow.com/questions/10334511>
+
+  + Boost intrusive_ptr : faster shared pointer
+    + <https://baptiste-wicht.com/posts/2011/11/boost-intrusive_ptr.html>
+
+  + Wrapping C++ std::shared_ptr and similar smart pointers
+    + <https://discuss.ocaml.org/t/wrapping-c-std-shared-ptr-and-similar-smart-pointers/3582>
+
+  + C++ Gof Design Patterns heavily depends on new or shared_ptr
+    + <https://softwareengineering.stackexchange.com/questions/381197>
+
+ *Shared Pointers in Projects and Libraries* 
+
+  + *Boost Shared Pointers* - Inkscape
+    + http://wiki.inkscape.org/wiki/index.php/Boost_shared_pointers
+
+  + *Mantid Project - Some C++ Tips*
+    + https://www.mantidproject.org/Some_C%2B%2B_Tips
+
+  + *Boost Structures in OMPL - Open Motion Planing*
+    + https://www.mantidproject.org/Some_C%2B%2B_Tips
+
+  + *Project Chrono - Shared Pointers*
+    + http://api.projectchrono.org/shared_pointers.html
+ 
+
 ** Exceptions and Error Handling 
 *** Overview 
 
