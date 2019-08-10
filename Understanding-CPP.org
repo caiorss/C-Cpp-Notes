@@ -13322,6 +13322,81 @@ opposite is more difficult.
   std::shared_ptr<IInterface> p_int2 { factoryFunction(1) };
 #+END_SRC
   
+  *Polymorphism and Casting of Shared Pointers* 
+
+The functions std::static_pointer_cast, std::dynamic_pointer_cast,
+std::const_pointer_cast and std::shared_pointer_cast from [[https://en.cppreference.com/w/cpp/memory/shared_ptr/pointer_cast][pointer_cast]]
+(cppreference) can be used for downcasting and runtime type
+identification of polymorphic objects. 
+
+Consider the hierarchy: 
+
+#+BEGIN_SRC cpp 
+  class IBase(){
+  public:
+     virtual void method1() = 0;
+     ~IInterface() = default;
+  };
+
+  class ClassA: public IBase {
+     void method1() override { 
+        ... ... .. 
+     }
+
+     void methodExclusiveOfA() { .... }
+  }; 
+
+  class ClassB: public IBase {
+     void method1() override { 
+        ... ... .. 
+     }
+
+     void methodExclusiveOfB() { ... }
+  }; 
+#+END_SRC
+
+Create an instance of class A: 
+
+#+BEGIN_SRC cpp 
+   std::shared_ptr<IBase> obj = std::make_shared<ClassA>(obj);
+#+END_SRC
+
+ + *Static casting* - Casting at compile time without any runtime
+   overhead, however, if the casting is not possible, it results in
+   undefined behavior just like what happens with static_cast for
+   pointers. 
+
+#+BEGIN_SRC cpp 
+   std::shared_ptr<A> ptr_a = std::static_pointer_cast<A>(obj);
+   if(ptr_a) {
+      ptr_a->method1();
+      ptr_a->methodExclusiveofA(); 
+   }
+
+   // **** WARNING!! UNDEFINED BEHAVIOR!! *****
+   std::shared_ptr<A> ptr_b = std::static_pointer_cast<B>(obj);
+#+END_SRC
+
+ + *Dynamic Casting* - RTTI - Runtime Type Identification, if the
+   casting fails, the function _std::dynamic_pointer_cast_ returns a
+   null pointer just like _dynamic_cast<T>_ operator.
+
+#+BEGIN_SRC cpp 
+   // Increment reference counter by 1 if successful 
+   std::shared_ptr<A> ptr_a = std::dynamic_pointer_cast<A>(obj);
+   assert( ptr_a != nullptr);
+   if(ptr_a) {
+      ptr_a->method1();
+      ptr_a->methodExclusiveofA(); 
+   }
+
+   auto ptr_b = std::dynamic_pointer_cast<B>(obj);
+   assert( ptr_b == nullptr);
+   if(ptr_b){
+      ptr_b->method1();
+      ptr_b->methodExclusiveofB(); 
+   }
+#+END_SRC
 
 
 
