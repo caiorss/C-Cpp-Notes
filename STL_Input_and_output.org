@@ -792,16 +792,112 @@ Proces stderr:
   >>> 
 #+END_SRC
 
-** C-legacy -Printf - format specifiers and examples
-*** Specifiers
+** C-legacy IO functions - format specifiers and examples
+*** Puts 
+
+Print a string without any formatting - header: [[https://en.cppreference.com/w/cpp/header/cstdio][<cstdio>]] for C++ and <stdio.h> for C.
+
+ + puts - print a line to stdout followed by new line character. 
+
+#+BEGIN_SRC cpp 
+  int puts(const char*);
+#+END_SRC
+
+ + fputs - print line to file. 
+
+#+BEGIN_SRC cpp 
+  int fputs(FILE* fd, const char*);
+
+  // Example: print line to stdout - standard output
+   std::fputs(" => hello world C++17 line\n", stdout);
+
+  // Exmaple: print line to stderr - standard error output 
+  std::fputs(" => hello world C++17 line\n", stderr);
+#+END_SRC
+
+*** Printf-like Functions 
+
+The following functions are available in the header [[https://en.cppreference.com/w/cpp/header/cstdio][<cstdio>]] for C++,
+and in the header <stdio.h> for C. 
+
+ + Printf - print to stdout - standard output. 
+
+#+BEGIN_SRC cpp 
+   int printf(const char* format, ...);
+#+END_SRC
+
+ + fprintf - print to file
+   + stdout - file => standard output
+   + stderr - file => standard error output. 
+
+#+BEGIN_SRC cpp 
+   int fprintf(FILE* fd, const char* format, ...); 
+
+   // Example: Print to stdout, same as printf 
+   std::fprintf(stdout, " text = '%s' x = %.3f ", "square_root", 3.141598714); 
+
+   // Example: Print to stderr
+   std::fprintf(stderr, " text = '%s' x = %.3f ", "square_root", 3.141598714); 
+#+END_SRC
+
+ + dprintf - print to file descriptor 
+
+#+BEGIN_SRC cpp 
+  int dprintf(int fd, const char* format, ...);
+#+END_SRC
+
+ + sprintf - print to buffer - Note: function prone to buffer
+   overlflow. 
+
+#+BEGIN_SRC cpp 
+  int sprintf(char* buffer, const char* format, ...); 
+#+END_SRC 
+
+ + snprintf - print to buffer with bound checking - size is the
+   maximum number of characters that can be print to the buffer. 
+
+#+BEGIN_SRC cpp 
+  int snprintf(char* buffer, size_t size, const char* format, ...);
+#+END_SRC
+
+*** Specifiers for printf-like functions 
+
+Escacape sequences: 
+
+|----------+------------------------------------|
+| Sequence | Description                        |
+|----------+------------------------------------|
+|          | *New Line*                           |
+|----------+------------------------------------|
+| ~\n~       | LF - Line Feed (Unix new line )    |
+| ~\r~       | CR - Carriage Return               |
+|          |                                    |
+|          | *Tabs*                               |
+|----------+------------------------------------|
+| ~\t~       | Horizontal Tab                     |
+| ~\v~       | Vertical Tab                       |
+|          |                                    |
+|          | *Escape Characters*                  |
+|----------+------------------------------------|
+| %%       | Print a percent sign (%)           |
+| \\       | Print backlash, aka backward slash |
+| \"       | Print a single double quote        |
+|          |                                    |
+|          | *Special Characters*                 |
+|----------+------------------------------------|
+| ~\a~       | Alert bell                         |
+| ~\b~       | Backspace                          |
+| ~\c~       |                                    |
+| ~\f~       | Form feed                          |
+| ~\e~       | Escape                             |
+|----------+------------------------------------|
+
+
+Specifiers: 
 
 |-------------+-------------------------------------------------------------------+--------------|
 | Specifier   | Description                                                       |      Example |
 |-------------+-------------------------------------------------------------------+--------------|
-| *Escape*      |                                                                   |              |
-|-------------+-------------------------------------------------------------------+--------------|
-| %%  or \%   | Print a percent sign (%)                                          |              |
-|             |                                                                   |              |
 | *Misc*        |                                                                   |              |
 |-------------+-------------------------------------------------------------------+--------------|
 | %c          | Print a single character                                          |              |
@@ -977,6 +1073,56 @@ Print table of float points:
      8.000 2.98096E+03
      9.000 8.10308E+03
     10.000 2.20265E+04
+#+END_SRC
+
+Print table of string: 
+
+ + file: main.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+  #include <vector>
+
+  int main()
+  {
+      using table_row = std::pair<std::string, double>;
+      std::vector<table_row> table{
+           {"tristor", 10.23}
+          ,{"voltage regulator 5 volts", 1.25}
+          ,{"voltage regulator 12V", 9.50}
+          ,{"IMU sensor", 108.23}
+          ,{"Pressure transducer", 205.90}
+      };
+
+      std::printf("\n ==>>> C++11 Table printing (First column right aligned) \n\n");
+      for(auto const& r: table)
+          std::printf("%25s %10.2f\n", r.first.c_str(), r.second);
+
+      std::printf("\n ==>>> C++17 Table printing (First column left aligned) \n\n");
+      for(auto const& [key, value]: table)
+          std::printf("%-25s %10.2f\n", key.c_str(), value);
+  }
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC text 
+  ==>>> C++11 Table printing (First column right aligned) 
+
+                    tristor      10.23
+  voltage regulator 5 volts       1.25
+      voltage regulator 12V       9.50
+                 IMU sensor     108.23
+        Pressure transducer     205.90
+
+   ==>>> C++17 Table printing (First column left aligned) 
+
+  tristor                        10.23
+  voltage regulator 5 volts       1.25
+  voltage regulator 12V           9.50
+  IMU sensor                    108.23
+  Pressure transducer           205.90
 #+END_SRC
 
 ** Reading data from generic Input Stream - read data from file, console and memory
