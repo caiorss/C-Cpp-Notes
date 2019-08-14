@@ -13277,7 +13277,7 @@ Or even better:
 Instead of: 
 
 #+BEGIN_SRC cpp 
-   std::vector<IBase> dataset { new ClassA(), new ClasB(param0, param1, ...), new Class C, ... }
+   std::vector<IBase> dataset { new ClassA(), new ClasB(param0, param1, ...), new Class C, ... };
    dataset.push_back(new ClassA(param0, param1, ..., paramN));
    dataset.push_back(new ClassB(param0, param1, ..., paramN));
 
@@ -13345,7 +13345,8 @@ It could also be written as:
 If the function only needs to query or modify the managed object and
 does not need to know anything about the shared_ptr, pass by
 reference, const reference or by pointer in the case that null pointer
-is acceptable. 
+is acceptable. Functions with those types of arguments will be able to
+work with ordinary values, dumb pointers and any type of smart pointers.
 
 #+BEGIN_SRC cpp 
    void someModifierFunction(AType& obj1)
@@ -13390,8 +13391,9 @@ increments the reference counter incurring on a performance overhead.
    }
 #+END_SRC
 
-Only pass by reference to shared_ptr if the function need to know
-about the pointer without taking any ownership (storing a copy). 
+Only pass by reference to shared_ptr if the function needs to know
+about the pointer and does not need to take any ownership (storing a
+copy of the pointer for later reference).
 
 #+BEGIN_SRC cpp 
    void function_that_needs_to_know_about_ptr(std::shared_ptr<T> const& ptr)
@@ -13400,6 +13402,68 @@ about the pointer without taking any ownership (storing a copy).
       std::cout << " Address = " << ptr.get() << "\n";
       std::cout << " Value returned by object's member function = " << ptr->memberFunction() << "\n";
    }
+#+END_SRC
+
+  *Ownership* 
+
+Avoid: 
+
+ + The following class needs to store a copy of a pointer to polymorphic
+   class for later reference and it is responsible for disposing the
+   resource during its destruction. In other words, it takes ownership
+   of the resource.    
+
+#+BEGIN_SRC cpp 
+  class ClassThatTakesOwnership
+  {
+  private:
+     // Pointer to heap-allocated instance of polymorphic class 
+     IInterface* m_ptr;
+
+  public: 
+     ClassThatTakesOwnership(IInterface* ptr): m_ptr(ptr) {  } 
+
+     ~ClassThatTakesOwnership()
+      {
+         delete m_ptr; 
+         m_ptr = nullptr; 
+      }
+
+     void callLater(){ 
+        ptr->callMethod(); 
+     }      
+  };
+
+  ClassThatTakesOwnership cls1{new ImplementationA};
+
+  // NO! BROKEN!
+  std::shared_ptr<IInterface> obj = std::make_shared<ImplementationA>(); 
+  // NO FLAWED! 
+  ClassThatTakesOwnership cls2{obj.get()};
+#+END_SRC
+
+Better:
+
+#+BEGIN_SRC cpp 
+  class ClassThatTakesOwnership
+  {
+  private:
+     // Pointer to heap-allocated instance of polymorphic class 
+     std::shared_ptr<IInterface> m_ptr;
+
+  public: 
+     ClassThatTakesOwnership(std::shared_ptr<IInterface> ptr)
+       : m_ptr(std::move(ptr)) {  } 
+
+     void callLater(){ 
+        ptr->callMethod(); 
+     }      
+  };
+
+  std::shared_ptr<IInterface> obj = std::make_shared<ImplementationA>(); 
+  ClassThatTakesOwnership cls1{obj};
+
+  ClassThatTakesOwnership cls2{std::make_shared<ImplementationB>()};
 #+END_SRC
 
   *Factory functions* 
