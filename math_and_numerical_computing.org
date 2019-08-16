@@ -55,20 +55,40 @@ Headers:
 
  *Float Point Types*
 
-|-------------+------+---+----+-----+-------+----------------------------------------|
-| C++ Type    | Bits | S |  E |   M |     B | Description                            |
-|-------------+------+---+----+-----+-------+----------------------------------------|
-| float       |   32 | 1 |  8 |  23 |   127 | IEE754 single precision float point    |
-| double      |   64 | 1 | 11 |  52 |  1023 | IEE754 double precision float point    |
-| long double |  128 | 1 | 15 | 112 | 32767 | IEE754 quadruple precision float point |
-|-------------+------+---+----+-----+-------+----------------------------------------|
+|-------------+-----------+------+---+----+-----+-------+----------------------------------------|
+| C++ Type    | Name      | Bits | S |  E |   M |     B | Description                            |
+|-------------+-----------+------+---+----+-----+-------+----------------------------------------|
+| float       | Binary32  |   32 | 1 |  8 |  23 |   127 | IEE754 single precision float point    |
+| double      | Binary64  |   64 | 1 | 11 |  52 |  1023 | IEE754 double precision float point    |
+| long double | Binary128 |  128 | 1 | 15 | 112 | 32767 | IEE754 quadruple precision float point |
+|-------------+-----------+------+---+----+-----+-------+----------------------------------------|
 
  + S => Sign bits => 0 for positive numbers and 1 for negative numbers.
  + E => Exponent bits
- + M => Mantiassa Bits (aka Fraction)
+ + M => Mantiassa Bits (aka Fraction or _significand_)
  + B => Exponent Bias
 
+ *Storage Layout*
+
+|------------------+------+---------+------------+-----------|
+| Float Point Type | Bits | Sign    | Exponent   | Mantissa  |
+|------------------+------+---------+------------+-----------|
+| float            |   32 | 1 [31]  | 8  [23-30] | 32 [0-22] |
+| double           |   64 | 1 [63]  | 11 [52-62] | 51 [0-51] |
+| long double      |  128 | 1 [127] |            |           |
+
+  + 1 [31] - Means that sign bit of the float point is the 31th bit.
+  + 8 [23-30] - Means that the exponents bits are are all bits between
+    23th and 30th bit (including both sides).
+
  *Representation of Float Points* 
+
+ + General Format:
+
+#+BEGIN_SRC text
+                 Sign    E
+   Value :=  (-1)     X R  X Mantissa
+#+END_SRC
 
  + Single Precision (float)
    + Where:
@@ -95,6 +115,7 @@ Headers:
 
  *Special Values for Single Precision float point number in Hexadecimal* (float type)
 
+|-------------------+----------+--------------|
 | Case              |     Case | Bytes Values |
 |-------------------+----------+--------------|
 | Positive Zero     |     +0.0 |   0x00000000 |
@@ -358,7 +379,181 @@ If-else statement:
    >> 
 #+END_SRC
 
-** Numerical Constants
+** Functions for inspecting float points
+*** Equality of Float Points
+
+Equality based on absolute error:
+  + Two float points are almost equal under a given tolerance when the
+    relative error is smaller than the tolerance.
+
+#+BEGIN_SRC text
+  abs(x - y)  < tolerance
+#+END_SRC
+
+Equality based on relative error (Better):
+
+#+BEGIN_SRC text
+    abs(x - y)  < tolerance
+    -----------
+      abs(x)
+
+   Or:
+
+      abs(x - y)  < tolerance x abs(x)
+#+END_SRC
+
+Or:
+
+#+BEGIN_SRC text
+     abs(x - y)  < tolerance x max(abs(x), abs(y))
+
+  OR
+     abs(x - y)  < tolerance x (abs(x) + abs(y)) / 2.0
+#+END_SRC
+
+ *C++ Implementations*
+
+Equality based on absolute error:
+
+#+BEGIN_SRC cpp
+  /** Checks whether two floats X and Y are almost equal under given tolerance
+    ,* Requires headers: <cmath> and <limits>
+    ,* @tparam T - Any float point type (float, double, long double)
+    ,*/
+  template<typename T>
+  auto aeq_abs(T x, T y, T tol) -> bool
+  {
+      constexpr auto eps = std::numeric_limits<T>::epsilon();
+      // Tolerance can never be smaller than the Epsilon for this
+      tol = std::max(tol, eps);
+      // Missing: handle the case if X and/or Y are NaN
+      return std::fabs(x - y) < tol;
+  }
+#+END_SRC
+
+Equality based on relative error:
+ + Note: It can be misleading for very small numbers.
+
+#+BEGIN_SRC cpp
+  template<typename T>
+  auto aeq_rel(T x, T y, T tol) -> bool
+  {
+      constexpr auto eps = std::numeric_limits<T>::epsilon();
+      // Tolerance can never be smaller than the Epsilon for this
+      tol = std::max(tol, eps);
+      // Missing: handle the case if X and/or Y are NaN
+      return std::fabs(x - y) < tol * std::max(std::fabs(x), std::fabs(y)) ;
+  }
+#+END_SRC
+
+Equality based on relative error with tolerance given as number of
+digits:
+
+#+BEGIN_SRC cpp
+  template<typename T>
+  auto aeq_rel_digits(T x, T y, unsigned int digits = 0) -> bool
+  {
+      static T precisions [] = { 1E-1, 1E-2, 1E-3, 1E-4, 1E-5, 1E-6, 1E-7, 1E-8, 1E-9 };
+      T tol;
+      if(digits == 0)
+          tol = std::numeric_limits<T>::epsilon();
+      else
+          tol = precisions[digits - 1];
+      // Missing: handle the case if X and/or Y are NaN
+      return std::fabs(x - y) < tol * std::max(std::fabs(x), std::fabs(y)) ;
+  }
+#+END_SRC
+
+ *Testing:*
+
+#+BEGIN_SRC cpp
+  std::cout << std::boolalpha;
+
+  // 3 digits precision
+  std::cout << " ==>> [A] 1 / 3 == 0.3333 ? =: " << aeq_abs(1.0 / 3.0, 0.333, 0.001) << std::endl;
+  // 4 digits precision
+  std::cout << " ==>> [A] PI = 3.1415 ? =: " << aeq_abs(M_PI, 3.1415, 1E-4) << std::endl;
+
+  // 3 digits precision
+  std::cout << " ==>> [B] 1 / 3 == 0.3333 ? =: "
+            << aeq_rel_digits(1.0 / 3.0, 0.333333, 4) << std::endl;
+
+
+  std::cout << " ==>> [B] PI = 3.1415 ? =: "
+            << aeq_rel_digits(M_PI, 3.141, 3) << std::endl;
+
+  // Expect false
+  std::cout << " ==>> [B] PI = 3.1415 ? =: "
+            << aeq_rel_digits(M_PI, 3.141, 4) << std::endl;
+#+END_SRC
+
+Output:
+
+#+BEGIN_SRC text
+   ==>> [A] 1 / 3 == 0.3333 ? =: true
+   ==>> [A] PI = 3.1415 ? =: true
+   ==>> [B] 1 / 3 == 0.3333 ? =: true
+   ==>> [B] PI = 3.1415 ? =: true
+   ==>> [B] PI = 3.1415 ? =: false
+#+END_SRC
+
+*** Check if float is Finite, NaN or Infinity
+
+ *Check if float point* is *NaN* - Not-a-Number.
+
+ + std::isnan
+
+#+BEGIN_SRC cpp
+  >> float x = 4.5;
+  >>
+  >> std::isnan(x)
+  (bool) false
+  >>
+  >> x = 4.0 / 0.0
+  (float) inff
+  >>
+  >> std::isnan(x)
+  (bool) false
+  >>
+  >> x = std::sqrt(-1.0)
+  (float) -nanf
+  >>
+  >> std::isnan(x)
+  (bool) true
+  >>
+  >> x = 0.0 / 0.0
+  (float) nanf
+  >>
+  >> std::isnan(x)
+  (bool) true
+#+END_SRC
+
+ *Check whether float point is finite*
+
+ + std::isfinite
+
+#+BEGIN_SRC cpp
+  >> double q = 10.0
+  (double) 10.000000
+  >> std::isfinite(q)
+  (bool) true
+
+  >> q = 0.0 / 0.0
+  (double) nan
+  >> std::isfinite(q)
+  (bool) false
+
+  >> q = 1.0 / 0.0
+  (double) inf
+  >> std::isfinite(q)
+  (bool) false
+
+  >> q = -1.0 / 0.0
+  (double) -inf
+  >> std::isfinite(q)
+  (bool) false
+#+END_SRC
+** Float Point Numerical Constants
 
 Notes: Those constants are defined at the header <cmath>
 
