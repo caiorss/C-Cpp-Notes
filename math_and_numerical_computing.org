@@ -392,7 +392,7 @@ If-else statement:
    >> 
 #+END_SRC
 
-** Functions for inspecting float points
+** Functions for float points 
 *** Equality of Float Points
 
 Equality based on absolute error:
@@ -427,6 +427,7 @@ Or:
  *C++ Implementations*
 
 Equality based on absolute error:
+ + Note: It can be misleading for very small numbers.
 
 #+BEGIN_SRC cpp
   /** Checks whether two floats X and Y are almost equal under given tolerance
@@ -445,7 +446,6 @@ Equality based on absolute error:
 #+END_SRC
 
 Equality based on relative error:
- + Note: It can be misleading for very small numbers.
 
 #+BEGIN_SRC cpp
   template<typename T>
@@ -456,6 +456,20 @@ Equality based on relative error:
       tol = std::max(tol, eps);
       // Missing: handle the case if X and/or Y are NaN
       return std::fabs(x - y) < tol * std::max(std::fabs(x), std::fabs(y)) ;
+  }
+#+END_SRC
+
+Equality based on relative error in percent:
+
+#+BEGIN_SRC cpp
+  template<typename T>
+  auto aeq_rel(T x, T y, T tol_pct) -> bool
+  {
+      constexpr auto eps = std::numeric_limits<T>::epsilon();
+      // Tolerance can never be smaller than the Epsilon for this
+      tol = std::max(tol, eps);
+      // Missing: handle the case if X and/or Y are NaN
+      return std::fabs(x - y) < tol / 100.0 * std::max(std::fabs(x), std::fabs(y)) ;
   }
 #+END_SRC
 
@@ -510,7 +524,96 @@ Output:
    ==>> [B] PI = 3.1415 ? =: false
 #+END_SRC
 
+*** Classify float point numbers 
+
+Function fclassify at header <cmath> 
+
+  + int std::fclasify(float arg)
+  + int std::fclasify(double arg)
+  + int std::fclasify(long double arg)
+
+See: 
+  + [[https://en.cppreference.com/w/cpp/numeric/math/FP_categories][FP_Categories]] enumeration.
+
+Probe function: 
+
+#+BEGIN_SRC cpp 
+  #define CLASSIFY_FLOAT(expr) classify_float(#expr, (expr))
+
+  template<typename FLOAT>
+  void classify_float(const char* expr, FLOAT number)
+  {
+      int x = std::fpclassify(number);
+      if(x == FP_INFINITE)
+      {
+          std::cout << " Number x = " << expr << " is infinity" << "\n";
+          return;
+      }
+      if(x == FP_NAN)
+      {
+          std::cout << " Number x = " << expr  << " ; NAN not a number" << "\n";
+          return;
+      }
+      if(x == FP_NORMAL)
+      {
+          std::cout << " Number x = " << expr << " is normal" << std::endl;
+          return;
+      }
+      if(x == FP_SUBNORMAL)
+      {
+          std::cout << " Number x = " << expr << " is sub-normal" << std::endl;
+          return;
+      }
+      if(x == FP_ZERO)
+      {
+          std::cout << " Number x = " << expr << " is zero" << std::endl;
+          return;
+      }
+      std::cout << " [ERROR] Number x = " << expr << " cannot be classified. " << std::endl;
+  }
+#+END_SRC
+
+Testing code (main function): 
+
+#+BEGIN_SRC cpp 
+  CLASSIFY_FLOAT(3451.0523);
+  CLASSIFY_FLOAT(1e100);
+  CLASSIFY_FLOAT(1e500);
+  CLASSIFY_FLOAT(1e-100);
+  CLASSIFY_FLOAT(1e-500);
+  CLASSIFY_FLOAT(0.0);
+  CLASSIFY_FLOAT(+0.0);
+  CLASSIFY_FLOAT(-0.0);
+  CLASSIFY_FLOAT(0.0 / 0.0);
+  CLASSIFY_FLOAT(1.0 / 0.0);
+  CLASSIFY_FLOAT(-1.0 / 0.0);
+  CLASSIFY_FLOAT( std::numeric_limits<double>::min());
+  CLASSIFY_FLOAT( std::numeric_limits<double>::min() / 10.0);
+  CLASSIFY_FLOAT( std::numeric_limits<double>::min() / 1000.0);
+#+END_SRC
+
+Output:
+
+#+BEGIN_SRC text 
+   Number x = 3451.0523 is normal
+   Number x = 1e100 is normal
+   Number x = 1e500 is infinity
+   Number x = 1e-100 is normal
+   Number x = 1e-500 is zero
+   Number x = 0.0 is zero
+   Number x = +0.0 is zero
+   Number x = -0.0 is zero
+   Number x = 0.0 / 0.0 ; NAN not a number
+   Number x = 1.0 / 0.0 is infinity
+   Number x = -1.0 / 0.0 is infinity
+   Number x = std::numeric_limits<double>::min() is normal
+   Number x = std::numeric_limits<double>::min() / 10.0 is sub-normal
+   Number x = std::numeric_limits<double>::min() / 1000.0 is sub-normal
+#+END_SRC
+
 *** Check if float is Finite, NaN or Infinity
+
+Note: Functions from header: <cmath> 
 
  *Check if float point* is *NaN* - Not-a-Number.
 
@@ -541,6 +644,27 @@ Output:
   (bool) true
 #+END_SRC
 
+ *Check whether a float point is infinity* 
+
+ + std::isinf 
+
+#+BEGIN_SRC cpp 
+   >> std::isinf(1e100)
+   (bool) false
+
+   >> std::isinf(1e500)
+   (bool) true
+
+   >> std::isinf(1 / 0.0)
+   (bool) true
+
+   >> std::isinf(-1 / 0.0)
+   (bool) true
+
+   >> std::isinf(0.0 / 0.0)
+   (bool) false
+#+END_SRC
+
  *Check whether float point is finite*
 
  + std::isfinite
@@ -566,6 +690,58 @@ Output:
   >> std::isfinite(q)
   (bool) false
 #+END_SRC
+*** Maximum, minimum and absolute value 
+
+Header: <cmath> 
+
+ *Maximum* 
+
+Overloads for std::fmax. 
+
+#+BEGIN_SRC cpp 
+   float       fmax( float x, float y );               // (1)	(since C++11)
+   double      fmax( double x, double y );             // (2)	(since C++11)
+   long double fmax( long double x, long double y );   // (3)	(since C++11)
+#+END_SRC
+
+ *Minimum* 
+
+#+BEGIN_SRC cpp 
+  float       fmin( float x, float y );              // (1)	(since C++11)
+  double      fmin( double x, double y );            // (2)	(since C++11)
+  long double fmin( long double x, long double y );  // (3)	(since C++11)
+#+END_SRC
+
+ *Absolute Value* 
+
+ + See: [[https://en.cppreference.com/w/cpp/numeric/math/fabs][fabs]] (cppreference)
+
+Overloads for _fabs_ 
+
+#+BEGIN_SRC cpp 
+  float       fabs ( float arg );
+  float       fabsf( float arg );  
+  double      fabs ( double arg );
+  long double fabs ( long double arg );
+  long double fabsl( long double arg );
+#+END_SRC
+
+ *See also:*
+
+  + [[https://stackoverflow.com/questions/16584558/the-difference-between-max-and-fmax-cross-platform-compiling][c++ - The difference between max and fmax (Cross platform compiling) - Stack Overflow]]
+
+  + [[https://stackoverflow.com/questions/30913952/minimum-and-maximum-of-signed-zero/30914285?noredirect=1#comment49866669_30914285][c++ - Minimum and maximum of signed zero - Stack Overflow]]
+
+*** Rounding and truncation 
+
+  + [[https://en.cppreference.com/w/cpp/numeric/math/round][round]]
+
+  + [[https://en.cppreference.com/w/cpp/numeric/math/trunc][trunc]] 
+
+  + [[https://en.cppreference.com/w/cpp/numeric/math/floor][floor]]
+
+  + [[https://en.cppreference.com/w/cpp/numeric/math/ceil][ceil]]
+
 ** Float Point Numerical Constants
 
 Notes: Those constants are defined at the header <cmath>
