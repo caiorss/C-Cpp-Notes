@@ -141,7 +141,8 @@
     array { x = 10.230 ; y = 90.230 ; z = 100.000 }
  #+END_SRC
 
-** Algorithm std::clamp 
+** Functions and algorithms 
+*** Algorithm std::clamp 
 
 Clamps the the input value to range [LOW, HIGH]: 
 
@@ -195,7 +196,87 @@ Testing code:
   }
 #+END_SRC
 
-** std::invoke 
+*** Function std::apply - apply function to tuple 
+
+Apply a function to a tuple: 
+
+ + Header:  [[https://en.cppreference.com/w/cpp/utility][<utility>]]
+ + Documentation: [[https://en.cppreference.com/w/cpp/utility/apply][<apply>]] 
+
+Example: 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <tuple>       // Import: std::tuple
+  #include <utility>     // Import: std::appply
+
+  using Coord2d = std::tuple<std::string, float, float>;
+
+  void print_coord2d(std::string const& name, float x, float y)
+  {
+      std::printf(" Coord2D{ name = %s ; x = %.3f; y = %.3f } \n", name.c_str(), x, y);
+  }
+
+  // Higher order function => Returns a lambda that applies a function of
+  // (string, float, float) into a tuple argument.
+  template<typename Function>
+  auto make_function(Function func)
+  {
+      return [=](Coord2d const& coord){
+          std::apply(func, coord);
+      };
+  }
+
+  int main (void)
+  {
+      auto p1 = std::make_tuple("p1", -20.415f, 9.01f);
+      Coord2d p2 { "p2", 10.251, 89.245};
+      Coord2d p3 = { "p3", 10.251, 89.245};
+      // Calls move constructor
+      auto p4 = Coord2d { "p4", 20.671, 90.156};
+
+      std::apply(print_coord2d, p1);
+      std::apply(print_coord2d, p2);
+      std::apply(print_coord2d, p3);
+      std::apply(print_coord2d, p4);
+
+      std::cout << "\n";
+
+      std::apply([](std::string const& name, float x, float y)
+                 {
+          std::cout << " Plot point { "
+                    <<  name << " ; "
+                    << x << y << " } " << "\n";
+                 },
+                 p1);
+
+      std::cout << "\n ==== Test transformed functions ===== " << std::endl;
+
+      auto tuple_printer = make_function(print_coord2d);
+
+      tuple_printer(p1);
+      tuple_printer(p2);
+
+      return 0;
+  }
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC text 
+   Coord2D{ name = p1 ; x = -20.415; y = 9.010 } 
+   Coord2D{ name = p2 ; x = 10.251; y = 89.245 } 
+   Coord2D{ name = p3 ; x = 10.251; y = 89.245 } 
+   Coord2D{ name = p4 ; x = 20.671; y = 90.156 } 
+
+   Plot point { p1 ; -20.4159.01 } 
+
+   ==== Test transformed functions ===== 
+   Coord2D{ name = p1 ; x = -20.415; y = 9.010 } 
+   Coord2D{ name = p2 ; x = 10.251; y = 89.245 } 
+#+END_SRC
+
+*** Function std::invoke - invoke anything callable 
    :PROPERTIES:
    :ID:       5754cb0e-f4d3-434c-85e0-5ea55655a22f
    :END:
