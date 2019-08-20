@@ -4086,6 +4086,180 @@ Summary:
  + 1 Gb (Giga byte)  = 1024 Megabytes
  + 1 TB (Tera Byte)  = 1024 Giga bytes
  + 1 PT (Penta Byte) = 1024 Tera bytes 
+*** Bit Manipulation for Low Level and Embedded Systems 
+
+The following bit manipulation idioms are widely used in legacy C
+code, embedded systems code, device driver code or for manipulating
+arbitrary bits of some variable: 
+
+ *Memory Mapped IO* 
+
+The following code simulates a MMIO memory mapped IO in a embedded
+system (a microcontroller), more specifically a 8-bits GPRIO - General
+Purpose IO a digital IO located at the fixed address 0xFF385A (defined
+in the device's datasheet or memory map). Setting the first bit
+(bit 0) of this IO device, makes the LED attached to the first pin be
+turned ON, clearing this bit makes the led to be turned off. 
+
+  + _volatile_ keyword => Tells the compiler to disable optimization for
+    this variable and indicates that it can be changed any time.
+
+  + _reinterpret_cast_ => Indicates that it is a memory reinterpretation
+    cast, indicates that the memory at address 0xFF385A is being
+    reintreted as an 8-bit unsigned integer.
+
+  + _constexpr_ => Compile-time constant, has no storage space. Costs
+    any program memory (ROM, flash) space. The value GPRIO_ADDRESS is
+    replaced where it is used.
+
+  + The hypothetical program (firmware) runs without any operating
+    system, therefore, it has access to all physical memory. 
+
+#+BEGIN_SRC cpp 
+   #include <cstdint> 
+   
+   // address taken from device's datasheet supplied by manufacturer. 
+   constexpr uintptr_t GPRIOA_ADDRESS = 0xFF385A;
+    
+   // Access memory mapped IO register at 0xFF385A using pointer. 
+   volatile const std::uint8_t>* pGPRIOA = reinterpret_cast<std::uint8_t*>(GPRIOA_ADDRESS);    
+
+   // Access memory mapped IO register at 0xFF385A using reference. 
+   volatile std::uint8_t& GPRIOA = *reinterpret_cast<std::uint8_t*>(GPRIOA_ADDRESS);    
+ #+END_SRC
+
+ *Bitwise Operators Reminder* 
+
+#+BEGIN_SRC cpp 
+   (|) => X_or_Y   = a | b; => bitwise OR 
+   (&) => X_and_Y = a & b;  => bitwise AND 
+   (^) => X_xor_Y = X ^ Y;  => bitwise XOR 
+   (~) => not_x = ~X;       => bitwise NOT => Invert all bits 
+
+   Left shift => bitshift Operator: 
+   X << Y = X * 2^Y    => Shift Y bits to the left.
+
+   Right shift => bitshift Operator:
+   X >> Y = X / 2^Y    => Shift Y bits to the right.
+ #+END_SRC
+
+ *Read/Get the N-th bit*
+
+#+BEGIN_SRC cpp 
+   bit_value = (GPRIOA >> N) & 0x01;
+
+   // Check if bit 4 is set 
+   if((GPRIOA >> 4) & 0x01)
+   { 
+     ... 
+   }
+
+   // Check if 0-th bit is set 
+   if((GPRIOA >> 0) & 0x01 == 1)
+   { 
+      ... 
+   }
+
+     // Check if 6-th bit is set 
+   if((GPRIOA >> 6) & 0x01 == 1)
+   { 
+      ... 
+   }
+#+END_SRC
+
+ *Setting the Nth-bit* 
+
+Set the N-th bit (turn bit into 1) of a general variable: 
+
+#+BEGIN_SRC cpp 
+   // Verbose way 
+   <VARIABLE> = <VARIABLE> | (1 << N); 
+   // Short way 
+   <VARIABLE> |= (1 << N); 
+#+END_SRC
+
+Set the 4-th bit -  (turn on the 4th LED in this case)
+
+#+BEGIN_SRC cpp 
+   // Verbose way 
+   GPRIOA = GPRIOA | (1 << 4); 
+   // Short way 
+   GPRIOA |= 1 << 4; 
+#+END_SRC
+
+ *Clear the Nth-bit* 
+
+Clear the N-th (turn the bit into zero) bit of general variable:
+
+#+BEGIN_SRC cpp 
+   // Verbose way 
+   <VARIABLE> = <VARIABLE> & ~(1 << N); 
+   // Short way 
+   <VARIABLE> &= ~(1 << N); 
+#+END_SRC
+
+Clear the 5-th bit (turn on the 4th LED in this case)
+
+#+BEGIN_SRC cpp 
+   // Verbose way 
+   GPRIOA = GPRIOA & ~(1 << 5); 
+   // Short way 
+   GPRIOA &= ~(1 << 5); 
+#+END_SRC
+
+Analysis: 
+
+#+BEGIN_SRC text 
+           Bitshift operation 
+           1 << 5 = 2^5 = 32 = 0x20 = 0b00010000
+
+                        B7  B6  B5  B4  B3  B2  B1  B0   BITS 
+                        --------------------------------  
+             1 << 5  =>  0   0   1   0   0   0   0   0    => Equivalent value to 1 << 5 
+           ~(1 << 5) =>  1   1   0   1   1   1   1   1    => Invert all bits of (1 << 5)
+            GPRIOA   =>  b7  b6  b5  b4  b3  b2  b1  b0   => Bits of GPRIOA 
+                     -----------------------------------
+  GPRIOA & ~(1 << 5) =>  b7  b6  0   b4  b4  b3  b1  b0   => Result of AND (&) bitwise operation 
+#+END_SRC
+
+ *Invert all bits* 
+
+#+BEGIN_SRC cpp 
+   VARIABLE = ~VARIABLE; 
+#+END_SRC 
+
+Invert all bits of GPIOA: 
+
+#+BEGIN_SRC spp 
+  GPIOA = ~GPIOA;
+#+END_SRC
+
+ *Toggle the Nth-bit* 
+
+Toggle operation: if the bit is 1, turn it into 0, if it is 0, turn it
+into 1. 
+
+#+BEGIN_SRC cpp 
+   // Verbose way 
+   <VARIABLE> = <VARIABLE> ^ (1 << N); 
+   // Short way 
+   <VARIABLE> ^= (1 << N); 
+#+END_SRC
+
+Toggle the bit 6 of GPIOA register: 
+
+#+BEGIN_SRC cpp  
+   // Verbose 
+   GPIOA = GPIOA ^ (1 << 6); 
+   // Short 
+   GPIOA ^= (1 << 6); 
+#+END_SRC
+
+
+
+
+
+
 *** Numerical Ranges for Unsigned Integers of N bits
 
 #+CAPTION: Range of unsigned integers of N bits for the most common number of bits.
