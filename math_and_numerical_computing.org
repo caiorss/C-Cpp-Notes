@@ -42,7 +42,53 @@ Headers:
  + [[http://www.cplusplus.com/reference/numeric/][<numeric>]] - Numerical "algorithms" or numerical functions for
    processing containers. std::accumulate, std::iner_product,
    std::partial_sum and std::iota.
-** Float Points 
+** Floating Point 
+*** Floating Point Overview 
+
+ *Computer Representation of Real Numbers* 
+
+Main Representations: 
+
+ _Fixed Point_ 
+
+Most used in some financial calculations for handling monetary values
+or in embedded devices such as microcontrollers and some DPS - Digital
+Signal Processors or in legacy systems without a FPU Floating Point
+Unit where the cost of software emulation of float points is not
+acceptable.
+
+Types of Fixed Point: 
+
+  + Binary Fixed Points
+
+  + Decimal Fixed Points
+
+  + Arbitrary Precision Fixed Points
+
+  + Arbitrary Precision Decimal Fixed Point (aka Big-Decimal)
+    + Better for handling monetary values such as prices. 
+
+Note: 
+ + A systems without a FPU can emulate using software or it can use an
+   external FPU chip. 
+
+ _Float Points_  
+
+Most used in mainstream processors or systems with systems with FPU -
+(Float Point Unit). Nowadays most of float point implementations are
+conformant to the IEEE754 standard. 
+
+  + Binary Float Points (IEEE754)
+    + binary32 - (C++ float) - single precision 
+    + binary64 - (C++ double) - double precision 
+    + binary128 - (C++ long double) - quadruple precision
+
+  + Decimal Float Point (IEEE754)
+    + decimal32
+    + decimal64
+    + decimal128
+
+    + Arbitrary Precision Float Points (Non IEEE754)
 
  *Technical Standards for Float Points*
 
@@ -53,20 +99,81 @@ Headers:
   + IEEE 754:2008 - Standard for Floating-Point Arithmetic
     + ISO standard ISO/IEC/IEEE 60559:2011
 
- *Float Point Types*
+ *Problems of Float Points* 
 
-|-------------+-----------+------+---+----+-----+-------+----------------------------------------|
-| C++ Type    | Name      | Bits | S |  E |   M |     B | Description                            |
-|-------------+-----------+------+---+----+-----+-------+----------------------------------------|
-| float       | Binary32  |   32 | 1 |  8 |  23 |   127 | IEE754 single precision float point    |
-| double      | Binary64  |   64 | 1 | 11 |  52 |  1023 | IEE754 double precision float point    |
-| long double | Binary128 |  128 | 1 | 15 | 112 | 32767 | IEE754 quadruple precision float point |
-|-------------+-----------+------+---+----+-----+-------+----------------------------------------|
+  + Float Points - FP *are not real numbers*, they are an approximation
+    or a computer representation for real numbers.
 
- + S => Sign bits => 0 for positive numbers and 1 for negative numbers.
- + E => Exponent bits
- + M => Mantiassa Bits (aka Fraction or _significand_)
- + B => Exponent Bias
+  + Float Points can only represent a finite and limited amount of
+    real numbers.
+
+  + Not all real numbers can be exactly represented due to the
+    quantiazation or discretization error.
+
+  + Operations are not commutative
+
+  + Loss of precision
+
+  + _Cancellation_ aka catastrophic cancellation which is the total
+    loss of precision when subtracting two large and very close real
+    numbers. 
+
+ *Category of Float Points Values* 
+
+Any float point values can fall in one of the following categories: 
+
+  1. Signed Zeror (+0 or -0)
+
+  2. Normal numbers 
+
+  3. Subnormals
+
+  4. Inifnities (positive and negative infinity)
+
+  5. NaN - Not a number.
+
+
+ *Float Point Types in C++ X IEEE754*
+
+|-----------+-------------+------+---+----+-----+-------+-------------------------------------------|
+| Name      | C++ Type    | Bits | S |  E |   M |     B | Description                               |
+|-----------+-------------+------+---+----+-----+-------+-------------------------------------------|
+| binary16  | -           |   16 | 1 |  5 |  10 |    15 | IEE754 half precision floating point      |
+| binary32  | float       |   32 | 1 |  8 |  23 |   127 | IEE754 single precision floating point    |
+| binary64  | double      |   64 | 1 | 11 |  52 |  1023 | IEE754 double precision floating point    |
+| binary128 | long double |  128 | 1 | 15 | 112 | 16383 | IEE754 quadruple precision floating point |
+| -         | long double |   80 | 1 | 15 |  64 | 16383 | 80 bit extended precision.                |
+|-----------+-------------+------+---+----+-----+-------+-------------------------------------------|
+
+Symbols: 
+
+   + S => Sign bits => 0 for positive numbers and 1 for negative numbers.
+   + E => Exponent bits
+   + B => Exponent Bias
+   + M => Mantiassa Bits (aka Fraction or _significand_)
+
+Note: 
+  + In some platforms, the type _long double_ can be an 80-bits extended
+    precision, not binary128. However, most computers and CPUs support
+    binary128. 
+
+Exponent range: 
+
+|-----------+---------------------+-------------+-------+-------+--------+-------|
+| Name      |                     | C++ Type    | ERmin | ERmax |   Emin |  Emax |
+|-----------+---------------------+-------------+-------+-------+--------+-------|
+| binar16   | half precision      | -           |       |       |        |       |
+| binary32  | single precision    | float       |     1 |   254 |   -126 |   127 |
+| binary64  | double precision    | double      |     1 |  2026 |  -1022 |  1023 |
+| binary128 | quadruple precision | long double |     1 | 32766 | -16382 | 16383 |
+|           |                     |             |       |       |        |       |
+|-----------+---------------------+-------------+-------+-------+--------+-------|
+
+Symbols: 
+
+   + ERmin => Minimum value of raw expoent (without bias).
+   + ERMax => Maximum value of raw exponent (without bias)
+   + Emax = ERmax - bias => Maximum value of exponent. 
 
  *Storage Layout*
 
@@ -85,12 +192,16 @@ Headers:
  *Binary Format for 32 bits float points binary32, aka float*  
 
 #+BEGIN_SRC text 
-     [S]ign  [E]xponent  [M]antissa (aka significand)
-     1 bit   8 bits            23 bits 
-     +----+------------+------------------------+
-     | S  | EEEE EEEEE | MMM MMMMMMMM MMMMMMMM  |
-     +----+------------+------------------------+
-       31  30        23 | 22                   0  --- Bit position 
+     [S]ign  [E]xponent               [M]antissa (aka significand)
+     1 bit   8 bits                   23 bits 
+     +----+-------------------------+-------------------------------+
+     | S  | E7 E6 E5 E4 E3 E2 E1 E0 | MMM.MMMM MMMM.MMMM MMMM.MMMM  |
+     +----+-------------------------+-------------------------------+
+       31 | 30                   23 | 22                           0  --- Bit position 
+
+   Mantissa: M22 M21 M20 M19 M18 M17 M16 .... M2 M1 M0
+            --------                          ---------
+              byte 4                            byte 0
 #+END_SRC
 
 
@@ -99,8 +210,11 @@ Headers:
  + General Format:
 
 #+BEGIN_SRC text
-                 Sign    E
-   Value :=  (-1)     X R  X Mantissa
+                 Sign         Exponent - Bias 
+   Value :=  (-1)     *  Radix        *        Mantissa
+
+                 S      E - B 
+   Value :=  (-1)  *  R    *  M
 #+END_SRC
 
  + Single Precision (float)
@@ -109,13 +223,21 @@ Headers:
      + E - Exponent bits
      + M - Mantissa bits
      + Radix (base) 2
-     + Bias: 127 
+     + Bias: 127
+     + b[i] i-th bit, b22 => bit 22.
 
 #+BEGIN_SRC text 
                  S      (E - 127)
-   Value :=  (-1)   X  2         X (1.M)
+   Value :=  (-1)   *  2         * (1.M)
             -----    ------        ------
             Sign     Exponent     Mantissa 
+           Factor     Factor       Factor 
+
+
+                b31    b30,b29,..,b23 - 127           
+  Value :=  (-1)   *  2            *     (1.b22,b21,b20,...b0)
+
+  matissa = 1.0 + b22 / 2^1 + b21 / 2^2 + b20 / 2^3 + ... b0 / 2^22 
 #+END_SRC
 
  + Double Precision (double)
@@ -392,8 +514,71 @@ If-else statement:
    >> 
 #+END_SRC
 
-** Functions for float points 
-*** Equality of Float Points
+*** Floating Point Numerical Constants
+
+Notes: Those constants are defined at the header <cmath>
+
+ *Numerical Constants in Header CMath* 
+
+ + [[https://en.cppreference.com/w/cpp/header/cmath][<cmath>]]
+
+#+CAPTION: C++ Numerical constants in header <cmath> 
+|------------------------+-----------+----------------------------------------------|
+| Constant               |     Value | Description                                  |
+|------------------------+-----------+----------------------------------------------|
+| *General Math Constants* |           |                                              |
+| ~M_E~                    | 2.7182818 | Euler's number or exp(1)                     |
+| ~M_LN2~                  | 0.6931472 | Natural logarithm of 2 or log(2)             |
+| ~M_LN10~                 | 2.3025851 | Natural logarithm of 10 or log(10)           |
+|                        |           |                                              |
+| ~M_LOG10E~               | 0.4342945 | Log of E (Euler's number) at base 10         |
+| ~M_LOG2E~                | 1.4426950 | Log of E (Euler's number) at base 2          |
+|                        |           |                                              |
+| ~M_SQRT2~                | 1.4142136 | Square root of 2 or sqrt(2)                  |
+| ~M_SQRT1_2~              | 0.7071068 | Square root of 1/2 or sqrt(1/2) or 1/sqrt(2) |
+|                        |           |                                              |
+| ~M_PI~                   | 3.1415927 | PI number                                    |
+| ~M_PI_2~                 | 1.5707963 | PI/2                                         |
+| ~M_PI_4~                 | 0.7853982 | PI/3                                         |
+| ~M_1_PI~                 | 0.3183099 | 1/PI                                         |
+| ~M_2_PI~                 | 0.6366197 | 2/PI                                         |
+| ~M_2_SQRTPI~             | 1.1283792 | 2/sqrt(PI)                                   |
+|                        |           |                                              |
+|                        |           |                                              |
+|------------------------+-----------+----------------------------------------------|
+
+
+ *Example in CERN's Root REPL - Math Constants*
+
+#+BEGIN_SRC cpp 
+  #include <cmath>
+ 
+  >> M_PI
+  (double) 3.1415927
+
+  >> sin(M_PI)
+  (double) 1.2246468e-16
+
+  >> cos(M_PI)
+  (double) -1.0000000
+
+  >> cos(M_PI_2)
+  (double) 6.1232340e-17
+
+  >> sin(M_PI_2)
+  (double) 1.0000000
+  >> 
+#+END_SRC
+
+See: 
+
+ + P0631R2 Math Constants - Document P0631R2 - *Math Constants* -
+   <http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0631r2.pdf>
+ + [[https://en.cppreference.com/w/cpp/numeric/math/INFINITY][INFINITY - cppreference.com]]
+ + [[https://en.cppreference.com/w/cpp/numeric/math/NAN][NAN -   cppreference.com]]
+
+*** Functions for floating points 
+**** Equality of Float Points
 
 Equality based on absolute error:
   + Two float points are almost equal under a given tolerance when the
@@ -524,7 +709,7 @@ Output:
    ==>> [B] PI = 3.1415 ? =: false
 #+END_SRC
 
-*** Classify float point numbers 
+**** Classify float point numbers 
 
 Function fclassify at header <cmath> 
 
@@ -611,7 +796,7 @@ Output:
    Number x = std::numeric_limits<double>::min() / 1000.0 is sub-normal
 #+END_SRC
 
-*** Check if float is Finite, NaN or Infinity
+**** Check if float is Finite, NaN or Infinity
 
 Note: Functions from header: <cmath> 
 
@@ -690,7 +875,7 @@ Note: Functions from header: <cmath>
   >> std::isfinite(q)
   (bool) false
 #+END_SRC
-*** Maximum, minimum and absolute value 
+**** Maximum, minimum and absolute value 
 
 Header: <cmath> 
 
@@ -732,7 +917,7 @@ Overloads for _fabs_
 
   + [[https://stackoverflow.com/questions/30913952/minimum-and-maximum-of-signed-zero/30914285?noredirect=1#comment49866669_30914285][c++ - Minimum and maximum of signed zero - Stack Overflow]]
 
-*** Rounding and truncation 
+**** Rounding and truncation 
 
   + [[https://en.cppreference.com/w/cpp/numeric/math/round][round]]
 
@@ -742,82 +927,56 @@ Overloads for _fabs_
 
   + [[https://en.cppreference.com/w/cpp/numeric/math/ceil][ceil]]
 
-** Float Point Numerical Constants
+*** Floating Point Literature and Further Reading 
 
-Notes: Those constants are defined at the header <cmath>
+Fundamental: 
 
- *Numerical Constants in Header CMath* 
-
- + [[https://en.cppreference.com/w/cpp/header/cmath][<cmath>]]
-
-#+CAPTION: C++ Numerical constants in header <cmath> 
-|------------------------+-----------+----------------------------------------------|
-| Constant               |     Value | Description                                  |
-|------------------------+-----------+----------------------------------------------|
-| *General Math Constants* |           |                                              |
-| ~M_E~                    | 2.7182818 | Euler's number or exp(1)                     |
-| ~M_LN2~                  | 0.6931472 | Natural logarithm of 2 or log(2)             |
-| ~M_LN10~                 | 2.3025851 | Natural logarithm of 10 or log(10)           |
-|                        |           |                                              |
-| ~M_LOG10E~               | 0.4342945 | Log of E (Euler's number) at base 10         |
-| ~M_LOG2E~                | 1.4426950 | Log of E (Euler's number) at base 2          |
-|                        |           |                                              |
-| ~M_SQRT2~                | 1.4142136 | Square root of 2 or sqrt(2)                  |
-| ~M_SQRT1_2~              | 0.7071068 | Square root of 1/2 or sqrt(1/2) or 1/sqrt(2) |
-|                        |           |                                              |
-| ~M_PI~                   | 3.1415927 | PI number                                    |
-| ~M_PI_2~                 | 1.5707963 | PI/2                                         |
-| ~M_PI_4~                 | 0.7853982 | PI/3                                         |
-| ~M_1_PI~                 | 0.3183099 | 1/PI                                         |
-| ~M_2_PI~                 | 0.6366197 | 2/PI                                         |
-| ~M_2_SQRTPI~             | 1.1283792 | 2/sqrt(PI)                                   |
-|                        |           |                                              |
-|                        |           |                                              |
-|------------------------+-----------+----------------------------------------------|
-
-
- *Example in CERN's Root REPL - Math Constants*
-
-#+BEGIN_SRC cpp 
-  #include <cmath>
- 
-  >> M_PI
-  (double) 3.1415927
-
-  >> sin(M_PI)
-  (double) 1.2246468e-16
-
-  >> cos(M_PI)
-  (double) -1.0000000
-
-  >> cos(M_PI_2)
-  (double) 6.1232340e-17
-
-  >> sin(M_PI_2)
-  (double) 1.0000000
-  >> 
-#+END_SRC
-
-See: 
-
- + P0631R2 Math Constants - Document P0631R2 - *Math Constants* -
-   <http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0631r2.pdf>
- + [[https://en.cppreference.com/w/cpp/numeric/math/INFINITY][INFINITY - cppreference.com]]
- + [[https://en.cppreference.com/w/cpp/numeric/math/NAN][NAN -   cppreference.com]]
-
-** Float Point Literature and Further Reading 
-
-  * *What Every Computer Scientist Should Know About Floating-Point Arithmetic*
-    + <https://docs.oracle.com/cd/E19957-01/806-3568/ncg_goldberg.html> 
+  * *FAQ What Every Computer Scientist Should Know About Floating-Point Arithmetic*
+    + <https://docs.oracle.com/cd/E19957-01/806-3568/ncg_goldberg.html>
 
   * *The Perils of Float Point* 
     + <http://www.lahey.com/float.htm>
 
+  * *A Tutorial on Data Representation Integers, Floating-point Numbers, and Characters*
+    + <https://www3.ntu.edu.sg/home/ehchua/programming/java/datarepresentation.html>
+
   * *An Introduction to Float-Point Arithmetic and Computation* - CERN, Jeff Arnold
     + <https://indico.cern.ch/event/626147/attachments/1456066/2247140/FloatingPoint.Handout.pdf>
 
-  * *A Tutorial on Data Representation Integers, Floating-point Numbers, and Characters*
-    + <https://www3.ntu.edu.sg/home/ehchua/programming/java/datarepresentation.html>
+Float Point Comparison: 
+
+  * *Comparing Float Point Numbers, 2021 Edition*
+    * <https://randomascii.wordpress.com/2012/02/25/comparing-floating-point-numbers-2012-edition/> 
+
+  * *Comparing Floting Point Numbers* - Bruce Dawson
+    + http://staff.polito.it/claudio.fornaro/CorsoINF/Other%20interesting%20lectures/Comparing%20Floating%20Point%20Numbers.pdf
+
+  * *Comparing Floating-Point Numbers Is Tricky*
+    * <https://bitbashing.io/comparing-floats.html>
+
+  * *Boost - Float Point Comparison* - Boost C++ Libraries
+    * <https://www.boost.org/doc/libs/1_71_0/libs/math/doc/html/math_toolkit/float_comparison.html> 
+
+  * *Float Point Comparison in Rust*
+    * <https://docs.rs/float-cmp/0.5.2/float_cmp/>
+
+Platform Specific Behavior: 
+
+  * *Cross-Platform Issues with Floating-Point Arithmetic in C++*
+    + <https://www.appinf.com/download/FPIssues.pdf>
+
+  + [[https://mcuoneclipse.com/2019/03/29/be-aware-floating-point-operations-on-arm-cortex-m4f/][Be aware: Floating Point Operations on ARM Cortex-M4F | MCU on Eclipse]]
+
+Miscellaneous: 
+
+  * *Real Close to the Machine: Floating Point in D*
+    + <https://dlang.org/articles/d-floating-point.html>
+
+  * *Making floating point math highly efficient for AI hardware* - Facebook 
+    * <https://ai.facebook.com/blog/making-floating-point-math-highly-efficient-for-ai-hardware/>
+
+  * *Subnormal Floating-Point Degradation in Parallel Applications*
+    + <http://charm.cs.uiuc.edu/subnormal/> 
 
   * *Float Point Numbers & Currency Rouding Errors*
     + <https://spin.atomicobject.com/2014/08/14/currency-rounding-errors/>
@@ -834,14 +993,48 @@ See:
   * *Number Representation and Errors* - Jun Zhang
     * <https://www.cs.uky.edu/~jzhang/CS321/lecture1.pdf> 
 
-  * *Comparing Floating-Point Numbers Is Tricky*
-    * <https://bitbashing.io/comparing-floats.html>
-
   * *Why Fixed Point Won't Cure Your Float Point Blues* - Richard Harris
     * <https://accu.org/index.php/journals/1717>
 
   * *Fixed-Point Math in C*
     * <https://www.embedded.com/discussion/other/4024639/Fixed-point-math-in-C> 
+
+*** Floating Point Libraries 
+
+   + *Boost Multiprecision*
+     + site: https://www.boost.org/doc/libs/1_71_0/libs/multiprecision/doc/html/boost_multiprecision/intro.html
+     + "The Multiprecision Library provides integer, rational,
+       floating-point, and complex types in C++ that have more range
+       and precision than C++'s ordinary built-in types. The big
+       number types in Multiprecision can be used with a wide
+       selection of basic mathematical operations, elementary
+       transcendental functions as well as the functions in
+       Boost.Math. The Multiprecision types can also interoperate with
+       the built-in types in C++ using clearly defined conversion
+       rules. This allows Boost.Multiprecision to be used for all
+       kinds of mathematical calculations involving integer, rational
+       and floating-point types requiring extended range and
+       precision. Multiprecision consists of a generic interface to
+       the mathematics of large numbers as well as a selection of big
+       number back ends, with support for integer, rational,
+       floating-point, and complex types. Boost.Multiprecision
+       provides a selection of back ends provided off-the-rack in
+       including interfaces to GMP, MPFR, MPIR, MPC, TomMath as well
+       as its own collection of Boost-licensed, header-only back ends
+       for integers, rationals and floats. In addition, user-defined
+       back ends can be created and used with the interface of
+       Multiprecision, provided the class implementation adheres to
+       the necessary concepts." 
+
+   + *half* - IEEE 754-based half-precision floating-point library
+     + site: http://half.sourceforge.net/index.html
+     + "This is a C++ header-only library to provide an IEEE 754
+       conformant 16-bit half-precision floating-point type along with
+       corresponding arithmetic operators, type conversions and common
+       mathematical functions. It aims for both efficiency and ease of
+       use, trying to accurately mimic the behaviour of the built-in
+       floating-point types at the best performance possible. It is
+       hosted on SourceForge.net."
 
 ** C++11 Random Number Library 
 *** Overview 
