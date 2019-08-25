@@ -201,7 +201,7 @@ Any float point values can fall in one of the following categories:
 |-----------+-------------+------+---+----+-----+-------+-------------------------------------------|
 | Name      | C++ Type    | Bits | S |  E |   M |     B | Description                               |
 |-----------+-------------+------+---+----+-----+-------+-------------------------------------------|
-| binary16  | -           |   16 | 1 |  5 |  10 |    15 | IEE754 half precision floating point      |
+| binary16  | N/A         |   16 | 1 |  5 |  10 |    15 | IEE754 half precision floating point      |
 | binary32  | float       |   32 | 1 |  8 |  23 |   127 | IEE754 single precision floating point    |
 | binary64  | double      |   64 | 1 | 11 |  52 |  1023 | IEE754 double precision floating point    |
 | binary128 | long double |  128 | 1 | 15 | 112 | 16383 | IEE754 quadruple precision floating point |
@@ -215,10 +215,16 @@ Symbols:
    + B => Exponent Bias
    + M => Mantiassa Bits (aka Fraction or _significand_)
 
-Note: 
-  + In some platforms, the type _long double_ can be an 80-bits extended
+Notes: 
+
+  + _long double_ =>  In some platforms, the type _long double_ can be an 80-bits extended
     precision, not binary128. However, most computers and CPUs support
-    binary128. 
+    binary128.
+  
+  + _binary16_ (half precision floating point) => There is no C++
+    fundamental type with binary16 float point format. It mostly used
+    in computer graphics and GPUs. The format was intruduced in NVidia
+    GPUs and defined by the IEEE754-2008.
 
 Exponent range: 
 
@@ -582,7 +588,7 @@ If-else statement:
 Equality based on absolute error:
 
   + Two float points are almost equal under a given tolerance when the
-    relative error is smaller than the tolerance.
+    relative error is smaller than some tolerance.
 
 #+BEGIN_SRC text
   abs(x - y)  < tolerance
@@ -597,7 +603,7 @@ Equality based on relative error (Better):
 
    Or:
 
-      abs(x - y)  < tolerance x abs(x)
+      abs(x - y)  < tolerance * abs(x)
 #+END_SRC
 
 Or:
@@ -616,7 +622,7 @@ Equality based on relative error and asbsolute error:
 
 #+BEGIN_SRC text 
   def almostEqual(a, b, relTol, absTol):
-      return abs(x - y) < relTol * max(abs(x), abs(y)) + absTol
+      return abs(x - y) < max(relTol * max(abs(x), abs(y)), absTol)
 #+END_SRC
 
  *C++ Implementations*
@@ -654,69 +660,66 @@ Equality based on relative error:
   }
 #+END_SRC
 
-Equality based on relative error in percent:
+Equality based on absolute and relative tolerance:  
+  + Based on: [[https://www.python.org/dev/peps/pep-0485/][Python PEP-485]] 
 
-#+BEGIN_SRC cpp
+#+BEGIN_SRC cpp 
+  /** Checks wether two floating points are almost equal or close enough. 
+   ,*  @tparam T        Any floating point type (float, double, long double)
+   ,*  @param input     Input floating point value 
+   ,*  @param expected  Expectd floating point value 
+   ,*  @param relTol    Relative tolerance 
+   ,*  @param absTol    Absolute tolerance 
+   ,*  @return bool     Returns true if input and expected are close enough.
+   ,*  Note: Requires headers: <cmath> and <limits>
+   ,*/
   template<typename T>
-  auto aeq_rel(T x, T y, T tol_pct) -> bool
+  bool almost_equal(T input, T expected
+                    , T relTol, T absTol = 8 * std::numeric_limits<T>::eps())
   {
-      constexpr auto eps = std::numeric_limits<T>::epsilon();
-      // Tolerance can never be smaller than the Epsilon for this
-      tol = std::max(tol, eps);
-      // Missing: handle the case if X and/or Y are NaN
-      return std::fabs(x - y) < tol / 100.0 * std::max(std::fabs(x), std::fabs(y)) ;
+      using std::fmax;
+      using std::max;
+      return fmax(expected - input) < max(relTol * max(input, expected), absTol);
   }
 #+END_SRC
 
-Equality based on relative error with tolerance given as number of
-digits:
+Equality based on absolute and tolerance given as number of precision
+digits. 1 precision digit is 0.1 tolerance, 5 precision digits is a
+tolerance of 1E-5 or 0.00001.
 
-#+BEGIN_SRC cpp
+#+BEGIN_SRC cpp 
+  /** Check whether two floating points are almost equal or close enough.
+   ,*
+   ,* @tparam T    Any floating point type (float, double, ...)
+   ,* @param  x    Input floating point value
+   ,* @param  y    Expected floating point value
+   ,* @param  drel Precision digits of the relative tolerance.
+   ,* @param  dabs Precision digits of the absolute tolerance.
+   ,* @return bool Returns true if x and y are close enough.
+   ,*
+   ,* Requires headers: <cmath> and <limits>
+   ,*/
   template<typename T>
-  auto aeq_rel_digits(T x, T y, unsigned int digits = 0) -> bool
+  auto almost_equal_digits(T x, T y, int drel = 8, int dabs = 0) -> bool
   {
-      static T precisions [] = { 1E-1, 1E-2, 1E-3, 1E-4, 1E-5, 1E-6, 1E-7, 1E-8, 1E-9 };
-      T tol;
-      if(digits == 0)
-          tol = std::numeric_limits<T>::epsilon();
-      else
-          tol = precisions[digits - 1];
-      // Missing: handle the case if X and/or Y are NaN
-      return std::fabs(x - y) < tol * std::max(std::fabs(x), std::fabs(y)) ;
+      using std::fabs;
+      using std::max;
+      static const T precisions [] = {
+          1E-1, 1E-2, 1E-3, 1E-4, 1E-5, 1E-6, 1E-7, 1E-8
+          , 1E-9, 1E-10, 1E-11, 1E-12, 1E-13, 1E-15, 1E-16 };
+
+      constexpr size_t n = std::size(precisions);
+
+      T tol_rel = drel > 0 && drel < n
+                      ? precisions[drel - 1]
+                      : std::numeric_limits<T>::epsilon();
+
+      T tol_abs = dabs > 0 && dabs < n
+                      ? precisions[dabs - 1]
+                      : 8 & std::numeric_limits<T>::epsilon();
+
+      return fabs(x - y) < max(tol_rel * max(fabs(x), fabs(y)), tol_abs);
   }
-#+END_SRC
-
- *Testing:*
-
-#+BEGIN_SRC cpp
-  std::cout << std::boolalpha;
-
-  // 3 digits precision
-  std::cout << " ==>> [A] 1 / 3 == 0.3333 ? =: " << aeq_abs(1.0 / 3.0, 0.333, 0.001) << std::endl;
-  // 4 digits precision
-  std::cout << " ==>> [A] PI = 3.1415 ? =: " << aeq_abs(M_PI, 3.1415, 1E-4) << std::endl;
-
-  // 3 digits precision
-  std::cout << " ==>> [B] 1 / 3 == 0.3333 ? =: "
-            << aeq_rel_digits(1.0 / 3.0, 0.333333, 4) << std::endl;
-
-
-  std::cout << " ==>> [B] PI = 3.1415 ? =: "
-            << aeq_rel_digits(M_PI, 3.141, 3) << std::endl;
-
-  // Expect false
-  std::cout << " ==>> [B] PI = 3.1415 ? =: "
-            << aeq_rel_digits(M_PI, 3.141, 4) << std::endl;
-#+END_SRC
-
-Output:
-
-#+BEGIN_SRC text
-   ==>> [A] 1 / 3 == 0.3333 ? =: true
-   ==>> [A] PI = 3.1415 ? =: true
-   ==>> [B] 1 / 3 == 0.3333 ? =: true
-   ==>> [B] PI = 3.1415 ? =: true
-   ==>> [B] PI = 3.1415 ? =: false
 #+END_SRC
 
 *** Functions
