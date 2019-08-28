@@ -3211,8 +3211,7 @@ Add months to a date:
 #+END_SRC
 
 * Complementary Libraries 
-** Future C++20 Inclusion 
-*** Range v3 (C++20)
+** Range v3 (C++20)
 
 Ranges v3 is a header-only generic library that will be included in
 the [[https://en.cppreference.com/w/cpp/ranges][C++20 ranges]] and provides stl-like algorithms that can operate on
@@ -3757,6 +3756,7 @@ Output:
    BEFORE => output = [0](  )
    AFTER => output = [10]( 20 26 32 38 44 50 56 62 68 74  )
 #+END_SRC
+** Printf replacements 
 *** fmtlib (fmt) - Better printf 
 
 Fmt is a highly popular library for printing  in a formatted way just
@@ -4014,6 +4014,123 @@ can be loaded from CERN's Root or Cling REPL with:
   >> fmt::print(fmt::bg(fmt::color::blue), " [INFO] x = {0:.5E}\n", 20.6)
    [INFO] x = 2.06000E+01
   >> 
+#+END_SRC
+
+*** tinyprintf 
+
+Single-file header-only library replacement for printf. The advatange
+of this library is the extensibility, easy-of-use and deployment as it
+just a single header-file. 
+
+Repository: 
+
+  + https://github.com/c42f/tinyformat 
+
+ *Sample Project:* 
+
+File: CMakeLists.txt 
+
+#+BEGIN_SRC cmake 
+  cmake_minimum_required(VERSION 2.8)
+  project(tinyprintf-test)
+
+  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+
+  #============= Functions and macros ===========================#
+  macro(Download_Single_Headerlib FILE URL)
+      file(DOWNLOAD ${URL} ${CMAKE_BINARY_DIR}/include/${FILE})
+      IF(NOT Download_Single_Headerlib_flag)
+         include_directories(${CMAKE_BINARY_DIR}/include)
+         set(Download_Single_Headerlib_flag TRUE)
+      ENDIF()
+  endmacro()
+
+  Download_Single_Headerlib(
+      tinyformat.h
+      "https://raw.githubusercontent.com/c42f/tinyformat/master/tinyformat.h"
+      )
+
+  #============ Target settings ==================================#
+  add_executable(main main.cpp)
+#+END_SRC
+
+File: main.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+  #include <cmath>
+  #include <vector>
+
+  #include <tinyformat.h>
+
+  template<typename T>
+  void display(T&& x)
+  {
+      tfm::printfln(" Function = %s ; Value x = %s", __FUNCTION__, x);
+  }
+
+  struct Point3D
+  {
+      double x, y, z;
+  };
+
+  /** Enables printing user defined data with tinyprintf library */
+  std::ostream&
+  operator<<(std::ostream& os, Point3D const& point )
+  {
+      auto [x, y, z] = point;
+      return os << " Point3d{ x = " << x
+                << " ; y = " << y << " ; z = "
+                << z << " } ";
+  }
+
+  int main(int argc, char** argv)
+  {
+      std::string s = "Hello world";
+      tfm::printf(" LINE 1 => s = %s n1 = %d f = %.3f \n", s, 10, 283.41345);
+
+      tfm::printfln(" LINE 2 => arg1 = %1$s ; arg3 = %3$s ; arg2 = %2$d ", "A1", 1003, "A3");
+
+      // Templated function
+      display(10);
+      display("Hello world C++20 ... modules");
+
+      // Print user-defined type
+      tfm::printfln("\n User Defined Data =>> = %s", Point3D{3.5, 100.34, -90.341});
+
+      //==== Print to stream ===========//
+      std::stringstream ss;
+      for(int i = 0; i < 5; i++)
+      {
+          tfm::format(ss, "%8.d %10.5f\n", i, std::exp(i));
+      }
+
+      tfm::printfln("\nFunction tabulation result => \n %s", ss.str());
+
+      return 0;
+  }
+#+END_SRC
+
+Output of executable main: 
+
+#+BEGIN_SRC sh 
+   % ./main 
+
+   LINE 1 => s = Hello world n1 = 10 f = 283.413 
+   LINE 2 => arg1 = A1 ; arg3 = A3 ; arg2 = 1003 
+   Function = display ; Value x = 10
+   Function = display ; Value x = Hello world C++20 ... modules
+
+   User Defined Data =>> =  Point3d{ x = 3.5 ; y = 100.34 ; z = -90.341 } 
+
+  Function tabulation result => 
+          0    1.00000
+         1    2.71828
+         2    7.38906
+         3   20.08554
+         4   54.59815
 #+END_SRC
 
 ** Pretty Printing 
