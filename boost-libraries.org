@@ -3211,265 +3211,8 @@ Add months to a date:
 #+END_SRC
 
 * Complementary Libraries 
-** fmtlib (fmt) - Better printf 
-
-Fmt is a highly popular library for printing  in a formatted way just
-like the old C's printf, however fmt is type safe like std::ostream
-IO, however its format specifiers are more concise and based on Python
-ones.
-
-Web Site:
- + http://fmtlib.net/latest/index.html
-
-Repository: 
- + https://github.com/fmtlib/fmt
-
-Conan Refence: 
- + [[https://bintray.com/bincrafters/public-conan/fmt%253Abincrafters/5.3.0%253Astable][fmt/5.3.0@bincrafters/stable]] 
-
- *Library Local Installation for header-only usage* 
-
-Installation at: ~/dev/include/fmt 
-
-#+BEGIN_SRC sh 
- $ git clone https://github.com/fmtlib/fmt
-
- # Build directory /home/<USER>/dev on Linux 
- $ mkdir -p ~/dev && cd dev                           
- # Clone repository 
- $ git clone https://github.com/fmtlib/fmt
- # Extract headers 
- $ cp -r -v fmt/include ~/dev/
- # Delete fmt directory 
- $ rm -rf fmt 
-#+END_SRC
-
-Testing code: File - *fmttest.cpp*
-
-#+BEGIN_SRC cpp 
-  #include <iostream>
-  #include <fstream>
-  #include <cmath>
-  #include <sstream>
-
-  // If defined before including fmt, uses it as header-only library
-  #define FMT_HEADER_ONLY
-
-  // Basic functionality
-  #include <fmt/core.h>
-  // fmt string literals "name"_a, "product"_a
-  #include <fmt/format.h>
-  // Print to streams std::cout, std::cerr, std::ostream
-  #include <fmt/ostream.h>
-
-  #include <fmt/color.h>
-
-  // #include <fmt/color.h>
-
-  using namespace fmt::literals;
-
-  void printHeader(const char* header)
-  {
-      fmt::print("\n{}\n", header);
-      fmt::print("---------------------------------------------\n");
-  }
-
-  int main()
-  {
-      printHeader(" ***** EXPERIMENT 1 - Boolean  *************");
-      fmt::print(" true == {0} ; false == {1} \n", true, false);
-
-
-      printHeader(" ***** EXPERIMENT 2 - Numeric Base  *********");
-
-      fmt::print(" [BASES] => dec: {0:d} ; hex = 0x{0:X} "
-                 " ; oct = {0:o} ; bin = 0b{0:b} \n", 241 );
-
-      printHeader(" ***** EXPERIMENT 3 - Positional arguments ****");
-
-      fmt::print(" first = {0}, 2nd = {1}, 1st = {1}, 3rd = {2}\n",
-                  200, "hello", 5.615);
-
-      printHeader("**** EXPERIMENT 4 - Named Arguments ********* ");
-
-      fmt::print(" [A] Product => product = {0} id = {1} price = {2}\n"
-                 ,"oranges 1 kg", 200, 10.6758 );
-
-      // Requires: #include <fmt/format.h>
-      // using namespace fmt::literals;
-      fmt::print(" [B] Product => product = {product} id = {id} price = {price:.2F}\n"
-                 , "product"_a = "oranges 1 kg", "id"_a = 200, "price"_a = 10.6758 );
-
-      fmt::print(" [B] Product => product = {product} id = {id} price = {price:.2F}\n"
-                 , fmt::arg("product", "oranges 1 kg")
-                 , fmt::arg("id",  200)
-                 , fmt::arg("price", 10.6758 ));
-
-      printHeader("************ Colored Output ******************");
-
-      fmt::print( fmt::fg(fmt::color::aqua) | fmt::emphasis::bold,
-                 " [INFO] Voltage Leval  = {0:+.3F}\n", 10.6478);
-
-      fmt::print( fmt::fg(fmt::color::red) | fmt::emphasis::underline,
-                 " [ERROR] Fatal Error, shutdown systems code  0x{0:X}\n", 2651);
-
-
-      printHeader(" ***** EXPERIMENT 5 - Numeric Formatting ******");
-
-      double x = 20.0;
-      fmt::print("The square root of x = {}\n", std::sqrt(x));
-
-      x = 28524.0;
-
-      fmt::print(" log(x) = {:.2F}  (2 digit precision)\n", std::log(x));
-      fmt::print(" log(x) = {:+.6F} (6 digit precision)\n", std::log(x));
-      fmt::print(" 2000 * log(x) = {:+.6G} (6 digit precision)\n", 1e5 * std::log(x));
-      fmt::print("  log(x) = {0:+.8E} ; sqrt(x) = {1:+8E} (8 digit precision)\n",
-                 std::log(x), std::sqrt(x));
-
-      printHeader(" ***** EXPERIMENT 6 - Print numeric table ******");
-
-      int i = 0;
-      for(double x = 0.0; x <= 4.0; x += 0.5)
-          fmt::print("{0:8d}{1:10.5F}{2:10.5F}\n", i++, x, std::exp(x));
-
-      printHeader(" ***** EXPERIMENT 7 - Print table to file *******");
-
-      // std::ofstream file("/tmp/table.txt");
-      std::stringstream file; // Fake file
-
-      i = 0;
-
-      // Note: Requires <fmt/ostream.h>
-      for(double x = -4.0; x <= 4.0; x += 1.0)
-          fmt::print(file, "{0:8d}{1:10.5F}{2:10.5F}\n", i++, x, std::exp(x));
-
-      fmt::print("File content = \n{0}", file.str());
-
-      return 0;
-  }
-#+END_SRC
-
-Program output: 
-
-#+BEGIN_SRC text 
-   ,***** EXPERIMENT 1 - Boolean  *************
-  ---------------------------------------------
-   true == true ; false == false 
-
-   ,***** EXPERIMENT 2 - Numeric Base  *********
-  ---------------------------------------------
-   [BASES] => dec: 241 ; hex = 0xF1  ; oct = 361 ; bin = 0b11110001 
-
-   ,***** EXPERIMENT 3 - Positional arguments ****
-  ---------------------------------------------
-   first = 200, 2nd = hello, 1st = hello, 3rd = 5.615
-
-  ,**** EXPERIMENT 4 - Named Arguments ********* 
-  ---------------------------------------------
-   [A] Product => product = oranges 1 kg id = 200 price = 10.6758
-   [B] Product => product = oranges 1 kg id = 200 price = 10.68
-   [B] Product => product = oranges 1 kg id = 200 price = 10.68
-
-  ,************ Colored Output ******************
-  ---------------------------------------------
-  [1m[38;2;000;255;255m [INFO] Voltage Leval  = +10.648
-  [0m[4m[38;2;255;000;000m [ERROR] Fatal Error, shutdown systems code  0xA5B
-  [0m
-   ,***** EXPERIMENT 5 - Numeric Formatting ******
-  ---------------------------------------------
-  The square root of x = 4.47213595499958
-   log(x) = 10.26  (2 digit precision)
-   log(x) = +10.258501 (6 digit precision)
-   2000 * log(x) = +1.02585e+06 (6 digit precision)
-    log(x) = +1.02585011E+01 ; sqrt(x) = +1.688905E+02 (8 digit precision)
-
-   ,***** EXPERIMENT 6 - Print numeric table ******
-  ---------------------------------------------
-         0   0.00000   1.00000
-         1   0.50000   1.64872
-         2   1.00000   2.71828
-         3   1.50000   4.48169
-         4   2.00000   7.38906
-         5   2.50000  12.18249
-         6   3.00000  20.08554
-         7   3.50000  33.11545
-         8   4.00000  54.59815
-
-   ,***** EXPERIMENT 7 - Print table to file *******
-  ---------------------------------------------
-  File content = 
-         0  -4.00000   0.01832
-         1  -3.00000   0.04979
-         2  -2.00000   0.13534
-         3  -1.00000   0.36788
-         4   0.00000   1.00000
-         5   1.00000   2.71828
-         6   2.00000   7.38906
-         7   3.00000  20.08554
-         8   4.00000  54.59815
-#+END_SRC
-
-Compilation: 
-
-#+BEGIN_SRC sh 
-  $ g++  fmttest.cpp -o app.bin -std=c++1z -Wall -I$HOME/dev/include 
-
-  # Or, on Linux
-  $ clang++  fmttest.cpp -o app.bin -std=c++1z -Wall -I/home/<USER>/dev/include 
-
-  # Or, On OSX 
-  $ clang++  fmttest.cpp -o app.bin -std=c++1z -Wall -I/Users/<USER>/dev/include 
-#+END_SRC
-
-The code can be compiled without specifying the include path, by
-adding the following code to the file  *~/.profile* on Linux.
-
-#+BEGIN_SRC sh 
-  #------------ Local Libraries Installation ---------------------
-  LOCAL_LIB_PATH=~/dev
-  export CPLUS_INCLUDE_PATH=$LOCAL_LIB_PATH/include:$CPLUS_INCLUDE_PATH
-  export C_INCLUDE_PATH=$LOCAL_LIB_PATH/include:$C_INCLUDE_PATH
-  export LIBRARY_PATH=$LOCAL_LIB_PATH/lib:$LIBRARY_PATH
-  export LD_LIBRARY_PATH=$LOCAL_LIB_PATH/lib:$LD_LIBRARY_PATH
-#+END_SRC
-
-After this configuration was set, the code can be compiled with:
-
-#+BEGIN_SRC sh 
-  $ g++  fmttest.cpp -o app.bin -std=c++1z -Wall
-
-  # Header only compilation takes 2 seconds 
-  $ time g++  fmttest.cpp -o app.bin -std=c++1z -Wall
-
-  real	0m1.824s
-  user	0m1.650s
-  sys	0m0.156s
-#+END_SRC
-
-Once the environment variabble CPLUS_INCLUDE_PATH is set, the library
-can be loaded from CERN's Root or Cling REPL with:  
-
-#+BEGIN_SRC cpp 
-  #define FMT_HEADER_ONLY
-  #include <fmt/format.h>
-  #include <fmt/color.h>
-  #include <fmt/ostream.h>
-
-  >> fmt::print(" x = {0:.5F}, sqrt(x) = {1:+.8F}\n", 20.6, std::sqrt(20.6))
-   x = 20.60000, sqrt(x) = +4.53872229
-  >> 
-
-  // Print with color foreground blue 
-  >> fmt::print(fmt::fg(fmt::color::blue), " [INFO] x = {0:.5E}\n", 20.6)
-   [INFO] x = 2.06000E+01
-
-  // Print with background color blue 
-  >> fmt::print(fmt::bg(fmt::color::blue), " [INFO] x = {0:.5E}\n", 20.6)
-   [INFO] x = 2.06000E+01
-  >> 
-#+END_SRC
-** Range v3 (C++20)
+** Future C++20 Inclusion 
+*** Range v3 (C++20)
 
 Ranges v3 is a header-only generic library that will be included in
 the [[https://en.cppreference.com/w/cpp/ranges][C++20 ranges]] and provides stl-like algorithms that can operate on
@@ -4014,8 +3757,268 @@ Output:
    BEFORE => output = [0](  )
    AFTER => output = [10]( 20 26 32 38 44 50 56 62 68 74  )
 #+END_SRC
+*** fmtlib (fmt) - Better printf 
 
-** cxx-prettyprint - STL container pretty print
+Fmt is a highly popular library for printing  in a formatted way just
+like the old C's printf, however fmt is type safe like std::ostream
+IO, however its format specifiers are more concise and based on Python
+ones.
+
+Web Site:
+ + http://fmtlib.net/latest/index.html
+
+Repository: 
+ + https://github.com/fmtlib/fmt
+
+Conan Refence: 
+ + [[https://bintray.com/bincrafters/public-conan/fmt%253Abincrafters/5.3.0%253Astable][fmt/5.3.0@bincrafters/stable]] 
+
+ *Library Local Installation for header-only usage* 
+
+Installation at: ~/dev/include/fmt 
+
+#+BEGIN_SRC sh 
+ $ git clone https://github.com/fmtlib/fmt
+
+ # Build directory /home/<USER>/dev on Linux 
+ $ mkdir -p ~/dev && cd dev                           
+ # Clone repository 
+ $ git clone https://github.com/fmtlib/fmt
+ # Extract headers 
+ $ cp -r -v fmt/include ~/dev/
+ # Delete fmt directory 
+ $ rm -rf fmt 
+#+END_SRC
+
+Testing code: File - *fmttest.cpp*
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <fstream>
+  #include <cmath>
+  #include <sstream>
+
+  // If defined before including fmt, uses it as header-only library
+  #define FMT_HEADER_ONLY
+
+  // Basic functionality
+  #include <fmt/core.h>
+  // fmt string literals "name"_a, "product"_a
+  #include <fmt/format.h>
+  // Print to streams std::cout, std::cerr, std::ostream
+  #include <fmt/ostream.h>
+
+  #include <fmt/color.h>
+
+  // #include <fmt/color.h>
+
+  using namespace fmt::literals;
+
+  void printHeader(const char* header)
+  {
+      fmt::print("\n{}\n", header);
+      fmt::print("---------------------------------------------\n");
+  }
+
+  int main()
+  {
+      printHeader(" ***** EXPERIMENT 1 - Boolean  *************");
+      fmt::print(" true == {0} ; false == {1} \n", true, false);
+
+
+      printHeader(" ***** EXPERIMENT 2 - Numeric Base  *********");
+
+      fmt::print(" [BASES] => dec: {0:d} ; hex = 0x{0:X} "
+                 " ; oct = {0:o} ; bin = 0b{0:b} \n", 241 );
+
+      printHeader(" ***** EXPERIMENT 3 - Positional arguments ****");
+
+      fmt::print(" first = {0}, 2nd = {1}, 1st = {1}, 3rd = {2}\n",
+                  200, "hello", 5.615);
+
+      printHeader("**** EXPERIMENT 4 - Named Arguments ********* ");
+
+      fmt::print(" [A] Product => product = {0} id = {1} price = {2}\n"
+                 ,"oranges 1 kg", 200, 10.6758 );
+
+      // Requires: #include <fmt/format.h>
+      // using namespace fmt::literals;
+      fmt::print(" [B] Product => product = {product} id = {id} price = {price:.2F}\n"
+                 , "product"_a = "oranges 1 kg", "id"_a = 200, "price"_a = 10.6758 );
+
+      fmt::print(" [B] Product => product = {product} id = {id} price = {price:.2F}\n"
+                 , fmt::arg("product", "oranges 1 kg")
+                 , fmt::arg("id",  200)
+                 , fmt::arg("price", 10.6758 ));
+
+      printHeader("************ Colored Output ******************");
+
+      fmt::print( fmt::fg(fmt::color::aqua) | fmt::emphasis::bold,
+                 " [INFO] Voltage Leval  = {0:+.3F}\n", 10.6478);
+
+      fmt::print( fmt::fg(fmt::color::red) | fmt::emphasis::underline,
+                 " [ERROR] Fatal Error, shutdown systems code  0x{0:X}\n", 2651);
+
+
+      printHeader(" ***** EXPERIMENT 5 - Numeric Formatting ******");
+
+      double x = 20.0;
+      fmt::print("The square root of x = {}\n", std::sqrt(x));
+
+      x = 28524.0;
+
+      fmt::print(" log(x) = {:.2F}  (2 digit precision)\n", std::log(x));
+      fmt::print(" log(x) = {:+.6F} (6 digit precision)\n", std::log(x));
+      fmt::print(" 2000 * log(x) = {:+.6G} (6 digit precision)\n", 1e5 * std::log(x));
+      fmt::print("  log(x) = {0:+.8E} ; sqrt(x) = {1:+8E} (8 digit precision)\n",
+                 std::log(x), std::sqrt(x));
+
+      printHeader(" ***** EXPERIMENT 6 - Print numeric table ******");
+
+      int i = 0;
+      for(double x = 0.0; x <= 4.0; x += 0.5)
+          fmt::print("{0:8d}{1:10.5F}{2:10.5F}\n", i++, x, std::exp(x));
+
+      printHeader(" ***** EXPERIMENT 7 - Print table to file *******");
+
+      // std::ofstream file("/tmp/table.txt");
+      std::stringstream file; // Fake file
+
+      i = 0;
+
+      // Note: Requires <fmt/ostream.h>
+      for(double x = -4.0; x <= 4.0; x += 1.0)
+          fmt::print(file, "{0:8d}{1:10.5F}{2:10.5F}\n", i++, x, std::exp(x));
+
+      fmt::print("File content = \n{0}", file.str());
+
+      return 0;
+  }
+#+END_SRC
+
+Program output: 
+
+#+BEGIN_SRC text 
+   ,***** EXPERIMENT 1 - Boolean  *************
+  ---------------------------------------------
+   true == true ; false == false 
+
+   ,***** EXPERIMENT 2 - Numeric Base  *********
+  ---------------------------------------------
+   [BASES] => dec: 241 ; hex = 0xF1  ; oct = 361 ; bin = 0b11110001 
+
+   ,***** EXPERIMENT 3 - Positional arguments ****
+  ---------------------------------------------
+   first = 200, 2nd = hello, 1st = hello, 3rd = 5.615
+
+  ,**** EXPERIMENT 4 - Named Arguments ********* 
+  ---------------------------------------------
+   [A] Product => product = oranges 1 kg id = 200 price = 10.6758
+   [B] Product => product = oranges 1 kg id = 200 price = 10.68
+   [B] Product => product = oranges 1 kg id = 200 price = 10.68
+
+  ,************ Colored Output ******************
+  ---------------------------------------------
+  [1m[38;2;000;255;255m [INFO] Voltage Leval  = +10.648
+  [0m[4m[38;2;255;000;000m [ERROR] Fatal Error, shutdown systems code  0xA5B
+  [0m
+   ,***** EXPERIMENT 5 - Numeric Formatting ******
+  ---------------------------------------------
+  The square root of x = 4.47213595499958
+   log(x) = 10.26  (2 digit precision)
+   log(x) = +10.258501 (6 digit precision)
+   2000 * log(x) = +1.02585e+06 (6 digit precision)
+    log(x) = +1.02585011E+01 ; sqrt(x) = +1.688905E+02 (8 digit precision)
+
+   ,***** EXPERIMENT 6 - Print numeric table ******
+  ---------------------------------------------
+         0   0.00000   1.00000
+         1   0.50000   1.64872
+         2   1.00000   2.71828
+         3   1.50000   4.48169
+         4   2.00000   7.38906
+         5   2.50000  12.18249
+         6   3.00000  20.08554
+         7   3.50000  33.11545
+         8   4.00000  54.59815
+
+   ,***** EXPERIMENT 7 - Print table to file *******
+  ---------------------------------------------
+  File content = 
+         0  -4.00000   0.01832
+         1  -3.00000   0.04979
+         2  -2.00000   0.13534
+         3  -1.00000   0.36788
+         4   0.00000   1.00000
+         5   1.00000   2.71828
+         6   2.00000   7.38906
+         7   3.00000  20.08554
+         8   4.00000  54.59815
+#+END_SRC
+
+Compilation: 
+
+#+BEGIN_SRC sh 
+  $ g++  fmttest.cpp -o app.bin -std=c++1z -Wall -I$HOME/dev/include 
+
+  # Or, on Linux
+  $ clang++  fmttest.cpp -o app.bin -std=c++1z -Wall -I/home/<USER>/dev/include 
+
+  # Or, On OSX 
+  $ clang++  fmttest.cpp -o app.bin -std=c++1z -Wall -I/Users/<USER>/dev/include 
+#+END_SRC
+
+The code can be compiled without specifying the include path, by
+adding the following code to the file  *~/.profile* on Linux.
+
+#+BEGIN_SRC sh 
+  #------------ Local Libraries Installation ---------------------
+  LOCAL_LIB_PATH=~/dev
+  export CPLUS_INCLUDE_PATH=$LOCAL_LIB_PATH/include:$CPLUS_INCLUDE_PATH
+  export C_INCLUDE_PATH=$LOCAL_LIB_PATH/include:$C_INCLUDE_PATH
+  export LIBRARY_PATH=$LOCAL_LIB_PATH/lib:$LIBRARY_PATH
+  export LD_LIBRARY_PATH=$LOCAL_LIB_PATH/lib:$LD_LIBRARY_PATH
+#+END_SRC
+
+After this configuration was set, the code can be compiled with:
+
+#+BEGIN_SRC sh 
+  $ g++  fmttest.cpp -o app.bin -std=c++1z -Wall
+
+  # Header only compilation takes 2 seconds 
+  $ time g++  fmttest.cpp -o app.bin -std=c++1z -Wall
+
+  real	0m1.824s
+  user	0m1.650s
+  sys	0m0.156s
+#+END_SRC
+
+Once the environment variabble CPLUS_INCLUDE_PATH is set, the library
+can be loaded from CERN's Root or Cling REPL with:  
+
+#+BEGIN_SRC cpp 
+  #define FMT_HEADER_ONLY
+  #include <fmt/format.h>
+  #include <fmt/color.h>
+  #include <fmt/ostream.h>
+
+  >> fmt::print(" x = {0:.5F}, sqrt(x) = {1:+.8F}\n", 20.6, std::sqrt(20.6))
+   x = 20.60000, sqrt(x) = +4.53872229
+  >> 
+
+  // Print with color foreground blue 
+  >> fmt::print(fmt::fg(fmt::color::blue), " [INFO] x = {0:.5E}\n", 20.6)
+   [INFO] x = 2.06000E+01
+
+  // Print with background color blue 
+  >> fmt::print(fmt::bg(fmt::color::blue), " [INFO] x = {0:.5E}\n", 20.6)
+   [INFO] x = 2.06000E+01
+  >> 
+#+END_SRC
+
+** Pretty Printing 
+*** cxx-prettyprint - STL container pretty print
+
 
 Description:
  + "A header-only library for C++(0x) that allows automagic pretty-printing of any container."
@@ -4091,7 +4094,7 @@ Print map:
     dataset = [(AUD, 34.65), (BRL, 451.34), (CAD, 400.5), (USD, 200.3)]
    >>
 #+END_SRC
-** pprint - Pretty print library for C++17 
+*** pprint - Pretty print library for C++17 
 
 PPrint is an easy and simple to use header-only pretty printing
 library for C++17 capable of printing all C++17 containers, including
@@ -4243,6 +4246,7 @@ Output:
   ]
 #+END_SRC
 ** CLI11 Command Liner Parser Library 
+
 
 CLI11 is a small and lightweight header-only library for command line
 parsing.
@@ -4671,7 +4675,8 @@ Program output:
    DummyClass { x = 400 ; y = -641 ; N = 300 } =>  List[  ]
 #+END_SRC
 
-** TinyXML2 - Lightweight XML parser 
+** Parsers 
+*** TinyXML2 - Lightweight XML parser 
 
 Simple and ligtweight C++ library for parsing XML files.
 
@@ -4995,7 +5000,7 @@ Full Project Code:
           ZAR         16.653
 #+END_SRC
 
-** PugiXML - Lightweight XML parser 
+*** PugiXML - Lightweight XML parser 
 
 PugiXML is lightweight XML parsing library with DOM (Document Object
 Model) transversing and XPATH capabilities. 
@@ -5219,7 +5224,7 @@ Program output:
          HRK     7.410
 #+END_SRC
 
-** cpptoml configuration parser 
+*** cpptoml configuration parser 
 
 cpptoml is a single-file header-only library for parsing [[https://github.com/toml-lang/toml][TOML]] 
 configuration files that resembles the Windows INI files and are more
@@ -5392,7 +5397,7 @@ Parse file (std::ifstream):
    path: /tmp
 #+END_SRC
 
-** MuParser - Math expression parser 
+*** MuParser - Math expression parser 
 
 MuParser is a simple math expression parser library without any
 dependencies.
@@ -5591,6 +5596,873 @@ File: *muparser1_formula.cpp*
 
     EXPR => 
 
+#+END_SRC
+** Unit Testing 
+*** GTest - Unit Testing Framework
+
+GTest or Google test is one of the most used and most popular test
+frameworks which supports many features such as mocks; test fixtures;
+parameterized tests; XML test report in JUnit / xUnit format; test
+discovery and integration with IDEs, namely Eclipse, QTCreator and
+Visual Studio.
+
+
+Official Web site:
+ + https://github.com/google/googletest
+
+Some Tutorial/Primers: 
+ + [[https://github.com/google/googletest/blob/master/googletest/docs/primer.md][Google Test Primer]] (Official)
+ + [[https://docs.microsoft.com/en-us/visualstudio/test/how-to-use-google-test-for-cpp?view=vs-2019][How to use Google Test for C++ - Visual Studio | Microsoft Docs]]
+ + [[http://www.yolinux.com/TUTORIALS/Cpp-GoogleTest.html][GoogleTest: C++ unit test framework]]
+ + [[https://developer.ibm.com/articles/au-googletestingframework/][A quick introduction to the Google C++ Testing Framework – IBM Developer]]
+
+Conan Reference: 
+ + [[https://bintray.com/conan-community/conan/gtest%253Aconan/1.8.0%253Astable][gtest/1.8.0@conan/stable]]
+
+Test Runner for GTest: 
+ + https://github.com/nholthaus/gtest-runner
+
+CMake Integration:
+ + [[https://cmake.org/cmake/help/latest/module/FindGTest.html][FindGTest — CMake 3.14.4 Documentation]]
+
+Fatal Assertions: 
+ + ASSERT_TRUE
+ + ASSERT_FALSE
+ + ASSERT_EQ(val1, val2)
+ + ASSERT_NE(val1, val2)
+ + ASSERT_LT
+ + ASSERT_GT
+ + ASSERT_GE 
+
+Non-fatal assertions Macros: 
+
+ + EXPECT_TRUE
+ + EXPECT_FALSE
+ + EXPECT_EQ
+ + EXPECT_NQ
+ + EXPECT_DOUBLE_EQ
+ + EXPECT_FLOAT_EQ
+ + EXPECT_NEAR(value1, value2, absolute_tolerance)
+ + TEST(<NAME>, ){ ... <BODY> .. }
+ + EXPECT_FLOAT_EQ 
+
+ *Example: Usage with CMake and QTCreator*
+
+Get the source code: 
+ + Gist: [[https://gist.github.com/caiorss/eb2fc15b7ed322ccac5ee496585e54e9][Sample Project CMake and GTest with Conan]]
+
+#+BEGIN_SRC sh 
+  $ git clone https://gist.github.com/caiorss/eb2fc15b7ed322ccac5ee496585e54e9 gist && cd gist
+  Cloning into 'gist'...
+  remote: Enumerating objects: 4, done.
+  remote: Counting objects: 100% (4/4), done.
+  remote: Compressing objects: 100% (4/4), done.
+  remote: Total 4 (delta 0), reused 0 (delta 0), pack-reused 0
+  Unpacking objects: 100% (4/4), done.
+
+  $ ls
+  CMakeLists.txt  gtest-experiment.cpp
+
+  # Open with QT Creator, Visual Studio or build from command line 
+  $ qtcreator CMakeList.txt 
+
+  # Open with Visual Studio 
+  $ devenv CMakeLists.txt 
+#+END_SRC
+
+ *File: gtest-experiment.cpp*
+
+Headers:
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+  #include <vector>
+  #include <cassert>
+
+  #include <gtest/gtest.h>
+#+END_SRC
+
+Implementations: 
+
+#+BEGIN_SRC cpp 
+  // ==================== Implementation ========================
+
+  int factorial(int n){
+      int prod = 1;
+      for(int i = 1; i <= n; i++)
+          prod *= i;
+      return prod;
+  }
+
+  struct Date
+  {
+      int year;
+      int month;
+      int day;
+      Date(){}
+      Date(int year, int month, int day)
+          : year(year)
+          , month(month)
+          , day(day)
+      { }
+
+      // Comparison operator required by  EXPECT_EQ
+      bool operator==(Date const& rhs) const
+      {
+          return year  == rhs.year
+              && month == rhs.month
+              && day   == rhs.day;
+      }
+      // Necessary for make class printable in GTest
+      friend std::ostream& operator<<(std::ostream& os, Date const& rhs)
+      {
+          return os << "Date { " << rhs.year << " ; "
+                    << rhs.month << " ; "
+                    << rhs.day << " } ";
+      }
+  };
+
+  Date GregorianEasterSunday(int y)
+  {
+      int c = y / 100;
+      int n = y - 19 * ( y / 19 );
+      int k = ( c - 17 ) / 25;
+      int i = c - c / 4 - ( c - k ) / 3 + 19 * n + 15;
+      i = i - 30 * ( i / 30 );
+      i = i - ( i / 28 ) * ( 1 - ( i / 28 )
+            ,* ( 29 / ( i + 1 ) )
+            ,* ( ( 21 - n ) / 11 ) );
+      int j = y + y / 4 + i + 2 - c + c / 4;
+      j = j - 7 * ( j / 7 );
+      int l = i - j;
+      int m = 3 + ( l + 40 ) / 44;
+      int d = l + 28 - 31 * ( m / 4 );
+      return Date(y, m, d);
+  }
+#+END_SRC
+
+Test code: 
+
+#+BEGIN_SRC cpp 
+  //=============== Tests ====================================//
+
+  TEST(FactorialTest, test1){
+      EXPECT_EQ(6,        factorial(3));
+      EXPECT_EQ(24,       factorial(4));
+      EXPECT_EQ(120,      factorial(5));
+      EXPECT_EQ(3628800,  factorial(10));
+      // Expect greater than
+      EXPECT_GT(10000000, factorial(10));
+      // Expect not equal
+      EXPECT_NE(25, factorial(4));
+  }
+
+  TEST(FactorialTestFailure, testFailure){
+      // Deliberately fails for demonstration purposes
+      EXPECT_EQ(6, factorial(3));
+      EXPECT_EQ(4, factorial(4));
+      EXPECT_EQ(6, factorial(2));
+  }
+
+  TEST(GregorianEaster, testdates){
+      EXPECT_EQ(Date(2005, 3, 27), GregorianEasterSunday(2005));
+      EXPECT_EQ(Date(2008, 3, 23), GregorianEasterSunday(2008));
+      EXPECT_EQ(Date(2010, 4, 4),  GregorianEasterSunday(2010));
+  }
+#+END_SRC
+
+  *File: CMakeLists.txt*
+
+#+BEGIN_SRC cmake 
+  cmake_minimum_required(VERSION 3.9)
+  project( GtestsExperiment
+           VERSION      0.1
+           DESCRIPTION  "Experiment with Gtest uni testing framework"
+          )
+  # ============= Conan Bootstrap =============================#
+
+  # Download automatically, you can also just copy the conan.cmake file
+  if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan.cmake")
+     message(STATUS "Downloading conan.cmake from https://github.com/conan-io/cmake-conan")
+     file(DOWNLOAD "https://github.com/conan-io/cmake-conan/raw/v0.13/conan.cmake"
+                   "${CMAKE_BINARY_DIR}/conan.cmake")
+  endif()
+
+  include(${CMAKE_BINARY_DIR}/conan.cmake)
+
+  conan_cmake_run(REQUIRES
+                  gtest/1.8.1@bincrafters/stable
+                  BASIC_SETUP
+                  BUILD missing
+                  )
+
+  #============= Find Packages ================================#
+
+  find_package(GTest REQUIRED)
+
+  #---------------------------------------------------#
+  #             Targets Settings                      #
+  #---------------------------------------------------#
+
+  add_executable(gtest-experiment gtest-experiment.cpp)
+  target_link_libraries(gtest-experiment GTest::GTest GTest::Main)
+  add_test(GTestExperiment gtest-experiment)
+#+END_SRC
+
+ *Test Output:*
+
+#+CAPTION: Test output in Command Line 
+[[file:images/gtest-framework-console.png][file:images/gtest-framework-console.png]]
+
+#+CAPTION: QTCreator Test Discovery 
+[[file:images/gtest-framework-qtcreator.png][file:images/gtest-framework-qtcreator.png]]
+
+*** Catch2 - Unit Testing Framework
+
+Advatanges over other test frameworks:
+
+ + Header-only library, so it requires no linking step or linking
+   dependencies.
+
+ + Uses C++ operators instead of many macros such as (X > 20) instead of
+   EXPECT_GT(X, 20) (expect grater than) as in GTest (Google's test)
+
+ + BDD - Behavior Driven Development
+
+ + Property-based testing - testing with several random values and
+   combination of random values.
+
+ + Test with multiple data or data table which frees the user from
+   writing lots boilerplate ASSERT_EQUAL(x, y). A single REQUIRE macro
+   can be used for test a whole list of cartesian pairs such as (x, y,z, expected)
+
+ + XML output in JUnit, xUnit format.
+
+Problem:
+ + Compile-time can be a bit slow due to the library be header-only.
+
+Repository:
+ + https://github.com/catchorg/Catch2
+
+Conan Reference:
+ + [[https://bintray.com/catchorg/Catch2/Catch2:catchorg/2.7.2:stable][Catch2/2.7.2@catchorg/stable]]
+
+Code Examples:
+ + https://github.com/catchorg/Catch2/tree/master/examples
+ + [[https://github.com/catchorg/Catch2/blob/master/projects/SelfTest/UsageTests/Generators.tests.cpp][Test Generators]] - testing with multiple data
+
+Tutorial:
+ + [[https://github.com/catchorg/Catch2/blob/master/docs/tutorial.md#top][Catch2/tutorial.md at master · catchorg/Catch2 · GitHub]]
+ + [[https://mariusbancila.ro/blog/2018/03/29/writing-cpp-unit-tests-with-catch2/][Writing C++ unit tests with Catch2]] - BDD - Behavior Driven Development.
+
+Misc:
+ + [[https://levelofindirection.com/blog/catch2-released.html][Catch2 Released : Level of Indirection]]
+ + [[https://codingnest.com/the-future-of-catch2/][The future of Catch2 — The Coding Nest]]
+
+Example simple test:
+
+File: testcatch2.cpp
+
+#+BEGIN_SRC cpp
+  #include <iostream>
+
+  #include <catch2/catch.hpp>
+
+
+  int formula(int x, int y)
+  {
+      return 4 * x + 2 * y;
+  }
+
+  TEST_CASE("Test function furmula A", "[tag1]")
+  {
+      REQUIRE( formula(3, 4) == 20 );
+      REQUIRE( formula(4, 5) == 26 );
+  }
+
+  TEST_CASE("Test function formula B", "[tag2]")
+  {
+      REQUIRE( formula(0, 0) == 0  );
+      // Intentionally fails
+      REQUIRE( formula(2, 5) == 10 );
+  }
+
+
+  struct TestData
+  {
+      int x, y, expected;
+  };
+
+
+  TEST_CASE("Testing with struct")
+  {
+      auto t = GENERATE( values<TestData>(
+      {
+          {3,  4, 20}
+         ,{4,  5, 26}
+         ,{0,  0,  0}
+         ,{-1, 4,  6} // Fails
+         ,{ 2, 2, 12}
+      }));
+      REQUIRE( formula(t.x, t.y) == t.expected);
+  }
+
+
+  TEST_CASE("Testing with structured bindings")
+  {
+      auto [x, y, z] = GENERATE( table<int, int, int>(
+      {
+          {3,  4, 20}
+         ,{4,  5, 26}
+         ,{0,  0,  0}
+         ,{2, 2, 12}
+      }));
+      REQUIRE( formula(x, y) == z);
+  }
+#+END_SRC
+
+File: CMakeLists.txt - CMake building script integrated with Conan.
+
+#+BEGIN_SRC cmake
+  cmake_minimum_required(VERSION 3.9)
+  project(Catch2_testing)
+
+  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+
+  # ============= Conan Bootstrap =============================#
+
+  # Download automatically, you can also just copy the conan.cmake file
+  if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan.cmake")
+     message(STATUS "Downloading conan.cmake from https://github.com/conan-io/cmake-conan")
+     file(DOWNLOAD "https://github.com/conan-io/cmake-conan/raw/v0.13/conan.cmake"
+                   "${CMAKE_BINARY_DIR}/conan.cmake")
+  endif()
+
+  include(${CMAKE_BINARY_DIR}/conan.cmake)
+
+  conan_cmake_run(REQUIRES
+                  Catch2/2.7.2@catchorg/stable
+                  BASIC_SETUP
+                  BUILD missing
+                  )
+  #============= Find Packages ================================#
+
+  find_package(Catch2 REQUIRED)
+
+  #---------------------------------------------------#
+  #             Targets Settings                      #
+  #---------------------------------------------------#
+
+  add_executable(testcatch2 testcatch2.cpp test-main.cpp)
+  target_link_libraries(testcatch2)
+#+END_SRC
+
+Test runner help option:
+
+#+BEGIN_SRC sh
+  $ ./testcatch2 -h
+
+  Catch v2.7.2
+  usage:
+    testcatch2 [<test name|pattern|tags> ... ] options
+
+  where options are:
+    -?, -h, --help                            display usage information
+    -l, --list-tests                          list all/matching test cases
+    -t, --list-tags                           list all/matching tags
+    -s, --success                             include successful tests in
+                                              output
+    -b, --break                               break into debugger on failure
+    -e, --nothrow                             skip exception tests
+    -i, --invisibles                          show invisibles (tabs, newlines)
+    -o, --out <filename>                      output filename
+    -r, --reporter <name>                     reporter to use (defaults to
+                                              console)
+    -n, --name <name>                         suite name
+    -a, --abort                               abort at first failure
+    -x, --abortx <no. failures>               abort after x failures
+    -w, --warn <warning name>                 enable warnings
+    -d, --durations <yes|no>                  show test durations
+    -f, --input-file <filename>               load test names to run from a
+                                              file
+    -#, --filenames-as-tags                   adds a tag for the filename
+    -c, --section <section name>              specify section to run
+    -v, --verbosity <quiet|normal|high>       set output verbosity
+    --list-test-names-only                    list all/matching test cases
+                                              names only
+    --list-reporters                          list all reporters
+    --order <decl|lex|rand>                   test case order (defaults to
+                                              decl)
+    --rng-seed <'time'|number>                set a specific seed for random
+                                              numbers
+    --use-colour <yes|no>                     should output be colourised
+    --libidentify                             report name and version according
+                                              to libidentify standard
+    --wait-for-keypress <start|exit|both>     waits for a keypress before
+                                              exiting
+    --benchmark-resolution-multiple           multiple of clock resolution to
+    <multiplier>                              run benchmarks
+
+  For more detailed usage please see the project docs
+
+
+#+END_SRC
+
+Test runner test list:
+
+#+BEGIN_SRC sh
+  $ ./testcatch2 --list-tests
+  All available test cases:
+    Test function furmula A
+        [tag1]
+    Test function formula B
+        [tag2]
+    Testing with struct
+    Testing with structured bindings
+  4 test cases
+
+#+END_SRC
+
+Test runner output:
+
+#+BEGIN_SRC text
+   $ ./testcatch2
+
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   testcatch2 is a Catch v2.7.2 host application.
+   Run with -? for options
+
+   -------------------------------------------------------------------------------
+   Test function formula B
+   -------------------------------------------------------------------------------
+   /home/archbox/Documents/projects/fquant/testcatch2.cpp:17
+   ...............................................................................
+
+   /home/archbox/Documents/projects/fquant/testcatch2.cpp:21: FAILED:
+     REQUIRE( formula(2, 5) == 10 )
+   with expansion:
+     18 == 10
+
+   -------------------------------------------------------------------------------
+   Testing with struct
+   -------------------------------------------------------------------------------
+   /home/archbox/Documents/projects/fquant/testcatch2.cpp:31
+   ...............................................................................
+
+   /home/archbox/Documents/projects/fquant/testcatch2.cpp:41: FAILED:
+     REQUIRE( formula(t.x, t.y) == t.expected )
+   with expansion:
+     4 == 6
+
+   ===============================================================================
+   test cases:  4 |  2 passed | 2 failed
+   assertions: 13 | 11 passed | 2 failed
+#+END_SRC
+
+*** Doctest - Unit Testing Framewok
+
+Doctest is a unit test framework based on catch2 test framework,
+however doctest has a much faster compile-time than many other
+unit-test frameworks.
+
+Advantages:
+ + Easy of use
+ + Faster compile-time
+ + Easy to integrate, header-only-library
+ + Operator based testing: CHECK(VALUE == EXPECTED), CHECK(x > 10)
+   instead of No need to use macros ASSERT_EQ, ASSERT_NEQ (not equal)
+   as in GTest.
+
+Disadvantages:
+ + No XML output with jUnit standard similar to GTest standard.
+ + No integration with IDE
+ + No data-driven test, aka parameterized test, or test with a list of value tuples.
+
+Repository:
+ + https://github.com/onqtam/doctest
+
+Conan Reference:
+ + [[https://bintray.com/bincrafters/public-conan/doctest%253Abincrafters/2.3.1%253Astable][doctest/2.3.1@bincrafters/stable]]
+
+Conan Package:
+ + https://github.com/bincrafters/conan-doctest
+
+Code Examples:
+ + https://github.com/onqtam/doctest/tree/master/examples
+
+Features:
+ + https://github.com/onqtam/doctest/blob/master/doc/markdown/features.md
+
+See:
+ + [[https://accu.org/index.php/journals/2343][ACCU - doctest – the Lightest C++ Unit Testing Framewor]]
+ + [[https://www.codeproject.com/Articles/1156938/doctest-the-lightest-Cplusplus-unit-testing-framew][doctest - the lightest C++ unit testing framework - CodeProject]]
+
+Video:
+ + [[https://www.youtube.com/watch?v=eH1CxEC29l8][CppCon 2017: Viktor Kirilov “Mix Tests and Production Code With Doctest...” - YouTube]]
+
+Usage:
+
+ + File: doctest_experiment.cpp
+
+#+BEGIN_SRC cpp
+  #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+  #include <doctest.h>
+
+  int formula(int x, int y)
+  {
+      return 4 * x + 2 * y;
+  }
+
+  TEST_CASE("Test function furmula A")
+  {
+      CHECK( formula(3, 4) == 20 );
+      CHECK( formula(4, 5) == 26 );
+      CHECK( formula(4, 5) < 100 );
+      CHECK( formula(4, 5) != 0 );
+  }
+
+  TEST_CASE("Test function formula B")
+  {
+      CHECK( formula(0, 0) == 0  );
+      // Intentionally fails
+      CHECK( formula(2, 5) == 10 );
+  }
+#+END_SRC
+
+ + File: CMakeLists.txt integrated with Conan
+
+#+BEGIN_SRC cmake
+  cmake_minimum_required(VERSION 3.9)
+  project( doctest_experiment
+           VERSION      0.1
+           DESCRIPTION  "A doctest experiment"
+          )
+  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+
+  # ============= Conan Bootstrap =============================#
+
+  # Download automatically, you can also just copy the conan.cmake file
+  if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan.cmake")
+     message(STATUS "Downloading conan.cmake from https://github.com/conan-io/cmake-conan")
+     file(DOWNLOAD "https://github.com/conan-io/cmake-conan/raw/v0.13/conan.cmake"
+                   "${CMAKE_BINARY_DIR}/conan.cmake")
+  endif()
+
+  include(${CMAKE_BINARY_DIR}/conan.cmake)
+
+  conan_cmake_run(REQUIRES
+                  doctest/2.3.1@bincrafters/stable
+                  BASIC_SETUP
+                  BUILD missing
+                  )
+
+  #============= Find Packages ================================#
+
+  find_package(doctest 2.3.1 REQUIRED)
+
+  #---------------------------------------------------#
+  #             Targets Settings                      #
+  #---------------------------------------------------#
+
+  add_executable(doctest_experiment doctest_experiment.cpp)
+  copy_after_build(doctest_experiment)
+  # target_link_libraries(doctest_experiment doctest::doctest)
+#+END_SRC
+
+Show options:
+
+#+BEGIN_SRC sh
+   $ bin/doctest_experiment -h
+   [doctest] doctest version is "2.3.1"
+   [doctest]
+   [doctest] boolean values: "1/on/yes/true" or "0/off/no/false"
+   [doctest] filter  values: "str1,str2,str3" (comma separated strings)
+   [doctest]
+   [doctest] filters use wildcards for matching strings
+   [doctest] something passes a filter if any of the strings in a filter matches
+   [doctest]
+   [doctest] ALL FLAGS, OPTIONS AND FILTERS ALSO AVAILABLE WITH A "dt-" PREFIX!!!
+   [doctest]
+   [doctest] Query flags - the program quits after them. Available:
+
+    -?,   --help, -h                      prints this message
+    -v,   --version                       prints the version
+    -c,   --count                         prints the number of matching tests
+    -ltc, --list-test-cases               lists all matching tests by name
+    -lts, --list-test-suites              lists all matching test suites
+    -lr,  --list-reporters                lists all registered reporters
+
+   [doctest] The available <int>/<string> options/filters are:
+
+    -tc,  --test-case=<filters>           filters     tests by their name
+    -tce, --test-case-exclude=<filters>   filters OUT tests by their name
+    -sf,  --source-file=<filters>         filters     tests by their file
+    -sfe, --source-file-exclude=<filters> filters OUT tests by their file
+    -ts,  --test-suite=<filters>          filters     tests by their test suite
+    -tse, --test-suite-exclude=<filters>  filters OUT tests by their test suite
+    -sc,  --subcase=<filters>             filters     subcases by their name
+    -sce, --subcase-exclude=<filters>     filters OUT subcases by their name
+    -r,   --reporters=<filters>           reporters to use (console is default)
+    -o,   --out=<string>                  output filename
+    -ob,  --order-by=<string>             how the tests should be ordered
+                                          <string> - by [file/suite/name/rand]
+    -rs,  --rand-seed=<int>               seed for random ordering
+    -f,   --first=<int>                   the first test passing the filters to
+                                          execute - for range-based execution
+    -l,   --last=<int>                    the last test passing the filters to
+                                          execute - for range-based execution
+    -aa,  --abort-after=<int>             stop after <int> failed assertions
+    -scfl,--subcase-filter-levels=<int>   apply filters for the first <int> levels
+
+   [doctest] Bool options - can be used like flags and true is assumed. Available:
+
+    -s,   --success=<bool>                include successful assertions in output
+    -cs,  --case-sensitive=<bool>         filters being treated as case sensitive
+    -e,   --exit=<bool>                   exits after the tests finish
+    -d,   --duration=<bool>               prints the time duration of each test
+    -nt,  --no-throw=<bool>               skips exceptions-related assert checks
+    -ne,  --no-exitcode=<bool>            returns (or exits) always with success
+    -nr,  --no-run=<bool>                 skips all runtime doctest operations
+    -nv,  --no-version=<bool>             omit the framework version in the output
+    -nc,  --no-colors=<bool>              disables colors in output
+    -fc,  --force-colors=<bool>           use colors even when not in a tty
+    -nb,  --no-breaks=<bool>              disables breakpoints in debuggers
+    -ns,  --no-skip=<bool>                don't skip test cases marked as skip
+    -gfl, --gnu-file-line=<bool>          :n: vs (n): for line numbers in output
+    -npf, --no-path-filenames=<bool>      only filenames and no paths in output
+    -nln, --no-line-numbers=<bool>        0 instead of real line numbers in output
+
+   [doctest] for more information visit the project documentation
+#+END_SRC
+
+Test runner test listing:
+
+#+BEGIN_SRC sh
+  $ bin/doctest_experiment --list-test-cases
+  [doctest] listing all test case names
+  ===============================================================================
+  Test function furmula A
+  Test function formula B
+  ================================================
+#+END_SRC
+
+Run tests: (Note: It is printed with colored output)
+
+#+BEGIN_SRC text
+  $ bin/doctest_experiment
+  [doctest] doctest version is "2.3.1"
+  [doctest] run with "--help" for options
+  ===============================================================================
+  /home/archbox/Documents/projects/fquant/doctest_experiment.cpp:21:
+  TEST CASE:  Test function formula B
+
+  /home/archbox/Documents/projects/fquant/doctest_experiment.cpp:25: ERROR: CHECK( formula(2, 5) == 10 ) is NOT correct!
+    values: CHECK( 18 == 10 )
+
+  ===============================================================================
+  [doctest] test cases:      2 |      1 passed |      1 failed |      0 skipped
+  [doctest] assertions:      6 |      5 passed |      1 failed |
+  [doctest] Status: FAILURE!
+#+END_SRC
+** Google Benchmark 
+
+Overview: It is library for micro benchmarks of isolated parts of the
+code and comparison between algorithms performance. 
+
+Web Site: 
+  + https://github.com/google/benchmark
+  + https://opensource.googleblog.com/2014/01/introducing-benchmark.html 
+
+ *Sample Project:* 
+
+File: CmakeLists.txt 
+
+#+BEGIN_SRC cmake 
+  cmake_minimum_required(VERSION 2.8)
+  project(gbench-evaluation)
+
+  set(CMAKE_CXX_STANDARD          17)
+  set(CMAKE_CXX_STANDARD_REQUIRED ON) 
+  set(CMAKE_VERBOSE_MAKEFILE      ON)
+
+  #========== Macros for automating Library Fetching =============#
+
+  include(FetchContent)
+
+  # Download library archive (zip, *.tar.gz, ...) from URL
+  macro(Download_Library_Url NAME URL)
+      FetchContent_Declare(${NAME} URL  ${URL})
+      FetchContent_GetProperties(${NAME})
+      if(NOT ${NAME}_POPULATED)
+          FetchContent_Populate(${NAME})
+          add_subdirectory(${${NAME}_SOURCE_DIR} ${${NAME}_BINARY_DIR})
+      endif()
+  endmacro()
+
+
+  #========== Library Download / Fetching ===========================#
+
+  # Google Benchmark Build Setting 
+  set(BENCHMARK_ENABLE_TESTING        OFF CACHE BOOL "" FORCE)
+  set(BENCHMARK_ENABLE_GTEST_TESTS    OFF CACHE BOOL "" FORCE)
+  set(BENCHMARK_DOWNLOAD_DEPENDENCIES OFF CACHE BOOL "" FORCE)
+
+  Download_Library_Url(
+          gbenchmark 
+          "https://github.com/google/benchmark/archive/v1.5.0.zip" 
+          )
+	
+  #========== Package Settings =====================================#
+
+  add_executable(benchmark_runner bench.cpp)
+  target_link_libraries(benchmark_runner PRIVATE benchmark)
+#+END_SRC
+
+File: bench.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+  #include <cstdint>
+  #include <cassert>
+  #include <fstream>
+
+  // Google Benchmark header
+  #include <benchmark/benchmark.h>
+
+  // #define ENABLE_LOGGING
+
+  using ulong = unsigned long;
+
+  //======= Implementations =================#
+
+  auto fibonacci_recursive(ulong n) -> ulong
+  {
+      if(n < 2) { return 1; }
+      return fibonacci_recursive(n - 1) + fibonacci_recursive(n - 2);
+  }
+
+  auto fibonacci_non_recursive(ulong n) -> ulong
+  {
+      ulong a = 0, b = 1, next = 0;
+      if(n < 2) { return 1; }
+      for(auto i = 0UL; i < n; ++i)
+      {
+          next = a + b;
+          a = b;
+          b = next;
+      }
+      return next;
+  }
+
+
+  //====== Benchmark Code ===================#
+
+
+  /* Note: All benchmark functions must have this signature.
+   ,*
+   ,*  using BenchmarkSignature = void (*) (benchmark::State& state)
+   ,*/
+  void BM_fibonacci_non_recursive(benchmark::State& state)
+  {
+      // std::cerr << " [NON RECURSIVE FIBONACCI] " << std::endl;
+
+      while(state.KeepRunning())
+      {
+          for(int64_t n = 0, n_end = state.range(); n < n_end; n++) {
+              fibonacci_non_recursive(static_cast<ulong>(n));
+              // std::cerr << " n = " << n  << " Result = " << fibonacci_non_recursive(static_cast<ulong>(n)) << std::endl;
+          }
+      }
+  }
+
+  // Register benchmark function
+  // Possibility A: BENCHMARK(BM_fibonacci_non_recursive)->Range(0, 40);
+  BENCHMARK(BM_fibonacci_non_recursive)->Arg(10)->Arg(30)->Arg(40)->Arg(45);
+
+  #ifdef ENABLE_LOGGING
+    auto sink = std::ofstream("logging.txt");
+  #endif
+
+
+  void BM_fibonacci_recursive(benchmark::State& state)
+  {
+      // std::cerr << " [RECURSIVE FIBONACCI] " << std::endl;
+      static int counter = 0;
+      ulong result;
+
+      #ifdef ENABLE_LOGGING
+      sink << "\n [BM_fibonacci_recursive] counter = " << counter++ << std::endl;
+      #endif
+
+      while(state.KeepRunning())
+      {
+          for(int64_t n = 0, n_end = state.range(); n < n_end; n++) {
+              auto result = fibonacci_recursive(static_cast<ulong>(n));
+              #ifdef ENABLE_LOGGING
+              sink << "n_end = " << n_end << " n = " << n << " Result = "
+                   << fibonacci_recursive(static_cast<ulong>(n)) << std::endl;
+              #endif
+
+          }
+      }
+  }
+
+  // Register benchmark function
+  BENCHMARK(BM_fibonacci_recursive)->Arg(10)->Arg(30)->Arg(40)->Arg(45);
+
+
+  //=============== Entry Point - main() Function =====================//
+
+  // Benchmark program entry point
+  //----------------------------
+  // BENCHMARK_MAIN();
+
+  int main(int argc, char** argv)
+  {
+      std::cout << "========= Micro Benchmark ===============" << std::endl;
+      benchmark::Initialize(&argc, argv);
+      benchmark::RunSpecifiedBenchmarks();
+      return 0;
+  }
+#+END_SRC
+
+ *Building* 
+
+#+BEGIN_SRC sh  
+  $ cmake -H. -B_build -DCMAKE_BUILD_TYPE=Release
+  $ cmake --build _build --target
+#+END_SRC
+
+ *Running* 
+
+#+BEGIN_SRC sh 
+  $ _build/benchmark_runner 
+  ========= Micro Benchmark ===============
+  2019-08-28 14:53:53
+  Running _build/benchmark_runner
+  Run on (4 X 3100 MHz CPU s)
+  CPU Caches:
+    L1 Data 32K (x2)
+    L1 Instruction 32K (x2)
+    L2 Unified 256K (x2)
+    L3 Unified 4096K (x1)
+  Load Average: 0.72, 0.81, 0.96
+  ***WARNING*** CPU scaling is enabled, the benchmark real time measurements may be noisy and will incur extra overhead.
+  ------------------------------------------------------------------------
+  Benchmark                              Time             CPU   Iterations
+  ------------------------------------------------------------------------
+  BM_fibonacci_non_recursive/10      0.375 ns        0.373 ns   1000000000
+  BM_fibonacci_non_recursive/30      0.367 ns        0.366 ns   1000000000
+  BM_fibonacci_non_recursive/40      0.352 ns        0.351 ns   1000000000
+  BM_fibonacci_non_recursive/45      0.357 ns        0.356 ns   1000000000
+  BM_fibonacci_recursive/10            261 ns          260 ns      2531115
+  BM_fibonacci_recursive/30        4407109 ns      4396380 ns          159
+  BM_fibonacci_recursive/40      600690587 ns    598780692 ns            1
+  BM_fibonacci_recursive/45     6128444226 ns   6110706127 ns            1
 #+END_SRC
 
 ** Pistache - REST Http Web Server
@@ -5889,674 +6761,4 @@ File: pistache-server.cpp
    #   253     Use for experimentation and testing           [RFC3692]
    #   254     Use for experimentation and testing           [RFC3692]
    #   255                 Reserved                             [IANA]
-#+END_SRC
-
-** GTest - Unit Testing Framework
-
-GTest or Google test is one of the most used and most popular test
-frameworks which supports many features such as mocks; test fixtures;
-parameterized tests; XML test report in JUnit / xUnit format; test
-discovery and integration with IDEs, namely Eclipse, QTCreator and
-Visual Studio.
-
-
-Official Web site:
- + https://github.com/google/googletest
-
-Some Tutorial/Primers: 
- + [[https://github.com/google/googletest/blob/master/googletest/docs/primer.md][Google Test Primer]] (Official)
- + [[https://docs.microsoft.com/en-us/visualstudio/test/how-to-use-google-test-for-cpp?view=vs-2019][How to use Google Test for C++ - Visual Studio | Microsoft Docs]]
- + [[http://www.yolinux.com/TUTORIALS/Cpp-GoogleTest.html][GoogleTest: C++ unit test framework]]
- + [[https://developer.ibm.com/articles/au-googletestingframework/][A quick introduction to the Google C++ Testing Framework – IBM Developer]]
-
-Conan Reference: 
- + [[https://bintray.com/conan-community/conan/gtest%253Aconan/1.8.0%253Astable][gtest/1.8.0@conan/stable]]
-
-Test Runner for GTest: 
- + https://github.com/nholthaus/gtest-runner
-
-CMake Integration:
- + [[https://cmake.org/cmake/help/latest/module/FindGTest.html][FindGTest — CMake 3.14.4 Documentation]]
-
-Fatal Assertions: 
- + ASSERT_TRUE
- + ASSERT_FALSE
- + ASSERT_EQ(val1, val2)
- + ASSERT_NE(val1, val2)
- + ASSERT_LT
- + ASSERT_GT
- + ASSERT_GE 
-
-Non-fatal assertions Macros: 
-
- + EXPECT_TRUE
- + EXPECT_FALSE
- + EXPECT_EQ
- + EXPECT_NQ
- + EXPECT_DOUBLE_EQ
- + EXPECT_FLOAT_EQ
- + EXPECT_NEAR(value1, value2, absolute_tolerance)
- + TEST(<NAME>, ){ ... <BODY> .. }
- + EXPECT_FLOAT_EQ 
-
- *Example: Usage with CMake and QTCreator*
-
-Get the source code: 
- + Gist: [[https://gist.github.com/caiorss/eb2fc15b7ed322ccac5ee496585e54e9][Sample Project CMake and GTest with Conan]]
-
-#+BEGIN_SRC sh 
-  $ git clone https://gist.github.com/caiorss/eb2fc15b7ed322ccac5ee496585e54e9 gist && cd gist
-  Cloning into 'gist'...
-  remote: Enumerating objects: 4, done.
-  remote: Counting objects: 100% (4/4), done.
-  remote: Compressing objects: 100% (4/4), done.
-  remote: Total 4 (delta 0), reused 0 (delta 0), pack-reused 0
-  Unpacking objects: 100% (4/4), done.
-
-  $ ls
-  CMakeLists.txt  gtest-experiment.cpp
-
-  # Open with QT Creator, Visual Studio or build from command line 
-  $ qtcreator CMakeList.txt 
-
-  # Open with Visual Studio 
-  $ devenv CMakeLists.txt 
-#+END_SRC
-
- *File: gtest-experiment.cpp*
-
-Headers:
-
-#+BEGIN_SRC cpp 
-  #include <iostream>
-  #include <string>
-  #include <vector>
-  #include <cassert>
-
-  #include <gtest/gtest.h>
-#+END_SRC
-
-Implementations: 
-
-#+BEGIN_SRC cpp 
-  // ==================== Implementation ========================
-
-  int factorial(int n){
-      int prod = 1;
-      for(int i = 1; i <= n; i++)
-          prod *= i;
-      return prod;
-  }
-
-  struct Date
-  {
-      int year;
-      int month;
-      int day;
-      Date(){}
-      Date(int year, int month, int day)
-          : year(year)
-          , month(month)
-          , day(day)
-      { }
-
-      // Comparison operator required by  EXPECT_EQ
-      bool operator==(Date const& rhs) const
-      {
-          return year  == rhs.year
-              && month == rhs.month
-              && day   == rhs.day;
-      }
-      // Necessary for make class printable in GTest
-      friend std::ostream& operator<<(std::ostream& os, Date const& rhs)
-      {
-          return os << "Date { " << rhs.year << " ; "
-                    << rhs.month << " ; "
-                    << rhs.day << " } ";
-      }
-  };
-
-  Date GregorianEasterSunday(int y)
-  {
-      int c = y / 100;
-      int n = y - 19 * ( y / 19 );
-      int k = ( c - 17 ) / 25;
-      int i = c - c / 4 - ( c - k ) / 3 + 19 * n + 15;
-      i = i - 30 * ( i / 30 );
-      i = i - ( i / 28 ) * ( 1 - ( i / 28 )
-            ,* ( 29 / ( i + 1 ) )
-            ,* ( ( 21 - n ) / 11 ) );
-      int j = y + y / 4 + i + 2 - c + c / 4;
-      j = j - 7 * ( j / 7 );
-      int l = i - j;
-      int m = 3 + ( l + 40 ) / 44;
-      int d = l + 28 - 31 * ( m / 4 );
-      return Date(y, m, d);
-  }
-#+END_SRC
-
-Test code: 
-
-#+BEGIN_SRC cpp 
-  //=============== Tests ====================================//
-
-  TEST(FactorialTest, test1){
-      EXPECT_EQ(6,        factorial(3));
-      EXPECT_EQ(24,       factorial(4));
-      EXPECT_EQ(120,      factorial(5));
-      EXPECT_EQ(3628800,  factorial(10));
-      // Expect greater than
-      EXPECT_GT(10000000, factorial(10));
-      // Expect not equal
-      EXPECT_NE(25, factorial(4));
-  }
-
-  TEST(FactorialTestFailure, testFailure){
-      // Deliberately fails for demonstration purposes
-      EXPECT_EQ(6, factorial(3));
-      EXPECT_EQ(4, factorial(4));
-      EXPECT_EQ(6, factorial(2));
-  }
-
-  TEST(GregorianEaster, testdates){
-      EXPECT_EQ(Date(2005, 3, 27), GregorianEasterSunday(2005));
-      EXPECT_EQ(Date(2008, 3, 23), GregorianEasterSunday(2008));
-      EXPECT_EQ(Date(2010, 4, 4),  GregorianEasterSunday(2010));
-  }
-#+END_SRC
-
-  *File: CMakeLists.txt*
-
-#+BEGIN_SRC cmake 
-  cmake_minimum_required(VERSION 3.9)
-  project( GtestsExperiment
-           VERSION      0.1
-           DESCRIPTION  "Experiment with Gtest uni testing framework"
-          )
-  # ============= Conan Bootstrap =============================#
-
-  # Download automatically, you can also just copy the conan.cmake file
-  if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan.cmake")
-     message(STATUS "Downloading conan.cmake from https://github.com/conan-io/cmake-conan")
-     file(DOWNLOAD "https://github.com/conan-io/cmake-conan/raw/v0.13/conan.cmake"
-                   "${CMAKE_BINARY_DIR}/conan.cmake")
-  endif()
-
-  include(${CMAKE_BINARY_DIR}/conan.cmake)
-
-  conan_cmake_run(REQUIRES
-                  gtest/1.8.1@bincrafters/stable
-                  BASIC_SETUP
-                  BUILD missing
-                  )
-
-  #============= Find Packages ================================#
-
-  find_package(GTest REQUIRED)
-
-  #---------------------------------------------------#
-  #             Targets Settings                      #
-  #---------------------------------------------------#
-
-  add_executable(gtest-experiment gtest-experiment.cpp)
-  target_link_libraries(gtest-experiment GTest::GTest GTest::Main)
-  add_test(GTestExperiment gtest-experiment)
-#+END_SRC
-
- *Test Output:*
-
-#+CAPTION: Test output in Command Line 
-[[file:images/gtest-framework-console.png][file:images/gtest-framework-console.png]]
-
-#+CAPTION: QTCreator Test Discovery 
-[[file:images/gtest-framework-qtcreator.png][file:images/gtest-framework-qtcreator.png]]
-
-** Catch2 - Unit Testing Framework
-
-Advatanges over other test frameworks:
-
- + Header-only library, so it requires no linking step or linking
-   dependencies.
-
- + Uses C++ operators instead of many macros such as (X > 20) instead of
-   EXPECT_GT(X, 20) (expect grater than) as in GTest (Google's test)
-
- + BDD - Behavior Driven Development
-
- + Property-based testing - testing with several random values and
-   combination of random values.
-
- + Test with multiple data or data table which frees the user from
-   writing lots boilerplate ASSERT_EQUAL(x, y). A single REQUIRE macro
-   can be used for test a whole list of cartesian pairs such as (x, y,z, expected)
-
- + XML output in JUnit, xUnit format.
-
-Problem:
- + Compile-time can be a bit slow due to the library be header-only.
-
-Repository:
- + https://github.com/catchorg/Catch2
-
-Conan Reference:
- + [[https://bintray.com/catchorg/Catch2/Catch2:catchorg/2.7.2:stable][Catch2/2.7.2@catchorg/stable]]
-
-Code Examples:
- + https://github.com/catchorg/Catch2/tree/master/examples
- + [[https://github.com/catchorg/Catch2/blob/master/projects/SelfTest/UsageTests/Generators.tests.cpp][Test Generators]] - testing with multiple data
-
-Tutorial:
- + [[https://github.com/catchorg/Catch2/blob/master/docs/tutorial.md#top][Catch2/tutorial.md at master · catchorg/Catch2 · GitHub]]
- + [[https://mariusbancila.ro/blog/2018/03/29/writing-cpp-unit-tests-with-catch2/][Writing C++ unit tests with Catch2]] - BDD - Behavior Driven Development.
-
-Misc:
- + [[https://levelofindirection.com/blog/catch2-released.html][Catch2 Released : Level of Indirection]]
- + [[https://codingnest.com/the-future-of-catch2/][The future of Catch2 — The Coding Nest]]
-
-Example simple test:
-
-File: testcatch2.cpp
-
-#+BEGIN_SRC cpp
-  #include <iostream>
-
-  #include <catch2/catch.hpp>
-
-
-  int formula(int x, int y)
-  {
-      return 4 * x + 2 * y;
-  }
-
-  TEST_CASE("Test function furmula A", "[tag1]")
-  {
-      REQUIRE( formula(3, 4) == 20 );
-      REQUIRE( formula(4, 5) == 26 );
-  }
-
-  TEST_CASE("Test function formula B", "[tag2]")
-  {
-      REQUIRE( formula(0, 0) == 0  );
-      // Intentionally fails
-      REQUIRE( formula(2, 5) == 10 );
-  }
-
-
-  struct TestData
-  {
-      int x, y, expected;
-  };
-
-
-  TEST_CASE("Testing with struct")
-  {
-      auto t = GENERATE( values<TestData>(
-      {
-          {3,  4, 20}
-         ,{4,  5, 26}
-         ,{0,  0,  0}
-         ,{-1, 4,  6} // Fails
-         ,{ 2, 2, 12}
-      }));
-      REQUIRE( formula(t.x, t.y) == t.expected);
-  }
-
-
-  TEST_CASE("Testing with structured bindings")
-  {
-      auto [x, y, z] = GENERATE( table<int, int, int>(
-      {
-          {3,  4, 20}
-         ,{4,  5, 26}
-         ,{0,  0,  0}
-         ,{2, 2, 12}
-      }));
-      REQUIRE( formula(x, y) == z);
-  }
-#+END_SRC
-
-File: CMakeLists.txt - CMake building script integrated with Conan.
-
-#+BEGIN_SRC cmake
-  cmake_minimum_required(VERSION 3.9)
-  project(Catch2_testing)
-
-  set(CMAKE_CXX_STANDARD 17)
-  set(CMAKE_VERBOSE_MAKEFILE ON)
-
-  # ============= Conan Bootstrap =============================#
-
-  # Download automatically, you can also just copy the conan.cmake file
-  if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan.cmake")
-     message(STATUS "Downloading conan.cmake from https://github.com/conan-io/cmake-conan")
-     file(DOWNLOAD "https://github.com/conan-io/cmake-conan/raw/v0.13/conan.cmake"
-                   "${CMAKE_BINARY_DIR}/conan.cmake")
-  endif()
-
-  include(${CMAKE_BINARY_DIR}/conan.cmake)
-
-  conan_cmake_run(REQUIRES
-                  Catch2/2.7.2@catchorg/stable
-                  BASIC_SETUP
-                  BUILD missing
-                  )
-  #============= Find Packages ================================#
-
-  find_package(Catch2 REQUIRED)
-
-  #---------------------------------------------------#
-  #             Targets Settings                      #
-  #---------------------------------------------------#
-
-  add_executable(testcatch2 testcatch2.cpp test-main.cpp)
-  target_link_libraries(testcatch2)
-#+END_SRC
-
-Test runner help option:
-
-#+BEGIN_SRC sh
-  $ ./testcatch2 -h
-
-  Catch v2.7.2
-  usage:
-    testcatch2 [<test name|pattern|tags> ... ] options
-
-  where options are:
-    -?, -h, --help                            display usage information
-    -l, --list-tests                          list all/matching test cases
-    -t, --list-tags                           list all/matching tags
-    -s, --success                             include successful tests in
-                                              output
-    -b, --break                               break into debugger on failure
-    -e, --nothrow                             skip exception tests
-    -i, --invisibles                          show invisibles (tabs, newlines)
-    -o, --out <filename>                      output filename
-    -r, --reporter <name>                     reporter to use (defaults to
-                                              console)
-    -n, --name <name>                         suite name
-    -a, --abort                               abort at first failure
-    -x, --abortx <no. failures>               abort after x failures
-    -w, --warn <warning name>                 enable warnings
-    -d, --durations <yes|no>                  show test durations
-    -f, --input-file <filename>               load test names to run from a
-                                              file
-    -#, --filenames-as-tags                   adds a tag for the filename
-    -c, --section <section name>              specify section to run
-    -v, --verbosity <quiet|normal|high>       set output verbosity
-    --list-test-names-only                    list all/matching test cases
-                                              names only
-    --list-reporters                          list all reporters
-    --order <decl|lex|rand>                   test case order (defaults to
-                                              decl)
-    --rng-seed <'time'|number>                set a specific seed for random
-                                              numbers
-    --use-colour <yes|no>                     should output be colourised
-    --libidentify                             report name and version according
-                                              to libidentify standard
-    --wait-for-keypress <start|exit|both>     waits for a keypress before
-                                              exiting
-    --benchmark-resolution-multiple           multiple of clock resolution to
-    <multiplier>                              run benchmarks
-
-  For more detailed usage please see the project docs
-
-
-#+END_SRC
-
-Test runner test list:
-
-#+BEGIN_SRC sh
-  $ ./testcatch2 --list-tests
-  All available test cases:
-    Test function furmula A
-        [tag1]
-    Test function formula B
-        [tag2]
-    Testing with struct
-    Testing with structured bindings
-  4 test cases
-
-#+END_SRC
-
-Test runner output:
-
-#+BEGIN_SRC text
-   $ ./testcatch2
-
-   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   testcatch2 is a Catch v2.7.2 host application.
-   Run with -? for options
-
-   -------------------------------------------------------------------------------
-   Test function formula B
-   -------------------------------------------------------------------------------
-   /home/archbox/Documents/projects/fquant/testcatch2.cpp:17
-   ...............................................................................
-
-   /home/archbox/Documents/projects/fquant/testcatch2.cpp:21: FAILED:
-     REQUIRE( formula(2, 5) == 10 )
-   with expansion:
-     18 == 10
-
-   -------------------------------------------------------------------------------
-   Testing with struct
-   -------------------------------------------------------------------------------
-   /home/archbox/Documents/projects/fquant/testcatch2.cpp:31
-   ...............................................................................
-
-   /home/archbox/Documents/projects/fquant/testcatch2.cpp:41: FAILED:
-     REQUIRE( formula(t.x, t.y) == t.expected )
-   with expansion:
-     4 == 6
-
-   ===============================================================================
-   test cases:  4 |  2 passed | 2 failed
-   assertions: 13 | 11 passed | 2 failed
-#+END_SRC
-
-** Doctest - Unit Testing Framewok
-
-Doctest is a unit test framework based on catch2 test framework,
-however doctest has a much faster compile-time than many other
-unit-test frameworks.
-
-Advantages:
- + Easy of use
- + Faster compile-time
- + Easy to integrate, header-only-library
- + Operator based testing: CHECK(VALUE == EXPECTED), CHECK(x > 10)
-   instead of No need to use macros ASSERT_EQ, ASSERT_NEQ (not equal)
-   as in GTest.
-
-Disadvantages:
- + No XML output with jUnit standard similar to GTest standard.
- + No integration with IDE
- + No data-driven test, aka parameterized test, or test with a list of value tuples.
-
-Repository:
- + https://github.com/onqtam/doctest
-
-Conan Reference:
- + [[https://bintray.com/bincrafters/public-conan/doctest%253Abincrafters/2.3.1%253Astable][doctest/2.3.1@bincrafters/stable]]
-
-Conan Package:
- + https://github.com/bincrafters/conan-doctest
-
-Code Examples:
- + https://github.com/onqtam/doctest/tree/master/examples
-
-Features:
- + https://github.com/onqtam/doctest/blob/master/doc/markdown/features.md
-
-See:
- + [[https://accu.org/index.php/journals/2343][ACCU - doctest – the Lightest C++ Unit Testing Framewor]]
- + [[https://www.codeproject.com/Articles/1156938/doctest-the-lightest-Cplusplus-unit-testing-framew][doctest - the lightest C++ unit testing framework - CodeProject]]
-
-Video:
- + [[https://www.youtube.com/watch?v=eH1CxEC29l8][CppCon 2017: Viktor Kirilov “Mix Tests and Production Code With Doctest...” - YouTube]]
-
-Usage:
-
- + File: doctest_experiment.cpp
-
-#+BEGIN_SRC cpp
-  #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-  #include <doctest.h>
-
-  int formula(int x, int y)
-  {
-      return 4 * x + 2 * y;
-  }
-
-  TEST_CASE("Test function furmula A")
-  {
-      CHECK( formula(3, 4) == 20 );
-      CHECK( formula(4, 5) == 26 );
-      CHECK( formula(4, 5) < 100 );
-      CHECK( formula(4, 5) != 0 );
-  }
-
-  TEST_CASE("Test function formula B")
-  {
-      CHECK( formula(0, 0) == 0  );
-      // Intentionally fails
-      CHECK( formula(2, 5) == 10 );
-  }
-#+END_SRC
-
- + File: CMakeLists.txt integrated with Conan
-
-#+BEGIN_SRC cmake
-  cmake_minimum_required(VERSION 3.9)
-  project( doctest_experiment
-           VERSION      0.1
-           DESCRIPTION  "A doctest experiment"
-          )
-  set(CMAKE_CXX_STANDARD 17)
-  set(CMAKE_VERBOSE_MAKEFILE ON)
-
-  # ============= Conan Bootstrap =============================#
-
-  # Download automatically, you can also just copy the conan.cmake file
-  if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan.cmake")
-     message(STATUS "Downloading conan.cmake from https://github.com/conan-io/cmake-conan")
-     file(DOWNLOAD "https://github.com/conan-io/cmake-conan/raw/v0.13/conan.cmake"
-                   "${CMAKE_BINARY_DIR}/conan.cmake")
-  endif()
-
-  include(${CMAKE_BINARY_DIR}/conan.cmake)
-
-  conan_cmake_run(REQUIRES
-                  doctest/2.3.1@bincrafters/stable
-                  BASIC_SETUP
-                  BUILD missing
-                  )
-
-  #============= Find Packages ================================#
-
-  find_package(doctest 2.3.1 REQUIRED)
-
-  #---------------------------------------------------#
-  #             Targets Settings                      #
-  #---------------------------------------------------#
-
-  add_executable(doctest_experiment doctest_experiment.cpp)
-  copy_after_build(doctest_experiment)
-  # target_link_libraries(doctest_experiment doctest::doctest)
-#+END_SRC
-
-Show options:
-
-#+BEGIN_SRC sh
-   $ bin/doctest_experiment -h
-   [doctest] doctest version is "2.3.1"
-   [doctest]
-   [doctest] boolean values: "1/on/yes/true" or "0/off/no/false"
-   [doctest] filter  values: "str1,str2,str3" (comma separated strings)
-   [doctest]
-   [doctest] filters use wildcards for matching strings
-   [doctest] something passes a filter if any of the strings in a filter matches
-   [doctest]
-   [doctest] ALL FLAGS, OPTIONS AND FILTERS ALSO AVAILABLE WITH A "dt-" PREFIX!!!
-   [doctest]
-   [doctest] Query flags - the program quits after them. Available:
-
-    -?,   --help, -h                      prints this message
-    -v,   --version                       prints the version
-    -c,   --count                         prints the number of matching tests
-    -ltc, --list-test-cases               lists all matching tests by name
-    -lts, --list-test-suites              lists all matching test suites
-    -lr,  --list-reporters                lists all registered reporters
-
-   [doctest] The available <int>/<string> options/filters are:
-
-    -tc,  --test-case=<filters>           filters     tests by their name
-    -tce, --test-case-exclude=<filters>   filters OUT tests by their name
-    -sf,  --source-file=<filters>         filters     tests by their file
-    -sfe, --source-file-exclude=<filters> filters OUT tests by their file
-    -ts,  --test-suite=<filters>          filters     tests by their test suite
-    -tse, --test-suite-exclude=<filters>  filters OUT tests by their test suite
-    -sc,  --subcase=<filters>             filters     subcases by their name
-    -sce, --subcase-exclude=<filters>     filters OUT subcases by their name
-    -r,   --reporters=<filters>           reporters to use (console is default)
-    -o,   --out=<string>                  output filename
-    -ob,  --order-by=<string>             how the tests should be ordered
-                                          <string> - by [file/suite/name/rand]
-    -rs,  --rand-seed=<int>               seed for random ordering
-    -f,   --first=<int>                   the first test passing the filters to
-                                          execute - for range-based execution
-    -l,   --last=<int>                    the last test passing the filters to
-                                          execute - for range-based execution
-    -aa,  --abort-after=<int>             stop after <int> failed assertions
-    -scfl,--subcase-filter-levels=<int>   apply filters for the first <int> levels
-
-   [doctest] Bool options - can be used like flags and true is assumed. Available:
-
-    -s,   --success=<bool>                include successful assertions in output
-    -cs,  --case-sensitive=<bool>         filters being treated as case sensitive
-    -e,   --exit=<bool>                   exits after the tests finish
-    -d,   --duration=<bool>               prints the time duration of each test
-    -nt,  --no-throw=<bool>               skips exceptions-related assert checks
-    -ne,  --no-exitcode=<bool>            returns (or exits) always with success
-    -nr,  --no-run=<bool>                 skips all runtime doctest operations
-    -nv,  --no-version=<bool>             omit the framework version in the output
-    -nc,  --no-colors=<bool>              disables colors in output
-    -fc,  --force-colors=<bool>           use colors even when not in a tty
-    -nb,  --no-breaks=<bool>              disables breakpoints in debuggers
-    -ns,  --no-skip=<bool>                don't skip test cases marked as skip
-    -gfl, --gnu-file-line=<bool>          :n: vs (n): for line numbers in output
-    -npf, --no-path-filenames=<bool>      only filenames and no paths in output
-    -nln, --no-line-numbers=<bool>        0 instead of real line numbers in output
-
-   [doctest] for more information visit the project documentation
-#+END_SRC
-
-Test runner test listing:
-
-#+BEGIN_SRC sh
-  $ bin/doctest_experiment --list-test-cases
-  [doctest] listing all test case names
-  ===============================================================================
-  Test function furmula A
-  Test function formula B
-  ================================================
-#+END_SRC
-
-Run tests: (Note: It is printed with colored output)
-
-#+BEGIN_SRC text
-  $ bin/doctest_experiment
-  [doctest] doctest version is "2.3.1"
-  [doctest] run with "--help" for options
-  ===============================================================================
-  /home/archbox/Documents/projects/fquant/doctest_experiment.cpp:21:
-  TEST CASE:  Test function formula B
-
-  /home/archbox/Documents/projects/fquant/doctest_experiment.cpp:25: ERROR: CHECK( formula(2, 5) == 10 ) is NOT correct!
-    values: CHECK( 18 == 10 )
-
-  ===============================================================================
-  [doctest] test cases:      2 |      1 passed |      1 failed |      0 skipped
-  [doctest] assertions:      6 |      5 passed |      1 failed |
-  [doctest] Status: FAILURE!
 #+END_SRC
