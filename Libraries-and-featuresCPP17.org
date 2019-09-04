@@ -351,6 +351,156 @@ Main function:
    cpp17-invoke.cpp:9 I was evaluated ; 2x = 6
  #+END_SRC
 
+** Attributes 
+
+Attributes are annotations that provide unified syntax to language
+extensions and additional information to compilers that can be used
+for issue warning when certain conditions are met, apply special logic
+to the code or perform optimization. 
+
+The C++11 and C++17 standard defines the following new attributes:
+
+  + noreturn
+    + Annoation indicating that the function does not return. 
+
+  + deprecated or deprecated("reason")
+    + Indicates that the usage of the function or member function is
+      discouraged issuing a compile warning when the annotated code is
+      used. 
+
+  + falltrhough (C++17)
+
+  + nodiscard (C++17)
+
+  + maybe_unused (C++17)
+    + Disables compile warning for unnused function parameters,
+      variables or member variables.
+
+ *Examples of Language/Compiler Extensions which attributes could replace* 
+
+GNU GCC or G++ and Clang LLVM 
+
+#+BEGIN_SRC cpp 
+   __attribute___(aligned(16)) class Something{ ... };
+
+   double variable __attribute__((unnused));
+#+END_SRC
+
+MSV Visual C++ Compiler and MingW (GCC ported to Windows)
+
+#+BEGIN_SRC cpp 
+    // Function exportd from DLL 
+  __declspec(dllexport) bool function_export() { ... }
+
+   // Function imported from DLL 
+  __declspec(dllimport) void function_imported() { ... }
+
+  class __declspec(dllexport)  ClassExported
+  {
+    // .... code here ... //
+  };
+#+END_SRC
+
+ *Example of Attribute Usage:*
+
+ + Attribute _depreacted_ 
+
+#+BEGIN_SRC cpp 
+  [[deprecated]]
+  bool check_disk()
+  {
+      // ... code here ...
+      return true; 
+  }
+
+  [[deprecated("DO NOT USE IT. It will phased out on next release.")]]
+  void process_function()
+  {
+    /* ... Code here ... */    
+  }
+#+END_SRC
+
+ + Attribute _noreturn_
+
+#+BEGIN_SRC cpp 
+  void process_action(std::string const&);
+
+  [[noreturn]]
+  void process_input_event_loop()
+  {
+      std::string line;
+      // Infinite loop function never returns 
+      for (;;) {
+          std::getline(std::cin, line);
+          if(line == "exit") { std::puts(" Ciau."); std::exit(0); }
+          process_action(line);
+      };
+    
+  }
+#+END_SRC
+
+ + Attribute _maybe_unused_ (C++17)
+   + Suppress warnings for unused function parameters. 
+
+#+BEGIN_SRC cpp 
+  double compute_sum(size_t size, double xs [], [[maybe_unused]] int flags)
+  {
+      double sum = 0.0;
+      for(size_t i = 0; i < size; ++i) { sum+= xs[i]; }
+      return sum; 
+  }
+#+END_SRC
+
+ + Attribute _nodiscard_ (C++17)
+   + Raises a compiler warning when a return value of an annoated
+     function is discarded. It is useful to annotate functions which
+     returns error codes when exceptions cannot be used. 
+
+#+BEGIN_SRC cpp 
+  [[nodiscard]]
+  bool set_temperature(int t)
+  {
+      std::cout << " Set oven temperature to: " << t << " Celsius" << "\n";
+      // ... some code  ... //
+      return false;
+  }
+
+  int main() 
+  {
+     // Raises compiler warning 
+     set_temperature(100); 
+
+     // Do not raise compiler WARNING 
+     if(set_temperature(100)) 
+     { 
+        // do something else ... 
+     } else 
+     {
+        // Report failure to end use. 
+     }
+
+     return 0; 
+  }
+
+#+END_SRC
+
+ *See:* 
+
+  + [[https://en.cppreference.com/w/cpp/language/attributes][attribute specifier sequence(since C++11)]] (Cpp reference)
+
+  + [[https://docs.microsoft.com/en-us/cpp/cpp/attributes?view=vs-2019][Attributes in C++ | Microsoft Docs]]
+
+  + [[https://clang.llvm.org/docs/LanguageExtensions.html#non-standard-c-11-attributes][Clang Language Extensions — Clang 10 documentation]]
+
+  + WG21 Paper - *Towards supporrt for attributes in C++ (Revision 6)*
+    + <http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2008/n2761.pdf>
+    + C++ Proposal for attributes language extension. One of the main
+      cases presented for this proposal is the easier usage of OpenMP
+      language extension pragmas. 
+
+
+
+
 ** std::any 
    :PROPERTIES:
    :ID:       9397a9a0-e641-4cb6-89b7-24a82fe12d99
@@ -800,8 +950,6 @@ Output:
    $XDG_SESSION_PATH = <<error: not set>>
    $HOMEX = <<error: not set>>
 #+END_SRC
-
-
 
 
 
