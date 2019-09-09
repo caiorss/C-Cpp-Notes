@@ -65,6 +65,20 @@ Benefits of multi-threading:
     connections in network server appliocations.  
 
 
+Potential Problems of Concurrency and Multi-threading
+
+  + Race condition, aka data race
+
+  + Deadlock
+
+  + Starvation 
+
+  + Oversubscription
+
+  + Load balancing
+
+  + Thread exaustion 
+
  *Lowest Level Threading APIs:*
 
 Threads and processes require operating system support, therefore
@@ -77,5 +91,659 @@ provided by operating system for accessing threads are:
       real time systems such as RTEMS, QNX and VxWorks.
 
   * _Windows Win32 Thread API_
+
+** Standard Library Reference 
+ 
+ *Technical Specifications* 
+
+  + P0159 - Technical Specifiction for Concurrency
+
+  + P0024 - Technical Specifiction for Parallelism
+
+  + C++17 Concurrency TS (Technical Specification)
+ 
+
+ *C++11/14 Thread API*
+
+   + std::threads (C++11)
+
+ *Task Based API*
+
+  + [[https://docs.microsoft.com/en-us/cpp/standard-library/promise-class?view=vs-2019][std::promise]] (Microsoft) 
+
+  + [[https://docs.microsoft.com/en-us/cpp/standard-library/future?view=vs-2019][std::future]] (Microsoft)
+
+  + std::future<>, std::shared_future<>, std::atomic_future<> 
+
+  + [[https://docs.microsoft.com/en-us/cpp/standard-library/packaged-task-class?view=vs-2019][std::packaged_task]] (Microsft)
+
+  + std::async
+
+  + Function: [[https://docs.microsoft.com/en-us/cpp/standard-library/future-functions?view=vs-2019][std::async]] (Microsft)
+
+  + std::launch 
+
+C++17 Additions: 
+
+ + Concurrent TS (Nonblocking futures (.then), executors, await)
+ + future::when_any
+ + future::when_all()
+ + future::then() 
+ + future::unwrap()
+
+ *Syncronization Primitives:*
+
+ + Locks 
+   + [[https://en.cppreference.com/w/cpp/thread/mutex][std::mutex]]
+   + std::condition_variable
+
+ + RAII Wrappers for locks 
+   + [[https://en.cppreference.com/w/cpp/thread/unique_lock][std::unique_lock<>]] 
+   + [[https://en.cppreference.com/w/cpp/thread/lock_guard][std::lock_guard]] - RAII Wrapper for locks
+
+ + Atomic Operations => Header: [[https://en.cppreference.com/w/c/atomic][<atomic>]]
+   + [[https://en.cppreference.com/w/cpp/atomic/atomic][std::atomic]] 
+   + std::atomic_xxx, std::atomic<>, std::atomic_thread_fence()
+
+ *Implementations of C++11 Standard Library*
+
+   + Clang LLVM 
+
+   + GNU GCC/G++  
+
+   + MSVC - Microsft Visual C++ Compiler (aka Visual Studio Compiler)
+
+   + just::thread - commercial implementation by Just Software
+     Solution for MSVC, GNU GCC/G++ and CLang.
+
+
+** Class std::thread 
+
+The class std::threads _is not thread_, it is a proxy for a native
+thread and encapsulates a native thread or a kernel thread which the
+documentation calls _thread of execution_.  
+
+Header: 
+  + [[https://en.cppreference.com/w/cpp/header/thread][<thread>]]
+
+Documentation: 
+
+ + [[https://en.cppreference.com/w/cpp/thread/thread/thread][std::thread]]  - cppreference
+
+ + [[https://docs.microsoft.com/en-us/cpp/standard-library/thread-class?view=vs-2019][std::thread]] - Microsft MSFT, MSVC
+
+ + [[https://www.boost.org/doc/libs/1_71_0/doc/html/thread.html][boost:thread]]  - Predecessor of the standard library threads
+
+ + [[https://www.boost.org/doc/libs/1_71_0/doc/html/thread/thread_management.html][Thread Management - 1.71.0]] (Boost docs)
+ 
+Papers related to the standard library implementation: 
+
+ * [[http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2006/n2094.html][WG21 - N2093]]  - Multithreading API for C++0X - A Layered Approach - 2006-09-09
+
+ * [[http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2006/n2139.html][WG21 - N2139]] - Thoughts on a Thread Library for C++ - 2006-11-06
+
+ * [[http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2007/n2184.html][WG21 - N2184]] - Thread Launching for C++0X - 2007-03-09
+
+ * [[http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2008/n2497.html][WG21 - N2497]] - Multi-threading Library for Standard C++ (Revision 1) - 2008-01-07
+
+ * [[http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2007/n2320.html][WG21 - N2320]] - Multi-threading Library for Standard C++ - 2007-06-24
+
+
+ *Type of signature of std::thread member functions*
+
+#+BEGIN_SRC cpp 
+  class thread
+  {
+  public:
+      // types:
+      class id;
+      // typedef implementation-defined native_handle_type; // See [thread.native]
+
+      // construct/copy/destroy:
+      thread();
+      template <class F> explicit thread(F f);
+      template <class F, class ...Args> thread(F&& f, Args&&... args);
+      ~thread();
+      thread(const thread&) = delete;
+      thread(thread&&);
+      thread& operator=(const thread&) = delete;
+      thread& operator=(thread&&);
+
+      // members:
+      void swap(thread&&);
+      bool joinable() const;
+      void join();
+      void detach();
+      id get_id() const;
+      native_handle_type native_handle(); // See [thread.native]
+
+      // static members:
+      static unsigned hardware_concurrency();
+  };
+#+END_SRC
+
+ *Detailed Member Functions of class std::thread*
+
+ + _Default and move constructors_ 
+
+#+BEGIN_SRC cpp 
+  // Default constructor - without any thread of execution 
+  thread() noexcept;
+
+  // Move constructor 
+  thread(thread&& Other) noexcept;
+#+END_SRC
+
+ + _Other Constructors_
+   + The following constructor can take as agument (type parameter
+     Fn): any function pointer; callable object (aka "functor") or
+     lambda expression. The thread of execution associated to the
+     constructed object starts its execution immediately. 
+
+#+BEGIN_SRC cpp 
+  template <class Fn, class... Args>
+  explicit thread(Fn&& F, Args&&... A);
+#+END_SRC
+
+Example: Construct thread out of function pointer: 
+
+#+BEGIN_SRC cpp 
+  //========= Create thread out of function pointer =======// 
+  void do_forever() 
+  { 
+    while(every 10 seconds){ println(" 10 second elapsed!")};
+  }  
+
+  void action_sleep(int N)
+  { 
+     // .... sleep for N seconds ....
+     print(" [INFO] Thread wake up! OK");
+  }
+
+  thread th1 {do_forever};
+  thread th2 {&do_forever};
+  thread th3 {action_sleep, 10}; 
+  thread th4 {&action_sleep, 1};   
+#+END_SRC
+
+Example: construct threads out of function object, aka callable
+objects or functors. 
+
+#+BEGIN_SRC cpp 
+  // Functor
+  struct LoopMessage
+  {
+      const std::string message;
+      const int delay;
+
+      LoopMessage(std::string message, int delay):
+          message(message)
+        , delay(delay) { }
+
+      // Function-call operator called by the thread class. 
+      void operator()()
+      {
+          while(true)
+          {
+              std::this_thread::sleep_for(std::chrono::seconds(delay));
+              std::cout << " [INFO] thread id = " << std::this_thread::get_id()
+                        << " ; " << message << std::endl;
+          }
+      }
+  };
+
+  int main()
+  {
+      std::thread thread_messageA {LoopMessage, "Hello world", 10};
+      auto thread_messageB = std::thread{LoopMessage, "Hello world", 10}; 
+      return 0;
+  }
+#+END_SRC
+
+Example: construct thread object out of lambda expressions. 
+
+#+BEGIN_SRC cpp 
+    std::thread threadA ([](){
+        while(true)
+        {
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+           // ... action .... // 
+        }
+    });
+
+    auto th4 = std::thread([](int N){
+        while(true)
+        {
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+            // .... action ... // 
+        }
+    }, 10);
+#+END_SRC
+
+Note: Before a given std::thread object goes out of scope, it is
+necessary to call the methods .join() for waiting for the completion
+of associated thread of execution or std::thread::detach() for
+detaching the thread of execution. If neither of those functions are
+called, the C++ runtime calls _std::terminate_ and _std::abort()_
+indirectly which causes abnormal termination of the current
+application.  
+
+Example: 
+
+#+BEGIN_SRC cpp 
+  // Failure => Te runtime will call std::terminate 
+  int Function_error()
+  {
+     std::thread threadA {&functionPointer, 10, "Hello world"};
+     // Error: Missing call to methods .detach() or .join() 
+     // The runtime will call std::terminate() causing abnormal terminatoon!!
+     return 1;
+  }
+
+  // OK => Does not call std::terminate. 
+  int Function_join()
+  {
+     std::thread threadA {&functionPointer, 10, "Hello world"};
+     // Ok 
+     threadA.join(); // Wait for completion of threadA. 
+     return 1;
+  } // ThreaA out of scope here! 
+
+  // OK => Does not call std::terminate.
+  int Function_detach()
+  {
+     std::thread threadA {&functionPointer, 10, "Hello world"};
+     // Ok 
+     // Detach, no longer control or manage threadA. 
+     threadA.detach(); 
+     return 1;
+  }
+
+  int main() 
+  { 
+     Function_error(); 
+     Function_join(); 
+     Function_detach();
+
+     return 10; 
+  }
+#+END_SRC
+
+
+ + _joinable()_
+   + => Returns true if the thread is _joinable_, in other words, if the
+     thread of execution associated to the called object is running.  
+
+#+BEGIN_SRC cpp 
+  bool joinable() const noexcept;
+#+END_SRC
+
+ + _join()_
+   + => Blocks the current thread waiting for the completion of the
+     called object thread. For instance, calling threadA.join() will
+     block the current thread waiting until the thread of execution of
+     threadA object finishes. 
+
+#+BEGIN_SRC cpp 
+  void thread::join();
+#+END_SRC
+
+ + _detach()_ 
+   + => Detaches the associated thread of execution from a given
+     std::thread object. After this function is called, it is no
+     longer possible to control the detached thread of execution or
+     joining it (waiting for its completion). Then, the std::thread
+     object no longer represents the detached execution thread. 
+   + => A thread of execution that was detached is also called _daemon thread_. 
+
+#+BEGIN_SRC cpp 
+   void thread::detach();
+#+END_SRC
+
+ + _id()_
+   + => Returns the unique ID indentifier number for each thread. 
+
+#+BEGIN_SRC cpp 
+  int thread::id () noexcept;
+#+END_SRC
+
+ + _hardware_concurrency()_
+   + => Returns an estimate for the number of threads that can be run
+     in parallel. The result is often equal to the number of _logical CPU cores_.
+
+#+BEGIN_SRC cpp 
+  static unsigned int thread::hardware_concurrency() noexcept;
+#+END_SRC
+
+
+** Functions of namespace std::this_thread 
+
+Utilities functions for currrent thread of execution: 
+
+Header: 
+  + [[https://en.cppreference.com/w/cpp/thread][<header>]]
+
+Function Documentation: 
+
+  + [[https://en.cppreference.com/w/cpp/thread/yield][this_thread::yield]]
+
+  + [[https://en.cppreference.com/w/cpp/thread/get_id][this_thread::get_id]]
+
+  + [[https://en.cppreference.com/w/cpp/thread/sleep_for][this_thread::sleep_for]]
+
+  + [[https://en.cppreference.com/w/cpp/thread/sleep_until][this_thread::sleep_until]] 
+
+Signature of functions in namespace this_thread. 
+
+#+BEGIN_SRC cpp 
+      // Namespace: std::this_thread. 
+      namespace std { namespace this_thread {
+          // Returns the id of the current thread.
+          std::thread::id get_id() noexcept;
+          // Provides a hint to the implementation to reschedule the
+          // execution of threads, allowing other threads to run.
+          void            yield() noexcept;      
+          // Blocks the execution of the current thread for at least the specified sleep_duration.
+          template< class Rep, class Period >
+          void            sleep_for( const std::chrono::duration<Rep, Period>& sleep_duration );
+          // Blocks the execution of the current thread until specified
+          // sleep_time has been reached.
+          template< class Clock, class Duration >
+          void           sleep_until( const std::chrono::time_point<Clock,Duration>& sleep_time );
+       }
+      }
+#+END_SRC
+
+
+** Threads - std::thread usage and race condition 
+*** Race condition 
+
+When the a race condition happens, the outcome of the computation with
+a shared resource depends precisely on the order of execution of the
+threads. Race condition bugs are hard to trace and debug. The solution
+to this flaw is to coordinate the thread access to shared resources
+through synchronization primitives, namely, mutex (mutual exclusion
+locks), atomic variables, and so on.
+
+Most common types of shared resources: 
+  + Global variable or objects such as: std::cout, std::cerr, std::cin
+  + Shared variables between threads
+  + Singleton objects - class with an unique global instance. 
+
+C++ Standard definition about *Data Race* (aka race condition): 
+
+#+BEGIN_QUOTE
+  The execution of a program contains a *data race* if it conains two
+  potential concurrent conflicting actions, at least one of which is
+  not atomic, and neither happens before the other, except of the
+  special case for singnal handlers described below. *Any such data*
+  *race results* in *undefined behavior*.
+#+END_QUOTE
+
+C++ Standard about Undefined Behavior: 
+
+#+BEGIN_QUOTE
+  A conforming implementation executing a well-formaed program shall
+  reproduce the same observable behavior as one of the possible
+  executions of the corresponding instances of the abstract machien
+  with the smae program and the same input. However, if any such
+  exeuction contains an undefined operation, this International
+  Standard places no requirement on the implementation executing that
+  program with that input.
+#+END_QUOTE
+
+  *Example about race condition:*
+
+Race condition: 
+
+ + File: race_condtion.cpp
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <thread>
+  #include <chrono>
+  #include <thread>
+  #include <vector>
+
+  struct Worker
+  {
+      int& acc;
+
+      Worker(int& acc): acc(acc) { }
+
+      void operator()(int x)
+      {
+          std::this_thread::sleep_for(std::chrono::milliseconds(500));
+          acc = acc + x * x;
+      }
+  };
+
+  int main()
+  {
+      int result = 0;
+
+      std::vector<std::thread> thread_list{};
+      for(int i = 1; i <= 10; i++)
+      {
+          thread_list.push_back( std::thread{Worker(result), i} );
+      }
+
+      for(auto& t: thread_list) { t.join(); }
+      std::cout << " result   = " << result << std::endl;
+      return 0;
+  }
+#+END_SRC
+
+Building: 
+
+#+BEGIN_SRC sh 
+  $ g++ thread1.cpp -o thread1.bin -std=c++1z -Wall -Wextra -O0 -g -lpthread 
+#+END_SRC
+
+Running: 
+  + The expected result is 385. However, the program sometimes yields
+    an incorrect result due to a _race condition_ bug (aka data
+    race). 
+
+#+BEGIN_SRC sh 
+  $ ./thread1.bin 
+   result   = 385
+
+  $ ./thread1.bin 
+   result   = 384
+
+  $ ./thread1.bin 
+   result   = 385
+
+  $ ./thread1.bin 
+   result   = 368
+
+  $ ./thread1.bin 
+   result   = 385
+
+  ./thread1.bin 
+   result   = 376
+#+END_SRC
+*** Mutex solution 
+
+The race condition can be solved by using *mutex* - mutual exclusion
+synchronization primitive which allows only a single thread at a time
+to access the critical section, portion of the code with a shared
+resource.   
+
+File: thread2.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <thread>
+  #include <chrono>
+  #include <thread>
+  #include <vector>
+  #include <mutex>
+
+  using namespace std::chrono_literals;
+
+  struct Worker
+  {
+      int& acc;
+      // Requires <mutex> header
+      std::mutex& m;
+
+      Worker(int& acc, std::mutex& m): acc(acc), m(m) { }
+
+      void operator()(int x)
+      {
+          std::this_thread::sleep_for(std::chrono::milliseconds(500));
+          // --- Start of critical section ---- //
+          m.lock();   // Curren thread acquire locks
+          acc = acc + x * x;
+          m.unlock(); // Current thread releases lock
+          // --- End of critical section ---- //
+      }
+  };
+
+
+  int main()
+  {
+      // Shared resource
+      int result = 0;
+      std::mutex m;
+
+      std::vector<std::thread> thread_list{};
+      for(int i = 1; i <= 10; i++)
+      {
+          thread_list.push_back( std::thread{Worker(result, m), i} );
+      }
+
+      for(auto& t: thread_list) { t.join(); }
+
+      std::cout << " result   = " << result << std::endl;
+
+      return 0;
+  }
+#+END_SRC
+
+Building: 
+
+#+BEGIN_SRC sh 
+  $ g++ thread2.cpp -o thread2.bin -std=c++1z -Wall -Wextra -O0 -g -lpthread 
+#+END_SRC
+
+Running:  
+
+  + The computation becomes reproducible and predictable due to the
+    mutex allow only a single thread at atime access the shared
+    resource (variable result). 
+
+#+BEGIN_SRC sh 
+  $ ./thread2.bin 
+   result   = 385
+
+  $ ./thread2.bin 
+   result   = 385
+
+  $ ./thread2.bin 
+   result   = 385
+
+  $ ./thread2.bin 
+   result   = 385
+
+
+  $ ./thread2.bin 
+   result   = 385
+#+END_SRC
+
+Note: The current code is not exception safe and error prone, as a
+result if an exception happens or if the lock releasing code is
+missing, the outcome will be a _deadlock._ It is better to use the
+std::mutex_guard which is an RAII (Resource Acquisition Is
+Initialization) wrapper for locks. When the mutex guard object is
+constructed, the current thread acquires the lock and when the guard
+goes out of scope, the mutex lock is released. So, by using a
+_scope_guard_, the code becomes:
+
+#+BEGIN_SRC cpp 
+    void operator()(int x)
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        // --- Start of critical section ---- //
+        // Acquires lock 
+        std::lock_guard<std::mutex> mutex_guard(m);
+        acc = acc + x * x;
+        // --- End of critical section ---- //
+    } // Releases lock here, when the mutex_guard goes out of scope and is destroyed. 
+#+END_SRC
+
+*** Atomic variable solution 
+
+Another way to solve the race condition (aka data race) problem is
+using _atomic variables and atomic operations_. 
+
+File: thread3.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <thread>
+  #include <chrono>
+  #include <thread>
+  #include <vector>
+  #include <mutex>
+  #include <atomic>
+
+  using namespace std::chrono_literals;
+
+  struct Worker
+  {
+      std::atomic<int>& acc;
+      // Requires <mutex> header
+      std::mutex& m;
+
+      Worker(std::atomic<int>& acc, std::mutex& m)
+         : acc(acc), m(m) { }
+
+      void operator()(int x)
+      {
+          std::this_thread::sleep_for(std::chrono::milliseconds(500));
+          acc += x * x;
+      }
+  };
+
+  int main()
+  {
+      // Shared resource
+      std::atomic<int> result = 0;
+      std::mutex m;
+
+      std::vector<std::thread> thread_list{};
+      for(int i = 1; i <= 10; i++)
+      {
+          thread_list.push_back( std::thread{Worker(result, m), i} );
+      }
+
+      for(auto& t: thread_list) { t.join(); }
+
+      std::cout << " result   = " << result << std::endl;
+
+      return 0;
+  }
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC sh 
+  $ ./thread3.bin 
+   result   = 385
+
+  $ ./thread3.bin 
+   result   = 385
+
+  $ ./thread3.bin 
+   result   = 385
+
+  $ ./thread3.bin 
+   result   = 385
+#+END_SRC
+
+
 
 
