@@ -1,0 +1,1227 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<!-- 2019-09-09 Mon 17:11 -->
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Multithreading and concurrency</title>
+<meta name="generator" content="Org mode" />
+<meta name="author" content="Caio Rodrigues Soares - caiorss [DOT] rodrigues [AT] gmail [DOT] COM" />
+<meta name="description" content="cpp/c++ thread concurrency std::thread modern cpp c++"
+ />
+<style type="text/css">
+ <!--/*--><![CDATA[/*><!--*/
+  .title  { text-align: center;
+             margin-bottom: .2em; }
+  .subtitle { text-align: center;
+              font-size: medium;
+              font-weight: bold;
+              margin-top:0; }
+  .todo   { font-family: monospace; color: red; }
+  .done   { font-family: monospace; color: green; }
+  .priority { font-family: monospace; color: orange; }
+  .tag    { background-color: #eee; font-family: monospace;
+            padding: 2px; font-size: 80%; font-weight: normal; }
+  .timestamp { color: #bebebe; }
+  .timestamp-kwd { color: #5f9ea0; }
+  .org-right  { margin-left: auto; margin-right: 0px;  text-align: right; }
+  .org-left   { margin-left: 0px;  margin-right: auto; text-align: left; }
+  .org-center { margin-left: auto; margin-right: auto; text-align: center; }
+  .underline { text-decoration: underline; }
+  #postamble p, #preamble p { font-size: 90%; margin: .2em; }
+  p.verse { margin-left: 3%; }
+  pre {
+    border: 1px solid #ccc;
+    box-shadow: 3px 3px 3px #eee;
+    padding: 8pt;
+    font-family: monospace;
+    overflow: auto;
+    margin: 1.2em;
+  }
+  pre.src {
+    position: relative;
+    overflow: visible;
+    padding-top: 1.2em;
+  }
+  pre.src:before {
+    display: none;
+    position: absolute;
+    background-color: white;
+    top: -10px;
+    right: 10px;
+    padding: 3px;
+    border: 1px solid black;
+  }
+  pre.src:hover:before { display: inline;}
+  /* Languages per Org manual */
+  pre.src-asymptote:before { content: 'Asymptote'; }
+  pre.src-awk:before { content: 'Awk'; }
+  pre.src-C:before { content: 'C'; }
+  /* pre.src-C++ doesn't work in CSS */
+  pre.src-clojure:before { content: 'Clojure'; }
+  pre.src-css:before { content: 'CSS'; }
+  pre.src-D:before { content: 'D'; }
+  pre.src-ditaa:before { content: 'ditaa'; }
+  pre.src-dot:before { content: 'Graphviz'; }
+  pre.src-calc:before { content: 'Emacs Calc'; }
+  pre.src-emacs-lisp:before { content: 'Emacs Lisp'; }
+  pre.src-fortran:before { content: 'Fortran'; }
+  pre.src-gnuplot:before { content: 'gnuplot'; }
+  pre.src-haskell:before { content: 'Haskell'; }
+  pre.src-hledger:before { content: 'hledger'; }
+  pre.src-java:before { content: 'Java'; }
+  pre.src-js:before { content: 'Javascript'; }
+  pre.src-latex:before { content: 'LaTeX'; }
+  pre.src-ledger:before { content: 'Ledger'; }
+  pre.src-lisp:before { content: 'Lisp'; }
+  pre.src-lilypond:before { content: 'Lilypond'; }
+  pre.src-lua:before { content: 'Lua'; }
+  pre.src-matlab:before { content: 'MATLAB'; }
+  pre.src-mscgen:before { content: 'Mscgen'; }
+  pre.src-ocaml:before { content: 'Objective Caml'; }
+  pre.src-octave:before { content: 'Octave'; }
+  pre.src-org:before { content: 'Org mode'; }
+  pre.src-oz:before { content: 'OZ'; }
+  pre.src-plantuml:before { content: 'Plantuml'; }
+  pre.src-processing:before { content: 'Processing.js'; }
+  pre.src-python:before { content: 'Python'; }
+  pre.src-R:before { content: 'R'; }
+  pre.src-ruby:before { content: 'Ruby'; }
+  pre.src-sass:before { content: 'Sass'; }
+  pre.src-scheme:before { content: 'Scheme'; }
+  pre.src-screen:before { content: 'Gnu Screen'; }
+  pre.src-sed:before { content: 'Sed'; }
+  pre.src-sh:before { content: 'shell'; }
+  pre.src-sql:before { content: 'SQL'; }
+  pre.src-sqlite:before { content: 'SQLite'; }
+  /* additional languages in org.el's org-babel-load-languages alist */
+  pre.src-forth:before { content: 'Forth'; }
+  pre.src-io:before { content: 'IO'; }
+  pre.src-J:before { content: 'J'; }
+  pre.src-makefile:before { content: 'Makefile'; }
+  pre.src-maxima:before { content: 'Maxima'; }
+  pre.src-perl:before { content: 'Perl'; }
+  pre.src-picolisp:before { content: 'Pico Lisp'; }
+  pre.src-scala:before { content: 'Scala'; }
+  pre.src-shell:before { content: 'Shell Script'; }
+  pre.src-ebnf2ps:before { content: 'ebfn2ps'; }
+  /* additional language identifiers per "defun org-babel-execute"
+       in ob-*.el */
+  pre.src-cpp:before  { content: 'C++'; }
+  pre.src-abc:before  { content: 'ABC'; }
+  pre.src-coq:before  { content: 'Coq'; }
+  pre.src-groovy:before  { content: 'Groovy'; }
+  /* additional language identifiers from org-babel-shell-names in
+     ob-shell.el: ob-shell is the only babel language using a lambda to put
+     the execution function name together. */
+  pre.src-bash:before  { content: 'bash'; }
+  pre.src-csh:before  { content: 'csh'; }
+  pre.src-ash:before  { content: 'ash'; }
+  pre.src-dash:before  { content: 'dash'; }
+  pre.src-ksh:before  { content: 'ksh'; }
+  pre.src-mksh:before  { content: 'mksh'; }
+  pre.src-posh:before  { content: 'posh'; }
+  /* Additional Emacs modes also supported by the LaTeX listings package */
+  pre.src-ada:before { content: 'Ada'; }
+  pre.src-asm:before { content: 'Assembler'; }
+  pre.src-caml:before { content: 'Caml'; }
+  pre.src-delphi:before { content: 'Delphi'; }
+  pre.src-html:before { content: 'HTML'; }
+  pre.src-idl:before { content: 'IDL'; }
+  pre.src-mercury:before { content: 'Mercury'; }
+  pre.src-metapost:before { content: 'MetaPost'; }
+  pre.src-modula-2:before { content: 'Modula-2'; }
+  pre.src-pascal:before { content: 'Pascal'; }
+  pre.src-ps:before { content: 'PostScript'; }
+  pre.src-prolog:before { content: 'Prolog'; }
+  pre.src-simula:before { content: 'Simula'; }
+  pre.src-tcl:before { content: 'tcl'; }
+  pre.src-tex:before { content: 'TeX'; }
+  pre.src-plain-tex:before { content: 'Plain TeX'; }
+  pre.src-verilog:before { content: 'Verilog'; }
+  pre.src-vhdl:before { content: 'VHDL'; }
+  pre.src-xml:before { content: 'XML'; }
+  pre.src-nxml:before { content: 'XML'; }
+  /* add a generic configuration mode; LaTeX export needs an additional
+     (add-to-list 'org-latex-listings-langs '(conf " ")) in .emacs */
+  pre.src-conf:before { content: 'Configuration File'; }
+
+  table { border-collapse:collapse; }
+  caption.t-above { caption-side: top; }
+  caption.t-bottom { caption-side: bottom; }
+  td, th { vertical-align:top;  }
+  th.org-right  { text-align: center;  }
+  th.org-left   { text-align: center;   }
+  th.org-center { text-align: center; }
+  td.org-right  { text-align: right;  }
+  td.org-left   { text-align: left;   }
+  td.org-center { text-align: center; }
+  dt { font-weight: bold; }
+  .footpara { display: inline; }
+  .footdef  { margin-bottom: 1em; }
+  .figure { padding: 1em; }
+  .figure p { text-align: center; }
+  .inlinetask {
+    padding: 10px;
+    border: 2px solid gray;
+    margin: 10px;
+    background: #ffffcc;
+  }
+  #org-div-home-and-up
+   { text-align: right; font-size: 70%; white-space: nowrap; }
+  textarea { overflow-x: auto; }
+  .linenr { font-size: smaller }
+  .code-highlighted { background-color: #ffff00; }
+  .org-info-js_info-navigation { border-style: none; }
+  #org-info-js_console-label
+    { font-size: 10px; font-weight: bold; white-space: nowrap; }
+  .org-info-js_search-highlight
+    { background-color: #ffff00; color: #000000; font-weight: bold; }
+  .org-svg { width: 90%; }
+  /*]]>*/-->
+</style>
+<meta name="viewport" content="width=device-width, minimum-scale=1.0, maximum-scale=1.0" />
+<link href="theme/org-nav-theme.css" rel="stylesheet">
+<script src="theme/org-nav-theme.js"></script>
+<link rel="icon" href="favicon.ico" type="image/vnd.microsoft.icon" />
+<script type="text/javascript">
+/*
+@licstart  The following is the entire license notice for the
+JavaScript code in this tag.
+
+Copyright (C) 2012-2018 Free Software Foundation, Inc.
+
+The JavaScript code in this tag is free software: you can
+redistribute it and/or modify it under the terms of the GNU
+General Public License (GNU GPL) as published by the Free Software
+Foundation, either version 3 of the License, or (at your option)
+any later version.  The code is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+As additional permission under GNU GPL version 3 section 7, you
+may distribute non-source (e.g., minimized or compacted) forms of
+that code without the copy of the GNU GPL normally required by
+section 4, provided you include this license notice and a URL
+through which recipients can access the Corresponding Source.
+
+
+@licend  The above is the entire license notice
+for the JavaScript code in this tag.
+*/
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+</head>
+<body>
+<div id="content">
+<h1 class="title">Multithreading and concurrency</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#org30b6325">1. Multithreading and concurrency</a>
+<ul>
+<li><a href="#org120e093">1.1. Concepts</a></li>
+<li><a href="#orgd6adbb9">1.2. Standard Library Reference</a></li>
+<li><a href="#org9fda6b5">1.3. Class std::thread</a></li>
+<li><a href="#org4b80f2b">1.4. Functions of namespace std::this_thread</a></li>
+<li><a href="#orgdeb0de5">1.5. Threads - std::thread usage and race condition</a>
+<ul>
+<li><a href="#orgf4b31bb">1.5.1. Race condition</a></li>
+<li><a href="#org6d31e55">1.5.2. Mutex solution</a></li>
+<li><a href="#org138e04a">1.5.3. Atomic variable solution</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-org30b6325" class="outline-2">
+<h2 id="org30b6325"><span class="section-number-2">1</span> Multithreading and concurrency</h2>
+<div class="outline-text-2" id="text-1">
+</div>
+<div id="outline-container-org120e093" class="outline-3">
+<h3 id="org120e093"><span class="section-number-3">1.1</span> Concepts</h3>
+<div class="outline-text-3" id="text-1-1">
+<p>
+<b>Processes and Threads</b>
+</p>
+
+<p>
+Processes: 
+</p>
+
+<ul class="org-ul">
+<li>A process is a running program with its own virtual memory,
+address space, unique process identifier ID and context (CPU
+registers - IP - Instruction Pointer and SP - Stack Pointer)</li>
+
+<li>A single <span class="underline">CPU core</span> is only capable of executing a single process
+at a time. However, users have the illusion that multiple
+processes are being run simultaneously because the <span class="underline">operating system's</span>
+<span class="underline">scheduler</span> multiplexes the CPU execution time between all
+processes. As a result, each process is run sequentially by a
+single CPU core during a short <span class="underline">time slice</span> (time sharing). When the
+scheduler switches to another process, it saves the <span class="underline">process' state</span>
+(current directory, CPU registers, &#x2026;) and loads the state of the
+next process (context switching).</li>
+</ul>
+
+<p>
+Threads: 
+</p>
+
+<ul class="org-ul">
+<li>A thread is a independent flow of execution or task within a
+single process. The purpose of threads is to allow a process to
+execute multiple independent simultaneous tasks, such as running
+the user interface dispatch thread, handling socket connections,
+performing the download in a different thread and so on.</li>
+
+<li>For an operating system, a thread is a <span class="underline">lightweight process</span> or a
+stripped down process with its own stack, local data, CPU
+registers (specially IP - Instruction Pointer and SP - Stack
+Pointer), but without its own address space and virtual memory,
+instead it only can access to the virtual memory of the process
+that thread belongs to.</li>
+
+<li>Threads are also known as (aka):
+<ul class="org-ul">
+<li>Lightweight process</li>
+<li>Native thread</li>
+<li>Kernel-thread</li>
+<li>Operating system thread or OS thread</li>
+</ul></li>
+</ul>
+
+<p>
+Benefits of multi-threading:
+</p>
+
+<ul class="org-ul">
+<li>Increase application responsiviness, specially GUI - Graphical
+User Interface Applications.</li>
+
+<li>Take advantage of multi-core processor</li>
+
+<li>Speed up heavy math computations. Multi-threading allows to
+split a heavy matrix calculation into multiple threads running
+in different CPU cores.</li>
+
+<li>Fewer system resources usage. Using multiple threads for running
+multiple tasks is cheaper than running multiple processes for
+each task. Note: before multi-threading, it was common in
+Unix-like operating system to use the <span class="underline">fork()</span> system call to fork
+(copy) the current process for handling client socket
+connections in network server appliocations.</li>
+</ul>
+
+
+<p>
+Potential Problems of Concurrency and Multi-threading
+</p>
+
+<ul class="org-ul">
+<li>Race condition, aka data race</li>
+
+<li>Deadlock</li>
+
+<li>Starvation</li>
+
+<li>Oversubscription</li>
+
+<li>Load balancing</li>
+
+<li>Thread exaustion</li>
+</ul>
+
+<p>
+<b>Lowest Level Threading APIs:</b>
+</p>
+
+<p>
+Threads and processes require operating system support, therefore
+those APIs are operating system specific. The most fundamental APIs
+provided by operating system for accessing threads are: 
+</p>
+
+<ul class="org-ul">
+<li><span class="underline">pthread (Posix threads)</span> - POSIX API (C-API)
+<ul class="org-ul">
+<li>The posix thread API is implemented by most Unix-like operating
+systems such Linux, MacOsx, iOS, Android, BSD and some embedded
+real time systems such as RTEMS, QNX and VxWorks.</li>
+</ul></li>
+
+<li><span class="underline">Windows Win32 Thread API</span></li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-orgd6adbb9" class="outline-3">
+<h3 id="orgd6adbb9"><span class="section-number-3">1.2</span> Standard Library Reference</h3>
+<div class="outline-text-3" id="text-1-2">
+<p>
+<b>Technical Specifications</b> 
+</p>
+
+<ul class="org-ul">
+<li>P0159 - Technical Specifiction for Concurrency</li>
+
+<li>P0024 - Technical Specifiction for Parallelism</li>
+
+<li>C++17 Concurrency TS (Technical Specification)</li>
+</ul>
+
+
+<p>
+<b>C++11/14 Thread API</b>
+</p>
+
+<ul class="org-ul">
+<li>std::threads (C++11)</li>
+</ul>
+
+<p>
+<b>Task Based API</b>
+</p>
+
+<ul class="org-ul">
+<li><a href="https://docs.microsoft.com/en-us/cpp/standard-library/promise-class?view=vs-2019">std::promise</a> (Microsoft)</li>
+
+<li><a href="https://docs.microsoft.com/en-us/cpp/standard-library/future?view=vs-2019">std::future</a> (Microsoft)</li>
+
+<li>std::future&lt;&gt;, std::shared_future&lt;&gt;, std::atomic_future&lt;&gt;</li>
+
+<li><a href="https://docs.microsoft.com/en-us/cpp/standard-library/packaged-task-class?view=vs-2019">std::packaged_task</a> (Microsft)</li>
+
+<li>std::async</li>
+
+<li>Function: <a href="https://docs.microsoft.com/en-us/cpp/standard-library/future-functions?view=vs-2019">std::async</a> (Microsft)</li>
+
+<li>std::launch</li>
+</ul>
+
+<p>
+C++17 Additions: 
+</p>
+
+<ul class="org-ul">
+<li>Concurrent TS (Nonblocking futures (.then), executors, await)</li>
+<li>future::when_any</li>
+<li>future::when_all()</li>
+<li>future::then()</li>
+<li>future::unwrap()</li>
+</ul>
+
+<p>
+<b>Syncronization Primitives:</b>
+</p>
+
+<ul class="org-ul">
+<li>Locks 
+<ul class="org-ul">
+<li><a href="https://en.cppreference.com/w/cpp/thread/mutex">std::mutex</a></li>
+<li>std::condition_variable</li>
+</ul></li>
+
+<li>RAII Wrappers for locks 
+<ul class="org-ul">
+<li><a href="https://en.cppreference.com/w/cpp/thread/unique_lock">std::unique_lock&lt;&gt;</a></li>
+<li><a href="https://en.cppreference.com/w/cpp/thread/lock_guard">std::lock_guard</a> - RAII Wrapper for locks</li>
+</ul></li>
+
+<li>Atomic Operations =&gt; Header: <a href="https://en.cppreference.com/w/c/atomic">&lt;atomic&gt;</a>
+<ul class="org-ul">
+<li><a href="https://en.cppreference.com/w/cpp/atomic/atomic">std::atomic</a></li>
+<li>std::atomic_xxx, std::atomic&lt;&gt;, std::atomic_thread_fence()</li>
+</ul></li>
+</ul>
+
+<p>
+<b>Implementations of C++11 Standard Library</b>
+</p>
+
+<ul class="org-ul">
+<li>Clang LLVM</li>
+
+<li>GNU GCC/G++</li>
+
+<li>MSVC - Microsft Visual C++ Compiler (aka Visual Studio Compiler)</li>
+
+<li>just::thread - commercial implementation by Just Software
+Solution for MSVC, GNU GCC/G++ and CLang.</li>
+</ul>
+</div>
+</div>
+
+
+<div id="outline-container-org9fda6b5" class="outline-3">
+<h3 id="org9fda6b5"><span class="section-number-3">1.3</span> Class std::thread</h3>
+<div class="outline-text-3" id="text-1-3">
+<p>
+The class std::threads <span class="underline">is not thread</span>, it is a proxy for a native
+thread and encapsulates a native thread or a kernel thread which the
+documentation calls <span class="underline">thread of execution</span>.  
+</p>
+
+<p>
+Header: 
+</p>
+<ul class="org-ul">
+<li><a href="https://en.cppreference.com/w/cpp/header/thread">&lt;thread&gt;</a></li>
+</ul>
+
+<p>
+Documentation: 
+</p>
+
+<ul class="org-ul">
+<li><a href="https://en.cppreference.com/w/cpp/thread/thread/thread">std::thread</a>  - cppreference</li>
+
+<li><a href="https://docs.microsoft.com/en-us/cpp/standard-library/thread-class?view=vs-2019">std::thread</a> - Microsft MSFT, MSVC</li>
+
+<li><a href="https://www.boost.org/doc/libs/1_71_0/doc/html/thread.html">boost:thread</a>  - Predecessor of the standard library threads</li>
+
+<li><a href="https://www.boost.org/doc/libs/1_71_0/doc/html/thread/thread_management.html">Thread Management - 1.71.0</a> (Boost docs)</li>
+</ul>
+
+<p>
+Papers related to the standard library implementation: 
+</p>
+
+<ul class="org-ul">
+<li><a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2006/n2094.html">WG21 - N2093</a>  - Multithreading API for C++0X - A Layered Approach - 2006-09-09</li>
+
+<li><a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2006/n2139.html">WG21 - N2139</a> - Thoughts on a Thread Library for C++ - 2006-11-06</li>
+
+<li><a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2007/n2184.html">WG21 - N2184</a> - Thread Launching for C++0X - 2007-03-09</li>
+
+<li><a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2008/n2497.html">WG21 - N2497</a> - Multi-threading Library for Standard C++ (Revision 1) - 2008-01-07</li>
+
+<li><a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2007/n2320.html">WG21 - N2320</a> - Multi-threading Library for Standard C++ - 2007-06-24</li>
+</ul>
+
+
+<p>
+<b>Type of signature of std::thread member functions</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-keyword">class</span> <span class="org-type">thread</span>
+<span class="org-rainbow-delimiters-depth-1">{</span>
+<span class="org-function-name">public</span>:
+    <span class="org-comment-delimiter">// </span><span class="org-comment">types:</span>
+    <span class="org-keyword">class</span> <span class="org-type">id</span>;
+    <span class="org-comment-delimiter">// </span><span class="org-comment">typedef implementation-defined native_handle_type; // See [thread.native]</span>
+
+    <span class="org-comment-delimiter">// </span><span class="org-comment">construct/copy/destroy:</span>
+    <span class="org-function-name">thread</span><span class="org-rainbow-delimiters-depth-2">()</span>;
+    <span class="org-keyword">template</span> <span class="org-rainbow-delimiters-depth-2">&lt;</span><span class="org-keyword">class</span> <span class="org-type">F</span><span class="org-rainbow-delimiters-depth-2">&gt;</span> <span class="org-keyword">explicit</span> <span class="org-function-name">thread</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">F</span> <span class="org-variable-name">f</span><span class="org-rainbow-delimiters-depth-2">)</span>;
+    <span class="org-keyword">template</span> <span class="org-rainbow-delimiters-depth-2">&lt;</span><span class="org-keyword">class</span> <span class="org-type">F</span>, <span class="org-keyword">class</span> ...<span class="org-type">Args</span><span class="org-rainbow-delimiters-depth-2">&gt;</span> <span class="org-function-name">thread</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">F</span>&amp;&amp; <span class="org-variable-name">f</span>, <span class="org-type">Args</span>&amp;&amp;... <span class="org-variable-name">args</span><span class="org-rainbow-delimiters-depth-2">)</span>;
+    ~<span class="org-function-name">thread</span><span class="org-rainbow-delimiters-depth-2">()</span>;
+    <span class="org-function-name">thread</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-keyword">const</span> <span class="org-type">thread</span>&amp;<span class="org-rainbow-delimiters-depth-2">)</span> = <span class="org-keyword">delete</span>;
+    <span class="org-function-name">thread</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">thread</span>&amp;&amp;<span class="org-rainbow-delimiters-depth-2">)</span>;
+    <span class="org-type">thread</span>&amp; <span class="org-keyword">operator</span><span class="org-function-name">=</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-keyword">const</span> <span class="org-type">thread</span>&amp;<span class="org-rainbow-delimiters-depth-2">)</span> = <span class="org-keyword">delete</span>;
+    <span class="org-type">thread</span>&amp; <span class="org-keyword">operator</span><span class="org-function-name">=</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">thread</span>&amp;&amp;<span class="org-rainbow-delimiters-depth-2">)</span>;
+
+    <span class="org-comment-delimiter">// </span><span class="org-comment">members:</span>
+    <span class="org-type">void</span> <span class="org-function-name">swap</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">thread</span>&amp;&amp;<span class="org-rainbow-delimiters-depth-2">)</span>;
+    <span class="org-type">bool</span> <span class="org-function-name">joinable</span><span class="org-rainbow-delimiters-depth-2">()</span> <span class="org-keyword">const</span>;
+    <span class="org-type">void</span> <span class="org-function-name">join</span><span class="org-rainbow-delimiters-depth-2">()</span>;
+    <span class="org-type">void</span> <span class="org-function-name">detach</span><span class="org-rainbow-delimiters-depth-2">()</span>;
+    <span class="org-type">id</span> <span class="org-function-name">get_id</span><span class="org-rainbow-delimiters-depth-2">()</span> <span class="org-keyword">const</span>;
+    <span class="org-type">native_handle_type</span> <span class="org-function-name">native_handle</span><span class="org-rainbow-delimiters-depth-2">()</span>; <span class="org-comment-delimiter">// </span><span class="org-comment">See [thread.native]</span>
+
+    <span class="org-comment-delimiter">// </span><span class="org-comment">static members:</span>
+    <span class="org-keyword">static</span> <span class="org-type">unsigned</span> <span class="org-function-name">hardware_concurrency</span><span class="org-rainbow-delimiters-depth-2">()</span>;
+<span class="org-rainbow-delimiters-depth-1">}</span>;
+</pre>
+</div>
+
+<p>
+<b>Detailed Member Functions of class std::thread</b>
+</p>
+
+<ul class="org-ul">
+<li><span class="underline">Default and move constructors</span></li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-comment-delimiter">// </span><span class="org-comment">Default constructor - without any thread of execution </span>
+thread<span class="org-rainbow-delimiters-depth-1">()</span> <span class="org-keyword">noexcept</span>;
+
+<span class="org-comment-delimiter">// </span><span class="org-comment">Move constructor </span>
+thread<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">thread</span>&amp;&amp; <span class="org-variable-name">Other</span><span class="org-rainbow-delimiters-depth-1">)</span> <span class="org-keyword">noexcept</span>;
+</pre>
+</div>
+
+<ul class="org-ul">
+<li><span class="underline">Other Constructors</span>
+<ul class="org-ul">
+<li>The following constructor can take as agument (type parameter
+Fn): any function pointer; callable object (aka "functor") or
+lambda expression. The thread of execution associated to the
+constructed object starts its execution immediately.</li>
+</ul></li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-keyword">template</span> <span class="org-rainbow-delimiters-depth-1">&lt;</span><span class="org-keyword">class</span> <span class="org-type">Fn</span>, <span class="org-keyword">class</span>... <span class="org-type">Args</span><span class="org-rainbow-delimiters-depth-1">&gt;</span>
+<span class="org-keyword">explicit</span> <span class="org-function-name">thread</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">Fn</span>&amp;&amp; <span class="org-variable-name">F</span>, <span class="org-type">Args</span>&amp;&amp;... <span class="org-variable-name">A</span><span class="org-rainbow-delimiters-depth-1">)</span>;
+</pre>
+</div>
+
+<p>
+Example: Construct thread out of function pointer: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-comment-delimiter">//</span><span class="org-comment">========= Create thread out of function pointer =======// </span>
+<span class="org-type">void</span> <span class="org-function-name">do_forever</span><span class="org-rainbow-delimiters-depth-1">()</span> 
+<span class="org-rainbow-delimiters-depth-1">{</span> 
+  <span class="org-keyword">while</span><span class="org-rainbow-delimiters-depth-2">(</span>every 10 seconds<span class="org-rainbow-delimiters-depth-2">){</span> println<span class="org-rainbow-delimiters-depth-3">(</span><span class="org-string">" 10 second elapsed!"</span><span class="org-rainbow-delimiters-depth-3">)</span><span class="org-rainbow-delimiters-depth-2">}</span>;
+<span class="org-rainbow-delimiters-depth-1">}</span>  
+
+<span class="org-type">void</span> <span class="org-function-name">action_sleep</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">int</span> <span class="org-variable-name">N</span><span class="org-rainbow-delimiters-depth-1">)</span>
+<span class="org-rainbow-delimiters-depth-1">{</span> 
+   <span class="org-comment-delimiter">// </span><span class="org-comment">.... sleep for N seconds ....</span>
+   print<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">" [INFO] Thread wake up! OK"</span><span class="org-rainbow-delimiters-depth-2">)</span>;
+<span class="org-rainbow-delimiters-depth-1">}</span>
+
+<span class="org-type">thread</span> <span class="org-variable-name">th1</span> <span class="org-rainbow-delimiters-depth-1">{</span>do_forever<span class="org-rainbow-delimiters-depth-1">}</span>;
+<span class="org-type">thread</span> <span class="org-variable-name">th2</span> <span class="org-rainbow-delimiters-depth-1">{</span>&amp;do_forever<span class="org-rainbow-delimiters-depth-1">}</span>;
+<span class="org-type">thread</span> <span class="org-variable-name">th3</span> <span class="org-rainbow-delimiters-depth-1">{</span>action_sleep, 10<span class="org-rainbow-delimiters-depth-1">}</span>; 
+<span class="org-type">thread</span> <span class="org-variable-name">th4</span> <span class="org-rainbow-delimiters-depth-1">{</span>&amp;action_sleep, 1<span class="org-rainbow-delimiters-depth-1">}</span>;   
+</pre>
+</div>
+
+<p>
+Example: construct threads out of function object, aka callable
+objects or functors. 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-comment-delimiter">// </span><span class="org-comment">Functor</span>
+<span class="org-keyword">struct</span> <span class="org-type">LoopMessage</span>
+<span class="org-rainbow-delimiters-depth-1">{</span>
+    <span class="org-keyword">const</span> <span class="org-constant">std</span>::<span class="org-type">string</span> <span class="org-variable-name">message</span>;
+    <span class="org-keyword">const</span> <span class="org-type">int</span> <span class="org-variable-name">delay</span>;
+
+    <span class="org-function-name">LoopMessage</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-constant">std</span>::<span class="org-type">string</span> <span class="org-variable-name">message</span>, <span class="org-type">int</span> <span class="org-variable-name">delay</span><span class="org-rainbow-delimiters-depth-2">)</span>:
+        message<span class="org-rainbow-delimiters-depth-2">(</span>message<span class="org-rainbow-delimiters-depth-2">)</span>
+      , delay<span class="org-rainbow-delimiters-depth-2">(</span>delay<span class="org-rainbow-delimiters-depth-2">)</span> <span class="org-rainbow-delimiters-depth-2">{</span> <span class="org-rainbow-delimiters-depth-2">}</span>
+
+    <span class="org-comment-delimiter">// </span><span class="org-comment">Function-call operator called by the thread class. </span>
+    <span class="org-type">void</span> <span class="org-keyword">operator</span><span class="org-function-name"><span class="org-rainbow-delimiters-depth-2">()</span></span><span class="org-rainbow-delimiters-depth-2">()</span>
+    <span class="org-rainbow-delimiters-depth-2">{</span>
+        <span class="org-keyword">while</span><span class="org-rainbow-delimiters-depth-3">(</span><span class="org-constant">true</span><span class="org-rainbow-delimiters-depth-3">)</span>
+        <span class="org-rainbow-delimiters-depth-3">{</span>
+            <span class="org-constant">std</span>::<span class="org-constant">this_thread</span>::sleep_for<span class="org-rainbow-delimiters-depth-4">(</span><span class="org-constant">std</span>::<span class="org-constant">chrono</span>::<span class="org-type">seconds</span><span class="org-rainbow-delimiters-depth-5">(</span><span class="org-variable-name">delay</span><span class="org-rainbow-delimiters-depth-5">)</span><span class="org-rainbow-delimiters-depth-4">)</span>;
+            <span class="org-constant">std</span>::cout &lt;&lt; <span class="org-string">" [INFO] thread id = "</span> &lt;&lt; <span class="org-constant">std</span>::<span class="org-constant">this_thread</span>::get_id<span class="org-rainbow-delimiters-depth-4">()</span>
+                      &lt;&lt; <span class="org-string">" ; "</span> &lt;&lt; message &lt;&lt; <span class="org-constant">std</span>::endl;
+        <span class="org-rainbow-delimiters-depth-3">}</span>
+    <span class="org-rainbow-delimiters-depth-2">}</span>
+<span class="org-rainbow-delimiters-depth-1">}</span>;
+
+<span class="org-type">int</span> <span class="org-function-name">main</span><span class="org-rainbow-delimiters-depth-1">()</span>
+<span class="org-rainbow-delimiters-depth-1">{</span>
+    <span class="org-constant">std</span>::<span class="org-type">thread</span> <span class="org-variable-name">thread_messageA</span> <span class="org-rainbow-delimiters-depth-2">{</span>LoopMessage, <span class="org-string">"Hello world"</span>, 10<span class="org-rainbow-delimiters-depth-2">}</span>;
+    <span class="org-keyword">auto</span> <span class="org-variable-name">thread_messageB</span> = <span class="org-constant">std</span>::thread<span class="org-rainbow-delimiters-depth-2">{</span>LoopMessage, <span class="org-string">"Hello world"</span>, 10<span class="org-rainbow-delimiters-depth-2">}</span>; 
+    <span class="org-keyword">return</span> 0;
+<span class="org-rainbow-delimiters-depth-1">}</span>
+</pre>
+</div>
+
+<p>
+Example: construct thread object out of lambda expressions. 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-function-name">std</span>::thread threadA <span class="org-rainbow-delimiters-depth-1">(</span><span class="org-rainbow-delimiters-depth-2">[](){</span>
+    <span class="org-keyword">while</span><span class="org-rainbow-delimiters-depth-3">(</span><span class="org-constant">true</span><span class="org-rainbow-delimiters-depth-3">)</span>
+    <span class="org-rainbow-delimiters-depth-3">{</span>
+        <span class="org-constant">std</span>::<span class="org-constant">this_thread</span>::sleep_for<span class="org-rainbow-delimiters-depth-4">(</span><span class="org-constant">std</span>::<span class="org-constant">chrono</span>::seconds<span class="org-rainbow-delimiters-depth-5">(</span>1<span class="org-rainbow-delimiters-depth-5">)</span><span class="org-rainbow-delimiters-depth-4">)</span>;
+       <span class="org-comment-delimiter">// </span><span class="org-comment">... action .... // </span>
+    <span class="org-rainbow-delimiters-depth-3">}</span>
+<span class="org-rainbow-delimiters-depth-2">}</span><span class="org-rainbow-delimiters-depth-1">)</span>;
+
+<span class="org-keyword">auto</span> <span class="org-variable-name">th4</span> = <span class="org-constant">std</span>::thread<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-rainbow-delimiters-depth-2">[](</span><span class="org-type">int</span> <span class="org-variable-name">N</span><span class="org-rainbow-delimiters-depth-2">){</span>
+    <span class="org-keyword">while</span><span class="org-rainbow-delimiters-depth-3">(</span><span class="org-constant">true</span><span class="org-rainbow-delimiters-depth-3">)</span>
+    <span class="org-rainbow-delimiters-depth-3">{</span>
+        <span class="org-constant">std</span>::<span class="org-constant">this_thread</span>::sleep_for<span class="org-rainbow-delimiters-depth-4">(</span><span class="org-constant">std</span>::<span class="org-constant">chrono</span>::seconds<span class="org-rainbow-delimiters-depth-5">(</span>1<span class="org-rainbow-delimiters-depth-5">)</span><span class="org-rainbow-delimiters-depth-4">)</span>;
+        <span class="org-comment-delimiter">// </span><span class="org-comment">.... action ... // </span>
+    <span class="org-rainbow-delimiters-depth-3">}</span>
+<span class="org-rainbow-delimiters-depth-2">}</span>, 10<span class="org-rainbow-delimiters-depth-1">)</span>;
+</pre>
+</div>
+
+<p>
+Note: Before a given std::thread object goes out of scope, it is
+necessary to call the methods .join() for waiting for the completion
+of associated thread of execution or std::thread::detach() for
+detaching the thread of execution. If neither of those functions are
+called, the C++ runtime calls <span class="underline">std::terminate</span> and <span class="underline">std::abort()</span>
+indirectly which causes abnormal termination of the current
+application.  
+</p>
+
+<p>
+Example: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-comment-delimiter">// </span><span class="org-comment">Failure =&gt; Te runtime will call std::terminate </span>
+<span class="org-type">int</span> <span class="org-function-name">Function_error</span><span class="org-rainbow-delimiters-depth-1">()</span>
+<span class="org-rainbow-delimiters-depth-1">{</span>
+   <span class="org-constant">std</span>::<span class="org-type">thread</span> <span class="org-variable-name">threadA</span> <span class="org-rainbow-delimiters-depth-2">{</span>&amp;functionPointer, 10, <span class="org-string">"Hello world"</span><span class="org-rainbow-delimiters-depth-2">}</span>;
+   <span class="org-comment-delimiter">// </span><span class="org-comment">Error: Missing call to methods .detach() or .join() </span>
+   <span class="org-comment-delimiter">// </span><span class="org-comment">The runtime will call std::terminate() causing abnormal terminatoon!!</span>
+   <span class="org-keyword">return</span> 1;
+<span class="org-rainbow-delimiters-depth-1">}</span>
+
+<span class="org-comment-delimiter">// </span><span class="org-comment">OK =&gt; Does not call std::terminate. </span>
+<span class="org-type">int</span> <span class="org-function-name">Function_join</span><span class="org-rainbow-delimiters-depth-1">()</span>
+<span class="org-rainbow-delimiters-depth-1">{</span>
+   <span class="org-constant">std</span>::<span class="org-type">thread</span> <span class="org-variable-name">threadA</span> <span class="org-rainbow-delimiters-depth-2">{</span>&amp;functionPointer, 10, <span class="org-string">"Hello world"</span><span class="org-rainbow-delimiters-depth-2">}</span>;
+   <span class="org-comment-delimiter">// </span><span class="org-comment">Ok </span>
+   threadA.join<span class="org-rainbow-delimiters-depth-2">()</span>; <span class="org-comment-delimiter">// </span><span class="org-comment">Wait for completion of threadA. </span>
+   <span class="org-keyword">return</span> 1;
+<span class="org-rainbow-delimiters-depth-1">}</span> <span class="org-comment-delimiter">// </span><span class="org-comment">ThreaA out of scope here! </span>
+
+<span class="org-comment-delimiter">// </span><span class="org-comment">OK =&gt; Does not call std::terminate.</span>
+<span class="org-type">int</span> <span class="org-function-name">Function_detach</span><span class="org-rainbow-delimiters-depth-1">()</span>
+<span class="org-rainbow-delimiters-depth-1">{</span>
+   <span class="org-constant">std</span>::<span class="org-type">thread</span> <span class="org-variable-name">threadA</span> <span class="org-rainbow-delimiters-depth-2">{</span>&amp;functionPointer, 10, <span class="org-string">"Hello world"</span><span class="org-rainbow-delimiters-depth-2">}</span>;
+   <span class="org-comment-delimiter">// </span><span class="org-comment">Ok </span>
+   <span class="org-comment-delimiter">// </span><span class="org-comment">Detach, no longer control or manage threadA. </span>
+   threadA.detach<span class="org-rainbow-delimiters-depth-2">()</span>; 
+   <span class="org-keyword">return</span> 1;
+<span class="org-rainbow-delimiters-depth-1">}</span>
+
+<span class="org-type">int</span> <span class="org-function-name">main</span><span class="org-rainbow-delimiters-depth-1">()</span> 
+<span class="org-rainbow-delimiters-depth-1">{</span> 
+   Function_error<span class="org-rainbow-delimiters-depth-2">()</span>; 
+   Function_join<span class="org-rainbow-delimiters-depth-2">()</span>; 
+   Function_detach<span class="org-rainbow-delimiters-depth-2">()</span>;
+
+   <span class="org-keyword">return</span> 10; 
+<span class="org-rainbow-delimiters-depth-1">}</span>
+</pre>
+</div>
+
+
+<ul class="org-ul">
+<li><span class="underline">joinable()</span>
+<ul class="org-ul">
+<li>=&gt; Returns true if the thread is <span class="underline">joinable</span>, in other words, if the
+thread of execution associated to the called object is running.</li>
+</ul></li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-type">bool</span> <span class="org-function-name">joinable</span><span class="org-rainbow-delimiters-depth-1">()</span> <span class="org-keyword">const</span> <span class="org-keyword">noexcept</span>;
+</pre>
+</div>
+
+<ul class="org-ul">
+<li><span class="underline">join()</span>
+<ul class="org-ul">
+<li>=&gt; Blocks the current thread waiting for the completion of the
+called object thread. For instance, calling threadA.join() will
+block the current thread waiting until the thread of execution of
+threadA object finishes.</li>
+</ul></li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-type">void</span> <span class="org-constant">thread</span>::<span class="org-function-name">join</span><span class="org-rainbow-delimiters-depth-1">()</span>;
+</pre>
+</div>
+
+<ul class="org-ul">
+<li><span class="underline">detach()</span> 
+<ul class="org-ul">
+<li>=&gt; Detaches the associated thread of execution from a given
+std::thread object. After this function is called, it is no
+longer possible to control the detached thread of execution or
+joining it (waiting for its completion). Then, the std::thread
+object no longer represents the detached execution thread.</li>
+<li>=&gt; A thread of execution that was detached is also called <span class="underline">daemon thread</span>.</li>
+</ul></li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-type">void</span> <span class="org-constant">thread</span>::<span class="org-function-name">detach</span><span class="org-rainbow-delimiters-depth-1">()</span>;
+</pre>
+</div>
+
+<ul class="org-ul">
+<li><span class="underline">id()</span>
+<ul class="org-ul">
+<li>=&gt; Returns the unique ID indentifier number for each thread.</li>
+</ul></li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-type">int</span> <span class="org-constant">thread</span>::<span class="org-function-name">id</span> <span class="org-rainbow-delimiters-depth-1">()</span> <span class="org-keyword">noexcept</span>;
+</pre>
+</div>
+
+<ul class="org-ul">
+<li><span class="underline">hardware_concurrency()</span>
+<ul class="org-ul">
+<li>=&gt; Returns an estimate for the number of threads that can be run
+in parallel. The result is often equal to the number of <span class="underline">logical CPU cores</span>.</li>
+</ul></li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-keyword">static</span> <span class="org-type">unsigned</span> <span class="org-type">int</span> <span class="org-constant">thread</span>::<span class="org-function-name">hardware_concurrency</span><span class="org-rainbow-delimiters-depth-1">()</span> <span class="org-keyword">noexcept</span>;
+</pre>
+</div>
+</div>
+</div>
+
+
+<div id="outline-container-org4b80f2b" class="outline-3">
+<h3 id="org4b80f2b"><span class="section-number-3">1.4</span> Functions of namespace std::this_thread</h3>
+<div class="outline-text-3" id="text-1-4">
+<p>
+Utilities functions for currrent thread of execution: 
+</p>
+
+<p>
+Header: 
+</p>
+<ul class="org-ul">
+<li><a href="https://en.cppreference.com/w/cpp/thread">&lt;header&gt;</a></li>
+</ul>
+
+<p>
+Function Documentation: 
+</p>
+
+<ul class="org-ul">
+<li><a href="https://en.cppreference.com/w/cpp/thread/yield">this_thread::yield</a></li>
+
+<li><a href="https://en.cppreference.com/w/cpp/thread/get_id">this_thread::get_id</a></li>
+
+<li><a href="https://en.cppreference.com/w/cpp/thread/sleep_for">this_thread::sleep_for</a></li>
+
+<li><a href="https://en.cppreference.com/w/cpp/thread/sleep_until">this_thread::sleep_until</a></li>
+</ul>
+
+<p>
+Signature of functions in namespace this_thread. 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-comment-delimiter">// </span><span class="org-comment">Namespace: std::this_thread. </span>
+<span class="org-keyword">namespace</span> <span class="org-constant">std</span> <span class="org-rainbow-delimiters-depth-1">{</span> <span class="org-keyword">namespace</span> <span class="org-constant">this_thread</span> <span class="org-rainbow-delimiters-depth-2">{</span>
+    <span class="org-comment-delimiter">// </span><span class="org-comment">Returns the id of the current thread.</span>
+    <span class="org-constant">std</span>::<span class="org-constant">thread</span>::<span class="org-type">id</span> <span class="org-function-name">get_id</span><span class="org-rainbow-delimiters-depth-3">()</span> <span class="org-keyword">noexcept</span>;
+    <span class="org-comment-delimiter">// </span><span class="org-comment">Provides a hint to the implementation to reschedule the</span>
+    <span class="org-comment-delimiter">// </span><span class="org-comment">execution of threads, allowing other threads to run.</span>
+    <span class="org-type">void</span>            <span class="org-function-name">yield</span><span class="org-rainbow-delimiters-depth-3">()</span> <span class="org-keyword">noexcept</span>;      
+    <span class="org-comment-delimiter">// </span><span class="org-comment">Blocks the execution of the current thread for at least the specified sleep_duration.</span>
+    <span class="org-keyword">template</span><span class="org-rainbow-delimiters-depth-3">&lt;</span> <span class="org-keyword">class</span> <span class="org-type">Rep</span>, <span class="org-keyword">class</span> <span class="org-type">Period</span> <span class="org-rainbow-delimiters-depth-3">&gt;</span>
+    <span class="org-type">void</span>            <span class="org-function-name">sleep_for</span><span class="org-rainbow-delimiters-depth-3">(</span> <span class="org-keyword">const</span> <span class="org-constant">std</span>::<span class="org-constant">chrono</span>::<span class="org-type">duration</span><span class="org-rainbow-delimiters-depth-4">&lt;</span><span class="org-type">Rep</span>, <span class="org-type">Period</span><span class="org-rainbow-delimiters-depth-4">&gt;</span>&amp; <span class="org-variable-name">sleep_duration</span> <span class="org-rainbow-delimiters-depth-3">)</span>;
+    <span class="org-comment-delimiter">// </span><span class="org-comment">Blocks the execution of the current thread until specified</span>
+    <span class="org-comment-delimiter">// </span><span class="org-comment">sleep_time has been reached.</span>
+    <span class="org-keyword">template</span><span class="org-rainbow-delimiters-depth-3">&lt;</span> <span class="org-keyword">class</span> <span class="org-type">Clock</span>, <span class="org-keyword">class</span> <span class="org-type">Duration</span> <span class="org-rainbow-delimiters-depth-3">&gt;</span>
+    <span class="org-type">void</span>           <span class="org-function-name">sleep_until</span><span class="org-rainbow-delimiters-depth-3">(</span> <span class="org-keyword">const</span> <span class="org-constant">std</span>::<span class="org-constant">chrono</span>::<span class="org-type">time_point</span><span class="org-rainbow-delimiters-depth-4">&lt;</span><span class="org-type">Clock</span>,<span class="org-type">Duration</span><span class="org-rainbow-delimiters-depth-4">&gt;</span>&amp; <span class="org-variable-name">sleep_time</span> <span class="org-rainbow-delimiters-depth-3">)</span>;
+ <span class="org-rainbow-delimiters-depth-2">}</span>
+<span class="org-rainbow-delimiters-depth-1">}</span>
+</pre>
+</div>
+</div>
+</div>
+
+
+<div id="outline-container-orgdeb0de5" class="outline-3">
+<h3 id="orgdeb0de5"><span class="section-number-3">1.5</span> Threads - std::thread usage and race condition</h3>
+<div class="outline-text-3" id="text-1-5">
+</div>
+<div id="outline-container-orgf4b31bb" class="outline-4">
+<h4 id="orgf4b31bb"><span class="section-number-4">1.5.1</span> Race condition</h4>
+<div class="outline-text-4" id="text-1-5-1">
+<p>
+When the a race condition happens, the outcome of the computation with
+a shared resource depends precisely on the order of execution of the
+threads. Race condition bugs are hard to trace and debug. The solution
+to this flaw is to coordinate the thread access to shared resources
+through synchronization primitives, namely, mutex (mutual exclusion
+locks), atomic variables, and so on.
+</p>
+
+<p>
+Most common types of shared resources: 
+</p>
+<ul class="org-ul">
+<li>Global variable or objects such as: std::cout, std::cerr, std::cin</li>
+<li>Shared variables between threads</li>
+<li>Singleton objects - class with an unique global instance.</li>
+</ul>
+
+<p>
+C++ Standard definition about <b>Data Race</b> (aka race condition): 
+</p>
+
+<blockquote>
+<p>
+The execution of a program contains a <b>data race</b> if it conains two
+potential concurrent conflicting actions, at least one of which is
+not atomic, and neither happens before the other, except of the
+special case for singnal handlers described below. <b>Any such data</b>
+<b>race results</b> in <b>undefined behavior</b>.
+</p>
+</blockquote>
+
+<p>
+C++ Standard about Undefined Behavior: 
+</p>
+
+<blockquote>
+<p>
+A conforming implementation executing a well-formaed program shall
+reproduce the same observable behavior as one of the possible
+executions of the corresponding instances of the abstract machien
+with the smae program and the same input. However, if any such
+exeuction contains an undefined operation, this International
+Standard places no requirement on the implementation executing that
+program with that input.
+</p>
+</blockquote>
+
+<p>
+<b>Example about race condition:</b>
+</p>
+
+<p>
+Race condition: 
+</p>
+
+<ul class="org-ul">
+<li>File: race_condtion.cpp</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">iostream</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">thread</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">chrono</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">thread</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">vector</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+
+<span class="org-keyword">struct</span> <span class="org-type">Worker</span>
+<span class="org-rainbow-delimiters-depth-1">{</span>
+    <span class="org-type">int</span>&amp; <span class="org-variable-name">acc</span>;
+
+    <span class="org-function-name">Worker</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">int</span>&amp; <span class="org-variable-name">acc</span><span class="org-rainbow-delimiters-depth-2">)</span>: <span class="org-function-name">acc</span><span class="org-rainbow-delimiters-depth-2">(</span>acc<span class="org-rainbow-delimiters-depth-2">)</span> <span class="org-rainbow-delimiters-depth-2">{</span> <span class="org-rainbow-delimiters-depth-2">}</span>
+
+    <span class="org-type">void</span> <span class="org-keyword">operator</span><span class="org-function-name"><span class="org-rainbow-delimiters-depth-2">()</span></span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">int</span> <span class="org-variable-name">x</span><span class="org-rainbow-delimiters-depth-2">)</span>
+    <span class="org-rainbow-delimiters-depth-2">{</span>
+        <span class="org-constant">std</span>::<span class="org-constant">this_thread</span>::sleep_for<span class="org-rainbow-delimiters-depth-3">(</span><span class="org-constant">std</span>::<span class="org-constant">chrono</span>::milliseconds<span class="org-rainbow-delimiters-depth-4">(</span>500<span class="org-rainbow-delimiters-depth-4">)</span><span class="org-rainbow-delimiters-depth-3">)</span>;
+        acc = acc + x * x;
+    <span class="org-rainbow-delimiters-depth-2">}</span>
+<span class="org-rainbow-delimiters-depth-1">}</span>;
+
+<span class="org-type">int</span> <span class="org-function-name">main</span><span class="org-rainbow-delimiters-depth-1">()</span>
+<span class="org-rainbow-delimiters-depth-1">{</span>
+    <span class="org-type">int</span> <span class="org-variable-name">result</span> = 0;
+
+    <span class="org-constant">std</span>::<span class="org-type">vector</span><span class="org-rainbow-delimiters-depth-2">&lt;</span><span class="org-constant">std</span>::thread<span class="org-rainbow-delimiters-depth-2">&gt;</span> <span class="org-variable-name">thread_list</span><span class="org-rainbow-delimiters-depth-2">{}</span>;
+    <span class="org-keyword">for</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">int</span> <span class="org-variable-name">i</span> = 1; i &lt;= 10; i++<span class="org-rainbow-delimiters-depth-2">)</span>
+    <span class="org-rainbow-delimiters-depth-2">{</span>
+        thread_list.push_back<span class="org-rainbow-delimiters-depth-3">(</span> <span class="org-constant">std</span>::thread<span class="org-rainbow-delimiters-depth-4">{</span>Worker<span class="org-rainbow-delimiters-depth-5">(</span>result<span class="org-rainbow-delimiters-depth-5">)</span>, i<span class="org-rainbow-delimiters-depth-4">}</span> <span class="org-rainbow-delimiters-depth-3">)</span>;
+    <span class="org-rainbow-delimiters-depth-2">}</span>
+
+    <span class="org-keyword">for</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-keyword">auto</span>&amp; <span class="org-variable-name">t</span>: thread_list<span class="org-rainbow-delimiters-depth-2">)</span> <span class="org-rainbow-delimiters-depth-2">{</span> t.join<span class="org-rainbow-delimiters-depth-3">()</span>; <span class="org-rainbow-delimiters-depth-2">}</span>
+    <span class="org-constant">std</span>::cout &lt;&lt; <span class="org-string">" result   = "</span> &lt;&lt; result &lt;&lt; <span class="org-constant">std</span>::endl;
+    <span class="org-keyword">return</span> 0;
+<span class="org-rainbow-delimiters-depth-1">}</span>
+</pre>
+</div>
+
+<p>
+Building: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">$ g++ thread1.cpp -o <span class="org-keyword">thread1.bin</span> -std=c++1z -Wall -Wextra -O0 -g -lpthread 
+</pre>
+</div>
+
+<p>
+Running: 
+</p>
+<ul class="org-ul">
+<li>The expected result is 385. However, the program sometimes yields
+an incorrect result due to a <span class="underline">race condition</span> bug (aka data
+race).</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-sh">$ ./thread1.bin 
+ result   = 385
+
+$ ./thread1.bin 
+ result   = 384
+
+$ ./thread1.bin 
+ result   = 385
+
+$ ./thread1.bin 
+ result   = 368
+
+$ ./thread1.bin 
+ result   = 385
+
+./thread1.bin 
+ result   = 376
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-org6d31e55" class="outline-4">
+<h4 id="org6d31e55"><span class="section-number-4">1.5.2</span> Mutex solution</h4>
+<div class="outline-text-4" id="text-1-5-2">
+<p>
+The race condition can be solved by using <b>mutex</b> - mutual exclusion
+synchronization primitive which allows only a single thread at a time
+to access the critical section, portion of the code with a shared
+resource.   
+</p>
+
+<p>
+File: thread2.cpp 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">iostream</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">thread</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">chrono</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">thread</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">vector</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">mutex</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+
+<span class="org-keyword">using</span> <span class="org-keyword">namespace</span> <span class="org-constant">std</span>::<span class="org-constant">chrono_literals</span>;
+
+<span class="org-keyword">struct</span> <span class="org-type">Worker</span>
+<span class="org-rainbow-delimiters-depth-1">{</span>
+    <span class="org-type">int</span>&amp; <span class="org-variable-name">acc</span>;
+    <span class="org-comment-delimiter">// </span><span class="org-comment">Requires &lt;mutex&gt; header</span>
+    <span class="org-constant">std</span>::<span class="org-type">mutex</span>&amp; <span class="org-variable-name">m</span>;
+
+    <span class="org-function-name">Worker</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">int</span>&amp; <span class="org-variable-name">acc</span>, <span class="org-constant">std</span>::<span class="org-type">mutex</span>&amp; <span class="org-variable-name">m</span><span class="org-rainbow-delimiters-depth-2">)</span>: acc<span class="org-rainbow-delimiters-depth-2">(</span>acc<span class="org-rainbow-delimiters-depth-2">)</span>, m<span class="org-rainbow-delimiters-depth-2">(</span>m<span class="org-rainbow-delimiters-depth-2">)</span> <span class="org-rainbow-delimiters-depth-2">{</span> <span class="org-rainbow-delimiters-depth-2">}</span>
+
+    <span class="org-type">void</span> <span class="org-keyword">operator</span><span class="org-function-name"><span class="org-rainbow-delimiters-depth-2">()</span></span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">int</span> <span class="org-variable-name">x</span><span class="org-rainbow-delimiters-depth-2">)</span>
+    <span class="org-rainbow-delimiters-depth-2">{</span>
+        <span class="org-constant">std</span>::<span class="org-constant">this_thread</span>::sleep_for<span class="org-rainbow-delimiters-depth-3">(</span><span class="org-constant">std</span>::<span class="org-constant">chrono</span>::milliseconds<span class="org-rainbow-delimiters-depth-4">(</span>500<span class="org-rainbow-delimiters-depth-4">)</span><span class="org-rainbow-delimiters-depth-3">)</span>;
+        <span class="org-comment-delimiter">// </span><span class="org-comment">--- Start of critical section ---- //</span>
+        m.lock<span class="org-rainbow-delimiters-depth-3">()</span>;   <span class="org-comment-delimiter">// </span><span class="org-comment">Curren thread acquire locks</span>
+        acc = acc + x * x;
+        m.unlock<span class="org-rainbow-delimiters-depth-3">()</span>; <span class="org-comment-delimiter">// </span><span class="org-comment">Current thread releases lock</span>
+        <span class="org-comment-delimiter">// </span><span class="org-comment">--- End of critical section ---- //</span>
+    <span class="org-rainbow-delimiters-depth-2">}</span>
+<span class="org-rainbow-delimiters-depth-1">}</span>;
+
+
+<span class="org-type">int</span> <span class="org-function-name">main</span><span class="org-rainbow-delimiters-depth-1">()</span>
+<span class="org-rainbow-delimiters-depth-1">{</span>
+    <span class="org-comment-delimiter">// </span><span class="org-comment">Shared resource</span>
+    <span class="org-type">int</span> <span class="org-variable-name">result</span> = 0;
+    <span class="org-constant">std</span>::<span class="org-type">mutex</span> <span class="org-variable-name">m</span>;
+
+    <span class="org-constant">std</span>::<span class="org-type">vector</span><span class="org-rainbow-delimiters-depth-2">&lt;</span><span class="org-constant">std</span>::thread<span class="org-rainbow-delimiters-depth-2">&gt;</span> <span class="org-variable-name">thread_list</span><span class="org-rainbow-delimiters-depth-2">{}</span>;
+    <span class="org-keyword">for</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">int</span> <span class="org-variable-name">i</span> = 1; i &lt;= 10; i++<span class="org-rainbow-delimiters-depth-2">)</span>
+    <span class="org-rainbow-delimiters-depth-2">{</span>
+        thread_list.push_back<span class="org-rainbow-delimiters-depth-3">(</span> <span class="org-constant">std</span>::thread<span class="org-rainbow-delimiters-depth-4">{</span><span class="org-variable-name">Worker</span><span class="org-rainbow-delimiters-depth-5">(</span>result, m<span class="org-rainbow-delimiters-depth-5">)</span>, <span class="org-variable-name">i</span><span class="org-rainbow-delimiters-depth-4">}</span> <span class="org-rainbow-delimiters-depth-3">)</span>;
+    <span class="org-rainbow-delimiters-depth-2">}</span>
+
+    <span class="org-keyword">for</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-keyword">auto</span>&amp; <span class="org-variable-name">t</span>: thread_list<span class="org-rainbow-delimiters-depth-2">)</span> <span class="org-rainbow-delimiters-depth-2">{</span> t.join<span class="org-rainbow-delimiters-depth-3">()</span>; <span class="org-rainbow-delimiters-depth-2">}</span>
+
+    <span class="org-constant">std</span>::cout &lt;&lt; <span class="org-string">" result   = "</span> &lt;&lt; result &lt;&lt; <span class="org-constant">std</span>::endl;
+
+    <span class="org-keyword">return</span> 0;
+<span class="org-rainbow-delimiters-depth-1">}</span>
+</pre>
+</div>
+
+<p>
+Building: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">$ g++ thread2.cpp -o <span class="org-keyword">thread2.bin</span> -std=c++1z -Wall -Wextra -O0 -g -lpthread 
+</pre>
+</div>
+
+<p>
+Running:  
+</p>
+
+<ul class="org-ul">
+<li>The computation becomes reproducible and predictable due to the
+mutex allow only a single thread at atime access the shared
+resource (variable result).</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-sh">$ ./thread2.bin 
+ result   = 385
+
+$ ./thread2.bin 
+ result   = 385
+
+$ ./thread2.bin 
+ result   = 385
+
+$ ./thread2.bin 
+ result   = 385
+
+
+$ ./thread2.bin 
+ result   = 385
+</pre>
+</div>
+
+<p>
+Note: The current code is not exception safe and error prone, as a
+result if an exception happens or if the lock releasing code is
+missing, the outcome will be a <span class="underline">deadlock.</span> It is better to use the
+std::mutex_guard which is an RAII (Resource Acquisition Is
+Initialization) wrapper for locks. When the mutex guard object is
+constructed, the current thread acquires the lock and when the guard
+goes out of scope, the mutex lock is released. So, by using a
+<span class="underline">scope_guard</span>, the code becomes:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-type">void</span> <span class="org-keyword">operator</span><span class="org-function-name"><span class="org-rainbow-delimiters-depth-1">()</span></span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">int</span> <span class="org-variable-name">x</span><span class="org-rainbow-delimiters-depth-1">)</span>
+<span class="org-rainbow-delimiters-depth-1">{</span>
+    <span class="org-constant">std</span>::<span class="org-constant">this_thread</span>::sleep_for<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-constant">std</span>::<span class="org-constant">chrono</span>::milliseconds<span class="org-rainbow-delimiters-depth-3">(</span>500<span class="org-rainbow-delimiters-depth-3">)</span><span class="org-rainbow-delimiters-depth-2">)</span>;
+    <span class="org-comment-delimiter">// </span><span class="org-comment">--- Start of critical section ---- //</span>
+    <span class="org-comment-delimiter">// </span><span class="org-comment">Acquires lock </span>
+    <span class="org-constant">std</span>::<span class="org-type">lock_guard</span><span class="org-rainbow-delimiters-depth-2">&lt;</span><span class="org-constant">std</span>::mutex<span class="org-rainbow-delimiters-depth-2">&gt;</span> <span class="org-variable-name">mutex_guard</span><span class="org-rainbow-delimiters-depth-2">(</span>m<span class="org-rainbow-delimiters-depth-2">)</span>;
+    acc = acc + x * x;
+    <span class="org-comment-delimiter">// </span><span class="org-comment">--- End of critical section ---- //</span>
+<span class="org-rainbow-delimiters-depth-1">}</span> <span class="org-comment-delimiter">// </span><span class="org-comment">Releases lock here, when the mutex_guard goes out of scope and is destroyed. </span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org138e04a" class="outline-4">
+<h4 id="org138e04a"><span class="section-number-4">1.5.3</span> Atomic variable solution</h4>
+<div class="outline-text-4" id="text-1-5-3">
+<p>
+Another way to solve the race condition (aka data race) problem is
+using <span class="underline">atomic variables and atomic operations</span>. 
+</p>
+
+<p>
+File: thread3.cpp 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">iostream</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">thread</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">chrono</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">thread</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">vector</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">mutex</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">atomic</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+
+<span class="org-keyword">using</span> <span class="org-keyword">namespace</span> <span class="org-constant">std</span>::<span class="org-constant">chrono_literals</span>;
+
+<span class="org-keyword">struct</span> <span class="org-type">Worker</span>
+<span class="org-rainbow-delimiters-depth-1">{</span>
+    <span class="org-constant">std</span>::<span class="org-type">atomic</span><span class="org-rainbow-delimiters-depth-2">&lt;</span><span class="org-type">int</span><span class="org-rainbow-delimiters-depth-2">&gt;</span>&amp; <span class="org-variable-name">acc</span>;
+    <span class="org-comment-delimiter">// </span><span class="org-comment">Requires &lt;mutex&gt; header</span>
+    <span class="org-constant">std</span>::<span class="org-type">mutex</span>&amp; <span class="org-variable-name">m</span>;
+
+    <span class="org-function-name">Worker</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-constant">std</span>::<span class="org-type">atomic</span><span class="org-rainbow-delimiters-depth-3">&lt;</span><span class="org-type">int</span><span class="org-rainbow-delimiters-depth-3">&gt;</span>&amp; <span class="org-variable-name">acc</span>, <span class="org-constant">std</span>::<span class="org-type">mutex</span>&amp; <span class="org-variable-name">m</span><span class="org-rainbow-delimiters-depth-2">)</span>
+       : acc<span class="org-rainbow-delimiters-depth-2">(</span>acc<span class="org-rainbow-delimiters-depth-2">)</span>, m<span class="org-rainbow-delimiters-depth-2">(</span>m<span class="org-rainbow-delimiters-depth-2">)</span> <span class="org-rainbow-delimiters-depth-2">{</span> <span class="org-rainbow-delimiters-depth-2">}</span>
+
+    <span class="org-type">void</span> <span class="org-keyword">operator</span><span class="org-function-name"><span class="org-rainbow-delimiters-depth-2">()</span></span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">int</span> <span class="org-variable-name">x</span><span class="org-rainbow-delimiters-depth-2">)</span>
+    <span class="org-rainbow-delimiters-depth-2">{</span>
+        <span class="org-constant">std</span>::<span class="org-constant">this_thread</span>::sleep_for<span class="org-rainbow-delimiters-depth-3">(</span><span class="org-constant">std</span>::<span class="org-constant">chrono</span>::milliseconds<span class="org-rainbow-delimiters-depth-4">(</span>500<span class="org-rainbow-delimiters-depth-4">)</span><span class="org-rainbow-delimiters-depth-3">)</span>;
+        acc += x * x;
+    <span class="org-rainbow-delimiters-depth-2">}</span>
+<span class="org-rainbow-delimiters-depth-1">}</span>;
+
+<span class="org-type">int</span> <span class="org-function-name">main</span><span class="org-rainbow-delimiters-depth-1">()</span>
+<span class="org-rainbow-delimiters-depth-1">{</span>
+    <span class="org-comment-delimiter">// </span><span class="org-comment">Shared resource</span>
+    <span class="org-constant">std</span>::<span class="org-type">atomic</span><span class="org-rainbow-delimiters-depth-2">&lt;</span><span class="org-type">int</span><span class="org-rainbow-delimiters-depth-2">&gt;</span> <span class="org-variable-name">result</span> = 0;
+    <span class="org-constant">std</span>::<span class="org-type">mutex</span> <span class="org-variable-name">m</span>;
+
+    <span class="org-constant">std</span>::<span class="org-type">vector</span><span class="org-rainbow-delimiters-depth-2">&lt;</span><span class="org-constant">std</span>::thread<span class="org-rainbow-delimiters-depth-2">&gt;</span> <span class="org-variable-name">thread_list</span><span class="org-rainbow-delimiters-depth-2">{}</span>;
+    <span class="org-keyword">for</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">int</span> <span class="org-variable-name">i</span> = 1; i &lt;= 10; i++<span class="org-rainbow-delimiters-depth-2">)</span>
+    <span class="org-rainbow-delimiters-depth-2">{</span>
+        thread_list.push_back<span class="org-rainbow-delimiters-depth-3">(</span> <span class="org-constant">std</span>::thread<span class="org-rainbow-delimiters-depth-4">{</span><span class="org-variable-name">Worker</span><span class="org-rainbow-delimiters-depth-5">(</span>result, m<span class="org-rainbow-delimiters-depth-5">)</span>, <span class="org-variable-name">i</span><span class="org-rainbow-delimiters-depth-4">}</span> <span class="org-rainbow-delimiters-depth-3">)</span>;
+    <span class="org-rainbow-delimiters-depth-2">}</span>
+
+    <span class="org-keyword">for</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-keyword">auto</span>&amp; <span class="org-variable-name">t</span>: thread_list<span class="org-rainbow-delimiters-depth-2">)</span> <span class="org-rainbow-delimiters-depth-2">{</span> t.join<span class="org-rainbow-delimiters-depth-3">()</span>; <span class="org-rainbow-delimiters-depth-2">}</span>
+
+    <span class="org-constant">std</span>::cout &lt;&lt; <span class="org-string">" result   = "</span> &lt;&lt; result &lt;&lt; <span class="org-constant">std</span>::endl;
+
+    <span class="org-keyword">return</span> 0;
+<span class="org-rainbow-delimiters-depth-1">}</span>
+</pre>
+</div>
+
+<p>
+Output: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">$ ./thread3.bin 
+ result   = 385
+
+$ ./thread3.bin 
+ result   = 385
+
+$ ./thread3.bin 
+ result   = 385
+
+$ ./thread3.bin 
+ result   = 385
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div id="postamble" class="status">
+<p class="author">Author: Caio Rodrigues Soares - caiorss [DOT] rodrigues [AT] gmail [DOT] COM</p>
+<p class="date">Created: 2019-09-09 Mon 17:11</p>
+<p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
+</div>
+</body>
+</html>
