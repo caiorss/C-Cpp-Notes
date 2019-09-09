@@ -793,3 +793,217 @@ Output:
 
 
 
+** Condition Variables and Producer Consumer Problem 
+
+  + A condition variable is a synchronization primitive which allows
+    one or more threads to wait for a event, signal from another
+    thread, without wasting CPU cycles. 
+
+  + Mechanism: several threads wait on a condition variable, until
+    another thread notifies this synchronization primitive.
+
+  + Note: Condition variables do not provide locking such as Mutexes,
+    so they must be used alongside condition variables in order to
+    avoid race conditions.
+
+  + Operations of condition Variables:
+
+    + ConditionVar.wait(MutexLock)
+      + => Makes current thread (waiting thread) sleep waiting from a signal
+
+    + ConditionVar.notify_one()
+      + => Wakes up a waiting thread. If there is no waiting thread,
+        the operation does nothing.
+
+    + ConditionVar.notify_all()
+      + => Wake up all waiting threads.
+
+ *Condition Variable Method Signatures*
+
+#+BEGIN_SRC cpp 
+  class condition_variable
+  {
+   public:
+      condition_variable();
+      ~condition_variable();
+      condition_variable(const condition_variable&) = delete;
+      condition_variable& operator=(const condition_variable&) = delete;
+
+      /** Wake up only one sleeping thread */
+      void notify_one() noexcept;
+    
+      /** Wake up all sleeping threads that are waiting for this signal */      
+      void notify_all() noexcept;
+
+      /** Make thread which alls this method sleep (wait for signal)
+        ,* without waste CPU cycles */  
+      void wait(unique_lock<mutex>& lock);
+
+      template <class Predicate>
+          void wait(unique_lock<mutex>& lock, Predicate pred);
+
+      template <class Clock, class Duration>
+      cv_status wait_until(unique_lock<mutex>& lock, const chrono::time_point<Clock, Duration>& abs_time);
+
+      template <class Clock, class Duration, class Predicate>
+      bool wait_until(unique_lock<mutex>& lock, const chrono::time_point<Clock, Duration>& abs_time, Predicate pred);
+
+      template <class Rep, class Period>
+      cv_status wait_for(unique_lock<mutex>& lock, const chrono::duration<Rep, Period>& rel_time);
+
+      template <class Rep, class Period, class Predicate>
+      bool wait_for(unique_lock<mutex>& lock, const chrono::duration<Rep, Period>& rel_time, Predicate pred);
+
+      typedef implementation-defined native_handle_type;
+      native_handle_type native_handle();
+  };
+#+END_SRC
+
+ *Example: Usage of Conditions Variables in Producer/Consumer problem* 
+
+The producer consumer problem is classical synchronization problem
+where a producer puts data into a data structure and another thread, called
+consumer, removes data from the data structure. Only a single thread
+should be able to access the data structure at any atime. 
+
+Sample implementation: https://gist.github.com/iikuy/8115191
+
+Example: 
+ 
+  + File: producer-consumer.cpp
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <thread>
+  #include <chrono>
+
+  #include <queue>
+  #include <vector>
+
+  // --- Concurrency Headers ---- //
+  #include <thread> // threads
+  #include <mutex>  // mutex, lock_guard, unique_lock
+  #include <future> // conditional_variables
+
+  using namespace std::chrono_literals;
+
+  int main(int argc, char** argv)
+  {
+
+      std::cout << " Number of hardware threads = "
+                << std::thread::hardware_concurrency() << "\n\n";
+
+      std::condition_variable cond;
+      std::mutex m;
+      std::queue<double> buffer;
+      bool finished = false;
+
+      auto producer_thread = std::thread([&]
+      {
+              std::cout << " [PRODUCER] Producer thread started." << "\n";
+              for(int i = 0; i < 5; i++)
+              {
+                  std::this_thread::sleep_for(1s);
+                  {  // -- start of critical section ----//
+                      auto lock = std::lock_guard<std::mutex>{m};
+                      double x = 5 * i + 10;
+                      std::cout << "\n [PRODUCER] Send data to buffer x = " << x << "\n";
+                      buffer.push(x); // Mutex protects the buffer fron race condition
+                    // --- End of ciritical section ---- //
+                  }
+
+                  // Send signal notifying consumer thread to proceed.
+                  cond.notify_all();
+              }
+
+              {
+                  auto lock = std::lock_guard<std::mutex>{m};
+                  std::cout << " [PRODUCER] End of transmission" << std::endl;
+                  finished = true;
+              }
+      });
+
+      auto consumer_thread = std::thread([&]{
+          std::cout << " [CONSUMER] Consumer thread started." << "\n";
+          while(true)
+          {            
+              auto lock = std::unique_lock<std::mutex>{m};
+
+              std::cout << " [CONSUMER] Waiting input " << "\n";
+
+              // The condition variable waits for cond.notify_one() signal
+              // from the producer thread. Before this signal is sent, this
+              // thread sleeps until receives it.
+              cond.wait(lock, [&]{ return !buffer.empty(); });
+
+              std::cout << " [CONSUMER] Processing data ... wait" << "\n";
+              // Delay for simulating processing time
+              std::this_thread::sleep_for(5s);
+
+              std::cout << " [CONSUMER] Received value " << buffer.front() << "\n";
+              buffer.pop();
+
+              if(finished){
+                  std::cout << " [CONSUMER] Stop consumer thread. Ok" << "\n";
+                  break;
+              }
+
+              // Unlock in order to avoid deadlock
+              // lock.unlock();
+          }
+      });
+
+      std::cout << " [TRACE] Waiting thread completion" << "\n";
+      producer_thread.join();
+      consumer_thread.join();
+
+      return 0;
+  }
+#+END_SRC
+
+Building and Running: 
+
+#+BEGIN_SRC sh 
+  $ g++ producer-consumer.cpp -o out.bin -std=c++1z -O0 -g -Wall -lpthread
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC sh 
+  $ ./out.bin 
+   Number of hardware threads = 4
+
+   [PRODUCER] Producer thread started.
+   [TRACE] Waiting thread completion
+   [CONSUMER] Consumer thread started.
+   [CONSUMER] Waiting input 
+
+   [PRODUCER] Send data to buffer x = 10
+   [CONSUMER] Processing data ... wait
+   [CONSUMER] Received value 10
+   [CONSUMER] Waiting input 
+
+   [PRODUCER] Send data to buffer x = 15
+   [CONSUMER] Processing data ... wait
+   [CONSUMER] Received value 15
+   [CONSUMER] Waiting input 
+
+   [PRODUCER] Send data to buffer x = 20
+   [CONSUMER] Processing data ... wait
+   [CONSUMER] Received value 20
+   [CONSUMER] Waiting input 
+
+   [PRODUCER] Send data to buffer x = 25
+   [CONSUMER] Processing data ... wait
+   [CONSUMER] Received value 25
+   [CONSUMER] Waiting input 
+
+   [PRODUCER] Send data to buffer x = 30
+   [PRODUCER] End of transmission
+   [CONSUMER] Processing data ... wait
+   [CONSUMER] Received value 30
+   [CONSUMER] Stop consumer thread. Ok
+
+#+END_SRC
+
+
