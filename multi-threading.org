@@ -1007,3 +1007,238 @@ Running:
 #+END_SRC
 
 
+** Producer/consumer problem with concurrent blocking queue 
+
+The producer consumer synchronization problem can be simplified with a
+concurrent blocking queue which encapsulates the data structure
+implementation and the all synchronization locks. 
+
+Requirements: 
+
+  * The _producer thread_ puts an element in the queue and signals the
+    condition variable what wakes up the _consumer thread_. 
+
+  * When the queue is empty, the _consumer thread_ gets in sleep state
+    and waits for some element to be put into the queue. 
+
+  * The access to the queue must be thread-safe. 
+
+Parts of standard library used: 
+
+  + [[https://en.cppreference.com/w/cpp/thread/thread][std::thread]]
+  + [[https://en.cppreference.com/w/cpp/thread/condition_variable][std::condition_variable]]
+  + [[https://en.cppreference.com/w/cpp/thread/mutex][std::mutex]]
+  + [[https://en.cppreference.com/w/cpp/thread/unique_lock][std::unique_lock]]
+  + [[https://en.cppreference.com/w/cpp/thread/lock_guard][lock:guard]]
+  + [[https://en.cppreference.com/w/cpp/container/queue][queue]] 
+
+ *Example:* Simple Blocking Queue Implementation for consumer/producer problem. 
+
+File: concurrent_queue.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <thread>
+  #include <chrono>
+
+  #include <queue>
+  #include <vector>
+  #include <functional>
+
+  // --- Concurrency Headers ---- //
+  #include <thread> // threads
+  #include <mutex>  // mutex, lock_guard, unique_lock
+  #include <future> // conditional_variables
+
+  using namespace std::chrono_literals;
+
+  template<typename T>
+  class ConcurrentQueue
+  {
+      using guard = std::lock_guard<std::mutex>;
+
+      std::queue<T>           m_queue;
+      std::condition_variable m_cvar;
+      mutable std::mutex      m_mutex;
+
+  public:
+      ConcurrentQueue(){}
+
+      // Called by producer thread
+      void push(T& value)
+      {
+          auto g = guard(m_mutex);
+          m_queue.push(value);
+          m_cvar.notify_one();
+      }
+
+      void push(T&& value)
+      {
+          auto g = guard(m_mutex);
+          m_queue.push(value);
+          m_cvar.notify_one();
+      }
+
+
+      // Called by consumer thread.
+      // blocks consumer thread making
+      // it sleep when the queue is empty
+      void pop()
+      {
+          auto g = guard(m_mutex);
+          m_queue.pop();
+      }
+
+      // Called by consumer thread
+      T& front()
+      {
+          auto lock = std::unique_lock<std::mutex>(m_mutex);
+          // The second argument of m_cvar.wait, a lambda function is
+          // passed as predicate to prevent spurious thread wake up.
+          m_cvar.wait(lock, [&]{ return !m_queue.empty(); });
+          T& result = m_queue.front();
+          lock.unlock();
+          return result;
+      }
+
+      // Called by consumer thread
+      const T& front() const
+      {
+          auto lock = std::unique_lock<std::mutex>(m_mutex);
+          m_cvar.wait(lock, [&]{ return !m_queue.empty(); });
+          T& result = m_queue.front();
+          lock.unlock();
+          return result;
+      }
+
+      bool empty() const
+      {
+          auto g = guard(m_mutex);
+          return m_queue.front();
+      }
+
+      std::size_t size() const
+      {
+          auto g = guard(m_mutex);
+          return  m_queue.size();
+      }
+
+  };
+
+
+
+  int main(int argc, char* argv[])
+  {
+
+      ConcurrentQueue<double> queue;
+
+      // Mutex used for protecting std::cout from frace condition
+      std::mutex output_mutex;
+      std::atomic_bool finished = false;
+
+      auto consumer_thread = std::thread( [&]
+      {
+        {
+            auto guard = std::lock_guard(output_mutex);
+            std::cout << " [CONSUMER] Consumer thread started." << "\n";
+        }
+          while(true)
+          {
+              auto value = queue.front();
+              {
+                  auto guard = std::lock_guard(output_mutex);
+                  std::cout << " [CONSUMER] Wait input ..." << "\n";
+                  std::cout << " [CONSUMER] Received value = " << value << "\n";
+              }
+              queue.pop();
+              if(!queue.empty() && finished) { break; }
+          }
+      });
+
+       // Protect cout from race condition
+      {
+          auto guard = std::lock_guard(output_mutex);
+          std::cout << " [TRACE] Start interactive SHELL OK." << "\n";
+      }
+
+      // The producer thread is the current one (main thread)
+      for(int i = 0; i < 5; i++)
+      {
+          std::this_thread::sleep_for(1s);
+          double x = i * i - 4 * i + 10.0 ;
+          {
+              auto guard = std::lock_guard(output_mutex);
+              std::cout << " [PRODUCER] => Sending number: " << x << "\n";
+          }
+          queue.push(x);
+      }
+
+      finished = true;
+      consumer_thread.join();
+      return 0;
+  }
+#+END_SRC
+
+Building: 
+
+#+BEGIN_SRC sh 
+  $ clang++ concurrent_queue.cpp -o out.bin -std=c++1z -O0 -Wall -g -lpthread
+#+END_SRC
+
+Running:
+
+#+BEGIN_SRC sh 
+  $ out.bin  
+   [TRACE] Start interactive SHELL OK.
+   [CONSUMER] Consumer thread started.
+   [PRODUCER] => Sending number: 10
+   [CONSUMER] Wait input ...
+   [CONSUMER] Received value = 10
+   [PRODUCER] => Sending number: 7
+   [CONSUMER] Wait input ...
+   [CONSUMER] Received value = 7
+   [PRODUCER] => Sending number: 6
+   [CONSUMER] Wait input ...
+   [CONSUMER] Received value = 6
+   [PRODUCER] => Sending number: 7
+   [CONSUMER] Wait input ...
+   [CONSUMER] Received value = 7
+   [PRODUCER] => Sending number: 10
+   [CONSUMER] Wait input ...
+   [CONSUMER] Received value = 10
+#+END_SRC
+
+ *Further Reading* 
+
+Other Implementations of Concurrent Blocking Queue: 
+
+  + [[https://github.com/cameron314/concurrentqueue][cameron314/concurrentqueue]] [BEST] - "A fast multi-producer,
+    multi-consumer lock-free concurrent queue for C++11"
+
+  + Facebook's Folly - [[https://github.com/facebook/folly/blob/master/folly/docs/ProducerConsumerQueue.md][ProducerConsumerQueue]] (documentation) - Code: [[https://github.com/facebook/folly/blob/master/folly/ProducerConsumerQueue.h][ProducerConsumerQueue.h]]
+
+  + [[https://juanchopanzacpp.wordpress.com/2013/02/26/concurrent-queue-c11/][Concurrent queue – C++11 | Juan's C++ blog]]
+
+  + [[https://www.boost.org/doc/libs/1_70_0/doc/html/thread/sds.html#thread.sds.synchronized_queues][Boost Synchronized Data Structure - Synchronized Queue]]
+
+  + [[https://docs.microsoft.com/en-us/cpp/parallel/concrt/reference/concurrent-queue-class?view=vs-2019][concurrent_queue Class | Microsoft Docs]]
+
+  + [[https://codereview.stackexchange.com/questions/128832/c11-blocking-queue-learning-exercise][c++ - C++11 Blocking Queue learning exercise - Code Review Stack Exchange]]
+
+  + [[https://gist.github.com/thelinked/6997598][C++11 blocking queue using the standard library. · GitHub]]
+
+References: 
+  
+  + Paper: [[http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p0260r3.html][WG21 - C++ Concurrent Queues]] - Lawerence Crwol, Chris Mysen
+    + "Concurrent queues are a fundamental structuring tool for
+      concurrent programs. We propose a concurrent queue concept and a
+      concrete implementation. We propose a set of communication types
+      that enable loosely bound program components to dynamically
+      construct and safely share concurrent queues."
+
+  + [[https://www.baeldung.com/java-blocking-queue][Guide to java.util.concurrent.BlockingQueue | Baeldung]]
+    + Shows how a concurrent queue works and solves the
+      producer/consumer problem.
+
+  + [[https://vorbrodt.blog/2019/02/03/blocking-queue/][Blocking queue – Vorbrodt's C++ Blog]]
+
