@@ -247,12 +247,19 @@ Papers related to the standard library implementation:
 
       // construct/copy/destroy:
       thread();
+
       template <class F> explicit thread(F f);
+
       template <class F, class ...Args> thread(F&& f, Args&&... args);
+
       ~thread();
+
       thread(const thread&) = delete;
+
       thread(thread&&);
+
       thread& operator=(const thread&) = delete;
+
       thread& operator=(thread&&);
 
       // members:
@@ -501,7 +508,7 @@ Signature of functions in namespace this_thread.
 #+END_SRC
 
 
-** Threads - std::thread usage and race condition 
+** Thread - std::thread usage and synchronization primtives 
 *** Race condition 
 
 When the a race condition happens, the outcome of the computation with
@@ -792,6 +799,129 @@ Output:
 
 
 
+** Thread - Returning values from std::thread 
+*** Return value from thread 
+
+There is no way to return a value from a std::thread computaiton, if a
+function used for instantiating std::thread has any returning value it
+is ignored.  
+
+Example: 
+
+#+BEGIN_SRC cpp 
+   double heavy_computation(doube input)
+   {
+       // do something .... heavy calculation 
+       return output; 
+   }
+
+  // Return value ignored. 
+  auto th = std::thread( &heavy_computation, 10);
+
+ // ... ... ... 
+
+  th.join();
+#+END_SRC
+
+The workaround for returning a value out of std::thread is to set a
+variable defined outside of the thread or set a parameter passed as
+pointer or reference.
+
+ + Return value from thread by setting a variable defined outside of
+   the thread. 
+
+#+BEGIN_SRC cpp 
+  double output = 0.0;
+
+  // Return value ignored. 
+  auto th = std::thread( &[&]
+           { 
+              // perform heavy computation // 
+               .... 
+              /* set output */
+              output =  .... 
+           }, 10);
+
+ // ... ... ... 
+
+  th.join();
+  printf(" output = %f", output);
+#+END_SRC
+
+
+ + Return value from thread by setting the function parameters passed
+   by reference or pointer. 
+
+#+BEGIN_SRC cpp 
+   void heavy_computation(doube input, double& output1, double* output2)
+   {
+       // do something .... heavy calculation 
+       output1 =  .... ;
+       *output2 = "Something else ...."; 
+   }
+
+   double      output1 = 0.0; 
+   std::string output2 = "";
+ 
+   auto th = std::thread(&heavy_computation, std::ref(output1), &output2);
+   th.join();
+ 
+   std::cout << " output1 = " << output1 " ; " << " output2 = " << output2 << "\n";
+#+END_SRC
+*** Catch exceptions in threads 
+
+If any exception is thrown in a std::thread, the exception is not
+propagated to the try ... catch block outside of the thread, instead
+the C++ runtime calls std::terminate causing abonormal termination. 
+
+ *Example: code does not work => calls std::terminate*
+
+#+BEGIN_SRC cpp 
+  auto do_something = [](int input)
+  {
+     // ....  .... // 
+     if(input < 0 ){ throw std::logic_error("Invalid input"); }
+     //.... ... ... ... //
+  };
+
+  // DOES NOT WORK =>>> C++ runtime calls std::terminate !!!
+  try
+  {
+     auto th = std::thread(do_something, -10);
+  } catch(std::logic_error& ex)
+  {
+     std::cout << " Error: " << ex.what() << "\n".;
+  }
+#+END_SRC
+
+ *Example: Solution* 
+
+#+BEGIN_SRC cpp 
+  std::exception_ptr exptr = nullptr;
+
+  auto do_something = [&](int input)
+  {
+    try {
+     // ....  .... // 
+     if(input < 0 ){ throw std::logic_error("Invalid input"); }
+     //.... ... ... ... //
+
+    // Catch all exceptions 
+    } catch(...) { 
+        exception_ptr = std::current_exception();
+    }
+  };
+
+  try
+  {
+     auto th = std::thread(do_something, -10);
+     th.join(); 
+     std::rethrow_exception(exptr);
+  } catch(std::logic_error& ex)
+  {
+     std::cout << " Error: " << ex.what() << "\n".;
+  }
+#+END_SRC
 
 ** Condition Variables and Producer Consumer Problem 
 
