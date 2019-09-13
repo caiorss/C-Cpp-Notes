@@ -1247,10 +1247,208 @@ Usage example:
      std::cout << "Result = " << x << "\n";
   }
 #+END_SRC
+*** Example 
+
+File: future1.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <thread>
+  #include <chrono>
+
+  #include <queue>
+  #include <vector>
+
+  // --- Concurrency Headers ---- //
+  #include <thread>
+  #include <mutex>
+  #include <future>
+  #include <type_traits>
+  #include <optional>
+
+  namespace cr = std::chrono;
+  using namespace std::chrono_literals;
+
+  #define LOG_FUNCTION_ENTRY() \
+            std::cerr << " [TRACE-ENTRY] Function = " << __FUNCTION__  \
+            << " ; threadID " << std::this_thread::get_id() << std::endl
+
+
+  struct TimeCounter
+  {
+
+
+      decltype(std::chrono::steady_clock::now()) start;
+      TimeCounter(){  start = cr::steady_clock::now();  }
+
+      void report(std::string const& label)
+      {
+          auto end = cr::steady_clock::now();
+          auto duration = cr::duration_cast<cr::seconds>(end - start);
+          std::cout << " [TRACE] Elapsed time: {" << label << "} = " << duration.count()
+                    << std::endl;
+      }
+  };
+
+  std::mutex mu;
+
+  double expensive_computationA(int n)
+  {
+      {   /* --- Start of critical section --- */
+          // Protect std::cout from race condition
+          std::lock_guard<std::mutex> guard(mu);
+          LOG_FUNCTION_ENTRY();
+      }   /* --- End of critical section --- */
+      std::this_thread::sleep_for(4s);
+      return 4.0 * n + 5;
+  }
+
+  double expensive_computationB(int n)
+  {
+      {   /* --- Start of critical section --- */
+          // Protect std::cout from race condition
+          std::lock_guard<std::mutex> guard(mu);
+          LOG_FUNCTION_ENTRY();
+      }   /* --- End of critical section --- */
+      std::this_thread::sleep_for(8s);
+      return 2.515 * n + 15.8714;
+  }
+
+  std::string
+  computatio_with_exception(int n)
+  {
+      LOG_FUNCTION_ENTRY();
+      std::this_thread::sleep_for(1s);
+      if(n < 0) { throw std::logic_error(" Error: not allowed negative N"); }
+      return "Hello world";
+  }
 
 
 
+  int main(int argc, char** argv)
+  {
 
+      std::cout << " Number of hardware threads = "
+                << std::thread::hardware_concurrency() << std::endl;
+
+  #if 1
+
+      LOG_FUNCTION_ENTRY();
+
+      std::puts("\n ==== EXPERIMENT 1 >>  without std::future => Run Serially ==== ");
+      std::puts("-----------------------------------------------------------------\n");
+      {
+          TimeCounter tc;
+          double resultA = expensive_computationA(10);
+          double resultB = expensive_computationB(10);
+
+          std::cout << " [TRACE] Completed =>> resultA = " << resultA
+                    << " ; resultB = " << resultB
+                    << std::endl;
+          tc.report("EXPERIMENT1");
+      }
+
+      std::puts("\n ==== EXPERIMENT 2 >> with std::futures - Run in Parallel ===== ");
+      std::puts("-----------------------------------------------------------------\n");
+      {
+          TimeCounter tc;
+
+
+          // Function runs in another thread when the future object
+          // is instantiated.
+          // The default policy of std::async is (async | deferred) which
+          // would let the C++ runtime decide when run the thread.
+          std::future<double> futA = std::async(std::launch::async
+                                                , &expensive_computationA, 10);
+
+          // Function runs only when the std::future<T>::get() method is called.
+          // The function expensive_computationB is not run at the moment futB object
+          // is created.
+          auto futB = std::async(std::launch::async, expensive_computationB, 10);
+
+          // Protect std::cout from race condition (aka data race)
+          {
+              std::lock_guard<std::mutex> guard(mu);
+              std::cout << " [TRACE] Waiting futures results " << std::endl;
+          }
+
+          // Calls to .get() method blocks the current thread and waits
+          // for the completion of the computations wrapped in the future object.
+          double resultB = futB.get();
+          double resultA = futA.get();
+
+          std::cout << " [TRACE] Completed =>> resultA = " << resultA
+                    << " ; resultB = " << resultB
+                    << std::endl;
+
+          tc.report("EXPERIMENT2");
+
+          // The method can only be used only once!!
+          // otherwise, it calls std::termiante causing abnormal termination.
+          //---------------------------------
+          // double resultAA = futA.get(); // DO NOT!
+      }
+
+      std::puts("\n ==== EXPERIMENT 3 >> Exceptions handling ====================== ");
+      std::puts("-----------------------------------------------------------------\n");
+      {
+          std::cout << "Future Created" << "\n";
+          auto fut1 = std::async(computatio_with_exception, -10);
+
+          try {
+              auto result1 = fut1.get();
+              std::cout << " [INFO] Result1 = " << result1 << "\n";
+          } catch(std::logic_error& ex)
+          {
+              std::cerr << " [ERROR] " << ex.what() << "\n";
+          }
+
+      }
+
+  #endif
+
+      return 0;
+  }
+#+END_SRC
+
+Building: 
+
+#+BEGIN_SRC sh 
+   clang++ future1.cpp -o future1.bin -std=c++1z -lpthread -Wall -Wextra -O0 -g
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC sh 
+   $ ./future1.bin 
+
+   Number of hardware threads = 4
+
+   ==== EXPERIMENT 1 >>  without std::future => Run Serially ==== 
+  -----------------------------------------------------------------
+
+   [TRACE-ENTRY] Function = main ; threadID 139662702782272
+   [TRACE-ENTRY] Function = expensive_computationA ; threadID 139662702782272
+   [TRACE-ENTRY] Function = expensive_computationB ; threadID 139662702782272
+   [TRACE] Completed =>> resultA = 45 ; resultB = 41.0214
+   [TRACE] Elapsed time: {EXPERIMENT1} = 12
+
+   ==== EXPERIMENT 2 >> with std::futures - Run in Parallel ===== 
+  -----------------------------------------------------------------
+
+   [TRACE] Waiting futures results 
+   [TRACE-ENTRY] Function = expensive_computationA ; threadID 139662684923648
+   [TRACE-ENTRY] Function = expensive_computationB ; threadID 139662676530944
+   [TRACE] Completed =>> resultA = 45 ; resultB = 41.0214
+   [TRACE] Elapsed time: {EXPERIMENT2} = 8
+
+   ==== EXPERIMENT 3 >> Exceptions handling ====================== 
+  -----------------------------------------------------------------
+
+  Future Created
+   [TRACE-ENTRY] Function = computatio_with_exception ; threadID 139662684923648
+   [ERROR]  Error: not allowed negative N
+#+END_SRC
 ** Condition Variables and Producer Consumer Problem 
 
   + A condition variable is a synchronization primitive which allows
