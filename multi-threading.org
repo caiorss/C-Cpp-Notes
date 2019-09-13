@@ -1662,12 +1662,151 @@ Running:
 
 #+END_SRC
 
+** Messaging Passing Concurrency and Message Queue 
+*** Overview 
 
-** Producer/consumer problem with concurrent blocking queue 
+Message Passing Concurrency
+
+  + In Message passing concurrency threads communicate by sending
+    messages to each other through a _message queue_ FIFO buffer,
+    instead of communicating through explicit locks and mutating the
+    shared memory.
+
+  + The mosft fundamental construct of message passing concurrency is
+    the _message queue_, that allows communication between _producers_
+    (aka senders) and _consumers_ (aka receivers) threads running at
+    different speeds.
+
+  + _Message queues_ are also called mailbox, channels or concurrent queue.
+
+  + _Message queues_ are used for the from implementing the following
+    messaging passing design patterns: 
+
+    * _CSP_ - Concurrent Sequential Process - proposed by Tony Hoare and
+      used in GO/Golang and Clojure.
+
+    * _Actor Model_ - Proposed by Carl Hewitt and used in Erlang and
+      Scala's Akka.
+
+    * _Active Object_
+
+    * _Thread Pools_
+
+Producer Consumer Problem: 
+
+ + The most basic use case of _message queues_ is solving the producer
+   consumer/problem inter-thread communication problem where a
+   producer and consumer thread communicates through a buffer,
+   generally a queue. There are two scenarios, if the buffer is empty,
+   the consumer thread gets blocked (suspended) and is only resumed
+   when the producer puts some item in the buffer. If the queue has a
+   limited size and is full, the producer thread gets blocked
+   (suspended) until the consumer removes the item from the queue.
+
+ + Note: _Message queues_ can be implemented as a class that
+   encapsulates the queue data structure and synchronization
+   primitives: condition variables and mutexes. 
+
+Other uses of _message passing_ and _message queues_ 
+
+  + Message passing is not only used for inter-thread communication,
+    this approach is also applicable for process communication through
+    IPC - Inter Process Communication and distributed systems where
+    multiple processes communicates over the network through sockets. 
+
+Sample Implementations of _message queue_ 
+
+  + Java:
+
+    + LinkedBlockingQueue (Bounded buffer)
+      + => Linked list of unlimited size that blocks/suspends the
+        consumer thread if the queue is empty until the producer puts
+        some element in the queue. 
+
+    + ArrayBlockingQueue (Bounded buffer)
+      + => Fixed size queue that blocks/suspends the consumer thread
+        (aka receiver) if the queue is empty until the producer thread
+        (aka sender) adds an element to the queue. The producer thread
+        gets blocked if the queue is full until the consumer thread
+        pops an element from the queue.
+
+  + [[https://github.com/cameron314/concurrentqueue][cameron314/concurrentqueue]]
+    + "A fast multi-producer,  multi-consumer lock-free concurrent queue for C++11"
+
+  + Facebook's Folly - [[https://github.com/facebook/folly/blob/master/folly/docs/ProducerConsumerQueue.md][ProducerConsumerQueue]] (documentation) - Code: [[https://github.com/facebook/folly/blob/master/folly/ProducerConsumerQueue.h][ProducerConsumerQueue.h]]
+
+  + [[https://juanchopanzacpp.wordpress.com/2013/02/26/concurrent-queue-c11/][Concurrent queue – C++11 | Juan's C++ blog]]
+
+
+Example of Message Queue Behavior in Pseudocode: 
+
+#+BEGIN_SRC cpp 
+  // Message queue of fixed size 10 
+  fixed_message_queue<double> buffer(10);
+
+  auto consumer_thread = thread([&]{
+     while(buffer.is_closed()){
+        sleep(2);
+        // Block current thread if the queue is empty 
+        double next = buffer.take();   
+        print("Received message x = %.3f", next);
+     }
+  });
+
+  auto producer_thread = thread([&]{
+     for(double x = 0.0; x < 100.0; x += 2.0) {
+        sleep(10);
+        double y = 4 * x + 10;
+        // Block current thread if the queue is full (has 10 elements)
+        double next = buffer.put(x);   
+        print("Received message x = %.3f", next);
+     }
+     // Indicates that messages will no longer be sent 
+     queue.close();
+  });
+#+END_SRC
+
+ *Message Passing Concurrency in other languages* 
+
+  + [[https://golang.org/doc/effective_go.html#concurrency][Effective Go - The Go Programming Language]] - Concurrency
+
+  + [[https://bartoszmilewski.com/2009/07/16/on-actors-and-casting/][On Actors and Casting |   Bartosz Milewski's Programming Cafe]]
+
+ *C++ Implementations of Message Passing* (Message Queue / Actor Model and CSP)
+
+  + [[https://docs.microsoft.com/en-us/previous-versions/visualstudio/visual-studio-2010/dd492627(v=vs.100)?redirectedfrom=MSDN][Asynchronous Agents Library | Microsoft Docs]] - PPL Library 
+
+  + [[https://github.com/Himmele/Mindroid.ecpp][Mindroid.ecpp: Mindroid.ecpp]] - is an embedded application
+   framework inspired by Google's Android operating system
+
+  + [[http://web.archive.org/web/20090303231159/http://www.ddj.com/hpc-high-performance-computing/210604448][Writing Lock-Free Code: A Corrected Queue]] - Herb Sutter
+
+  + [[https://stackoverflow.com/questions/26489876/what-is-the-best-practice-for-passing-data-between-threads-queues-messages-or][c++ - What is the best practice for passing data between threads? Queues, messages or others?]]
+
+  + [[https://github.com/cameron314/concurrentqueue][cameron314/concurrentqueue]]
+    + "A fast multi-producer,  multi-consumer lock-free concurrent queue for C++11"
+
+  + Facebook's Folly - [[https://github.com/facebook/folly/blob/master/folly/docs/ProducerConsumerQueue.md][ProducerConsumerQueue]] (documentation) - Code: [[https://github.com/facebook/folly/blob/master/folly/ProducerConsumerQueue.h][ProducerConsumerQueue.h]]
+
+  + [[https://juanchopanzacpp.wordpress.com/2013/02/26/concurrent-queue-c11/][Concurrent queue – C++11 | Juan's C++ blog]]
+
+  + [[https://www.boost.org/doc/libs/1_70_0/doc/html/thread/sds.html#thread.sds.synchronized_queues][Boost Synchronized Data Structure - Synchronized Queue]]
+
+  + [[https://docs.microsoft.com/en-us/cpp/parallel/concrt/reference/concurrent-queue-class?view=vs-2019][concurrent_queue Class | Microsoft Docs]]
+
+  + [[https://codereview.stackexchange.com/questions/128832/c11-blocking-queue-learning-exercise][c++ - C++11 Blocking Queue learning exercise - Code Review Stack Exchange]]
+
+  + [[https://gist.github.com/thelinked/6997598][C++11 blocking queue using the standard library. · GitHub]]
+
+  + [[https://github.com/Balnian/ChannelsCPP][GitHub - Balnian/ChannelsCPP: C++ implementation of the Go (GoLang) Channel and Select structure]]
+
+  + [[https://gist.github.com/vmrob/e4fde208302ae8979b57][Go channels in C++ · GitHub]]
+
+*** Producer/consumer problem with messague queue 
 
 The producer consumer synchronization problem can be simplified with a
-concurrent blocking queue which encapsulates the data structure
-implementation and the all synchronization locks. 
+message queue (aka concurrent blocking queue) which encapsulates the
+data structure implementation and the all synchronization promitives.
 
 Requirements: 
 
@@ -1709,7 +1848,7 @@ File: concurrent_queue.cpp
   using namespace std::chrono_literals;
 
   template<typename T>
-  class ConcurrentQueue
+  class MessageQueue 
   {
       using guard = std::lock_guard<std::mutex>;
 
@@ -1718,7 +1857,7 @@ File: concurrent_queue.cpp
       mutable std::mutex      m_mutex;
 
   public:
-      ConcurrentQueue(){}
+      MessageQueue(){}
 
       // Called by producer thread
       void push(T& value)
@@ -1786,7 +1925,7 @@ File: concurrent_queue.cpp
   int main(int argc, char* argv[])
   {
 
-      ConcurrentQueue<double> queue;
+      MessageQueue<double> queue;
 
       // Mutex used for protecting std::cout from frace condition
       std::mutex output_mutex;
@@ -1838,7 +1977,7 @@ File: concurrent_queue.cpp
 Building: 
 
 #+BEGIN_SRC sh 
-  $ clang++ concurrent_queue.cpp -o out.bin -std=c++1z -O0 -Wall -g -lpthread
+  $ clang++ message_queue.cpp -o out.bin -std=c++1z -O0 -Wall -g -lpthread
 #+END_SRC
 
 Running:
@@ -1864,27 +2003,37 @@ Running:
    [CONSUMER] Received value = 10
 #+END_SRC
 
- *Further Reading* 
+*** References
 
-Other Implementations of Concurrent Blocking Queue: 
+  + *Chapter 10 - Concurrency - Message Passing*
+    + https://www.doc.ic.ac.uk/~jnm/book/firstbook/pdf/ch10.pdf
 
-  + [[https://github.com/cameron314/concurrentqueue][cameron314/concurrentqueue]] [BEST] - "A fast multi-producer,
-    multi-consumer lock-free concurrent queue for C++11"
+  + *Reading 22: Queues and Message-Passing* - MIT 
+    + http://web.mit.edu/6.031/www/fa17/classes/22-queues/
+    + Note: contains "Implementing message passing with queues"
 
-  + Facebook's Folly - [[https://github.com/facebook/folly/blob/master/folly/docs/ProducerConsumerQueue.md][ProducerConsumerQueue]] (documentation) - Code: [[https://github.com/facebook/folly/blob/master/folly/ProducerConsumerQueue.h][ProducerConsumerQueue.h]]
+  + *Two models for concurrent programming* - MIT 
+    + http://web.mit.edu/6.031/www/fa17/classes/19-concurrency/#two_models_for_concurrent_programming
 
-  + [[https://juanchopanzacpp.wordpress.com/2013/02/26/concurrent-queue-c11/][Concurrent queue – C++11 | Juan's C++ blog]]
+  + *Android Style Message Passing* - Communicating between Threads using Message Queues.
+    + http://blog.coldflake.com/posts/Android-style-Message-Passing/
+    + Coverage: Message queue, active object.
 
-  + [[https://www.boost.org/doc/libs/1_70_0/doc/html/thread/sds.html#thread.sds.synchronized_queues][Boost Synchronized Data Structure - Synchronized Queue]]
+  + *Programming with Trheads - Synchronization and Communication* [PAPER]
+    + <https://cms.uni-konstanz.de/fileadmin/archive/deussen/fileadmin/informatik/ag-deussen/2011/heck2011-programming_with_threads.pdf>
 
-  + [[https://docs.microsoft.com/en-us/cpp/parallel/concrt/reference/concurrent-queue-class?view=vs-2019][concurrent_queue Class | Microsoft Docs]]
+  + *Producer consumer design pattern* - DZone 
+    + <https://dzone.com/articles/producer-consumer-pattern>
 
-  + [[https://codereview.stackexchange.com/questions/128832/c11-blocking-queue-learning-exercise][c++ - C++11 Blocking Queue learning exercise - Code Review Stack Exchange]]
+  + *A Thread-Safe Message Queue*
+    + <https://wiki.tcl-lang.org/page/A+Thread-Safe+Message+Queue>
 
-  + [[https://gist.github.com/thelinked/6997598][C++11 blocking queue using the standard library. · GitHub]]
+  + *How to use wait, nitifyAll in Java - Producer Consumer Example*
+    + <https://javarevisited.blogspot.com/2015/07/how-to-use-wait-notify-and-notifyall-in.html> 
 
-References: 
-  
+  + *5. Message Passing*
+    + https://cs.gmu.edu/~rcarver/ModernMultithreading/LectureNotes/chapter5notes-2up.pdf
+
   + Paper: [[http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p0260r3.html][WG21 - C++ Concurrent Queues]] - Lawerence Crwol, Chris Mysen
     + "Concurrent queues are a fundamental structuring tool for
       concurrent programs. We propose a concurrent queue concept and a
@@ -1897,4 +2046,6 @@ References:
       producer/consumer problem.
 
   + [[https://vorbrodt.blog/2019/02/03/blocking-queue/][Blocking queue – Vorbrodt's C++ Blog]]
+
+
 
