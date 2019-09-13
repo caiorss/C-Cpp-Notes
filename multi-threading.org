@@ -468,7 +468,6 @@ Example:
   static unsigned int thread::hardware_concurrency() noexcept;
 #+END_SRC
 
-
 ** Functions of namespace std::this_thread 
 
 Utilities functions for currrent thread of execution: 
@@ -798,7 +797,6 @@ Output:
 #+END_SRC
 
 
-
 ** Thread - Returning values from std::thread 
 *** Return value from thread 
 
@@ -1077,6 +1075,181 @@ Running:
    [ERROR] Error: invalid input: -10
 
 #+END_SRC
+
+** Task-based APIs => Futures and Promises 
+*** Futures overview 
+
+Overview: 
+
+  + The std::future class encapsulates a value that will eventually
+    become available from an asynchronous computation. 
+
+  + This class makes easier to run functions or anything callable that
+    returns value in a new thread and get this value without any
+    global variables. Another benefit is that is much easier to handle
+    exceptions from another thread than the class std::thread.
+
+  + Use cases:
+    + Short computations that returns a value such as a network request.
+    + Implement parallel algorithms and parallel computations. 
+
+  + Not the best use case:
+    + Long running thread or worker thread.
+
+  + Problems:
+    + Many other implementations of futures run the tasks in a
+      thread-pool, a pre-allocated set of threads of spawning too much
+      threads that would increase the memory footprint, reducing the
+      performance and throughput.
+    + The C++ standard library's std::future API does not use thread
+      pools.
+
+ *Documentation*
+
+  + [[https://en.cppreference.com/w/cpp/thread/promise][std::promise]]
+
+  + [[https://en.cppreference.com/w/cpp/atomic/memory_order][std::memory_order]]
+
+ *Other Implementations of Futures and Promises*
+
+  + [[https://www.boost.org/doc/libs/1_71_0/doc/html/thread/synchronization.html#thread.synchronization.futures][boost::future]]
+
+  + [[https://github.com/facebook/folly/blob/master/folly/docs/Futures.md][folly::Future]] 
+
+  + [[http://stlab.cc/libraries/concurrency/future/future/][stlab::future]] 
+
+  + hpx::future
+*** Usage 
+
+The function [[https://en.cppreference.com/w/cpp/thread/async][std::async]] is used for creating  [[https://en.cppreference.com/w/cpp/thread/future][std::future]] objects out of
+functions that return values.
+
+#+BEGIN_SRC cpp 
+  // Note: simplified pseudo-signature => 
+ 
+  // Overload 1: 
+  template<typename Callable, typename ... Args>
+  auto async( Function&& f, Args&&... args ) -> std::future<Return>;
+
+  // Overload 2: 
+  template<typename Return, typename Callable, typename ... Args>
+  auto async( std::launch policy, Function&& f, Args&&... args ) -> std::future<Return>;
+#+END_SRC
+
+Usage example: 
+
+  + The object futA represents the return value or the result of the
+    computation heavy_computation that is run in a new thread not
+    blocking the thread that called std::async.
+
+  + The parameter _std::launch::async_ => or launch policy is necessary
+    to run the computation in a new thread. 
+
+#+BEGIN_SRC cpp 
+   double heavy_computation(int size, std::string label, bool flag)
+   { 
+     // Sleep blocking the current thread for 10 seconds.
+     std::this_thread::sleep_for(10s);
+     // ... ... ... .. 
+     return output; 
+  }
+
+   std::future<double> futA = std::async(std::launch::async, heavy_computation, 100, "calc1", false);
+
+   auto futB = std::async(std::launch::async, [](int n)
+              { 
+                 // .... heavy CPU bound computation ... // 
+                 double output = ...; 
+                   ... ... ... 
+                 return output;
+              }, 200);
+#+END_SRC
+
+  + _std::future<T>::get()_
+    + The member function .get() from [[https://en.cppreference.com/w/cpp/thread/future][std::future]] blocks the current
+      thread (similar to std::thread::join) waiting for the completion
+      of the computation and then returns its result.
+
+#+BEGIN_SRC cpp 
+    // Block current thread - similar to std::thread::join()
+    double resultA = futA.get(); 
+    double resultB = futB.get(); 
+
+    std::cout << " resultA = " << resultA << " ; " << resultB << "\n";
+#+END_SRC
+
+  + _std::fuuture<T>::wait()_
+    + The member function .wait() blocks the current thread waiting the
+      std::future's thread termination.  
+
+#+BEGIN_SRC cpp
+  // Wait for the computation completion blocking current thread.
+  futB.wait(); 
+#+END_SRC
+ 
+  + Catching exceptions.
+
+#+BEGIN_SRC cpp 
+    double computation(int input)
+    { 
+      ... .... ... ... 
+
+      if(bad_input(input)) { 
+          throw std::runtime_error("Invalid input, try again ..."); 
+      }
+
+      ... .... ... ... 
+      return result; 
+   }
+
+    // Type: std::future<double>
+    auto afuture = std::async(std::launch::async, computation, 10);
+
+    try
+    { 
+      double result = afuture.get(); 
+      std::cout << " Result = " << result << "\n";
+    } catch(std::runtime_error& ex)
+    {
+      std::cout << " [ERROR] " << ex.what() << "\n":
+    }
+#+END_SRC
+
+ + Run computations in parallel 
+
+#+BEGIN_SRC cpp 
+    double computation(int input)
+    { 
+      ... .... ... ... 
+      // Sleep blocking this thread for 8 seconds 
+      // for simulating a heavy CPU-bound computation.
+      std::this_thread::sleep_for(8s);
+      ... .... ... ... 
+      return result; 
+   }
+
+   std::vector<std::future<double>> futures; 
+   futures.reserver(3);
+   std::vector<int> inputs {10, 20, 25};
+   std::vector<double> outputs; 
+     
+  for(auto& x: inputs){ 
+     futures.push_back( std::async(std::launch::async, computation, x);   ) 
+  };
+
+  // Block current thread waiting all computations finish. 
+  // If every computation takes 8 seconds, the total time waiting 
+  // will be 8 seconds since they are all run in parallel. 
+  for(auto& fut: futures)
+  {
+     double x = fut.get(); 
+     outputs.push_back(x);
+     std::cout << "Result = " << x << "\n";
+  }
+#+END_SRC
+
+
+
 
 ** Condition Variables and Producer Consumer Problem 
 
