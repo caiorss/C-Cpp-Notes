@@ -922,6 +922,161 @@ the C++ runtime calls std::terminate causing abonormal termination.
      std::cout << " Error: " << ex.what() << "\n".;
   }
 #+END_SRC
+*** Example: Returning values and catching exceptions 
+
+File: return-thread.cpp 
+
+#+BEGIN_SRC cpp 
+  // Experiment returning results from threads
+  //---------------------------------------------
+  #include <iostream>
+  #include <chrono>
+  #include <thread>
+  #include <vector>
+  #include <functional>
+
+  using namespace std::chrono_literals;
+  namespace cr = std::chrono;
+
+  struct Timer
+  {
+      decltype(cr::steady_clock::now()) start;
+
+      Timer(){  start = cr::steady_clock::now();  }
+
+      ~Timer()
+      {
+          auto end = cr::steady_clock::now();
+          auto duration = cr::duration_cast<cr::seconds>(end - start);
+          std::cout << " [TRACE] Elapsed time: " << duration.count()
+                    << std::endl;
+      }
+  };
+
+
+  double heavy_computation(int input)
+  {
+      using namespace std::string_literals;
+
+      std::this_thread::sleep_for(4s);
+      if(input < 0) {
+          throw std::runtime_error("Error: invalid input: "s + std::to_string(input));
+      }
+      return input * 3.815 + 5.6;
+  }
+
+
+  int main(int argc, char* argv[])
+  {
+      std::vector<int>         inputs{2, 10, 5};
+      std::vector<double>      results(3);
+      std::vector<std::thread> threads;
+      threads.reserve(3);
+
+      // Note: A std::thread will never return anything from a function
+      // passed as argument, even if has non-void return type.
+      // The only to return a value from a thread is to set an
+      // argument passed by pointer or reference or set a global object.
+      auto thread_adapter = [&](size_t index, int input)
+      {
+          results[index] = heavy_computation(input);
+      };
+
+      std::puts("\n ===== Experiment 1 - Return value from threads (Parallel Computing) ==== \n");
+
+      {   // Shows elapsed time at end of this scope
+          auto timer = Timer{};
+
+          for(size_t i = 0; i < 3; i++) {
+              threads.push_back( std::thread(thread_adapter, i, inputs[i]) );
+          }
+
+          std::puts(" [INFO] Waiting for thread completion");
+
+          // Wait for the completion of all threads
+          for(size_t i = 0; i < 3; i++) { threads[i].join(); }
+
+          // Show results
+          for(size_t i = 0; i < 3; i++) {
+              std::printf(" Result[%lu] = %f\n", i, results[i]);
+          }
+      }
+
+      ///---------------------------------------------------------------//
+      std::puts("\n ===== Dealing with exceptions from threads ==== \n");
+
+      double output = 0.0;
+      std::exception_ptr exptr = nullptr;
+
+      auto thread_adapter2 = [&](int input)
+      {
+          std::puts(" [TRACE] Inside thread_adapter2");
+
+          // Note: if an exception is not caught,
+          // it will not be propagated to the parent thread.
+          // Instead, the C++ runtime will call std::terminate
+          // causing abonormal temrination.
+          try
+          {
+              output = heavy_computation(input);
+          } catch (...)
+          {
+              // Catch all exceptions from the computation that
+              // should run in a new thread and set a shared memory variable
+              // set only once by this thread.
+              exptr = std::current_exception();
+          }
+      };
+
+      auto th = std::thread(thread_adapter2, -10);
+      std::puts(" [TRACE] Waiting thread_adapter2 thread termination.");
+      th.join();
+
+      if(!exptr)
+      {
+          std::cout << " [INFO] Result of thread_adapter2 is: " << output << "\n";
+
+      } else
+      {
+          try
+          {
+              std::rethrow_exception(exptr);
+          } catch (std::runtime_error& err) {
+              std::cout << " [ERROR] " << err.what() << "\n";
+          }
+      }
+
+      return 0;
+  }
+
+#+END_SRC
+
+Building: 
+
+#+BEGIN_SRC sh 
+  $ g++ return-thread.cpp -o out.bin -std=c++1z -O0 -g -lpthread
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC sh 
+  $ ./out.bin 
+
+   ===== Experiment 1 - Return value from threads (Parallel Computing) ==== 
+
+   [INFO] Waiting for thread completion
+   Result[0] = 13.230000
+   Result[1] = 43.750000
+   Result[2] = 24.675000
+   [TRACE] Elapsed time: 4
+
+   ===== Dealing with exceptions from threads ==== 
+
+   [TRACE] Waiting thread_adapter2 thread termination.
+   [TRACE] Inside thread_adapter2
+   [ERROR] Error: invalid input: -10
+
+#+END_SRC
 
 ** Condition Variables and Producer Consumer Problem 
 
