@@ -506,7 +506,6 @@ Signature of functions in namespace this_thread.
       }
 #+END_SRC
 
-
 ** Thread - std::thread usage and synchronization primtives 
 *** Race condition 
 
@@ -616,6 +615,162 @@ Running:
   ./thread1.bin 
    result   = 376
 #+END_SRC
+*** Debugging Race Conditions with CLang's Sanitizers
+
+It is well known that Race condition (aka data races) are hard to
+reproduce, trace and debug due to the nondeterminism of concurrent
+systems and the result in race condition be dependent on the order
+that threads were run. For instance, multiple executions with the same
+inputs may lead to different outcomes. 
+
+Clang compiler has some _sanitizers_ and static analysis tools that
+helps to debug undefined behavior, memory and race condition. 
+
+Clang Sanitizer Tools: 
+
+   * [[https://clang.llvm.org/docs/ThreadSafetyAnalysis.html][Thread Safety Analysis]] (Static analysis tool => compiler warning)
+     * Compiler switch:  *-Wthread-safety*
+     * Warns about potential race conditions in the code at compile-time.
+
+   * [[https://clang.llvm.org/docs/ThreadSanitizer.html][Thread Sanitizer]]
+     * Compiler switch: *-fsanitize=thread*
+     * Can detect:
+       * Race conditions or data races at runtime.
+
+   * [[https://clang.llvm.org/docs/AddressSanitizer.html][Address Sanitizer]]
+     + Compiler switch: *-fsanitize=address*
+     + Can detect:
+       + Out-of-bounds accesses to heap, stack and globals
+       + Use-after-free
+       + Use-after-return (runtime flag ASAN_OPTIONS=detect_stack_use_after_return=1)
+       + Double-free, invalid free
+       + Memory leaks (experimental)
+
+   * [[https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html][Undefined Behavior Sanitizer]]
+     * Compiler switch: *-fsanitize=undefined*
+     * Can detect:
+       * Using misaligned or null pointer
+       * Signed integer overflow
+       * Conversion to, from, or between floating-point types which
+         would overflow the destination. 
+
+   * [[https://clang.llvm.org/docs/MemorySanitizer.html][Memory Sanitizer]]
+     * Compiler switch: *-fsanitize=memory* 
+     * Can detect:
+       * Uninitialized reads (reading of unitialized variables)
+
+Example: Using Clang sanitizer tools for race condition detection: 
+
+ + File: flawed-program.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <thread>
+  #include <chrono>
+  #include <thread>
+  #include <vector>
+
+  struct Worker
+  {
+      int& acc;
+
+      Worker(int& acc): acc(acc) { }
+
+      void operator()(int x)
+      {
+          std::this_thread::sleep_for(std::chrono::milliseconds(500));
+          acc = acc + x * x;
+      }
+  };
+
+  int main()
+  {
+      int result = 0;
+
+      std::vector<std::thread> thread_list{};
+      for(int i = 1; i <= 10; i++)
+      {
+          thread_list.push_back( std::thread{Worker(result), i} );
+      }
+
+      for(auto& t: thread_list) { t.join(); }
+      std::cout << " result   = " << result << std::endl;
+      return 0;
+  }
+#+END_SRC
+
+Building: 
+
+#+BEGIN_SRC sh 
+  # Compiler swiches: 
+  #   =>> -O0                  Disable optimization 
+  #   =>> -g                   Enable debug building 
+  #   =>> -Wthread-safety      Enable Clang compiler warning for race conditions
+  #   =>> -fsanitize=thread    Enable thread sanitizer 
+  #   =>> -fsanitize=undefined Eanble undefined behavior sanitizer 
+  $ clang++ flawed-program.cpp -o out.bin -O0 -g -lpthread -Wall -Wextra -pedantic \
+      -Wthread-safety \
+      -fsanitize=thread \
+      -fsanitize=undefined 
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC sh 
+   $ ./out.bin 
+
+   ==================
+   WARNING: ThreadSanitizer: data race (pid=22979)
+     Read of size 4 at 0x7ffdb2ae1b78 by thread T2:
+       #0 Worker::operator()(int) /Users/dummy/projects/cmake-experiment/flawed-program.cpp:16:17 (out.bin+0x4b7516)
+       #1 void std::__invoke_impl<void, Worker, int>(std::__invoke_other, Worker&&, int&&) /usr/bin/../lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/invoke.h:60:14 (out.bin+0x4b7421)
+       #2 std::__invoke_result<Worker, int>::type std::__invoke<Worker, int>(Worker&&, int&&) /usr/bin/../lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/invoke.h:95:14 (out.bin+0x4b7026)
+       #3 _ZNSt6thread8_InvokerISt5tupleIJ6WorkeriEEE9_M_invokeIJLm0ELm1EEEEDTclsr3stdE8__invokespcl10_S_declvalIXT_EEEEESt12_Index_tupleIJXspT_EEE /usr/bin/../lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/thread:244:13 (out.bin+0x4b6eb6)
+       #4 std::thread::_Invoker<std::tuple<Worker, int> >::operator()() /usr/bin/../lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/thread:253:11 (out.bin+0x4b6ca8)
+       #5 std::thread::_State_impl<std::thread::_Invoker<std::tuple<Worker, int> > >::_M_run() /usr/bin/../lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/thread:196:13 (out.bin+0x4b5fe7)
+       #6 <null> <null> (libstdc++.so.6+0xbf5c2)
+
+     Previous write of size 4 at 0x7ffdb2ae1b78 by thread T1:
+       #0 Worker::operator()(int) /Users/dummy/projects/cmake-experiment/flawed-program.cpp:16:15 (out.bin+0x4b75c6)
+       #1 void std::__invoke_impl<void, Worker, int>(std::__invoke_other, Worker&&, int&&) /usr/bin/../lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/invoke.h:60:14 (out.bin+0x4b7421)
+       #2 std::__invoke_result<Worker, int>::type std::__invoke<Worker, int>(Worker&&, int&&) /usr/bin/../lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/invoke.h:95:14 (out.bin+0x4b7026)
+       #3 _ZNSt6thread8_InvokerISt5tupleIJ6WorkeriEEE9_M_invokeIJLm0ELm1EEEEDTclsr3stdE8__invokespcl10_S_declvalIXT_EEEEESt12_Index_tupleIJXspT_EEE /usr/bin/../lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/thread:244:13 (out.bin+0x4b6eb6)
+       #4 std::thread::_Invoker<std::tuple<Worker, int> >::operator()() /usr/bin/../lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/thread:253:11 (out.bin+0x4b6ca8)
+       #5 std::thread::_State_impl<std::thread::_Invoker<std::tuple<Worker, int> > >::_M_run() /usr/bin/../lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/thread:196:13 (out.bin+0x4b5fe7)
+       #6 <null> <null> (libstdc++.so.6+0xbf5c2)
+
+     As if synchronized via sleep:
+       #0 nanosleep <null> (out.bin+0x43565e)
+       #1 void std::this_thread::sleep_for<long, std::ratio<1l, 1000l> >(std::chrono::duration<long, std::ratio<1l, 1000l> > const&) /usr/bin/../lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/thread:379:9 (out.bin+0x4b7798)
+       #2 Worker::operator()(int) /Users/dummy/projects/cmake-experiment/flawed-program.cpp:15:11 (out.bin+0x4b74ef)
+       #3 void std::__invoke_impl<void, Worker, int>(std::__invoke_other, Worker&&, int&&) /usr/bin/../lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/invoke.h:60:14 (out.bin+0x4b7421)
+       #4 std::__invoke_result<Worker, int>::type std::__invoke<Worker, int>(Worker&&, int&&) /usr/bin/../lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/invoke.h:95:14 (out.bin+0x4b7026)
+       #5 _ZNSt6thread8_InvokerISt5tupleIJ6WorkeriEEE9_M_invokeIJLm0ELm1EEEEDTclsr3stdE8__invokespcl10_S_declvalIXT_EEEEESt12_Index_tupleIJXspT_EEE /usr/bin/../lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/thread:244:13 (out.bin+0x4b6eb6)
+       #6 std::thread::_Invoker<std::tuple<Worker, int> >::operator()() /usr/bin/../lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/thread:253:11 (out.bin+0x4b6ca8)
+       #7 std::thread::_State_impl<std::thread::_Invoker<std::tuple<Worker, int> > >::_M_run() /usr/bin/../lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/thread:196:13 (out.bin+0x4b5fe7)
+       #8 <null> <null> (libstdc++.so.6+0xbf5c2)
+
+     Location is stack of main thread.
+
+     Location is global '??' at 0x7ffdb2ac4000 ([stack]+0x00000001db78)
+
+     Thread T2 (tid=22982, running) created by main thread at:
+       #0 pthread_create <null> (out.bin+0x425eba)
+       #1 std::thread::_M_start_thread(std::unique_ptr<std::thread::_State, std::default_delete<std::thread::_State> >, void (*)()) <null> (libstdc++.so.6+0xbf8a8)
+       #2 main /Users/dummy/projects/cmake-experiment/flawed-program.cpp:27:34 (out.bin+0x4b3304)
+
+     Thread T1 (tid=22981, finished) created by main thread at:
+       #0 pthread_create <null> (out.bin+0x425eba)
+       #1 std::thread::_M_start_thread(std::unique_ptr<std::thread::_State, std::default_delete<std::thread::_State> >, void (*)()) <null> (libstdc++.so.6+0xbf8a8)
+       #2 main /Users/dummy/projects/cmake-experiment/flawed-program.cpp:27:34 (out.bin+0x4b3304)
+
+   SUMMARY: ThreadSanitizer: data race /Users/dummy/projects/cmake-experiment/flawed-program.cpp:16:17 in Worker::operator()(int)
+   ==================
+    result   = 304
+   ThreadSanitizer: reported 1 warnings
+
+#+END_SRC
+
 *** Mutex solution 
 
 The race condition can be solved by using *mutex* - mutual exclusion
@@ -795,7 +950,6 @@ Output:
   $ ./thread3.bin 
    result   = 385
 #+END_SRC
-
 
 ** Thread - Returning values from std::thread 
 *** Return value from thread 
