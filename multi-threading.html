@@ -3,7 +3,7 @@
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
-<!-- 2019-09-13 Fri 17:03 -->
+<!-- 2019-09-14 Sat 13:34 -->
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Multithreading and concurrency</title>
@@ -240,39 +240,40 @@ for the JavaScript code in this tag.
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents">
 <ul>
-<li><a href="#orgc48a5d7">1. Multithreading and concurrency</a>
+<li><a href="#orgb2779b6">1. Multithreading and concurrency</a>
 <ul>
-<li><a href="#org15adc17">1.1. Fundamental Concepts</a></li>
-<li><a href="#orgd77030f">1.2. Standard Library Reference</a></li>
-<li><a href="#orgc6323a4">1.3. Class std::thread</a></li>
-<li><a href="#orgffbd7f1">1.4. Functions of namespace std::this_thread</a></li>
-<li><a href="#orga508ba6">1.5. Thread - std::thread usage and synchronization primtives</a>
+<li><a href="#org40c6789">1.1. Fundamental Concepts</a></li>
+<li><a href="#org3eab140">1.2. Standard Library Reference</a></li>
+<li><a href="#orgc583488">1.3. Class std::thread</a></li>
+<li><a href="#orga7d69a1">1.4. Functions of namespace std::this_thread</a></li>
+<li><a href="#org5680be2">1.5. Thread - std::thread usage and synchronization primtives</a>
 <ul>
-<li><a href="#orgbf353a7">1.5.1. Race condition</a></li>
-<li><a href="#orgd616c9e">1.5.2. Mutex solution</a></li>
-<li><a href="#org7434f94">1.5.3. Atomic variable solution</a></li>
+<li><a href="#orgb041b13">1.5.1. Race condition</a></li>
+<li><a href="#org77bdfb5">1.5.2. Debugging Race Conditions with CLang's Sanitizers</a></li>
+<li><a href="#orgd2e4ea2">1.5.3. Mutex solution</a></li>
+<li><a href="#orgc3b7cea">1.5.4. Atomic variable solution</a></li>
 </ul>
 </li>
-<li><a href="#org4908f3f">1.6. Thread - Returning values from std::thread</a>
+<li><a href="#org2fba2a2">1.6. Thread - Returning values from std::thread</a>
 <ul>
-<li><a href="#org45e119c">1.6.1. Return value from thread</a></li>
-<li><a href="#org4f1d107">1.6.2. Catch exceptions in threads</a></li>
-<li><a href="#org6a20804">1.6.3. Example: Returning values and catching exceptions</a></li>
+<li><a href="#orgf0af17e">1.6.1. Return value from thread</a></li>
+<li><a href="#orgaa5209f">1.6.2. Catch exceptions in threads</a></li>
+<li><a href="#orgd783d9d">1.6.3. Example: Returning values and catching exceptions</a></li>
 </ul>
 </li>
-<li><a href="#org2479daf">1.7. Task-based APIs =&gt; Futures and Promises</a>
+<li><a href="#org1643b1b">1.7. Task-based APIs =&gt; Futures and Promises</a>
 <ul>
-<li><a href="#org292d6a8">1.7.1. Futures overview</a></li>
-<li><a href="#org08fabde">1.7.2. Usage</a></li>
-<li><a href="#orgfe60f31">1.7.3. Example</a></li>
+<li><a href="#org00d099d">1.7.1. Futures overview</a></li>
+<li><a href="#org4e2b5ab">1.7.2. Usage</a></li>
+<li><a href="#orgd2d9676">1.7.3. Example</a></li>
 </ul>
 </li>
-<li><a href="#orgb36b806">1.8. Condition Variables and Producer Consumer Problem</a></li>
-<li><a href="#org92b74eb">1.9. Messaging Passing Concurrency and Message Queue</a>
+<li><a href="#org17a881c">1.8. Condition Variables and Producer Consumer Problem</a></li>
+<li><a href="#orgc14b18e">1.9. Messaging Passing Concurrency and Message Queue</a>
 <ul>
-<li><a href="#org0ba745d">1.9.1. Overview</a></li>
-<li><a href="#orgc10f94b">1.9.2. Producer/consumer problem with messague queue</a></li>
-<li><a href="#org80b4afd">1.9.3. References</a></li>
+<li><a href="#orgfc1d003">1.9.1. Overview</a></li>
+<li><a href="#org2ac662a">1.9.2. Producer/consumer problem with messague queue</a></li>
+<li><a href="#orgb25d189">1.9.3. References</a></li>
 </ul>
 </li>
 </ul>
@@ -281,12 +282,12 @@ for the JavaScript code in this tag.
 </div>
 </div>
 
-<div id="outline-container-orgc48a5d7" class="outline-2">
-<h2 id="orgc48a5d7"><span class="section-number-2">1</span> Multithreading and concurrency</h2>
+<div id="outline-container-orgb2779b6" class="outline-2">
+<h2 id="orgb2779b6"><span class="section-number-2">1</span> Multithreading and concurrency</h2>
 <div class="outline-text-2" id="text-1">
 </div>
-<div id="outline-container-org15adc17" class="outline-3">
-<h3 id="org15adc17"><span class="section-number-3">1.1</span> Fundamental Concepts</h3>
+<div id="outline-container-org40c6789" class="outline-3">
+<h3 id="org40c6789"><span class="section-number-3">1.1</span> Fundamental Concepts</h3>
 <div class="outline-text-3" id="text-1-1">
 <p>
 <b>Processes and Threads</b>
@@ -397,13 +398,14 @@ Potential Problems of Concurrency and Multi-threading
 </ul>
 
 <p>
-<b>Lowest Level Threading APIs:</b>
+<b>Low Level Multithreading APIs:</b>
 </p>
 
 <p>
 Threads and processes require operating system support, therefore
-those APIs are operating system specific. The most fundamental APIs
-provided by operating system for accessing threads are: 
+programming languages do not provide threads, they just provide high
+level wrapper APIs for calling operating systems' low level APIs. The
+most common of those low level APIs are: 
 </p>
 
 <ul class="org-ul">
@@ -414,12 +416,98 @@ systems such Linux, MacOsx, iOS, Android, BSD and some embedded
 real time systems such as RTEMS, QNX and VxWorks.</li>
 </ul></li>
 
-<li><span class="underline">Windows Win32 Thread API</span></li>
+<li><span class="underline">Windows Win32 Thread API</span>
+<ul class="org-ul">
+<li>Available only for Windows NT and Windows CE kernels.</li>
+</ul></li>
 </ul>
 
 
 <p>
-<b>Hardware</b> 
+<b>Concurrency X Parallelism</b>
+</p>
+
+<ul class="org-ul">
+<li><span class="underline">Concurrency</span>
+
+<ul class="org-ul">
+<li>=&gt; Multiple threads run sharing resources (shared memory) in the
+same process. It is not possible to run them safely without
+synchronization promitives, specially locks such as mutexes and
+semaphores.</li>
+
+<li>Note: concurrency is possible in a system with just one processor
+and one core.</li>
+
+<li>Main purpose: <span class="underline">Increase system responsiviness.</span>
+<ul class="org-ul">
+<li>Avoid blocking main threads of user interface's event loop by
+running a computation with significant delay in a new thread;
+handle multiple client requests of a web server in another
+thread or in a thread pool and so on..</li>
+</ul></li>
+
+<li>Better for:
+
+<ul class="org-ul">
+<li>GUI - Graphical User Interfaces, increase responsiviness
+avoiding freezing the UI.</li>
+
+<li>Network Servers with lots IO.</li>
+
+<li>Games and computer graphics =&gt; Tasks with long delay that could
+block the game loop can be executed in another thread.</li>
+</ul></li>
+</ul></li>
+
+<li><span class="underline">Parallel Computing</span>
+
+<ul class="org-ul">
+<li>=&gt; Multiple threads are running in different processing units
+without any communication or shared data. Parallelism  require at
+least more than one processing unit, which can be multiple CPU
+cores, multiple CPU chips/sockets, multiple computers or a GPU
+card.</li>
+
+<li>=&gt; Parallelism is not possible with a single core CPU, it
+requires multiple cores or multiple processing units.</li>
+
+<li>=&gt; Parallism is also possible without threads with SIMD CPU
+instructions (data parallelism).</li>
+
+<li>=&gt; Better for:
+<ul class="org-ul">
+<li>HPC - High Performance Computing</li>
+<li>Math intensive computation</li>
+<li>CPU-bound tasks</li>
+<li>Math, Physics, Science and Engineering</li>
+</ul></li>
+
+<li>Hardware for Parallel Computing 
+<ul class="org-ul">
+<li>Multi-core CPUs</li>
+<li>Multi processor servers with multi-core CPUs.</li>
+<li>GPU</li>
+<li>Computer cluster (distributed systems)</li>
+</ul></li>
+
+<li>APIs - Application Programming Interfaces for Parallel Computing
+
+<ul class="org-ul">
+<li>OpenMP =&gt; Useful for parallelizing existing algorithms and loops.</li>
+
+<li>MPI - Message Passing Interface.</li>
+
+<li>GPU =&gt; Cuda, OpenCL, Sycl &#x2026;</li>
+
+<li>SIMD Libraries</li>
+</ul></li>
+</ul></li>
+</ul>
+
+
+<p>
+<b>Hardware and Multicore</b> 
 </p>
 
 <ul class="org-ul">
@@ -471,8 +559,8 @@ processing cores per CPU and 2 threads per core has a total of
 </div>
 </div>
 
-<div id="outline-container-orgd77030f" class="outline-3">
-<h3 id="orgd77030f"><span class="section-number-3">1.2</span> Standard Library Reference</h3>
+<div id="outline-container-org3eab140" class="outline-3">
+<h3 id="org3eab140"><span class="section-number-3">1.2</span> Standard Library Reference</h3>
 <div class="outline-text-3" id="text-1-2">
 <p>
 <b>Technical Specifications</b> 
@@ -568,8 +656,8 @@ Solution for MSVC, GNU GCC/G++ and CLang.</li>
 </div>
 </div>
 
-<div id="outline-container-orgc6323a4" class="outline-3">
-<h3 id="orgc6323a4"><span class="section-number-3">1.3</span> Class std::thread</h3>
+<div id="outline-container-orgc583488" class="outline-3">
+<h3 id="orgc583488"><span class="section-number-3">1.3</span> Class std::thread</h3>
 <div class="outline-text-3" id="text-1-3">
 <p>
 The class std::threads <span class="underline">is not thread</span>, it is a proxy for a native
@@ -902,8 +990,8 @@ in parallel. The result is often equal to the number of <span class="underline">
 </div>
 </div>
 
-<div id="outline-container-orgffbd7f1" class="outline-3">
-<h3 id="orgffbd7f1"><span class="section-number-3">1.4</span> Functions of namespace std::this_thread</h3>
+<div id="outline-container-orga7d69a1" class="outline-3">
+<h3 id="orga7d69a1"><span class="section-number-3">1.4</span> Functions of namespace std::this_thread</h3>
 <div class="outline-text-3" id="text-1-4">
 <p>
 Utilities functions for currrent thread of execution: 
@@ -956,13 +1044,12 @@ Signature of functions in namespace this_thread.
 </div>
 </div>
 
-
-<div id="outline-container-orga508ba6" class="outline-3">
-<h3 id="orga508ba6"><span class="section-number-3">1.5</span> Thread - std::thread usage and synchronization primtives</h3>
+<div id="outline-container-org5680be2" class="outline-3">
+<h3 id="org5680be2"><span class="section-number-3">1.5</span> Thread - std::thread usage and synchronization primtives</h3>
 <div class="outline-text-3" id="text-1-5">
 </div>
-<div id="outline-container-orgbf353a7" class="outline-4">
-<h4 id="orgbf353a7"><span class="section-number-4">1.5.1</span> Race condition</h4>
+<div id="outline-container-orgb041b13" class="outline-4">
+<h4 id="orgb041b13"><span class="section-number-4">1.5.1</span> Race condition</h4>
 <div class="outline-text-4" id="text-1-5-1">
 <p>
 When the a race condition happens, the outcome of the computation with
@@ -1101,9 +1188,205 @@ $ ./thread1.bin
 </div>
 </div>
 </div>
-<div id="outline-container-orgd616c9e" class="outline-4">
-<h4 id="orgd616c9e"><span class="section-number-4">1.5.2</span> Mutex solution</h4>
+<div id="outline-container-org77bdfb5" class="outline-4">
+<h4 id="org77bdfb5"><span class="section-number-4">1.5.2</span> Debugging Race Conditions with CLang's Sanitizers</h4>
 <div class="outline-text-4" id="text-1-5-2">
+<p>
+It is well known that Race condition (aka data races) are hard to
+reproduce, trace and debug due to the nondeterminism of concurrent
+systems and the result in race condition be dependent on the order
+that threads were run. For instance, multiple executions with the same
+inputs may lead to different outcomes. 
+</p>
+
+<p>
+Clang compiler has some <span class="underline">sanitizers</span> and static analysis tools that
+helps to debug undefined behavior, memory and race condition. 
+</p>
+
+<p>
+Clang Sanitizer Tools: 
+</p>
+
+<ul class="org-ul">
+<li><a href="https://clang.llvm.org/docs/ThreadSafetyAnalysis.html">Thread Safety Analysis</a> (Static analysis tool =&gt; compiler warning)
+<ul class="org-ul">
+<li>Compiler switch:  <b>-Wthread-safety</b></li>
+<li>Warns about potential race conditions in the code at compile-time.</li>
+</ul></li>
+
+<li><a href="https://clang.llvm.org/docs/ThreadSanitizer.html">Thread Sanitizer</a>
+<ul class="org-ul">
+<li>Compiler switch: <b>-fsanitize=thread</b></li>
+<li>Can detect:
+<ul class="org-ul">
+<li>Race conditions or data races at runtime.</li>
+</ul></li>
+</ul></li>
+
+<li><a href="https://clang.llvm.org/docs/AddressSanitizer.html">Address Sanitizer</a>
+<ul class="org-ul">
+<li>Compiler switch: <b>-fsanitize=address</b></li>
+<li>Can detect:
+<ul class="org-ul">
+<li>Out-of-bounds accesses to heap, stack and globals</li>
+<li>Use-after-free</li>
+<li>Use-after-return (runtime flag ASAN_OPTIONS=detect_stack_use_after_return=1)</li>
+<li>Double-free, invalid free</li>
+<li>Memory leaks (experimental)</li>
+</ul></li>
+</ul></li>
+
+<li><a href="https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html">Undefined Behavior Sanitizer</a>
+<ul class="org-ul">
+<li>Compiler switch: <b>-fsanitize=undefined</b></li>
+<li>Can detect:
+<ul class="org-ul">
+<li>Using misaligned or null pointer</li>
+<li>Signed integer overflow</li>
+<li>Conversion to, from, or between floating-point types which
+would overflow the destination.</li>
+</ul></li>
+</ul></li>
+
+<li><a href="https://clang.llvm.org/docs/MemorySanitizer.html">Memory Sanitizer</a>
+<ul class="org-ul">
+<li>Compiler switch: <b>-fsanitize=memory</b></li>
+<li>Can detect:
+<ul class="org-ul">
+<li>Uninitialized reads (reading of unitialized variables)</li>
+</ul></li>
+</ul></li>
+</ul>
+
+<p>
+Example: Using Clang sanitizer tools for race condition detection: 
+</p>
+
+<ul class="org-ul">
+<li>File: flawed-program.cpp</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">iostream</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">thread</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">chrono</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">thread</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">vector</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+
+<span class="org-keyword">struct</span> <span class="org-type">Worker</span>
+<span class="org-rainbow-delimiters-depth-1">{</span>
+    <span class="org-type">int</span>&amp; <span class="org-variable-name">acc</span>;
+
+    <span class="org-function-name">Worker</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">int</span>&amp; <span class="org-variable-name">acc</span><span class="org-rainbow-delimiters-depth-2">)</span>: <span class="org-function-name">acc</span><span class="org-rainbow-delimiters-depth-2">(</span>acc<span class="org-rainbow-delimiters-depth-2">)</span> <span class="org-rainbow-delimiters-depth-2">{</span> <span class="org-rainbow-delimiters-depth-2">}</span>
+
+    <span class="org-type">void</span> <span class="org-keyword">operator</span><span class="org-function-name"><span class="org-rainbow-delimiters-depth-2">()</span></span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">int</span> <span class="org-variable-name">x</span><span class="org-rainbow-delimiters-depth-2">)</span>
+    <span class="org-rainbow-delimiters-depth-2">{</span>
+        <span class="org-constant">std</span>::<span class="org-constant">this_thread</span>::sleep_for<span class="org-rainbow-delimiters-depth-3">(</span><span class="org-constant">std</span>::<span class="org-constant">chrono</span>::milliseconds<span class="org-rainbow-delimiters-depth-4">(</span>500<span class="org-rainbow-delimiters-depth-4">)</span><span class="org-rainbow-delimiters-depth-3">)</span>;
+        acc = acc + x * x;
+    <span class="org-rainbow-delimiters-depth-2">}</span>
+<span class="org-rainbow-delimiters-depth-1">}</span>;
+
+<span class="org-type">int</span> <span class="org-function-name">main</span><span class="org-rainbow-delimiters-depth-1">()</span>
+<span class="org-rainbow-delimiters-depth-1">{</span>
+    <span class="org-type">int</span> <span class="org-variable-name">result</span> = 0;
+
+    <span class="org-constant">std</span>::<span class="org-type">vector</span><span class="org-rainbow-delimiters-depth-2">&lt;</span><span class="org-constant">std</span>::thread<span class="org-rainbow-delimiters-depth-2">&gt;</span> <span class="org-variable-name">thread_list</span><span class="org-rainbow-delimiters-depth-2">{}</span>;
+    <span class="org-keyword">for</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">int</span> <span class="org-variable-name">i</span> = 1; i &lt;= 10; i++<span class="org-rainbow-delimiters-depth-2">)</span>
+    <span class="org-rainbow-delimiters-depth-2">{</span>
+        thread_list.push_back<span class="org-rainbow-delimiters-depth-3">(</span> <span class="org-constant">std</span>::thread<span class="org-rainbow-delimiters-depth-4">{</span>Worker<span class="org-rainbow-delimiters-depth-5">(</span>result<span class="org-rainbow-delimiters-depth-5">)</span>, i<span class="org-rainbow-delimiters-depth-4">}</span> <span class="org-rainbow-delimiters-depth-3">)</span>;
+    <span class="org-rainbow-delimiters-depth-2">}</span>
+
+    <span class="org-keyword">for</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-keyword">auto</span>&amp; <span class="org-variable-name">t</span>: thread_list<span class="org-rainbow-delimiters-depth-2">)</span> <span class="org-rainbow-delimiters-depth-2">{</span> t.join<span class="org-rainbow-delimiters-depth-3">()</span>; <span class="org-rainbow-delimiters-depth-2">}</span>
+    <span class="org-constant">std</span>::cout &lt;&lt; <span class="org-string">" result   = "</span> &lt;&lt; result &lt;&lt; <span class="org-constant">std</span>::endl;
+    <span class="org-keyword">return</span> 0;
+<span class="org-rainbow-delimiters-depth-1">}</span>
+</pre>
+</div>
+
+<p>
+Building: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">Compiler swiches: </span>
+<span class="org-comment-delimiter">#   </span><span class="org-comment">=&gt;&gt; -O0                  Disable optimization </span>
+<span class="org-comment-delimiter">#   </span><span class="org-comment">=&gt;&gt; -g                   Enable debug building </span>
+<span class="org-comment-delimiter">#   </span><span class="org-comment">=&gt;&gt; -Wthread-safety      Enable Clang compiler warning for race conditions</span>
+<span class="org-comment-delimiter">#   </span><span class="org-comment">=&gt;&gt; -fsanitize=thread    Enable thread sanitizer </span>
+<span class="org-comment-delimiter">#   </span><span class="org-comment">=&gt;&gt; -fsanitize=undefined Eanble undefined behavior sanitizer </span>
+$ clang++ flawed-program.cpp -o <span class="org-keyword">out.bin</span> -O0 -g -lpthread -Wall -Wextra -pedantic <span class="org-sh-escaped-newline">\</span>
+    -Wthread-safety <span class="org-sh-escaped-newline">\</span>
+    -fsanitize=thread <span class="org-sh-escaped-newline">\</span>
+    -fsanitize=undefined 
+</pre>
+</div>
+
+<p>
+Running: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">$ ./out.bin 
+
+==================
+<span class="org-function-name">WARNING</span>: ThreadSanitizer: data race (<span class="org-variable-name">pid</span>=22979)
+  Read of size 4 at 0x7ffdb2ae1b78 by thread T2:
+    <span class="org-comment-delimiter">#</span><span class="org-comment">0 Worker::operator()(int) /Users/dummy/projects/cmake-experiment/flawed-program.cpp:16:17 (out.bin+0x4b7516)</span>
+    <span class="org-comment-delimiter">#</span><span class="org-comment">1 void std::__invoke_impl&lt;void, Worker, int&gt;(std::__invoke_other, Worker&amp;&amp;, int&amp;&amp;) /usr/bin/../lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/invoke.h:60:14 (out.bin+0x4b7421)</span>
+    <span class="org-comment-delimiter">#</span><span class="org-comment">2 std::__invoke_result&lt;Worker, int&gt;::type std::__invoke&lt;Worker, int&gt;(Worker&amp;&amp;, int&amp;&amp;) /usr/bin/../lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/invoke.h:95:14 (out.bin+0x4b7026)</span>
+    <span class="org-comment-delimiter">#</span><span class="org-comment">3 _ZNSt6thread8_InvokerISt5tupleIJ6WorkeriEEE9_M_invokeIJLm0ELm1EEEEDTclsr3stdE8__invokespcl10_S_declvalIXT_EEEEESt12_Index_tupleIJXspT_EEE /usr/bin/../lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/thread:244:13 (out.bin+0x4b6eb6)</span>
+    <span class="org-comment-delimiter">#</span><span class="org-comment">4 std::thread::_Invoker&lt;std::tuple&lt;Worker, int&gt; &gt;::operator()() /usr/bin/../lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/thread:253:11 (out.bin+0x4b6ca8)</span>
+    <span class="org-comment-delimiter">#</span><span class="org-comment">5 std::thread::_State_impl&lt;std::thread::_Invoker&lt;std::tuple&lt;Worker, int&gt; &gt; &gt;::_M_run() /usr/bin/../lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/thread:196:13 (out.bin+0x4b5fe7)</span>
+    <span class="org-comment-delimiter">#</span><span class="org-comment">6 &lt;null&gt; &lt;null&gt; (libstdc++.so.6+0xbf5c2)</span>
+
+  Previous write of size 4 at 0x7ffdb2ae1b78 by thread T1:
+    <span class="org-comment-delimiter">#</span><span class="org-comment">0 Worker::operator()(int) /Users/dummy/projects/cmake-experiment/flawed-program.cpp:16:15 (out.bin+0x4b75c6)</span>
+    <span class="org-comment-delimiter">#</span><span class="org-comment">1 void std::__invoke_impl&lt;void, Worker, int&gt;(std::__invoke_other, Worker&amp;&amp;, int&amp;&amp;) /usr/bin/../lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/invoke.h:60:14 (out.bin+0x4b7421)</span>
+    <span class="org-comment-delimiter">#</span><span class="org-comment">2 std::__invoke_result&lt;Worker, int&gt;::type std::__invoke&lt;Worker, int&gt;(Worker&amp;&amp;, int&amp;&amp;) /usr/bin/../lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/invoke.h:95:14 (out.bin+0x4b7026)</span>
+    <span class="org-comment-delimiter">#</span><span class="org-comment">3 _ZNSt6thread8_InvokerISt5tupleIJ6WorkeriEEE9_M_invokeIJLm0ELm1EEEEDTclsr3stdE8__invokespcl10_S_declvalIXT_EEEEESt12_Index_tupleIJXspT_EEE /usr/bin/../lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/thread:244:13 (out.bin+0x4b6eb6)</span>
+    <span class="org-comment-delimiter">#</span><span class="org-comment">4 std::thread::_Invoker&lt;std::tuple&lt;Worker, int&gt; &gt;::operator()() /usr/bin/../lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/thread:253:11 (out.bin+0x4b6ca8)</span>
+    <span class="org-comment-delimiter">#</span><span class="org-comment">5 std::thread::_State_impl&lt;std::thread::_Invoker&lt;std::tuple&lt;Worker, int&gt; &gt; &gt;::_M_run() /usr/bin/../lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/thread:196:13 (out.bin+0x4b5fe7)</span>
+    <span class="org-comment-delimiter">#</span><span class="org-comment">6 &lt;null&gt; &lt;null&gt; (libstdc++.so.6+0xbf5c2)</span>
+
+  As if synchronized via sleep:
+    <span class="org-comment-delimiter">#</span><span class="org-comment">0 nanosleep &lt;null&gt; (out.bin+0x43565e)</span>
+    <span class="org-comment-delimiter">#</span><span class="org-comment">1 void std::this_thread::sleep_for&lt;long, std::ratio&lt;1l, 1000l&gt; &gt;(std::chrono::duration&lt;long, std::ratio&lt;1l, 1000l&gt; &gt; const&amp;) /usr/bin/../lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/thread:379:9 (out.bin+0x4b7798)</span>
+    <span class="org-comment-delimiter">#</span><span class="org-comment">2 Worker::operator()(int) /Users/dummy/projects/cmake-experiment/flawed-program.cpp:15:11 (out.bin+0x4b74ef)</span>
+    <span class="org-comment-delimiter">#</span><span class="org-comment">3 void std::__invoke_impl&lt;void, Worker, int&gt;(std::__invoke_other, Worker&amp;&amp;, int&amp;&amp;) /usr/bin/../lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/invoke.h:60:14 (out.bin+0x4b7421)</span>
+    <span class="org-comment-delimiter">#</span><span class="org-comment">4 std::__invoke_result&lt;Worker, int&gt;::type std::__invoke&lt;Worker, int&gt;(Worker&amp;&amp;, int&amp;&amp;) /usr/bin/../lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/invoke.h:95:14 (out.bin+0x4b7026)</span>
+    <span class="org-comment-delimiter">#</span><span class="org-comment">5 _ZNSt6thread8_InvokerISt5tupleIJ6WorkeriEEE9_M_invokeIJLm0ELm1EEEEDTclsr3stdE8__invokespcl10_S_declvalIXT_EEEEESt12_Index_tupleIJXspT_EEE /usr/bin/../lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/thread:244:13 (out.bin+0x4b6eb6)</span>
+    <span class="org-comment-delimiter">#</span><span class="org-comment">6 std::thread::_Invoker&lt;std::tuple&lt;Worker, int&gt; &gt;::operator()() /usr/bin/../lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/thread:253:11 (out.bin+0x4b6ca8)</span>
+    <span class="org-comment-delimiter">#</span><span class="org-comment">7 std::thread::_State_impl&lt;std::thread::_Invoker&lt;std::tuple&lt;Worker, int&gt; &gt; &gt;::_M_run() /usr/bin/../lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/thread:196:13 (out.bin+0x4b5fe7)</span>
+    <span class="org-comment-delimiter">#</span><span class="org-comment">8 &lt;null&gt; &lt;null&gt; (libstdc++.so.6+0xbf5c2)</span>
+
+  Location is stack of main thread.
+
+  Location is global <span class="org-string">'??'</span> at 0x7ffdb2ac4000 ([stack]+0x00000001db78)
+
+  Thread T2 (<span class="org-variable-name">tid</span>=22982, running) created by main thread at:
+    <span class="org-comment-delimiter">#</span><span class="org-comment">0 pthread_create &lt;null&gt; (out.bin+0x425eba)</span>
+    <span class="org-comment-delimiter">#</span><span class="org-comment">1 std::thread::_M_start_thread(std::unique_ptr&lt;std::thread::_State, std::default_delete&lt;std::thread::_State&gt; &gt;, void (*)()) &lt;null&gt; (libstdc++.so.6+0xbf8a8)</span>
+    <span class="org-comment-delimiter">#</span><span class="org-comment">2 main /Users/dummy/projects/cmake-experiment/flawed-program.cpp:27:34 (out.bin+0x4b3304)</span>
+
+  Thread T1 (<span class="org-variable-name">tid</span>=22981, finished) created by main thread at:
+    <span class="org-comment-delimiter">#</span><span class="org-comment">0 pthread_create &lt;null&gt; (out.bin+0x425eba)</span>
+    <span class="org-comment-delimiter">#</span><span class="org-comment">1 std::thread::_M_start_thread(std::unique_ptr&lt;std::thread::_State, std::default_delete&lt;std::thread::_State&gt; &gt;, void (*)()) &lt;null&gt; (libstdc++.so.6+0xbf8a8)</span>
+    <span class="org-comment-delimiter">#</span><span class="org-comment">2 main /Users/dummy/projects/cmake-experiment/flawed-program.cpp:27:34 (out.bin+0x4b3304)</span>
+
+<span class="org-function-name">SUMMARY</span>: ThreadSanitizer: data race /Users/dummy/projects/cmake-experiment/flawed-program.cpp:16:17<span class="org-keyword"> in</span> Worker::operator()(int)
+==================
+ result   = 304
+<span class="org-function-name">ThreadSanitizer</span>: reported 1 warnings
+
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgd2e4ea2" class="outline-4">
+<h4 id="orgd2e4ea2"><span class="section-number-4">1.5.3</span> Mutex solution</h4>
+<div class="outline-text-4" id="text-1-5-3">
 <p>
 The race condition can be solved by using <b>mutex</b> - mutual exclusion
 synchronization primitive which allows only a single thread at a time
@@ -1230,9 +1513,9 @@ goes out of scope, the mutex lock is released. So, by using a
 </div>
 </div>
 
-<div id="outline-container-org7434f94" class="outline-4">
-<h4 id="org7434f94"><span class="section-number-4">1.5.3</span> Atomic variable solution</h4>
-<div class="outline-text-4" id="text-1-5-3">
+<div id="outline-container-orgc3b7cea" class="outline-4">
+<h4 id="orgc3b7cea"><span class="section-number-4">1.5.4</span> Atomic variable solution</h4>
+<div class="outline-text-4" id="text-1-5-4">
 <p>
 Another way to solve the race condition (aka data race) problem is
 using <span class="underline">atomic variables and atomic operations</span>. 
@@ -1312,13 +1595,12 @@ $ ./thread3.bin
 </div>
 </div>
 
-
-<div id="outline-container-org4908f3f" class="outline-3">
-<h3 id="org4908f3f"><span class="section-number-3">1.6</span> Thread - Returning values from std::thread</h3>
+<div id="outline-container-org2fba2a2" class="outline-3">
+<h3 id="org2fba2a2"><span class="section-number-3">1.6</span> Thread - Returning values from std::thread</h3>
 <div class="outline-text-3" id="text-1-6">
 </div>
-<div id="outline-container-org45e119c" class="outline-4">
-<h4 id="org45e119c"><span class="section-number-4">1.6.1</span> Return value from thread</h4>
+<div id="outline-container-orgf0af17e" class="outline-4">
+<h4 id="orgf0af17e"><span class="section-number-4">1.6.1</span> Return value from thread</h4>
 <div class="outline-text-4" id="text-1-6-1">
 <p>
 There is no way to return a value from a std::thread computaiton, if a
@@ -1401,8 +1683,8 @@ th.join<span class="org-rainbow-delimiters-depth-1">()</span>;
 </div>
 </div>
 </div>
-<div id="outline-container-org4f1d107" class="outline-4">
-<h4 id="org4f1d107"><span class="section-number-4">1.6.2</span> Catch exceptions in threads</h4>
+<div id="outline-container-orgaa5209f" class="outline-4">
+<h4 id="orgaa5209f"><span class="section-number-4">1.6.2</span> Catch exceptions in threads</h4>
 <div class="outline-text-4" id="text-1-6-2">
 <p>
 If any exception is thrown in a std::thread, the exception is not
@@ -1466,8 +1748,8 @@ the C++ runtime calls std::terminate causing abonormal termination.
 </div>
 </div>
 </div>
-<div id="outline-container-org6a20804" class="outline-4">
-<h4 id="org6a20804"><span class="section-number-4">1.6.3</span> Example: Returning values and catching exceptions</h4>
+<div id="outline-container-orgd783d9d" class="outline-4">
+<h4 id="orgd783d9d"><span class="section-number-4">1.6.3</span> Example: Returning values and catching exceptions</h4>
 <div class="outline-text-4" id="text-1-6-3">
 <p>
 File: return-thread.cpp 
@@ -1635,12 +1917,12 @@ Running:
 </div>
 </div>
 
-<div id="outline-container-org2479daf" class="outline-3">
-<h3 id="org2479daf"><span class="section-number-3">1.7</span> Task-based APIs =&gt; Futures and Promises</h3>
+<div id="outline-container-org1643b1b" class="outline-3">
+<h3 id="org1643b1b"><span class="section-number-3">1.7</span> Task-based APIs =&gt; Futures and Promises</h3>
 <div class="outline-text-3" id="text-1-7">
 </div>
-<div id="outline-container-org292d6a8" class="outline-4">
-<h4 id="org292d6a8"><span class="section-number-4">1.7.1</span> Futures overview</h4>
+<div id="outline-container-org00d099d" class="outline-4">
+<h4 id="org00d099d"><span class="section-number-4">1.7.1</span> Futures overview</h4>
 <div class="outline-text-4" id="text-1-7-1">
 <p>
 Overview: 
@@ -1702,8 +1984,8 @@ pools.</li>
 </ul>
 </div>
 </div>
-<div id="outline-container-org08fabde" class="outline-4">
-<h4 id="org08fabde"><span class="section-number-4">1.7.2</span> Usage</h4>
+<div id="outline-container-org4e2b5ab" class="outline-4">
+<h4 id="org4e2b5ab"><span class="section-number-4">1.7.2</span> Usage</h4>
 <div class="outline-text-4" id="text-1-7-2">
 <p>
 The function <a href="https://en.cppreference.com/w/cpp/thread/async">std::async</a> is used for creating  <a href="https://en.cppreference.com/w/cpp/thread/future">std::future</a> objects out of
@@ -1857,8 +2139,8 @@ futB.wait<span class="org-rainbow-delimiters-depth-1">()</span>;
 </div>
 </div>
 </div>
-<div id="outline-container-orgfe60f31" class="outline-4">
-<h4 id="orgfe60f31"><span class="section-number-4">1.7.3</span> Example</h4>
+<div id="outline-container-orgd2d9676" class="outline-4">
+<h4 id="orgd2d9676"><span class="section-number-4">1.7.3</span> Example</h4>
 <div class="outline-text-4" id="text-1-7-3">
 <p>
 File: future1.cpp 
@@ -2072,8 +2354,8 @@ Future Created
 </div>
 </div>
 </div>
-<div id="outline-container-orgb36b806" class="outline-3">
-<h3 id="orgb36b806"><span class="section-number-3">1.8</span> Condition Variables and Producer Consumer Problem</h3>
+<div id="outline-container-org17a881c" class="outline-3">
+<h3 id="org17a881c"><span class="section-number-3">1.8</span> Condition Variables and Producer Consumer Problem</h3>
 <div class="outline-text-3" id="text-1-8">
 <ul class="org-ul">
 <li>A condition variable is a synchronization primitive which allows
@@ -2318,12 +2600,12 @@ Running:
 </div>
 </div>
 
-<div id="outline-container-org92b74eb" class="outline-3">
-<h3 id="org92b74eb"><span class="section-number-3">1.9</span> Messaging Passing Concurrency and Message Queue</h3>
+<div id="outline-container-orgc14b18e" class="outline-3">
+<h3 id="orgc14b18e"><span class="section-number-3">1.9</span> Messaging Passing Concurrency and Message Queue</h3>
 <div class="outline-text-3" id="text-1-9">
 </div>
-<div id="outline-container-org0ba745d" class="outline-4">
-<h4 id="org0ba745d"><span class="section-number-4">1.9.1</span> Overview</h4>
+<div id="outline-container-orgfc1d003" class="outline-4">
+<h4 id="orgfc1d003"><span class="section-number-4">1.9.1</span> Overview</h4>
 <div class="outline-text-4" id="text-1-9-1">
 <p>
 Message Passing Concurrency
@@ -2503,8 +2785,8 @@ framework inspired by Google's Android operating system</li>
 </div>
 </div>
 
-<div id="outline-container-orgc10f94b" class="outline-4">
-<h4 id="orgc10f94b"><span class="section-number-4">1.9.2</span> Producer/consumer problem with messague queue</h4>
+<div id="outline-container-org2ac662a" class="outline-4">
+<h4 id="org2ac662a"><span class="section-number-4">1.9.2</span> Producer/consumer problem with messague queue</h4>
 <div class="outline-text-4" id="text-1-9-2">
 <p>
 The producer consumer synchronization problem can be simplified with a
@@ -2728,8 +3010,8 @@ Running:
 </div>
 </div>
 
-<div id="outline-container-org80b4afd" class="outline-4">
-<h4 id="org80b4afd"><span class="section-number-4">1.9.3</span> References</h4>
+<div id="outline-container-orgb25d189" class="outline-4">
+<h4 id="orgb25d189"><span class="section-number-4">1.9.3</span> References</h4>
 <div class="outline-text-4" id="text-1-9-3">
 <ul class="org-ul">
 <li><b>Chapter 10 - Concurrency - Message Passing</b>
@@ -2803,7 +3085,7 @@ producer/consumer problem.</li>
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Caio Rodrigues Soares - caiorss [DOT] rodrigues [AT] gmail [DOT] COM</p>
-<p class="date">Created: 2019-09-13 Fri 17:03</p>
+<p class="date">Created: 2019-09-14 Sat 13:34</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
 </body>
