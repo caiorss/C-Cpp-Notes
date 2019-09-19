@@ -331,6 +331,29 @@ C++17 Additions:
    + just::thread - commercial implementation by Just Software
      Solution for MSVC, GNU GCC/G++ and CLang.
 
+** Papers from WG21 Working Group 
+ 
+Executors and thread-pools 
+
+   * [[http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2013/n3562.pdf][N3562]] - *Executors and Schedulers, Revision1*
+     + "This paper is a proposal for executors, objects that can
+       execute units of work packaged asfunction objects, in the form
+       of an abstract base class and several concrete classes that
+       inheritfrom it. It is based on components that are heavily used
+       in internal Google and Microsoft code,with changes to better
+       match the style of the C++ standard."
+
+Enhancement of task-based concurrency API std::future and related apis.
+
+   * [[http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2014/n3857.pdf][N3857]] - *Improvements to std::future<T> and Related APIs*
+     + "This proposal is anevolution of the functionality of
+       std::future/std::shared_future. It details additions which can
+       enable wait free compositions of asynchronous operations.This
+       document supersedes N3784. Several typos in the code samples
+       have been fixed, and a small editorial change made in the
+       Technical Specification section." 
+
+
 ** Class std::thread 
 
 The class std::threads _is not thread_, it is a proxy for a native
@@ -2349,3 +2372,111 @@ Running:
 
 
 
+** Thread Pools 
+*** Overview 
+
+  + A thread pool is a widely used technique for executing many short
+    living tasks by reusing pre-existing long running worker threads
+    without creating and destroying too many threads what would
+    increase the system latency and reduce its throughput.
+
+  + Use Cases: 
+    * Run short running tasks without creating too many threads.
+    * Execute future/promise computations. 
+    * Network Servers
+    * Web Servers
+    * Run parallel algorithms
+    * Note: NodeJS and Nginx web server uses _thread pools_ behind the
+      scenes for handling incoming network requests and running
+      asynchronous computations without blocking the main thread.
+
+  + Benefits
+    + Reduce the overhead of creation and destruction of too many threads.
+    + Reuse threads.
+    + More lightweight task-based concurrency (future and promises).
+
+  + Implementation Parts:
+
+    + _Task Queue_: (Message Queue)
+      + A message queue which is possible to code submits tasks to.
+
+    + _Tasks_ (aka jobs)
+      + In C++ a task could be represented by a function, object,
+        callable object or lambda. In Java, the task could an object
+        implementating the Runnable interface.
+
+    + _Worker Threads_
+      + N amount of long-running worker threads. Each thread takes a
+        task from the task queue and get blocked when if the task
+        queue is empty.
+
+  + Functionalities of a thread pool
+    * Parts
+      + central task queue
+      + N worker threads 
+      + completion queue [optional]
+    * Actions 
+      * add thread
+      * submit task or job
+      * return a future object representing the return value of the
+        taks submited to the thread pool.
+      * shutdown queue => stop all threads 
+
+  + Considerations:
+
+    + A suitable size for the thread pool is the total number _hardware_
+      _threads_, number of threads that can be run in different
+      processing units. This number is generally the number of logical
+      CPUs (total number CPU cores).
+
+    + Thread starvation => A single CPU intensive or long running task
+      will make a thread unable to handle other pending tasks. 
+
+    + The tasks should not block any worker thread, they must be short
+      living. Otherwise the blocked worker thread may not be able to
+      handle other tasks from the task queue.
+
+    + It is wise to use IO and socket with timeouts in operations that
+      may block the task queue.
+
+  + Usage for network and web servers:
+    + Thread pools are scalable to handle network request when used
+      alongside _non-blocking IO_ such as _epoll_ on Linux, _IOCP_ on
+      Windows and _kqueue_ on MacOSX and BSD-variants. Nginx web server
+      and NodeJS uses thread pool and non blocking IO for reaching
+      high scalability and performance.
+*** Some thread pool implementations 
+
+    * [[https://www.javacodegeeks.com/2016/12/implement-thread-pool-java.html][How to implement Thread pool in Java | Java Code Geeks - 2019]] [JAVA] [BEST]
+      + Java implementation: Internally it uses a LinkedBlockingQueue as
+        a task queue (message queue) and a group of worker threads
+        taking tasks from the queue and executing them in an infinite
+        loop. The tasks or jobs submited to the thread pool are
+        represented by the Runnable interface.
+
+    * [[https://kezunlin.me/post/f241bd30/][boost thread pool example | KeZunLin's Blog]]
+      + Thread pool built on top of Boost.Asio. 
+
+    * [[http://progsch.net/wordpress/?p=71][A Thread Pool with Boost.Threads and Boost.Asio | Jakob's Devlog]]
+
+    * [[https://github.com/yc2prime/ThreadPool][GitHub -  yc2prime/ThreadPool]]
+      + A C++ thread pool implementation base on Boost.Asio. 
+*** Further Reading 
+
+    * [[https://en.wikipedia.org/wiki/Thread_pool][Thread pool - Wikipedia]]
+
+    * [[https://www.javacodegeeks.com/2016/12/implement-thread-pool-java.html][How to implement Thread pool in Java | Java Code Geeks - 2019]] [BEST]
+
+    * [[https://www.geeksforgeeks.org/thread-pools-java/][Thread Pools in Java - GeeksforGeeks]] [BEST]
+      + Shows some potential problems of thread pools, namely, deadlock,
+        thread leakage and resource trashing.
+
+    * [[http://zhidko.net/threadpool.html][How Thread Pool design pattern works]] - Zhidko
+
+    * [[https://stackify.com/java-thread-pools/][Finally Getting the Most out of the Java Thread Pool]]
+
+    * [[https://thispointer.com/designing-a-thread-pool-framework-part-1-whats-the-need-of-a-thread-pool/][Designing a Thread Pool Framework Part 1: What’s the need of a Thread Pool – thispointer.com]]
+
+    * [[https://www.codeproject.com/Articles/3631/A-Method-of-Worker-Thread-Pooling][A Method of Worker Thread Pooling - CodeProject]]
+
+    * [[https://stackoverflow.com/questions/11191501/design-pattern-for-threadpooling][java - Design pattern for threadpooling - Stack Overflow]]
