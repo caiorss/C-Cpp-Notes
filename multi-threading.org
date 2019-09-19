@@ -2461,6 +2461,267 @@ Running:
 
     * [[https://github.com/yc2prime/ThreadPool][GitHub -  yc2prime/ThreadPool]]
       + A C++ thread pool implementation base on Boost.Asio. 
+*** Example: Simple thread pool implementation
+
+File: thread-pool-simple.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <functional>
+  #include <vector>
+  #include <string>
+
+  // Concurrency headers
+  #include <deque>
+  #include <queue>
+  #include <thread>
+  #include <mutex>
+  #include <atomic>
+  #include <condition_variable>
+  #include <chrono>
+  #include <cassert>
+
+  class ThreadPool
+  {
+  public:
+      using Task = std::function<void ()>;
+
+      // Create a thread pool with N worker threads
+      ThreadPool(size_t n)
+      {
+          std::cout << " [TRACE] Created thread pool with N = "
+                    << n << " worker threads" << std::endl;
+
+          for(size_t i = 0; i < n; ++i) { this->add_worker(); }
+      }
+
+      ThreadPool(): ThreadPool(std::thread::hardware_concurrency()){ }
+
+      ~ThreadPool()
+      {
+          std::cout << " [TRACE] <Destructor> Waiting for termination of all threads"
+                    << std::endl;
+          this->shutdown();
+          std::cout << " [TRACE] <Destructor> All Worker threads were shutdown. OK"
+                    << std::endl;
+      }
+
+      // Return the number of worker threads
+      size_t size() const
+      {
+          return m_workers.size();
+      }
+
+      // Submit a task to the thread pool
+      void submit(Task task)
+      {
+          auto guard = std::lock_guard<std::mutex>{m_qmutex};
+          m_queue.push(task);
+          // Wake up a single worker thread signaling it.
+          m_qvar.notify_one();
+      }
+
+      // Force ThreadPool shutdown
+      void shutdown()
+      {
+          // Set the flag to false for indicating to worker threads that
+          // there nor further tasks(jobs) will be submited.
+          m_is_active = false;
+          // Signal all threads, wake up all worker threads
+          m_qvar.notify_all();
+          // Wait for completion of all threads.
+          for(auto& worker: m_workers) { worker.join(); }
+          // Remove all worker threads
+          m_workers.clear();
+      }
+
+      // Block the calling thread and waits for the completion of all tasks.
+      void wait_tasks()
+      {
+          auto lock = std::unique_lock<std::mutex>{m_qmutex};
+          m_qempty.wait(lock, [&]{ return m_queue.empty(); } );
+          lock.unlock();
+      }
+
+      // Pop a task from queue => blocking the calling thread
+      // if the queue is empty.
+      Task pop_task()
+      {
+          auto lock = std::unique_lock<std::mutex>{m_qmutex};
+          // Block current thread if the queue is empty or until
+          // the condition variable is signaled from the queue
+          // thread.
+          m_qvar.wait(lock, [&]{ return !m_queue.empty(); });
+          auto task = m_queue.front();
+          m_queue.pop();
+
+          // Wake up thread that called .wait_tasks()
+          if(m_queue.empty()){ m_qempty.notify_all(); }
+
+          // lock.unlock();
+          return task;
+      }
+
+      // Add new worker thread
+      void add_worker()
+      {
+
+          auto th = std::thread([this]{
+              while(true)
+              {
+                  // std::puts(" [INFO] Waiting task");
+                  auto task = pop_task();
+                  task();
+
+                  // Shutdown worker thread when the flag m_is_active
+                  // is set to false and the queue is empty
+                  auto guard = std::lock_guard<std::mutex>{m_qmutex};
+                  if(!m_is_active && m_queue.empty()){ return; }
+              }
+
+          });
+
+          std::cout << " [TRACE] <add_worker> - Created worker thread ID = "
+                    << th.get_id() << std::endl;
+
+          m_workers.push_back(std::move(th));
+
+      } // --- End of add_worker() --- //
+
+  private:
+      // Flag indicating that the thread pool is active (running)
+      std::atomic<bool>       m_is_active = true;
+      // Task queue (message queue)
+      std::queue<Task>        m_queue;
+      // Worker threads
+      std::deque<std::thread> m_workers;
+      // Mutex for protecting the queue
+      std::mutex              m_qmutex;
+      // Condition variable for signaling that
+      // there are tasks in the queue
+      std::condition_variable m_qvar;
+
+      // Condition variable for signaling that the task queue is empty
+      std::condition_variable m_qempty;
+  };
+
+
+  int main(int argc, char** argv)
+  {
+      using namespace std::chrono_literals;
+
+
+      if(argc < 3){
+          std::cerr<< " Error: invalid command line switch." << std::endl;
+          return EXIT_FAILURE;
+      }
+
+      auto cmd = std::string(argv[1]);
+      auto size = std::stoi(argv[2]);
+      assert(size > 0);
+
+      if(cmd == "serial")
+      {
+          for(int i = 0; i < size; i++)
+          {
+                  std::this_thread::sleep_for(std::chrono::seconds(2));
+                  std::cout << " Task id = " << i
+                            << " thread id = " << std::this_thread::get_id()
+                            << " completed OK. \n";
+          }
+          return EXIT_FAILURE;
+      }
+
+      if(cmd == "parallel")
+      {
+          // Get thread pool size from environemnt variable
+          const char* thsize = std::getenv("THREAD_POOL_SIZE");
+
+          // std::cout << " thsize = " << thsize << std::endl;
+
+          int n_workers = thsize != nullptr
+                              ? std::stoi(thsize) : std::thread::hardware_concurrency();
+
+          ThreadPool thp(n_workers);
+          // Mutex used for protecting std::cout from data race
+          std::mutex cout_mutex;
+
+          // Run
+          for(int i = 0; i < size; i++)
+          {
+              thp.submit([=, &cout_mutex]{
+                  std::this_thread::sleep_for(std::chrono::seconds(2));
+
+                  {
+                      std::lock_guard<std::mutex> guard(cout_mutex);
+                      std::cout << " Task id = " << i
+                                << " thread id = " << std::this_thread::get_id()
+                                << " completed OK. \n";
+                  }
+
+              });
+          }
+          std::cout << " [TRACE] <main> Waiting tasks execution ..." << "\n";
+      }
+
+      return 0;
+  }
+#+END_SRC
+
+Building: 
+
+#+BEGIN_SRC sh 
+  $ clang++ thread-pool-simple.cpp -o out.bin -std=c++1z -lpthread -O0 -g -Wall -Wextra -fsanitize=thread -fsanitize=undefined
+#+END_SRC
+
+Run 20 tasks serially: (40 seconds)
+
+#+BEGIN_SRC sh 
+   $ time ./out.bin serial 20
+    Task id = 0 thread id = 140386475086592 completed OK. 
+    Task id = 1 thread id = 140386475086592 completed OK. 
+    Task id = 2 thread id = 140386475086592 completed OK. 
+    Task id = 3 thread id = 140386475086592 completed OK. 
+     ... ...   ... ...   ... ...   ... ...   ... ... 
+     ... ...   ... ...   ... ...   ... ...   ... ... 
+    Task id = 17 thread id = 140386475086592 completed OK. 
+    Task id = 18 thread id = 140386475086592 completed OK. 
+    Task id = 19 thread id = 140386475086592 completed OK. 
+
+   real	0m40.086s
+   user	0m0.037s
+   sys	0m0.045s
+
+#+END_SRC
+
+Run 20 tasks with thread pool of 4 threads. (10 seconds)
+
+#+BEGIN_SRC sh 
+    $ time ./out.bin parallel 20
+     [TRACE] Created thread pool with N = 4 worker threads
+     [TRACE] <add_worker> - Created worker thread ID = 139760855148288
+     [TRACE] <add_worker> - Created worker thread ID = 139760846755584
+     [TRACE] <add_worker> - Created worker thread ID = 139760836278016
+     [TRACE] <add_worker> - Created worker thread ID = 139760827885312
+     [TRACE] <main> Waiting tasks execution ...
+     [TRACE] <Destructor> Waiting for termination of all threads
+     Task id = 0 thread id = 139760846755584 completed OK. 
+     Task id = 3 thread id = 139760827885312 completed OK. 
+     Task id = 1 thread id = 139760855148288 completed OK. 
+     Task id = 2 thread id = 139760836278016 completed OK. 
+
+     ... ... ...      ... ... ...      ... ... ...      ... ... ...  
+
+     Task id = 17 thread id = 139760827885312 completed OK. 
+     Task id = 18 thread id = 139760836278016 completed OK. 
+     Task id = 19 thread id = 139760846755584 completed OK. 
+     [TRACE] <Destructor> All Worker threads were shutdown. OK
+
+    real	0m10.103s
+    user	0m0.050s
+    sys	0m0.062s
+
+#+END_SRC
 *** Further Reading 
 
     * [[https://en.wikipedia.org/wiki/Thread_pool][Thread pool - Wikipedia]]
