@@ -332,7 +332,13 @@ C++17 Additions:
      Solution for MSVC, GNU GCC/G++ and CLang.
 
 ** Papers from WG21 Working Group 
- 
+
+C++11 Thread Local Storage 
+
+  * [[http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2008/n2659.htm][WG21 - N2659 Thread-Local Storage]] (C++ Standard Proposal)
+    + "Proposal that defines the _thread_local_ storage class specifier
+      for C++11."
+
 Executors and thread-pools 
 
    * [[http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2013/n3562.pdf][N3562]] - *Executors and Schedulers, Revision1*
@@ -352,7 +358,6 @@ Enhancement of task-based concurrency API std::future and related apis.
        document supersedes N3784. Several typos in the code samples
        have been fixed, and a small editorial change made in the
        Technical Specification section." 
-
 
 ** Class std::thread 
 
@@ -1395,6 +1400,217 @@ Running:
 
 #+END_SRC
 
+** Thread Local Variables 
+
+The keyword *thread local*, added in C+11, ensures that a new instance of a
+global or static variable is created for every thread using the
+variable. 
+
+ + A variable with this annotation is implicitly static and has _thread_
+   __storage duration_, its lifetime is bound to the thread lifetime.
+
+ + Every using a variable annotated as _thread local_ has its own copy
+   of it, therefore any modification to the variable inside the thread
+   will not have any effect for other threads.
+
+ + Allocation and memory release:
+   + Variables declared with _thread_local_ storage class specifier are
+     allocated on a per-thread base, instantiated when the thread is
+     created and destroyed when its thread terminates.
+
+ + Thread local variables can be declared:
+
+   * Globally 
+
+   * In namespaces
+
+   * As class static member variable 
+
+   * Inside functions. It has the same effect as variables allocated
+     with _static_ keyword that persist the variable value between
+     function calls.
+
+ + Thread local storage is implemented by the operating system and is
+   o.s. specific. The *thrad_local* keyword provide a uniform way to use
+   _thread local storage_ (TLS) capabilities of many operating systems
+   and avoid compiler-specific language extensions for accessing the
+   TLS feature.
+
+   + Windows API TLS: TlsSetValue(), TlsGetValue(), TlsFree() ...
+
+   + MSVC Compiler language extension: __declspec(thread)
+
+   + GCC Compiler language extension for TLS: __thread int var = 0;
+
+ + If use of a C++11 compiler is not possible, the Boost library
+   provides the container [[https://www.boost.org/doc/libs/1_71_0/doc/html/thread/thread_local_storage.html][boost:thread_specific_ptr]] which provides
+   portable thread local storage. 
+
+ *Example:*
+
+File: thread-local.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <thread>
+  #include <mutex>
+  #include <cassert>
+
+  thread_local int tls_variable = 100;
+
+  std::mutex cout_mutex;
+
+  void worker_function(int offset)
+  {
+      tls_variable = tls_variable + offset;
+      auto guard = std::lock_guard<std::mutex>(cout_mutex);
+      std::cout << " [INFO] Thread ID = "           << std::this_thread::get_id()
+                << " ; &tls_variable = "     << &tls_variable
+                << " ; VALUE(tls_variable) " << tls_variable
+                << std::endl;
+  }
+
+  // Note: 'thread_local' is similar to declare 'static int n = 0'
+  // that persist the variable n state between function
+  // calls. However, unlike 'static', the thread_local annotation
+  // ensure that there will be a copy of the variable 'n' for
+  // every thread.
+  void log_counter(bool show_counter, const char* thread_name)
+  {
+      // Same as declaring: 'static thread_local int n = 0;'
+      thread_local int n = 0;
+      n++;
+      if(show_counter){
+          auto guard = std::lock_guard<std::mutex>(cout_mutex);
+          std::cout << " [LOGGER] Called by THREAD_ID = "
+                    << std::this_thread::get_id()
+                    << " ; THREAD_NAME = " << thread_name
+                    << " ; ADDRESS(n) = "  << &n
+                    << " ; COUNTER  = "    << n
+                    << "\n";
+      }
+  }
+
+  int main(int argc, char** argv)
+  {
+      using namespace std::chrono_literals;
+
+      std::cout << "\n=== EXPERIMENT A ========================================\n";
+
+      // Only modified for the main thread
+      tls_variable = 25;
+
+      std::cout << " [INFO] Before => MAIN Thread ID = " << std::this_thread::get_id()
+                << " ; &tls_variable = "                 << &tls_variable
+                << " ; VALUE(tls_variable) "             << tls_variable
+                << std::endl;
+
+
+      auto t1 = std::thread(worker_function, 15);
+      auto t2 = std::thread(worker_function, 20);
+      auto t3 = std::thread(worker_function, 90);
+
+      t1.join();
+      t2.join();
+      t3.join();
+
+      std::cout << " [INFO] After => MAIN Thread ID = " << std::this_thread::get_id()
+                << " ; &tls_variable = "                 << &tls_variable
+                << " ; VALUE(tls_variable) "             << tls_variable
+                << std::endl;
+
+      assert(tls_variable == 25);
+
+
+      std::cout << "\n=== EXPERIMENT B == Thread local storage and functions ====\n";
+
+      auto th1 = std::thread([]{
+          for(int i = 0; i < 10; ++i) log_counter(false, "th1");
+          std::this_thread::sleep_for(2s);
+          log_counter(true, "th1");
+      });
+
+      auto th2 = std::thread([]{
+          for(int i = 0; i < 20; ++i) log_counter(false, "th2");
+          std::this_thread::sleep_for(1s);
+          log_counter(true, "th2");
+      });
+
+      log_counter(false, "main");
+      log_counter(false, "main");
+      log_counter(false, "main");
+      log_counter(true,  "main");
+
+      th1.join();
+      th2.join();
+
+      return 0;
+  }
+#+END_SRC
+
+Building: 
+
+#+BEGIN_SRC sh 
+  $ clang++ thread-local.cpp -o out.bin -std=c++1z -O0 -g -lpthread -Wall -Wextra
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC sh 
+  $ ./out.bin 
+
+  === EXPERIMENT A ========================================
+   [INFO] Before => MAIN Thread ID = 140391161767744 ; &tls_variable = 0x7faf5d53a738 ; VALUE(tls_variable) 25
+   [INFO] Thread ID = 140391143909120 ; &tls_variable = 0x7faf5c4326f8 ; VALUE(tls_variable) 115
+   [INFO] Thread ID = 140391135516416 ; &tls_variable = 0x7faf5bc316f8 ; VALUE(tls_variable) 120
+   [INFO] Thread ID = 140391127123712 ; &tls_variable = 0x7faf5b4306f8 ; VALUE(tls_variable) 190
+   [INFO] After => MAIN Thread ID = 140391161767744 ; &tls_variable = 0x7faf5d53a738 ; VALUE(tls_variable) 25
+
+  === EXPERIMENT B == Thread local storage and functions ====
+   [LOGGER] Called by THREAD_ID = 140391161767744 ; THREAD_NAME = main ; ADDRESS(n) = 0x7faf5d53a73c ; COUNTER  = 4
+   [LOGGER] Called by THREAD_ID = 140391135516416 ; THREAD_NAME = th2 ; ADDRESS(n) = 0x7faf5bc316fc ; COUNTER  = 21
+   [LOGGER] Called by THREAD_ID = 140391127123712 ; THREAD_NAME = th1 ; ADDRESS(n) = 0x7faf5b4306fc ; COUNTER  = 11
+#+END_SRC
+
+
+ *References:*
+
+  + [[https://en.cppreference.com/w/cpp/language/storage_duration][Storage class specifiers - cppreference.com]]
+
+  + [[https://docs.microsoft.com/en-us/cpp/cpp/storage-classes-cpp?view=vs-2019][Storage classes (C++) | Microsoft Docs]]
+
+  + [[https://docs.microsoft.com/en-us/cpp/parallel/thread-local-storage-tls?view=vs-2019][Thread Local Storage (TLS) | Microsoft Docs]]
+
+  + [[http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2008/n2659.htm][WG21 - N2659 Thread-Local Storage]] (C++ Standard Proposal)
+    + "Proposal that defines the _thread_local_ storage class specifier
+      for C++11."
+
+  + [[https://sites.google.com/site/sireeshajakku/cpp/tls---thread-local-storage][TLS - Thread Local Storage - sireeshajakku]]
+
+  + [[https://www.ibm.com/support/knowledgecenter/en/ssw_ibm_i_74/rzahw/rzahwdatco.htm][Data that is private to a thread]]
+
+  + [[https://www.installsetupconfig.com/win32programming/windowsthreadsprocessapis7_23.html][The Win32 Windows Thread Local Storage Program Example]]
+
+  + [[https://docs.oracle.com/cd/E19683-01/817-3677/chapter8-1/index.html][Chapter 8 Thread-Local Storage (Linker and Libraries Guide)]]
+
+ *Further Reading:*
+
+ + [[http://david-grs.github.io/tls_performance_overhead_cost_linux/][TLS performance overhead and cost on GNU/Linux]]
+
+ + [[https://testbit.eu/2015/thread-local-storage-benchmark][Thread-Local-Storage Benchmark | Timj’s bits and tests]]
+
+ + [[https://software.intel.com/en-us/blogs/2011/05/02/the-hidden-performance-cost-of-accessing-thread-local-variables][The hidden performance cost of accessing thread-local variables |Intel® Software]]
+
+ + [[https://blog.knatten.org/2012/06/15/avoiding-heap-allocations-with-static-thread-locals/][Avoiding Heap Allocations With Static Thread Locals – C++ on a Friday]]
+
+ + [[https://www.codeproject.com/Tips/875963/Multi-Instance-Thread-Local-Storage][Multi Instance Thread Local Storage - CodeProject]]
+
+ *Questions:*
+
+  + [[https://stackoverflow.com/questions/3734512/how-does-a-c-compiler-implement-thread-local-storage-in-c0x][c++11 - How does a C++ compiler implement thread local storage in C++0x? - Stack Overflow]]
+
+  + [[https://stackoverflow.com/questions/10999131/can-you-use-thread-local-variables-inside-a-class-or-structure][c++ - Can you use thread local variables inside a class or structure - Stack Overflow]]
+
 ** Task-based APIs => Futures and Promises 
 *** Futures overview 
 
@@ -2369,7 +2585,6 @@ Running:
       producer/consumer problem.
 
   + [[https://vorbrodt.blog/2019/02/03/blocking-queue/][Blocking queue – Vorbrodt's C++ Blog]]
-
 
 
 ** Thread Pools 
