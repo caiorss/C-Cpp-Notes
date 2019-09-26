@@ -267,6 +267,364 @@ processing cores per CPU and 2 threads per core has a total of
 
  + NHW = 2 x 2 x 4 = 16 threads or 16 logical processors 
 
+** Concepts Reference Map 
+
+ *Multitasking* 
+
+Ability to perform multiple actions at the same time: 
+
+  + _Multi processing_ (Multi-process)
+
+    + => Spawn, fork new process for handling new requests or
+      performing other tasks. Example: POSIX system call _fork_ - before
+      threads become widespread, servers handled new incoming client
+      sockets requests by forking a new process by calling _fork_ which
+      creates a child process which is a copy of the current process.
+ 
+    + => Processes communicate through IPC - Interprocess
+      Communication primitives such as shared memory, message passing,
+      synchronization primitives or sockets.
+
+    + => Advantages:
+      + Better robustness: the crashing or abnormal termination of any
+        process does not affect others.
+
+    + => Disadvantage:
+      + Higher overhead, creating processes is more expensive than
+        creating threads.
+      + More complicated communication: unlike threads, processes
+        cannot easily share data and variables without IPC inter
+        process communication.
+
+    + => Note: Web browsers such as Chrome and Firefox spawns a new
+       process for dealing with a new created tab or window.
+
+    + => Note: Some programming languages, such as Python, OCaml, and
+      Ruby suffer from the [[https://en.wikipedia.org/wiki/Global_interpreter_lock][GIL]] - _Global Interpreter Lock_ problem which
+      allows only a single _native thread_ run at a time due to
+      concurrency reasons and design choices. The GILs makes the
+      language unable to achieve true concurrency and parallelism by
+      taking advantage of multicore processors. The solution to this
+      issue is to use *multi-processing*, spawn multiple processes for
+      harness the multicore processors capabilities.
+
+    + => Note: Python and other languages with the GIL issue can
+      overcome the GIL limitation by using libraries written in native
+      code in Rust, C, C++ such as Numpy for Python. 
+
+  + _Multi threading_ (Kernel threads)
+    + => Use multiple threads for dealing with concurrency and running
+      multiple independent taks control flows within a single process.
+
+    + => Advantages:
+      + Creating new threads is less expensive than creating
+        processes, although spawning a kernel threads is still expensive.
+      + Threads can communicate through shared memory (process virtual
+        memory) and thread synchronization primitives.
+      + Unlike, threads can easily share variables and data.
+
+    + => Disadvantages:
+      + Threads 
+
+  + _Multi threading_ (User Space threads)
+
+    + User-space threads (_fibers_, aka _coroutines_, aka _greenthreads_,
+      _lightweight threads_) are similar to native threads which are
+      provided by the kernel. However, unlike kernel threads,
+      user-space threads are emulated by a runtime, interpreter or library in
+      the user-space. Note: languages withotu user-space threads, can
+      overcome the thread overhead by using _thread pools_ and
+      non-blocking IO just like Nginx web server and NodeJS. The
+      problem of this approach is the non-friendly *callbacks* and
+      possible "callback-hell". 
+
+    + Advantages:
+
+      + Faster context switch than kernel-threads.
+
+      + It is possible to run multiple user-space threads in a single
+        threads. 
+
+      + Scalability: It is expensive to spawn multiple kernel threads
+        for handling every incoming connection of some web server due
+        to the memory and context switch overhead of kernel
+        threads. However, it is  cheap and faster to spawn hundreds or
+        thousands of _user-space_ _threads_ for handling incoming connections.
+
+    + Disadvantages: 
+
+      + Cooperative multithreading: All fibers or user-space threads
+        can only use _non-blocking IO_ and non-blocking system calls
+        (epoll, select, kqueue, ...), otherwise all other user-space
+        threads will be stalled. 
+
+      + User-space threads are not suitable for _CPU-bound_ (CPU
+        intensive), numerical computations and _parallel computations_.
+
+    + Programming Languages with _user-space threads:_
+      + Golang (Goroutines are user-space threads)
+      + Haskell
+      + Erlang 
+      + OCaml
+      + Python
+      + Ruby
+      + C++20, until C++20 is not released there is the 
+
+ *Concurrency Primitives* 
+
+   + Threads (kernel threads)
+
+   + Thread-local store 
+
+   + Lock synchronization primitives
+     + mutex
+     + recursive mutex
+     + semaphore
+     + barriers
+     + spinlocks
+
+   + Non-lock synchronization primitives
+     + atomic variables 
+
+   + Coordination synchronization primnitives 
+     + condition variables
+ 
+  *Thread Operations* 
+
+   + fork()/spawn()
+     + Create a new thread.
+
+   + join()
+     + Wait for thread termination.
+
+   + get_id()
+     + Get unique thread identifier nunber, similar to process ID (PID).
+
+   + cancel()
+     + aka trhead cancellation => Abnormally terminate a thread
+       (similar to std::terminate), not supported by C++ standard
+       library.
+
+  *Concurrency Hazards* 
+
+   + Data races, race conditions
+
+   + Deadlock
+
+   + Livelock
+
+   + Starvation 
+
+ *Concurrency Concepts* 
+
+   + Mutual exclusion
+     + locks
+     + race conditions (a.k.a: data races)
+
+   + Producer/consumer problems
+
+   + Thread local storage 
+
+  *High Level Concurrency Constructs* 
+
+   * _Message queue_ (aka blocking queue or mailbox)
+     + Construct used for implementing _message passing concurrency_ and
+       coordinates producer/consumer threads without explicit use of
+       locks and shared state. 
+     + Example: Java's BlockingQueue
+
+   * _Thread Pools_
+     + Construct used for recycling and avoiding creating too much
+       threads in IO intensive applications such as web
+       servers. A thread pool is comprised of a task queue and a set
+       of long-running worker threads that runs taks from the task
+       queue submited by the client code.  Thread pools can also be
+       used for parallel computing.
+
+     + Servers such as Nginx, the NodeJS (JavaScript runtime) and
+       Boost.Asio library use thread pools alongside _non blocking IO_
+       for achieving scalability.
+
+   * _Executors_
+     * Abstraction for decoupling tasks from the execution
+       method. It allows changing the execution mechanism without much
+       effort. For instance, it makes possible to run a set of tasks
+       from a task queue (message queue) serially in the same thread,
+       serially in a another thread or in a thread pool.
+
+   * _Futures_ (Task-based API)
+     * Allows the calling to get the return value from an asynchrnous
+       computation. It does not block the calling thread unti
+       Future.get() is called for retrieving the value from the async
+       computation. Note: The computation wrapped by the future object
+       can run in a new thread or in a thread pool (better).
+     * Note: The C++11 std::future runs in a new thread which has a
+       big overhead if too much future objects are created in a short
+       time. 
+
+   * _Promises_ (Task-based API)
+
+   * *Lock-free* data structures
+
+   * _Thread-safe containers/data structures or collections_
+     * Collections such as hashmaps, arrays, sets  tha encapsulates
+       synchronization primitives such as locks and are safe to use
+       from multiples threads.
+
+  *Concurrency Models* 
+
+  + CSP - Concurrent Sequential Process (Tony Hoare)
+    + Languages with CSP: Go (aka Golang), Clojure 
+
+  + Actor Model
+    + Languages with actor model: Erlang, Scala (Akka)
+    + Types: 
+      + Active Objects
+      + Agents
+
+  + STM - Software Transaction Memory
+    + Languages with STM: Haskell.
+
+  *Parallelism* 
+
+   + Goal: speed up computations and improve the overall performance
+     by splitting a big computation into multiple smaller computations
+     tha runs simulatenously in multiple processing units.
+
+   + Hardware: Multicore CPUs; CPU SIMD instructions (aka vector
+     instructions); server computers with many multicores CPU chips;
+     clusters of many computers; supercomputers with thousands of
+     cores; GPUs - Graphical Processing Unit.
+
+   + APIs:
+
+     + OpenMP (Language extension for C, C++ or Fortran + Runtime library)
+       + Parallelize for-loops of numerical algorithms without
+         explicitly dealing with threads. 
+
+     + MPI - Message Passing Interface
+
+     + Intel Cilk Language extension for C or C++ 
+
+     + Intel TBB - Thread Building Blocks
+
+     + Microsoft PPL - Parallel Patterns Library (Windows-Only)
+
+     + STL - C++17 Standard Library Parallel Algorithms
+
+     + Intel Parallel STL (Reference implementation of C++
+       Standard-Library parallel algorithms)
+
+     + GPU APIs:
+       + CUDA (proprieteary, Nvidia)
+       + OpenCL (open source, Khronos Group)
+       + SYCL (open source, Khronos Group)
+
+ *See:* 
+
+User-Space Threads, Coroutines, Fibers, ... 
+
+  + [[https://en.wikipedia.org/wiki/Fiber_(computer_science)][Fiber (computer science) - Wikipedia]]
+
+  + [[https://c9x.me/articles/gthreads/intro.html][Green threads explained (intro)]]
+
+  + [[https://en.cppreference.com/w/cpp/language/coroutines][Coroutines (C++20) - cppreference.com]]  
+
+  + [[https://www.modernescpp.com/index.php/coroutines][Coroutines - ModernesCpp.com]]
+
+  + [[https://stackoverflow.com/questions/43503656/what-are-coroutines-in-c20][c++ - What are coroutines in C++20? - Stack Overflow]]
+
+  + Library: [[https://www.boost.org/doc/libs/1_71_0/libs/coroutine/doc/html/index.html][Boost.Coroutine]]
+
+  + Library: [[https://www.boost.org/doc/libs/1_71_0/libs/coroutine2/doc/html/index.html][Boost.Coroutine2]]
+    + Boost coroutine library.
+
+  + Library: [[https://www.boost.org/doc/libs/1_71_0/libs/fiber/doc/html/index.html][Boost.Fiber]]
+
+  + Library: [[https://www.boost.org/doc/libs/1_71_0/doc/html/boost_asio/reference/coroutine.html][Boost.Asion - coroutines]]
+    + Coroutines support in Boost Asio network socket server/client framework
+
+  + [[http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2015/p0158r0.html][P0158R0 - Coroutines belong in a TS]] 
+
+  + [[http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p1364r0.pdf][P13564R0 - Fibers under the magnifying glass]] - Gor Nishanov [BEST, MUST READ]
+
+  + [[https://isocpp.org/files/papers/N4402.pdf][N4402 - Resumable Functions]] - Gor Nishanov
+
+  + [[http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p0866r0.pdf][P08066: Response to "Fibers Under Magnifying glass"]]
+
+  + [[https://nullprogram.com/blog/2019/03/28/][Fibers: the Most Elegant Windows API « null program]]
+
+  + [[https://jrebel.com/rebellabs/what-are-fibers-and-why-you-should-care/][What are fibers and why should you care? | JRebel & XRebel]]
+
+  + [[https://rcoh.me/posts/why-you-can-have-a-million-go-routines-but-only-1000-java-threads/][Why you can have millions of Goroutines but only thousands of Java Threads]]
+
+  + [[http://tleyden.github.io/blog/2014/10/30/goroutines-vs-threads/][Goroutines vs Threads - Seven Story Rabbit Hole]]
+
+  + [[https://crates.io/crates/corona][corona - crates.io: Rust Package Registry]] (Rust Coroutines)
+
+Web Browser Multi-processing: 
+
+  + [[https://blog.chromium.org/2008/09/multi-process-architecture.html][Chromium Blog: Multi-process Architecture]]
+
+  + [[https://www.chromium.org/developers/design-documents/multi-process-architecture][Multi-process Architecture - The Chromium Projects]]
+
+  + [[https://helgeklein.com/blog/2019/01/modern-multi-process-browser-architecture/][Modern Multi-Process Browser Architecture • Helge Klein]]
+
+  + [[https://stackoverflow.com/questions/4263124/which-is-better-choice-for-browsers-tab-multi-thread-or-multi-process][c - Which is better choice for browser's tab: multi-thread or multi-process? - Stack Overflow]]
+
+GIL => Global Interpreter Lock: 
+
+  + [[https://realpython.com/python-gil/][What is the Python Global Interpreter Lock (GIL)? – Real Python]]
+
+  + [[https://wiki.python.org/moin/GlobalInterpreterLock][GlobalInterpreterLock - Python Wiki]]
+
+  + [[https://www.geeksforgeeks.org/what-is-the-python-global-interpreter-lock-gil/][What is the Python Global Interpreter Lock (GIL) - GeeksforGeeks]]
+
+  + [[https://www.dabeaz.com/python/UnderstandingGIL.pdf][Understanding the Python GIL]] - David Beazley 
+
+Executor Design Pattern: 
+
+  + *The Executor Design Pattern* - Decoupling Tasks from Execution -
+    Eric Crahen - VikingPLOP 2002 - page 55
+    + <http://www.hillside.net/vikingplop/vikingplop2002/VikingPLoP2002_Proceedings.pdf> 
+
+  + *Concurrency Patterns* - Douglas C. Schmidt
+    + <https://www.dre.vanderbilt.edu/~schmidt/POSA/POSA2/conc-patterns.html>
+    + Note: "Other patterns in the literature that address
+      concurrency-related issues include Master-Slave [POSA1],
+      Producer-Consumer [Grand98], Scheduler [Lea99a], and Two-phase
+      Termination [Grand98]."
+
+  + [[https://gitee.com/iOceanPlus_Forked/CppCon2015/raw/master/Presentations/Executors%2520for%2520C++%2520-%2520A%2520Long%2520Story/Executors%2520for%2520C++%2520-%2520A%2520Long%2520Story%2520-%2520Detlef%2520Vollmann%2520-%2520CppCon%25202015.pdf][Executors for C++ - A long History]] - Strugling for a Base for
+    Concurrency Building Block - Detlef Vollman.
+
+  + [[https://github.com/executors/executors][GitHub - executors/executors: A proposal for a executor programming model for ISO C++]]
+
+  + [[https://www.modernescpp.com/index.php/a-short-detour-executors][A Short Detour: Executors - ModernesCpp.com]] 
+
+  + *Java Executor Framework*
+    + <http://technicalstack.com/java-executor-framework-thread-pool/>
+
+  + *WG21 - N4046 - Executors and Asynchronous Operations* - Christopher Kohlhoff
+
+    + <http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2014/n4046.pdf> 
+
+    + Note: Reference implementation of executors library:
+
+      http://github.com/chriskohlhoff/executors
+
+    + Presentation:
+      + http://think-async.com/executors/Executors_and_Asynchronous_Operations_Slides.pdf
+
+    + "This proposal is the asynchronous model that underpins the
+      P0112R0 Networking Library proposal, and the proposed wording
+      below is taken from the corresponding sections of P0112R0. In
+      doing so, it takes design concepts from Boost.Asio, many of
+      which have been unchanged since its inclusion in Boost, and
+      repackages them in a way that is more suited to C++14 language
+      facilities."
+
+
 ** Standard Library Reference 
  
  *Technical Specifications* 
@@ -1490,7 +1848,7 @@ Running:
 
 #+END_SRC
 
-** Thread Local Variables 
+** Thread Local Variables and TLS - Thread Local Storage
 
 The keyword *thread local*, added in C+11, ensures that a new instance of a
 global or static variable is created for every thread using the
