@@ -105,6 +105,161 @@ Any process may have the following inputs, outputs and states:
                                           Output File 
 #+END_SRC
 
+** Environment Variables for Program Configuration
+
+Environment variables are available in most operating systems such as
+Linux, MacOSx, BSD and Windows. They can be used for setting program
+configuration at initialization.
+
+See: 
+  + [[https://en.wikipedia.org/wiki/Environment_variable][Environment variable - Wikipedia]]
+  + [[https://docs.microsoft.com/en-us/windows/win32/procthread/environment-variables][Environment Variables - Windows applications | Microsoft Docs]]
+  + [[https://www.digitalocean.com/community/tutorials/how-to-read-and-set-environmental-and-shell-variables-on-a-linux-vps][How To Read and Set Environmental and Shell Variables on a Linux VPS | DigitalOcean]]
+  + [[https://opensource.com/article/19/8/what-are-environment-variables][What are environment variables in Bash? | Opensource.com]]
+  + [[https://wiki.archlinux.org/index.php/Environment_variables][Environment variables - ArchWiki]]
+
+File: envvar.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+
+  template<typename T>
+  T
+  get_env_value(std::string const& name, T default_value);
+
+  // Template specialization for std::string
+  template<>
+  std::string
+  get_env_value(std::string const& name, std::string default_value)
+  {
+      const char* p = std::getenv(name.c_str());
+      if(p == nullptr) { return default_value; }
+      return p;
+  }
+
+  // Template specialization for size_t
+  template<>
+  size_t
+  get_env_value(std::string const& name, size_t default_value)
+  {
+      const char* p = std::getenv(name.c_str());
+      if(p == nullptr) { return default_value; }
+      return std::stoul(p);
+  }
+
+  // Template specialization for double
+  template<>
+  double
+  get_env_value(std::string const& name, double default_value)
+  {
+      const char* p = std::getenv(name.c_str());
+      if(p == nullptr) { return default_value; }
+      return std::stod(p);
+  }
+
+
+  int main(int argc, char* argv[])
+  {
+      // Check whether environment variable "PROGRAM_USER_KEY" is set
+      if(const char* env = std::getenv("PROGRAM_USER_KEY"))
+      {
+          std::cout << " [1] Environment vartiable set => PROGRAM_USER_KEY = "
+                    << env << std::endl;
+      } else {
+          std::cout <<" [1] Environment variable PROGRAM_USER_KEY not set." << std::endl;
+      }
+
+
+      auto storage_path = get_env_value<std::string>("PROGRAM_STORAGE_PATH"
+                                                     , "/home/dummy/.data");
+      auto number_of_threads = get_env_value<size_t>("PROGRAM_NTHREADS", 10);
+      auto timeout = get_env_value<double>("PROGRAM_TIMEOUT", 1.0);
+
+      std::cout << " ==== Program Runtime Configuration =======" << std::endl;
+
+      std::cout << " ENV[PROGRAM_STORAGE_PATH] = " << storage_path << std::endl;
+      std::cout << " ENV[PROGRAM_NTHREADS]     = " << number_of_threads << std::endl;
+      std::cout << " ENV[PROGRAM_TIMEOUT]      = " << timeout << std::endl;
+
+      return EXIT_SUCCESS;
+  }
+#+END_SRC
+
+Building: 
+
+#+BEGIN_SRC sh 
+  $ g++ envvar.cpp -o envvars.bin --std=c++1z -g -O0 -Wall -Wextra
+#+END_SRC
+
+Running 1: 
+
+#+BEGIN_SRC sh 
+  $ ./envvars.bin 
+   [1] Environment variable PROGRAM_USER_KEY not set.
+   ==== Program Runtime Configuration =======
+   ENV[PROGRAM_STORAGE_PATH] = /home/dummy/.data
+   ENV[PROGRAM_NTHREADS]     = 10
+   ENV[PROGRAM_TIMEOUT]      = 1
+#+END_SRC
+
+Running 2: 
+ + Set PROGRAM_USER_KEY environment variable for the current terminal
+   session. 
+
+#+BEGIN_SRC sh 
+  $ export PROGRAM_USER_KEY=87axk689fghyk
+
+  $ ./envvars.bin 
+   [1] Environment vartiable set => PROGRAM_USER_KEY = 87axk689fghyk
+   ==== Program Runtime Configuration =======
+   ENV[PROGRAM_STORAGE_PATH] = /home/dummy/.data
+   ENV[PROGRAM_NTHREADS]     = 10
+   ENV[PROGRAM_TIMEOUT]      = 1
+  
+
+  $ export PROGRAM_USER_KEY=void_password
+
+  $ ./envvars.bin 
+   [1] Environment vartiable set => PROGRAM_USER_KEY = void_password
+   ==== Program Runtime Configuration =======
+   ENV[PROGRAM_STORAGE_PATH] = /home/dummy/.data
+   ENV[PROGRAM_NTHREADS]     = 10
+   ENV[PROGRAM_TIMEOUT]      = 1
+#+END_SRC
+
+
+Running 3: 
+ + Use the env ~/usr/bin/env~ for setting program environment variable. 
+
+#+BEGIN_SRC sh 
+  $ env PROGRAM_NTHREADS=15 ./envvars.bin 
+   [1] Environment vartiable set => PROGRAM_USER_KEY = void_password
+   ==== Program Runtime Configuration =======
+   ENV[PROGRAM_STORAGE_PATH] = /home/dummy/.data
+   ENV[PROGRAM_NTHREADS]     = 15
+   ENV[PROGRAM_TIMEOUT]      = 1
+
+  $ ./envvars.bin 
+   [1] Environment vartiable set => PROGRAM_USER_KEY = void_password
+   ==== Program Runtime Configuration =======
+   ENV[PROGRAM_STORAGE_PATH] = /home/dummy/.data
+   ENV[PROGRAM_NTHREADS]     = 10
+   ENV[PROGRAM_TIMEOUT]      = 1
+
+#+END_SRC
+
+Running 4: 
+ + Set multiple environment varaibles with "env" Unix program.
+
+#+BEGIN_SRC sh 
+  $ env PROGRAM_TIMEOUT=2.551 PROGRAM_STORAGE_PATH=/var/www ./envvars.bin 
+   [1] Environment vartiable set => PROGRAM_USER_KEY = void_password
+   ==== Program Runtime Configuration =======
+   ENV[PROGRAM_STORAGE_PATH] = /var/www
+   ENV[PROGRAM_NTHREADS]     = 10
+   ENV[PROGRAM_TIMEOUT]      = 2.551
+#+END_SRC
 
 ** C-legacy IO functions - format specifiers and examples
 *** Puts 
