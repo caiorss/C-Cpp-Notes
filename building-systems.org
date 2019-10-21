@@ -26,9 +26,14 @@ Some building systems:
   + *GNU Autotool* (GNU Building System) - One of the most used building
     systems in open source projects for Unix-like operating systems,
     specially Linux.
+    + Projects using GNU autotool have the files: configure.ac and
+      Makefine.am. They often have the instruction for installing as:
+      ./configure && make && make install. 
     + Projects using Autotools: Emacs editor; GIT version control
       system; GNU Core utils; GIMP image manipulation app.
     + Problems:
+      + Brittle
+      + Hard to read 
       + Hard to use and complicated
       + Requires many configuration files.
       + Does not work well on Windows 
@@ -257,7 +262,407 @@ Comparative table:
  + Reddit /r/cpp - [[https://www.reddit.com/r/cpp/comments/40cfbk/hunter_crossplatform_package_manager_for_c/][Hunter - Cross-platform package manager for C++]]
  + [[https://news.ycombinator.com/item?id=16915195][Announcing a single C++ library manager for Linux, macOS and Windows: Vcpkg]]
 
-* CMake
+* GNU Autotools Building System  
+** Overview 
+
+  * Autotools
+    + =>> GNU Building System or umbrela name for _autoconf_, _automake_
+      and _libtool_. GNU autotools is used by many open-source Linux
+      projects and embedded Linux.
+
+  * Used mostly in Unix-like or POSIX-like operating systems,
+    specially Linux.
+
+  * Motivation:
+    * Deal with legacy systems
+    * Learn about alternative building systems
+    * Maintenance of existing open source projects
+    * Possible porting GNU autotools to CMake 
+    * Embedded Linux
+
+  * Availalble for:
+    + Linux, MacOSX, FreeBSD, OpenBSD, NetBSD and so on.
+
+  * Documentation:
+    * [[http://www.gnu.org/software/autoconf/][GNU Autoconf]]
+    * [[http://www.gnu.org/software/automake/automake.html][GNU Automake]]
+    * [[http://www.gnu.org/software/libtool/libtool.html][GNU Libtool]]
+
+  * Supported Programming Languages
+    * C
+    * C++
+    * Objective C
+    * Fortran
+    * Fortran77
+    * Erlang 
+
+  * Terminal Documentation:
+    * $ info automake
+    * $ info autoconf
+    * $ info libtool 
+
+  * Common build configuration facilities
+    + $ make
+    + $ make install   => Install application.
+    + $ ... ... ..
+
+ *GNU Make Command for GNU autotools* 
+
+|--------------------+-----------------------------------------------------------------------------|
+| Make Command       | Description                                                                 |
+|--------------------+-----------------------------------------------------------------------------|
+| $ make             | Build application                                                           |
+| $ make -j4         | Build applciation using 4 threads                                           |
+|                    |                                                                             |
+| $ make check       | Run tests                                                                   |
+|                    |                                                                             |
+| $ make clean       | Clean compilation files                                                     |
+| $ make distclean   | Remove generated autools files.                                             |
+|                    |                                                                             |
+| $ make install     | Install application in the system to: /usr/loca/bin, /etc, ...              |
+| $ make intallcheck | Check installation                                                          |
+| $ make uninstall   | Remove installation files                                                   |
+|                    |                                                                             |
+| $ make dist        | Create source distribution tarball                                          |
+| $ make distcheck   | Similar to make dist, but checks if the compilation, the creates a tarball. |
+|                    |                                                                             |
+|--------------------+-----------------------------------------------------------------------------|
+
+ *Most Configuration variables* 
+
+|----------+--------------------------------+---|
+| Variable | Description                    |   |
+|----------+--------------------------------+---|
+| CC       | C compiler                     |   |
+| CXX      | C++ compuler                   |   |
+|          |                                |   |
+| CPPFLAGS | C and C++ Preprocessor flags   |   |
+| CFLAGS   | Flags of the C compiler        |   |
+| CXXFLAGS | Flags of the C++ compiler      |   |
+|          |                                |   |
+| LDFLAGS  | Linker Flags                   |   |
+| LIBS     | Libraries passed to the linker |   |
+|          |                                |   |
+|----------+--------------------------------+---|
+
+
+ *Installation* 
+
+Install on Fedora Linux Distribution: 
+
+#+BEGIN_SRC sh 
+  $ sudo dnf install autoconf automake
+#+END_SRC
+  
+ *Autotools workflow for users* 
+
+STEP 1: User run ./configure selecting build options; 
+
+#+BEGIN_SRC sh 
+  # Install application in default directory
+  $ ./configure
+ 
+  # Install the application in another directory 
+  $ ./configure --prefix=/home/user/juliuscaesar/opt
+#+END_SRC
+
+STEP 2: Run (GNU) make for building. 
+
+#+BEGIN_SRC sh 
+  $ make 
+
+  # Run GNY make with 4 threads 
+  $ make -j4 
+
+  # Run $ make and $ make install in a single step 
+  $ make -j4 && sudo make install 
+#+END_SRC
+
+STEP 3: Install. 
+
+#+BEGIN_SRC sh 
+  $ make install 
+
+  # If permission is needed 
+  $ sudo make install 
+#+END_SRC
+
+ *Developer Worflow* 
+
+STEP 1:
+  + => Create files:
+    + _configure.ac_  for *autoconf* - written in a language similar to
+      Bash (Bourne Shell Script) which is processed by *M4* macro
+      processor.
+      + Note: It is necessary to take care with whitespaces in macro invocations.
+    + _Makefile.am_ for *automake*. 
+
+
+STEP 2: 
+ + => The developer runs autoreconf that  generates the files
+   ./configure and Makefile.in
+
+STEP 3: 
+ + => Test the generated files by running:
+   + $ ./configure && make && make install.
+** Example: Basic GNU autotools project 
+*** Project Files 
+File: main.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+
+  int main()
+  {
+    std::cout << "Hello world autotools" << std::endl;
+    return 0;
+  }
+#+END_SRC
+
+File: configure.ac 
+
+#+BEGIN_SRC sh 
+   #------- File: configure.ac ----------#
+   #-------------------------------------# 
+
+   # app => Is the file name without extensions
+   # 0.1 => Is the version 
+   AC_INIT( [app], [0.1], [maintener@email.com])
+
+   # Require at least autoconf version >= 2.68 
+   AC_PREREQ([2.68])  
+   AM_INIT_AUTOMAKE([-Wall -Wextra])
+
+   # ./configure creates a Makefile
+   AC_CONFIG_FILES([Makefile])
+
+   # Find and check C compiler 
+   AC_PROG_CC
+   # Find and check a C++ compiler 
+   AC_PROG_CXX 
+   AC_OUTPUT 
+#+END_SRC
+
+File: Makefile.am 
+
+#+BEGIN_SRC sh 
+  # Contains all executable targets 
+  bin_PROGRAMS = app
+
+  # Sources for the executable targets 
+  app_SOURCES  = app.cpp 
+#+END_SRC
+
+File: clean.sh 
+  + Helper bash script used for cleaning current directory.
+
+#+BEGIN_SRC sh 
+  #!/usr/bin/env sh 
+  rm -v configure config.log config.status install-sh missing aclocal.m4 compile depcomp 
+  rm -vrf autom4te.cache
+  rm -v *.o *.bin *.so
+  rm *~ # Remove temporary files 
+#+END_SRC
+*** Building Steps
+
+ *STEP 1:*
+
+ + Create additional metadata files needed by _GNU autotools_
+
+#+BEGIN_SRC sh 
+  $ touch README NEWS AUTHORS ChangeLog # Set metadata files                                                │
+#+END_SRC
+
+ *STEP 2:*
+
+ + Run atuoreconf for generating ./configure shell script and addition files.
+ + Run: $ autoreconf -i -v 
+
+#+BEGIN_SRC sh 
+  $ autoreconf -i -v 
+
+  autoreconf: Entering directory `.'
+  autoreconf: configure.ac: not using Gettext
+  autoreconf: running: aclocal 
+  autoreconf: configure.ac: tracing
+  autoreconf: configure.ac: not using Libtool
+  autoreconf: running: /usr/bin/autoconf
+  autoreconf: configure.ac: not using Autoheader
+  autoreconf: running: automake --add-missing --copy --no-force
+  configure.ac:11: warning: unknown warning category 'extra'
+  configure.ac:17: installing './compile'
+  configure.ac:11: installing './install-sh'
+  configure.ac:11: installing './missing'
+  Makefile.am: installing './depcomp'
+  autoreconf: Leaving directory `.'
+#+END_SRC
+
+ *STEP 3:*
+
+ + Generate the Makefile by running the configuration script.
+
+Run: $ ./configure  
+
+#+BEGIN_SRC sh 
+  $ ./configure 
+  checking for a BSD-compatible install... /usr/bin/install -c
+  checking whether build environment is sane... yes
+  checking for a thread-safe mkdir -p... /usr/bin/mkdir -p
+  checking for gawk... gawk
+
+  ... ... ...   ... ... ...   ... ... ...   ... ... ... 
+       # Suppress output for breviety purposes 
+  ... ... ...   ... ... ...   ... ... ...   ... ... ... 
+
+  checking dependency style of g++... gcc3
+  checking that generated files are newer than configure... done
+  configure: creating ./config.status
+  config.status: creating Makefile
+  config.status: executing depfiles commands
+#+END_SRC
+
+Run: $ ./configure CC=clang CXX=clang++ for using clang.
+
+#+BEGIN_SRC sh 
+ $ ./configure CC=clang CXX=clang++
+#+END_SRC
+
+ *STEP 4:* 
+
+ + Run the makefile (GNU make)
+
+Run: $ make 
+
+#+BEGIN_SRC sh 
+   $ make
+
+   g++ -DPACKAGE_NAME=\"app\" -DPACKAGE_TARNAME=\"app\" -DPACKAGE_VERSION=\"0.1\"  \
+       -DPACKAGE_STRING=\"app\ 0.1\" -DPACKAGE_BUGREPORT=\"\" -DPACKAGE_URL=\"\"   \
+        -DPACKAGE=\"app\" -DVERSION=\"0.1\" -I.     -g -O2 -MT app.o -MD -MP -MF   \
+       .deps/app.Tpo -c -o app.o app.cpp \
+       mv -f .deps/app.Tpo .deps/app.Po \
+ 
+    g++  -g -O2   -o app app.o  
+#+END_SRC
+
+Run: $ make install 
+
+#+BEGIN_SRC sh 
+  $ make install
+  make[1]: Entering directory '/home/archbox/projects/autools1'
+   /usr/bin/mkdir -p '/usr/local/bin'
+    /usr/bin/install -c app '/usr/local/bin'
+  /usr/bin/install: cannot create regular file '/usr/local/bin/app': Permission denied
+  make[1]: *** [Makefile:313: install-binPROGRAMS] Error 1
+  make[1]: Leaving directory '/home/archbox/projects/autools1'
+  make: *** [Makefile:615: install-am] Error 2
+
+#+END_SRC
+
+Run: $ make dist => Create a tarball distribution. 
+
+#+BEGIN_SRC sh 
+  $ make dist
+  make  dist-gzip am__post_remove_distdir='@:'
+  make[1]: Entering directory '/home/archbox/projects/autools1'
+  if test -d "app-0.1"; then find "app-0.1" -type d ! -perm -200 -exec chmod u+w {} ... ... 
+  test -d "app-0.1" || mkdir "app-0.1"
+
+    .. ... ... ... ... ... ... 
+  rm -rf "app-0.1" || { sleep 5 && rm -rf "app-0.1"; }; else :; fi
+#+END_SRC
+
+Check the tarball file: 
+
+#+BEGIN_SRC sh 
+      $ tar -tzvf app-0.1.tar.gz 
+  drwxrwxr-x 1000/1000         0 2019-10-21 15:23 app-0.1/
+  -rw-rw-r-- 1000/1000     42147 2019-10-21 15:22 app-0.1/aclocal.m4
+  -rwxrwxr-x 1000/1000    154043 2019-10-21 15:22 app-0.1/configure
+  -rw-rw-r-- 1000/1000       546 2019-10-21 15:01 app-0.1/configure.ac
+  -rw-rw-r-- 1000/1000       101 2019-10-21 14:28 app-0.1/app.cpp
+  -rwxr-xr-x 1000/1000     14676 2019-10-21 15:22 app-0.1/install-sh
+  -rw-rw-r-- 1000/1000         0 2019-10-21 15:02 app-0.1/ChangeLog
+  -rwxr-xr-x 1000/1000      6872 2019-10-21 15:22 app-0.1/missing
+  -rwxr-xr-x 1000/1000     23566 2019-10-21 15:22 app-0.1/depcomp
+  -rw-rw-r-- 1000/1000         0 2019-10-21 15:02 app-0.1/AUTHORS
+  -rw-r--r-- 1000/1000     35147 2019-10-21 15:01 app-0.1/COPYING
+  -rw-r--r-- 1000/1000     15756 2019-10-21 15:01 app-0.1/INSTALL
+  -rwxr-xr-x 1000/1000      7381 2019-10-21 15:22 app-0.1/compile
+  -rw-rw-r-- 1000/1000       117 2019-10-21 14:52 app-0.1/Makefile.am
+  -rw-rw-r-- 1000/1000         0 2019-10-21 15:02 app-0.1/README
+  -rw-rw-r-- 1000/1000         0 2019-10-21 15:02 app-0.1/NEWS
+  -rw-rw-r-- 1000/1000     23477 2019-10-21 15:22 app-0.1/Makefile.in
+#+END_SRC
+
+ *STEP 5:* 
+
+ + Test the application. 
+
+#+BEGIN_SRC sh 
+  # Check executable file 
+  $ file app
+  app: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked, interpreter 
+  /lib64/l, for GNU/Linux 3.2.0, BuildID[sha1]=29f5b104ac648c3286ed616ea4cf4007a6b51ae2, 
+  with debug_info, not stripped
+
+  # Run native executable 
+  $ ./app
+  Hello world autotools
+#+END_SRC
+
+ *Build and install the application into a new location* 
+
+Run configure script. 
+
+#+BEGIN_SRC sh 
+  # Build with clang and install at ~/opt/app-test 
+  $ ./configure CC=clang CXX=clang++ --prefix=$HOME/opt/app-test
+ 
+#+END_SRC
+
+Run make and make install 
+
+#+BEGIN_SRC sh 
+  $ make install
+  make[1]: Entering directory '/home/archbox/projects/autools1'
+   /usr/bin/mkdir -p '/home/archbox/opt/app-test/bin'
+    /usr/bin/install -c app '/home/archbox/opt/app-test/bin'
+  make[1]: Nothing to be done for 'install-data-am'.
+  make[1]: Leaving directory '/home/archbox/projects/autools1'
+#+END_SRC
+
+Test installation: 
+
+#+BEGIN_SRC sh 
+  $ tree /home/archbox/opt/app-test
+  /home/archbox/opt/app-test
+  └── bin
+      └── app
+
+  1 directory, 1 file
+#+END_SRC
+
+Run the application: 
+
+#+BEGIN_SRC sh 
+  $ /home/archbox/opt/app-test/bin/app 
+  Hello world autotools
+#+END_SRC
+
+** Further Reading 
+
+  + [[https://eklitzke.org/how-to-autotools][How To Use Autotools]] 
+
+  + [[https://elinux.org/images/4/43/Petazzoni.pdf][Embedded Linux Conference 2016 - GNU Autotools Tutorial]]
+
+  + [[http://freesoftwaremagazine.com/articles/brief_introduction_to_gnu_autotools/][Chapter 1: A brief introduction to the GNU Autotools]]
+
+  + [[https://stackoverflow.com/questions/10999549/how-do-i-create-a-configure-script][linux - How do I create a configure script? - Stack Overflow]]
+
+  + [[https://developer.fedoraproject.org/tech/languages/c/autotools.html][Autotools — Fedora Developer Portal]]
+
+* CMake Building System 
 ** Overview 
 
  *Motivation* 
