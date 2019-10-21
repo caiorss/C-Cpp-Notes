@@ -5431,6 +5431,327 @@ Program output:
          HRK     7.410
 #+END_SRC
 
+*** nlohmann JSON Parser Library
+
+Easy to use single-file header-only library for parsing and writing
+[[http://json.org/][JSON]] (Javascript Object Notation).
+
+   + Library Repository:
+     + https://github.com/nlohmann/json
+
+   + Conan Recipe Repository:
+     + https://github.com/vthiery/conan-jsonformoderncpp
+
+   + Conan Reference:
+     + [[https://bintray.com/vthiery/conan-packages/jsonformoderncpp%253Avthiery/3.7.0%253Astable][jsonformoderncpp/3.7.0@vthiery/stable]]
+    
+  *Example:* 
+
+   + File: CMakeLists.txt
+     + Version with Conan 
+
+#+BEGIN_SRC cmake 
+   cmake_minimum_required(VERSION 3.14 FATAL_ERROR)
+   project(cppjson)
+
+   set(CMAKE_CXX_STANDARD 17)
+   set(CMAKE_VERBOSE_MAKEFILE ON)
+
+   # ============= Conan Bootstrap =============================#
+
+   # Download automatically, you can also just copy the conan.cmake file
+   if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan.cmake")
+      message(STATUS "Downloading conan.cmake from https://github.com/conan-io/cmake-conan")
+      file(DOWNLOAD "https://github.com/conan-io/cmake-conan/raw/v0.13/conan.cmake"
+                    "${CMAKE_BINARY_DIR}/conan.cmake")
+   endif()
+
+   include(${CMAKE_BINARY_DIR}/conan.cmake)
+
+   conan_cmake_run(REQUIRES     
+                                jsonformoderncpp/3.7.0@vthiery/stable
+                   BASIC_SETUP
+                   BUILD missing
+                   )
+   #===== Targets ===========================#
+
+   # Conan package: jsonformoderncpp/3.7.0@vthiery/stable
+   find_package(nlohmann_json 3.2.0 REQUIRED)
+   add_executable(json-parse  json-parse.cpp)
+   target_link_libraries(json-parse nlohmann_json::nlohmann_json)
+ #+END_SRC
+
+   + File: CMakeLists.txt
+     + Version without Conan with custom macro 
+
+#+BEGIN_SRC cmake 
+   cmake_minimum_required(VERSION 3.14 FATAL_ERROR)
+   project(cmake-experiment)
+
+   set(CMAKE_CXX_STANDARD 17)
+   set(CMAKE_VERBOSE_MAKEFILE ON)
+
+   macro(Download_Single_Headerlib_dir FILE PATH URL)
+       file(DOWNLOAD ${URL} ${CMAKE_BINARY_DIR}/include/${PATH}${FILE})
+       IF(NOT Download_Single_Headerlib_flag)
+          include_directories(${CMAKE_BINARY_DIR}/include)
+          set(Download_Single_Headerlib_flag TRUE)
+       ENDIF()
+   endmacro()
+
+   # #include <nlohmann/json.hpp>
+   Download_Single_Headerlib_dir(
+        json.hpp "nlohmann/"
+       "https://github.com/nlohmann/json/raw/develop/single_include/nlohmann/json.hpp"
+   )
+
+   # --------------------------------------------#
+
+   add_executable(json-parse json-parse.cpp)
+#+END_SRC
+
+   + File: json-parse.cpp 
+
+ #+BEGIN_SRC cpp 
+   #include <iostream>
+   #include <sstream>
+
+   #include <nlohmann/json.hpp>
+
+   using json = nlohmann::json;
+
+   int main()
+   {
+       std::puts("\n====== EXPERIMETN 1 - Create JSON Object ===========================");
+
+       {
+           json top;
+           top["hero1"] = "John Von Neumman / Modern Computers";
+           top["hero2"] = "Dennis Ritchie / C Language";
+           top["points"] = 200;
+           top["list_number"]  = {1, 2, 3, 3, 4, 5, 6};
+           top["list_string"]  = {"Rice", "Coffee", "Beans", "Milk"};
+
+           top["currency_basket"] = {{"USD", 10}, {"BRL", 2000}, {"CAD", 90}, {"AUD", "N/A"}};
+
+           json cd;
+           cd["latitude"]  = -23.5505;
+           cd["longitude"] = -46.6333;
+           cd["location"]  = "São Paulo city";
+
+           top["coordiante"] = cd;
+
+           std::cout << "\n VALUE OF JSON [NOT PRETTY PRINT] = "
+                     << top << std::endl;
+
+           std::cout << "\n VALUE OF JSON [PRETTY PRINT] = "
+                     << top.dump(4) << std::endl;
+
+       }
+
+        std::puts("\n====== EXPERIMETN 2 - Deserialization from string literal ===========");
+
+        {
+            json d;
+
+            try {
+                // Parsing from string literal
+                d = R"(
+                         {
+                           "x"            : 1956.2322
+                         , "y"            : 1000
+                         , "name"        : "Dennis Ritchie"
+                         , "fruits" : [ "orange", "jabuticaba", "banana", "apple"  ]
+                         , "basket" : { "BONDS": 1235, "CDS": 200.354, "FX": 500
+                                        , "market": "Emergin Markets"}
+                        }
+                  )"_json;
+            } catch(nlohmann::detail::parse_error& ex)
+            {
+                std::cout << " [ERROR] I cannot parse it: " << ex.what() << std::endl;
+            }
+
+            std::cout << "\n VALUE OF JSON PRETTY PRINT = " << d.dump(3) << std::endl;
+
+            std::cout << " [RESULT]    x = " << static_cast<double>(d["x"]) << std::endl;
+            std::cout << " [RESULT]    x = " << d["x"].get<double>() << std::endl;
+            std::cout << " [RESULT]    y = " << d["y"].get<int>()    << std::endl;
+            std::cout << " [RESULT] name = " << d["name"].get<std::string>() << std::endl;
+
+            std::cout << " [RESULT] fruit[0] = " << d["fruits"][0] << std::endl;
+            std::cout << " [RESULT] fruit[1] = " << d["fruits"][1] << std::endl;
+            std::cout << " [RESULT] fruit[2] = " << d["fruits"][2].get<std::string>() << std::endl;
+
+            std::cout << " [RESULT]  d['basket']['BONDS'] = "
+                      << d["basket"]["BONDS"].get<int>()
+                      << std::endl;
+
+            std::cout << " [RESULT]  d['basket']['CDS'] = "
+                      << d["basket"]["CDS"].get<double>()
+                      << std::endl;
+
+            std::cout << " [RESULT]  d['basket']['market'] = "
+                      << d["basket"]["market"].get<std::string>()
+                      << std::endl;
+
+            // Attempt to generate a parser error
+            try
+            {
+                // Note: Expects failure, the exception will be thrown!
+                double value = static_cast<double>(d["name"]);
+                std::cout << " [RESULT]  2 *  x = " <<  2 * value
+                          << "\n\n";
+            } catch (nlohmann::detail::type_error& ex)
+            {
+                std::cout << " [ERROR] err = " << ex.what() << std::endl;
+            }
+
+
+        }
+
+        std::puts("\n====== EXPERIMETN 3 - Deserialization from stream ===========");
+        {
+            const char* json_text = R"(
+                         {
+                           "x"            : 1956.2322
+                         , "y"            : 1000
+                         , "flag"         : true
+                         , "name"         : "Dennis Ritchie"
+                         , "asset_basket" : { "CAD": 100, "BRL": 200, "USD": 500}
+                        }
+                  )";
+
+            json js;
+            /* Input stream could be a file:
+             ,*     auto is = std::ifstream("/tmp/file");
+             ,*------------------------------------------*/
+            auto is = std::stringstream(json_text);
+            is >> js; // Extract from memory stream
+
+            std::cout << std::boolalpha;
+            std::cout << " JSON VALUE = " << js.dump(4) << std::endl;
+
+            std::cout << " =>      is_null(x) = " << js["x"].is_null()    << std::endl;
+            std::cout << " =>   is_boolean(x) = " << js["x"].is_boolean() << std::endl;
+            std::cout << " =>    is_number(x) = " << js["x"].is_number()  << std::endl;
+            std::cout << " => is_string(name) = " << js["name"].is_string()  << std::endl;
+
+            std::cout << " =>    is_string(asset_basket) = "
+                      << js["asset_basket"].is_string() << std::endl;
+
+            std::cout << " =>    is_object(asset_basket) = "
+                      << js["asset_basket"].is_object()  << std::endl;
+
+            std::puts("\n  >>>--|>>> Iterate Over JSON AST - Abstract Syntax Tree <<<|---<<< ");
+
+            for(auto const& element: js)
+                std::cout << " => element = " << element << std::endl;
+
+        }
+   }
+ #+END_SRC
+
+ Output: 
+
+ #+BEGIN_SRC sh 
+    ====== EXPERIMETN 1 - Create JSON Object ===========================
+
+     VALUE OF JSON [NOT PRETTY PRINT] = {"coordiante":{"latitude":-23.5505,"location":"São Paulo city","longitude":-46.6333}, ....}
+
+     VALUE OF JSON [PRETTY PRINT] = {
+        "coordiante": {
+            "latitude": -23.5505,
+            "location": "São Paulo city",
+            "longitude": -46.6333
+        },
+        "currency_basket": {
+            "AUD": "N/A",
+            "BRL": 2000,
+            "CAD": 90,
+            "USD": 10
+        },
+        "hero1": "John Von Neumman / Modern Computers",
+        "hero2": "Dennis Ritchie / C Language",
+        "list_number": [
+            1,
+            2,
+            3,
+            3,
+            4,
+            5,
+            6
+        ],
+        "list_string": [
+            "Rice",
+            "Coffee",
+            "Beans",
+            "Milk"
+        ],
+        "points": 200
+    }
+
+    ====== EXPERIMETN 2 - Deserialization from string literal ===========
+
+     VALUE OF JSON PRETTY PRINT = {
+       "basket": {
+          "BONDS": 1235,
+          "CDS": 200.354,
+          "FX": 500,
+          "market": "Emergin Markets"
+       },
+       "fruits": [
+          "orange",
+          "jabuticaba",
+          "banana",
+          "apple"
+       ],
+       "name": "Dennis Ritchie",
+       "x": 1956.2322,
+       "y": 1000
+    }
+     [RESULT]    x = 1956.23
+     [RESULT]    x = 1956.23
+     [RESULT]    y = 1000
+     [RESULT] name = Dennis Ritchie
+     [RESULT] fruit[0] = "orange"
+     [RESULT] fruit[1] = "jabuticaba"
+     [RESULT] fruit[2] = banana
+     [RESULT]  d['basket']['BONDS'] = 1235
+     [RESULT]  d['basket']['CDS'] = 200.354
+     [RESULT]  d['basket']['market'] = Emergin Markets
+     [ERROR] err = [json.exception.type_error.302] type must be number, but is string
+
+    ====== EXPERIMETN 3 - Deserialization from stream ===========
+     JSON VALUE = {
+        "asset_basket": {
+            "BRL": 200,
+            "CAD": 100,
+            "USD": 500
+        },
+        "flag": true,
+        "name": "Dennis Ritchie",
+        "x": 1956.2322,
+        "y": 1000
+    }
+     =>      is_null(x) = false
+     =>   is_boolean(x) = false
+     =>    is_number(x) = true
+     => is_string(name) = true
+     =>    is_string(asset_basket) = false
+     =>    is_object(asset_basket) = true
+
+      >>>--|>>> Iterate Over JSON AST - Abstract Syntax Tree <<<|---<<< 
+     => element = {"BRL":200,"CAD":100,"USD":500}
+     => element = true
+     => element = "Dennis Ritchie"
+     => element = 1956.2322
+     => element = 1000
+
+ #+END_SRC
+
+
+
+
 *** cpptoml configuration parser 
 
 cpptoml is a single-file header-only library for parsing [[https://github.com/toml-lang/toml][TOML]] 
