@@ -3292,8 +3292,152 @@ Program output:
          euler<float>() = 0.57722
 #+END_SRC
 
-
 * Complementary Libraries 
+** GSL - Guideline Support Library 
+*** Overview 
+
+The _GSL - Guideline Support Library_ (not confused with GNU Scientific
+Library) contains implementations of some types and functions proposed
+by the _C++ Core Guidelines_ for helping to enhance the code quality,
+reduce mistakes and make the intent clear. Note: some types of the C++
+core guidelines such as std::span will be included in the C++20. 
+
+ *C++ Core Guidelines* - Created by ISO C++ Comitee 
+
+  + Site: https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines
+ 
+  + Repo: http://github.com/isocpp/CppCoreGuidelins
+
+ *Implementations of the GSL Library*
+
+  + Microsft's Implementation of the GSL (Most used)
+    + (First implementation of the Core Guideline Types) 
+    + https://github.com/Microsft/GSL
+
+  + GSL-Lite - Single-header file implementation of the Microsft GSL (License: MIT)
+    * [[https://github.com/martinmoene/gsl-lite]]
+
+  + Martin Moene's GSL with Melanolib:
+    + https://github.com/mbasaglia/Meanolib
+
+  + Vicente Botet Escriba's fork:
+    + http://github.com/viboes/GSL 
+
+  *Parts of GSL* 
+
+    + _Views_
+      + span<T>
+      + string_span<T>
+      + (cw) zstring
+
+    + _Owners/Containers_
+      + owner<T>
+      + unique_ptr<T> (for old compiler that does not support C++11)
+      + shared_ptr<T> (old compilers)
+      + dyn_array<T>
+      + stack_array<T>
+
+    + _Utilities_
+      + not_null<T>
+      + finally()
+
+    + _Contract Support_ (Macros)
+      + Expect() => For pre-condition validation 
+      + Ensure() => For post-condition validation 
+
+    + _Type casting conversions_
+      + narrow()
+      + narrow_cast()
+
+    + _Concepts_
+      + String
+      + Number
+      + Sortable
+      + Pointer 
+
+ *Papers* 
+
+  + *P0122R33 - span: bounds-safe views for sequences*
+    + <http://open-std.org/JTC1/SC22/WG21/docs/papers/2016/p0122r3.pdf>
+
+  + *P0298R1 - A byte type definition*
+    + <http://open-std.org/JTC1/SC22/WG21/docs/papers/2016/p0298r1.pdf>
+*** Type gsl::owner 
+
+The type gsl::owner is proposed in the section [[https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Ri-raw][I11]] of the core guidelines:
+
+  + "I.11: Never transfer ownership by a raw pointer (T*) or reference (T&)" 
+
+Definition: 
+
+#+BEGIN_SRC cpp 
+  template <class T, class = std::enable_if_t<std::is_pointer<T>::value>>
+  using owner = T;
+#+END_SRC
+
+The type _owner<T>_ is just an alias for a pointer type for annotating
+raw owning pointer APIs that cannot be modified. This type allows
+distinguishing raw owning pointers from non-owning pointers, making
+the intent of the code clear. 
+
+Before: 
+
+#+BEGIN_SRC cpp 
+   IBaseClass*  factoryFunction(int key)
+   {
+      if(key == VALUE1)
+      { 
+        return new Implementation1(arg1, arg2, ...);
+      }
+      if(key == VALUE1)
+      { 
+        return new Implementation2;
+      }
+      //  ... ... ... . 
+      // Invalid input 
+     return nullptr; 
+   } 
+#+END_SRC
+
+After: 
+
+#+BEGIN_SRC cpp 
+   #include <gls/pointer>
+
+   gsl::owner<IBaseClass*>  
+   factoryFunction(int key)
+   {
+      if(key == VALUE1)
+      { 
+        return new Implementation1(arg1, arg2, ...);
+      }
+      if(key == VALUE1)
+      { 
+        return new Implementation2;
+      }
+      //  ... ... ... . 
+      // Invalid input 
+     return nullptr; 
+   } 
+
+   //  --------- Usage: ------------------// 
+
+   int main()
+   { 
+       std::cout << " Choose the implementation: ";
+       int key; 
+       std::cin >> key; 
+
+      gsl::owner<IBaseClass*> object = factoryFunction(key); 
+ 
+      object->InvokeVirtualMemberFunction();
+      // ... ... ... ..
+
+     delete object;
+    }
+#+END_SRC
+
+
 ** Range v3 (C++20)
 
 Ranges v3 is a header-only generic library that will be included in
