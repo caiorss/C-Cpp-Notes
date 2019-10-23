@@ -3362,7 +3362,7 @@ core guidelines such as std::span will be included in the C++20.
 
   + *P0298R1 - A byte type definition*
     + <http://open-std.org/JTC1/SC22/WG21/docs/papers/2016/p0298r1.pdf>
-*** Type gsl::owner 
+*** gsl::owner 
 
 The type gsl::owner is proposed in the section [[https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Ri-raw][I11]] of the core guidelines:
 
@@ -3379,6 +3379,9 @@ The type _owner<T>_ is just an alias for a pointer type for annotating
 raw owning pointer APIs that cannot be modified. This type allows
 distinguishing raw owning pointers from non-owning pointers, making
 the intent of the code clear. 
+
+See: 
+ + [[https://clang.llvm.org/extra/clang-tidy/checks/cppcoreguidelines-owning-memory.html][clang-tidy - cppcoreguidelines-owning-memory — Extra Clang Tools 10 documentation]]
 
 Before: 
 
@@ -3400,6 +3403,9 @@ Before:
 #+END_SRC
 
 After: 
+  + The annotation gsl::owner<T> makes clear that pointer returned by
+    factoryFunction owns memory and that it must release it later by
+    calling the delete operator.
 
 #+BEGIN_SRC cpp 
    #include <gls/pointer>
@@ -3435,6 +3441,52 @@ After:
 
      delete object;
     }
+#+END_SRC
+
+*** narrow_cast and narrow functions 
+
+The functions narrow and narrow_cast are used in several sections of
+the core guidelines, namely: 
+  + ES.46: Avoid lossy (narrowing, truncating) arithmetic conversions
+  + ES.49: If you must use a cast, use a named cast
+  + P.4: Ideally, a program should be statically type safe
+
+ *Function: narrow_cast()*
+
+ + The function narrow_cast is equivalent to a static_cast operator,
+   but it makes the clear and evident that a narrow cast is being
+   performed, a casting from type to another with _less bits_, therefore
+   with possible loss of _information_, loss of precision or
+   overflow/undeflow error.
+
+Usage: 
+
+#+BEGIN_SRC cpp 
+  double xx = 105e4;
+
+  // Same as static_cast, but the intent is more clear.  Makes easier to
+  // the reader spot that a loss of information or precision may happen.
+  // 
+  // Note: If an underflow/overflow happens in this case, it is
+  // undefined behavihor. UB
+  int nx = gsl::narrow_cast<int>(xx);
+#+END_SRC
+
+ *Function: narrow()* 
+
+  + The function _narrow<T>()_ is similar to the _narrow_cast()_, but it
+    calls std::terminate or throws an exception if there is a loss of
+    information in the narrow cast.
+
+  + The code in the next line throws a *gsl::narrowing_error* exception
+    that abnormaly terminates the program because the value 10.535e10
+    when casted to int, results in an overflow, there is not enough
+    bits to store the entire integer part of this number. This runtime
+    check makes easier to catch bugs like this. 
+
+#+BEGIN_SRC cpp 
+   double xx = 10.535e10;
+   nx = gsl::narrow<int>(xx);
 #+END_SRC
 
 
