@@ -5192,7 +5192,6 @@ Complete program output ([[file:src/lambdaFun.cpp][file:src/lambdaFun.cpp]]) :
 
  - *Creating Recursive Lambdas ... and returning them too!* -
    <http://cpptruths.blogspot.com.br/2013/10/creating-recursive-lambdas-and.html> 
-
 *** Lambdas in Deep 
 
 Define two test functions: 
@@ -5458,6 +5457,102 @@ As a result:
 
  * std::function<int (int)> is not the type of any of those lambda
    functions.
+*** Stateful lambdas 
+
+The function-call operator member function operator()(args) of a
+lambda object is annotated with _const_, therefore it cannot modify
+captured parameters by value. 
+
+#+BEGIN_SRC cpp 
+  // Compile-time error!! 
+  auto incrementer = [n = 1]() { return ++n; };
+#+END_SRC
+
+The previous line is equivalent to: 
+
+#+BEGIN_SRC cpp 
+  // The previous line is the same as: 
+  class __Anonymous_lambda_classA {
+      int n = 1;
+  public: 
+      __Anonymous_lambda_class() = default;
+ 
+      // Function-call operator annotated as const 
+      int operator()() const 
+      {  
+         // Value n cannot be modified!! 
+         // Compiel-time error!!
+         return ++n; 
+      }
+  };
+
+  __Anonymous_lambda_classA incrementer;
+#+END_SRC
+
+The _mutable_ keyword allows variables captured by value to be modified
+in the lambda expression.
+
+#+BEGIN_SRC cpp 
+  // Now it works
+  auto incrementer = [n = 1]() mutable { return ++n; };
+#+END_SRC
+
+The previous lambda expression 'incrementer' is equivalent to: 
+
+#+BEGIN_SRC cpp 
+  // The previous line is the same as: 
+  class __Anonymous_lambda_classB {
+      int n = 1;
+  public: 
+      __Anonymous_lambda_class() = default;
+ 
+      // Function-call operator non cost 
+      int operator()()  
+      {  
+         return ++n; 
+      }
+  };
+
+  __Anonymous_lambda_classB incrementer;
+#+END_SRC
+
+Test in Cling REPL: 
+
+#+BEGIN_SRC cpp 
+   $ ~/opt/cling_2018-09-16_fedora27/bin/cling -std=c++1z
+   // Now it works
+   auto incrementer = [n = 1]() mutable { return ++n; };
+   auto incrementerB = incrementer;
+
+   [cling]$ incrementer()
+   (int) 2
+   [cling]$ incrementer()
+   (int) 3
+   [cling]$ incrementer()
+   (int) 4
+   [cling]$ incrementer()
+   (int) 5
+
+   [cling]$ incrementerB()
+   (int) 2
+   [cling]$ incrementerB()
+   (int) 3
+   [cling]$ incrementerB()
+   (int) 4
+
+   [cling]$ inc()
+   (int) 6
+   [cling]$ inc()
+   (int) 7
+   [cling]$ inc()
+   (int) 8
+   [cling]$ incrementer()
+   (int) 6
+   [cling]$ 
+#+END_SRC
+
+
+
 *** Self-executable lambda for complex initialization 
 
 Self-executable lambdas functions can also be used for performing
