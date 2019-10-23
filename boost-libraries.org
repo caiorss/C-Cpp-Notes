@@ -3362,7 +3362,7 @@ core guidelines such as std::span will be included in the C++20.
 
   + *P0298R1 - A byte type definition*
     + <http://open-std.org/JTC1/SC22/WG21/docs/papers/2016/p0298r1.pdf>
-*** gsl::owner 
+*** Type: gsl::owner 
 
 The type gsl::owner is proposed in the section [[https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Ri-raw][I11]] of the core guidelines:
 
@@ -3443,7 +3443,29 @@ After:
     }
 #+END_SRC
 
-*** narrow_cast and narrow functions 
+*** Type: gsl::finally 
+
+The gsl::finally can register a callable object (lambda, functor or
+function pointer) which is called when it goes out of scope. This
+function is useful for exception-safe resource disposal or cleanup.
+
+#+BEGIN_SRC cpp   
+  {
+     int* arr = new int [10]; 
+
+     // RAII => Calls lambda when this object is out-of-scope 
+     // and its destructor is called. 
+     auto scope_guard = gsl::finally( [=]
+                     { 
+                        delete [] arr;
+                        std::puts("Resource cleaned OK.");
+                     });
+
+     for(size_t i = 0; i < 10; i++) { /** set arrary */ }   
+  } // scope_guard called here. 
+#+END_SRC
+
+*** Functions: narrow_cast and narrow
 
 The functions narrow and narrow_cast are used in several sections of
 the core guidelines, namely: 
@@ -3462,6 +3484,8 @@ the core guidelines, namely:
 Usage: 
 
 #+BEGIN_SRC cpp 
+  #include <gls/gls> // Include all heders
+
   double xx = 105e4;
 
   // Same as static_cast, but the intent is more clear.  Makes easier to
@@ -3485,8 +3509,426 @@ Usage:
     check makes easier to catch bugs like this. 
 
 #+BEGIN_SRC cpp 
+   #include <gls/gls> // Include all heders
+
    double xx = 10.535e10;
    nx = gsl::narrow<int>(xx);
+#+END_SRC
+*** Type: gsl::span (C++20)
+
+The GSL class *gsl::span<T>* (former gsl::array_view) is a _non-owning_
+representation or a _view_ for a contiguous allocated sequence of
+objects which can be a std::vector; std::array<T, size_t>;
+zero-terminated C-string, a buffer represented by the tuple (pointer,
+size) or (C-array, size). The gsl::span<T> view can also be used for
+refactoring C-style functions that takes the tuple parameters
+(pointer, size), representing a buffer, and making the function safe
+against memory corruption, out-of-bound read/write and buffer
+overflows, which can introduce security vulnerabilities.
+
+C++20 std::span documentation (not gsl::span)
+
+  + https://en.cppreference.com/w/cpp/container/span
+
+Motivating Paper: 
+
+  + P0122R3 - span: bounds-safe views for sequences of objects
+    + <http://open-std.org/JTC1/SC22/WG21/docs/papers/2016/p0122r3.pdf>
+
+Terminology: 
+
+  + Non-owning: A gsl::span<T> object is not responsible for
+    the allocating or releasing the objects that it points to.
+
+  + View: Object that encapsulates a reference type or points to
+    existing objects that it does not own.
+
+  + Buffer: Any memory region represented by the pair (pointer, size),
+    pointer to beginning of the region and buffer size.
+
+Summary: 
+
+  + gsl::span<T> can refer to any container: std::vector;
+    std::array<T, size_t>; null-terminated character array; buffer,
+    represented by pointer + tuple.
+
+  + gsl::span<T> does not allocate any memory and copying it does not
+    copy any element, gsl:span<T> is a _view_.
+
+Use-cases for gsl::span<T>:
+
+   + Provide range checking allowing to avoid buffer overrun (aka
+     buffer overflow):  terminates the program abnormally by
+     calling std::terminate or throwing an exception (fail-fast
+     approach). The range checking can be disabled for   
+
+   + Creating functions that can take std::vector, std::aray or a
+     buffer which can be presented by a C-style aray or the pair
+     (pointer, size). 
+
+   + Refactoring: Make C-style functions that take a buffer parameter
+     represented by the pair (pointer, size) safer against buffer
+     overflow vulnerabilities. The view object gsl::span<T> has built-in
+     array-bound checking, any out-of-bounds access can either throw
+     a gsl::fail_fast exception or a call std::terminate terminating
+     the program abnormally.
+
+
+ *Constructors* 
+
+#+BEGIN_SRC cpp 
+   // --------- Constructors for dynamic-size span  -----------// 
+   gls::span(); 
+   gsL::span(nullptr_t) noexcept; 
+   gls::span(pointer ptr, index_type number_of_elements);
+   gls::span(pointer ptrFirstElement, ptrLastElement);
+   
+   template <class Container> gls::span(Container& container);
+
+   // --------- Constructors for fixed-size span ---------------//
+
+   // Array buffer of size N. i.e:  int array [10] = { 1, 2, ..., 10};
+   template <size_t N> gsl::span(element_type (&array) [N]);
+
+   template <size_t N> gsl::span(Container& container);
+   template <size_t N> gsl::span(Container const& container);
+#+END_SRC
+
+ *Memeber Functions* 
+
+|---+----------------+-------------------------------------------+----------------------------------------------------------------|
+|   | Return         | Function                                  | Description                                                    |
+|   | Type           |                                           |                                                                |
+|---+----------------+-------------------------------------------+----------------------------------------------------------------|
+| A | index_type     | size() const                              | Returns number of elements in the span                         |
+| B | index_type     | size_bytes() const                        | Returns the total size of sequence in bytes                    |
+| C | TElement*      | data() const                              | Returns pointer to first element of span.                      |
+| D | bool           | empty() const                             | Returns treu if the span is empty                              |
+| E | TElement&      | operator[](index_type idx) const          | Returns reference to idx-th element of span.                   |
+| F | TElement&      | at(index_type idx) const                  | Returns reference to idx-th element of span.                   |
+| G | gsl::span      | subspan(index_type offset, index_count n) | Obtains a new span view from offset to  (offset + n) elements. |
+|   |                |                                           |                                                                |
+| H | iterator       | being() const                             | Returns iterator to beginning of span.                         |
+| I | iterator       | end() const                               | Returns iterator to end of span.                               |
+|   |                |                                           |                                                                |
+| J | const_iterator | cbegin() const                            |                                                                |
+| L | cosnt_iterator | cend() const                              |                                                                |
+|   |                |                                           |                                                                |
+|---+----------------+-------------------------------------------+----------------------------------------------------------------|
+
+
+  + Note: E => The behavior of the operator (operator[])(index_type )
+    is undefined if idx index is out of range.
+
+  + Note: F => Throws an exception if the index idx is out of range. 
+
+ *Dynamic-size gsl::span assignment* 
+
+ + The variable sp of type gsl::span<int> can refere to fixed-size
+   array; std::vector<int>; std::array<int, size_t> and so on.
+
+ + assert(<PREDICATE>) => Terminates the program abnormally by calling
+   std::abort if the predicate is false, then shows an error message
+   indicating the file and line where the assertion has failed.
+
+#+BEGIN_SRC cpp 
+    gsl::span<int> sp;
+
+    //--------- assign C-array to span -------------- // 
+    int carr [] = {-15, 6, 10, 9, 200};
+    sp = xs;                 // sp refers to array xs 
+    assert(sp[2] == 10); 
+    assert(sp[3] == 9);
+    assert(sp.size() == 5);
+    assert()
+
+    //------ Assign fixed-size buffer (C-array) to span ---// 
+    int buffer[200] = {3, 5, 6, 10, 20};
+    sp = buffer;
+    assert(sp.size() == 200);
+    assert(sp[2] == 6);
+    assert(sp[0] == 3);
+
+    //---- Assign to buffer defined by (pointer, size) tuple to span ---// 
+    int* p_buffer = &carr; 
+    auto buffer_size = gsl::index(5);
+    sp = gsl::make_span(p_buffer, buffer_size); 
+    assert(sp.size() == 5);
+    assert(sp[0] == -15);
+    assert(sp[2] ==  10);
+   
+    //------ assign std::vector cointainer to span -------// 
+    std::vector<int> xs = {1, 2, 3, 4, 5};
+    sp = xs;                 // sp refers to vector xs 
+    assert(sp[2] == 3);
+    assrrt(sp.size() == 5);  
+
+    //------ assign std::array to span -------------------//
+    std::array<int, 6> arr = {10, 20, 30, 40, 50, 60}; 
+    sp = arr;  // sp refers to std::array arr 
+    assert(sp[2] == 30);
+    assert(sp.size() == 6)
+#+END_SRC
+
+  *Function with gsl::span argument*
+
+A function that uses gsl::span<T> as argument can accept any buffer,
+C-arrray or continguous container as input.
+
+#+BEGIN_SRC cpp 
+  int sum_span_element(gsl::span<int> xs)
+  {
+      int sum = 0;
+      for(auto x: xs){ sum += x; }
+      return sum;
+  }
+
+  gsl::span<int> sp; 
+
+  // ------ Passing a C-array argument ------------------------------//
+  int carr [] = {-15, 6, 10, 9, 200};
+  sp = carr;
+  assert(sum_span_element(carr) == 210);
+  assert(sum_span_element(sp) == 210);
+
+  // ----- Passing a buffer argument defined by (pointer, size) pair ---// 
+  int* buffer_ptr  = carr; // Address of carr[0]
+  int  buffer_size = 5; 
+  sp = gsl::make_span(buffer_ptr, buffer_size);
+  assert( sum_span_element(sp) == 210 );
+  assert( sum_span_element(gsl::make_span(buffer_ptr, gsl::index(buffer_size))) == 210 );
+  assert( sum_span_element({buffer_ptr, gsl::index(buffer_size)}) == 210 );
+
+  // ---- Passing a std::vector argument ------------------//
+  std::vector<int> vec =  {10, 256, -15, 20, -8}; 
+  sp = vec; 
+  assert( sum_span_element(sp) == 263 );
+  assert( sum_span_element(vec) == 263 );
+#+END_SRC
+
+*** gsl::span code example 
+
+File: CMakeLists.txt 
+
+#+BEGIN_SRC cmake 
+  cmake_minimum_required(VERSION 3.14)
+  project(gls_experiment)
+
+  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+
+  # See documentation at: https://cmake.org/cmake/help/latest/module/FetchContent.html
+
+  #========== Macros for automating Library Fetching =============#
+  include(FetchContent)
+
+  # Download library archive (zip, *.tar.gz, ...) from URL
+  macro(Download_Library_Url NAME URL)
+      FetchContent_Declare(${NAME} URL  ${URL})
+      FetchContent_GetProperties(${NAME})
+      message( [DOWNLOAD LIB] " VAR1 = ${${NAME}_SOURCE_DIR}")
+      if(NOT ${NAME}_POPULATED)
+          FetchContent_Populate(${NAME})
+          add_subdirectory(${${NAME}_SOURCE_DIR} ${${NAME}_BINARY_DIR})
+      endif()
+  endmacro()
+
+  #============== Library Download =========================#
+
+  Download_Library_Url( gsl
+                        https://github.com/microsoft/GSL/archive/v2.0.0.zip
+                       )
+
+  # ========= Targets Settings ==========================#
+
+  add_executable(microsft_gsl  microsft_gsl.cpp)
+  target_link_libraries(microsft_gsl GSL)
+#+END_SRC
+
+File: gsl_span1.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <iomanip>
+  #include <memory>
+  #include <vector>
+  #include <array>
+  #include <algorithm>
+  #include <numeric>
+
+  // #define GSL_UNENFORCED_ON_CONTRACT_VIOLATION
+  // #define GSL_TERMINATE_ON_CONTRACT_VIOLATION
+  #define GSL_THROW_ON_CONTRACT_VIOLATION
+
+  // ------ Headers from the GSL - Guideline Support Library ----------//
+  //-------------------------------------------------------------------//
+  //#include <gsl/gsl> // For including everything
+  #include <gsl/gsl>
+  #include <gsl/span>
+  #include <gsl/pointers>
+
+  void display_span(const char* name, gsl::span<int> xs)
+  {
+      std::cout << "  => " << name << " = [ ";
+      for(auto const& x: xs){ std::cout << x << ", "; }
+      std::cout <<  " ]\n";
+  }
+
+  template<typename T>
+  void disp(const char* label, T&& value)
+  {
+      std::cout << std::setw(5)  << "  =>> "
+                << std::setw(10) << label
+                << std::setw(4) << "="
+                << std::setw(6) << value
+                << std::endl;
+  }
+
+  int cstring_len(gsl::not_null<const char*> ptr)
+  {
+      int n = 0;
+      for(auto p = ptr.get(); *p != '\0'; ++p) n++;
+      return n;
+  }
+
+  int main()
+  {
+
+
+      std::puts("\n ==== EXPERIMENT 1 - gsl::span variable =====================\n");
+      {
+          // Variable span, non owning view that can refere to any contiguous memory,
+          // C-array buffers; buffers (pointer, size) tuple; std::vector; std::array
+          gsl::span<int> sp;
+
+          int carray [] = {10, 5, 8, 5, 6, 15};
+          sp = carray;
+
+          int* ptr_data = sp.data();
+
+          display_span("carray [A]", sp);
+          display_span("carray [B]", carray);
+          disp(" *(carray.data + 0) ", *ptr_data);
+          disp(" *(carray.data + 0) ", *(ptr_data + 1));
+
+        
+          // Display buffer defined by tuple (pointer, size)
+          int*   buffer_ptr  = carray;
+          size_t buffer_size = std::size(carray);
+          sp = gsl::make_span(buffer_ptr, buffer_size);
+          display_span("buffer", sp);
+
+          std::vector<int> vector1 = {10, 256, -15, 20, -8};
+          sp = vector1; // View refers to vector1
+          display_span("vector1 [A]", sp);
+          display_span("vector1 [B]", sp);
+
+          // Just a nice C++ wrapper for a C stack-allocated or static-allocated array
+          // It encapsulates the array: int [] std_array = {100, ...}
+          std::array<int, 7> std_array = {100, -56, 6, 87, 61, 25, 151};
+          sp = std_array;
+          display_span("std_array [A]", sp);
+          display_span("std_array [B]", sp);
+      }
+
+      std::puts("\n ==== EXPERIMENT 2 - gsl::span with std algorithms  ======\n");
+      {
+          int carray [] = {8, 10, 5, 90, 0, 14};
+          gsl::span<int> sp;
+          sp = carray;
+
+          display_span("carray <before>", sp);
+          std::sort(sp.begin(), sp.end());
+          display_span("carray <after>", sp);
+
+          auto sum = std::accumulate(sp.begin(), sp.end(), 0);
+          std::cout << " [INFO] sum of all elements  = " << sum << std::endl;
+      }
+
+      std::puts("\n ==== EXPERIMENT 3 - gsl::span methods ==================\n");
+
+       {
+           int carrayA [] = {10, 15, -8, 251, 56, 15, 100};
+           auto sp = gsl::span{carrayA};        
+
+           std::cout << std::boolalpha;
+
+           // Returns true if the view points to an empty location
+           disp("sp.empty()", sp.empty());
+           // Returns the number of elements
+           disp("sp.size()", sp.size());
+           // Returns the total size in bytes
+           disp("sp.size_byte()", sp.size_bytes());                  
+
+           // --- Access to elements with array-index operator [] -------//
+           // Note: The bound checking only happens in the debug build.
+           //       In the release build, it is disabled.
+           disp("sp[0]", sp[0]);
+           disp("sp[4]", sp[4]);
+           disp("sp[5]", sp[5]);
+
+           sp[0] = 100;
+
+           // ---- Access to elements with always enabled, throws exception
+           // if the access is out of bounds.
+           disp("sp.at(0)", sp.at(0));
+           disp("sp.at(4)", sp.at(5));
+           disp("sp.at(5)", sp.at(4));
+
+           // Note 1: The bound checking with array operator is only enabled
+           // for debug building, in the release building it can be disabled
+           // due to performance reasons.
+           //
+           // Note 2: It only throws exception, if the macro
+           // GSL_THROW_ON_CONTRACT_VIOLATION is defined before GSL includes.
+           // Otherwise, it calls std::terminate without throwing an exception.
+           try
+           {
+               disp("sp[15]", sp[15]);
+           } catch (gsl::fail_fast& ex)
+           {
+               std::cout << "  [ERROR] Failure = " << ex.what() << std::endl;
+           }
+       }
+     
+     
+      return 0;
+  }
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC text 
+   ==== EXPERIMENT 1 - gsl::span variable =====================
+
+    => carray [A] = [ 10, 5, 8, 5, 6, 15,  ]
+    => carray [B] = [ 10, 5, 8, 5, 6, 15,  ]
+    =>>  *(carray.data + 0)    =    10
+    =>>  *(carray.data + 0)    =     5
+    => buffer = [ 10, 5, 8, 5, 6, 15,  ]
+    => vector1 [A] = [ 10, 256, -15, 20, -8,  ]
+    => vector1 [B] = [ 10, 256, -15, 20, -8,  ]
+    => std_array [A] = [ 100, -56, 6, 87, 61, 25, 151,  ]
+    => std_array [B] = [ 100, -56, 6, 87, 61, 25, 151,  ]
+
+   ==== EXPERIMENT 2 - gsl::span with std algorithms  ======
+
+    => carray <before> = [ 8, 10, 5, 90, 0, 14,  ]
+    => carray <after> = [ 0, 5, 8, 10, 14, 90,  ]
+   [INFO] sum of all elements  = 127
+
+   ==== EXPERIMENT 3 - gsl::span methods ==================
+
+    =>> sp.empty()   = false
+    =>>  sp.size()   =     7
+    =>> sp.size_byte()   =    28
+    =>>      sp[0]   =    10
+    =>>      sp[4]   =    56
+    =>>      sp[5]   =    15
+    =>>   sp.at(0)   =   100
+    =>>   sp.at(4)   =    15
+    =>>   sp.at(5)   =    56
+    [ERROR] Failure = GSL: Precondition failure at ... .../_deps/gsl-src/include/gsl/span: 499
 #+END_SRC
 
 
