@@ -3490,6 +3490,63 @@ Notes:
       return *this;
   }
 #+END_SRC
+
+
+  *Non-copiable parent class trick* 
+
+The class could also be made non-copiable using the following trick
+used by boost::noncopyable [[https://github.com/inducer/boost-python-ublas-subset/blob/master/boost_subset/boost/noncopyable.hpp][noncopyable]]: 
+
+ + NonCopyable base class: Any class inheriting this class (private
+   inheritance) will be non-copiable. 
+
+#+BEGIN_SRC cpp 
+  class NonCopyable
+  {
+  protected:
+      NonCopyable()  = default;
+      ~NonCopyable() = default;
+
+      // Disable default copy-constructor
+      NonCopyable(const NonCopyable&) = delete;
+      // Disable default copy assignment operator
+      const NonCopyable& operator=(const NonCopyable&) = delete;
+  };
+#+END_SRC
+
+ + Derived class. (Note: private inheritance). Any attempt to perform
+   copy operations with copy constructor or copy assignment operator,
+   results in compile-time error.
+
+#+BEGIN_SRC cpp 
+  //=========>> file: socket.hpp - Header  <<===========;
+  class SocketWrapper: public NonCopyable
+  {
+  public:
+      // Constructor
+      SocketWrapper();
+      // Destructor 
+      ~SocketWrapper();
+
+      // Move consttructor [OPTIONAL]
+      SocketWrapper(SocketWrapper&& rhs);
+      // Move-assignment operator  [OPTIONAL]
+      SocketWrapper& operator=(SocketWrapper&& rhs);
+
+  private:
+      // Resource - socket file descriptor 
+      int m_sockfd;   
+  };
+#+END_SRC
+
+
+
+
+
+
+
+
+
 ** Copy and swap idiom 
 
 The copy-and-swap idiom is a widely used technique for implementing
