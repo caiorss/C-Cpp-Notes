@@ -290,6 +290,15 @@ Comparative table:
     * Possible porting GNU autotools to CMake 
     * Embedded Linux
 
+  * Supported *IDEs - Integrated Development Environments*
+    * Eclipse IDE
+      + [[https://www.eclipse.org/linuxtools/][Linux Tools Plugin]]
+      + [[https://wiki.eclipse.org/CDT/Autotools/User_Guide][Eclipse CDT Autotools User Guide]]
+    * NetBeans
+      * [[http://plugins.netbeans.org/plugin/51647/cppgnuautotools][CppGnuAutoTools Plugin]]
+    * QTCreator
+      * [[https://doc.qt.io/qtcreator/creator-projects-autotools.html][Autotools Project Manager Plugin]]
+
   * Availalble for:
     + Linux, MacOSX, FreeBSD, OpenBSD, NetBSD and so on.
 
@@ -667,6 +676,8 @@ Run the application:
 
   + [[https://eklitzke.org/how-to-autotools][How To Use Autotools]] 
 
+  + *GNU Autotools Book* - https://www.star.bnl.gov/~liuzx/autobook.html
+
   + [[https://elinux.org/images/4/43/Petazzoni.pdf][Embedded Linux Conference 2016 - GNU Autotools Tutorial]]
 
   + [[http://freesoftwaremagazine.com/articles/brief_introduction_to_gnu_autotools/][Chapter 1: A brief introduction to the GNU Autotools]]
@@ -674,6 +685,294 @@ Run the application:
   + [[https://stackoverflow.com/questions/10999549/how-do-i-create-a-configure-script][linux - How do I create a configure script? - Stack Overflow]]
 
   + [[https://developer.fedoraproject.org/tech/languages/c/autotools.html][Autotools — Fedora Developer Portal]]
+
+  + [[http://thegreyblog.blogspot.com/2013/09/cc-project-built-with-gnu-build-system.html][C/C++ Project Built with GNU Build System (A.K.A. GNU Autotools): NetBeans vs. Eclipse CDT]]
+* QMake Building System 
+*** Overview 
+
+QMake is a building system generator used by QT Framework and QT
+Creator IDE, similar to CMake, which can generate Makefiles and
+projects for Visual Studio IDE (MSBuild building system).
+
+Features: 
+
+  + QT Framework now provides official support to CMake, but QMake is
+    still used in many old projects and libraries.
+
+Benefits: 
+
+  + For now, QMake still provides better support fro cross compilation
+    and for mobile platforms, such as Android or iOS.
+
+  + Multi-ABI cross-compilation support.
+
+Problems: 
+
+  + Not supported by other IDEs than QT Creator. So, it is not
+    supported by Eclipse, Netbeans or Visual Studio.
+
+  + Brittle building system => It does not support multiple targets or
+    generating multiple executables in the same building script.
+
+  + Hard to use with third-party libraries or libraries using CMake or
+    other building systems. 
+
+*** QMake project example 
+
+
+Project Structure: 
+
+#+BEGIN_SRC sh 
+  $ cd /path/to/project-root/dir
+  $ tree .
+  .
+  ├── app1
+  │   ├── app1.cpp
+  │   ├── app1.pro
+  │   ├── dataset.cpp
+  │   ├── Dataset.cpp
+  │   └── dataset.hpp
+  ├── app2
+  │   ├── app2.cpp
+  │   └── app2.pro
+  ├── apptest.pro
+#+END_SRC
+
+File: apptest.pro 
+
+#+BEGIN_SRC conf 
+  TEMPLATE = subdirs
+  SUBDIRS = app1 app2
+#+END_SRC
+
+ *Target app1 - subproject* 
+
+  + Target _app1_ is a console executable. 
+
+File: app1/app1.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include "dataset.hpp"
+
+  int main()
+  {
+      Dataset ds;
+      ds.add_data(10.34);
+      ds.add_data(100.23);
+      ds.add_data(-100.0);
+
+      std::cout << "Hello World!" << std::endl;
+      std::cout << " ds[0] = " << ds.get_data(0) << std::endl;
+      std::cout << " ds[1] = " << ds.get_data(0) << std::endl;
+      std::cout << " ds[2] = " << ds.get_data(0) << std::endl;
+
+      return 0;
+  }
+#+END_SRC
+
+File: app1/dataset.hpp 
+
+#+BEGIN_SRC cpp 
+  #ifndef DATASET_HPP
+  #define DATASET_HPP
+
+  #include <cstddef>
+
+  class Dataset{
+      struct pimpl;
+      pimpl* m_pimpl;
+  public:
+      Dataset();
+      ~Dataset();
+      void   add_data(double x);
+      double get_data(size_t idx) const;
+  };
+
+  #endif // DATASET_HPP
+#+END_SRC
+
+File: app1/dataset.cpp 
+
+#+BEGIN_SRC cpp 
+  #include "dataset.hpp"
+
+  #include <memory>
+  #include <vector>
+  #include <iostream>
+
+  struct Dataset::pimpl
+  {
+      std::vector<double> data;
+  };
+
+
+  Dataset::Dataset(): m_pimpl(new pimpl)
+  {
+      std::cout << " [INFO] Constructor called. OK" << std::endl;
+  }
+
+  Dataset::~Dataset(){
+      delete m_pimpl;
+  }
+
+  void Dataset::add_data(double x)
+  {
+      m_pimpl->data.push_back(x);
+  }
+
+  double Dataset::get_data(size_t i) const
+  {
+      return m_pimpl->data[i];
+  }
+#+END_SRC
+
+  *Target app2 - subproject*
+
+  + Target _app2_ is a user interface QT Widgets executable which file
+    name is app2_linux_x64.bin
+
+File: app2/app2.pro 
+
+#+BEGIN_SRC sh 
+  QT       += core gui widgets
+  TEMPLATE  = app
+  CONFIG   += c++1z
+  # CONFIG  += console c++1z
+  # CONFIG  -= app_bundle
+
+  # Change
+  TARGET   = app2_linux_x64.bin
+  SOURCES += app2.cpp 
+#+END_SRC
+
+File: app2/app2.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+
+  #include <QApplication>
+  #include <QtWidgets>
+
+  int main(int argc, char* argv[])
+  {
+      std::cout << " [INFO] Starting Application 2 OK" << std::endl;
+
+      QApplication app(argc, argv);
+
+      QPushButton button("Click me");
+      button.setVisible(true);
+
+      QObject::connect(&button, &QPushButton::clicked,
+                       []{
+                           std::cout << " [INFO] I Was clicked OK" << std::endl;
+                       });
+
+      return app.exec();
+  }
+#+END_SRC
+
+ *Building and Running* 
+
+STEP 1 - Create a ./build directory for separating the compilation
+output from the source code. 
+
+#+BEGIN_SRC sh 
+  $ mkdir build && cd build
+#+END_SRC
+
+STEP 2 - Run QMake
+
+#+BEGIN_SRC sh 
+  $ qmake ../
+
+  $ ls
+  Makefile
+#+END_SRC
+
+STEP 3 - Run Makefile 
+
+#+BEGIN_SRC sh 
+  $ make
+
+  $ tree .
+  .
+  ├── app1
+  │   ├── app1
+  │   ├── app1.o
+  │   ├── dataset.o
+  │   └── Makefile
+  ├── app2
+  │   ├── app2_linux_x64.bin
+  │   ├── app2.o
+  │   └── Makefile
+  └── Makefile
+
+  2 directories, 8 files
+#+END_SRC
+
+STEP 4 - Check executables 
+
+#+BEGIN_SRC sh 
+  # Run executable app1 
+  #--------------------------------------
+  $ app1/app1 
+   [INFO] Constructor called. OK
+  Hello World!
+   ds[0] = 10.34
+   ds[1] = 10.34
+   ds[2] = 10.34
+
+  # Run executable app2 
+  #--------------------------------------
+  $ app2/app2_linux_x64.bin 
+   [INFO] Starting Application 2 OK
+#+END_SRC
+
+*** Further Reading 
+
+Official Documentation 
+
+   + *QMake Manual* - QT Company
+     + <https://doc.qt.io/qt-5/qmake-manual.html> 
+
+   + *QMake - Getting Started* - QT Company
+     + <https://doc.qt.io/qt-5/qmake-tutorial.html>
+
+   + *QMake Running* 
+     + https://doc.qt.io/qt-5/qmake-running.html
+
+   + *QMake Variables*
+     + <https://doc.qt.io/qt-5/qmake-variable-reference.html>
+
+General 
+
+   + *Configuring QMake*
+     + <https://doc.qt.io/qt-5/qmake-environment-reference.html>
+
+   + KDAB - *Clang Tidy, part 2: Integrate qmake and other build systems using Bear*
+     + <https://www.kdab.com/clang-tidy-part-2-integrate-qmake-and-other-build-systems-using-bear/>
+
+   + KDAB - *Qt for Android better than ever before*
+     + <https://www.kdab.com/qt-for-android-better-than-ever-before/>
+
+   + *QMake for neophytes*
+     + <https://www.develer.com/en/qmake-for-neophytes/>
+
+   + *SUBDIRS for Fun and Profit*
+     + <http://silmor.de/qtstuff.subdirs.php>
+
+   + *C++ GUI Programming with Qt4: Building Qt Applications*
+     + <http://www.informit.com/articles/article.aspx?p=1405563&seqNum=2>
+
+   + *Building a Linux system for the STM32MP1: setting up a Qt5 application development environment*
+     + <https://bootlin.com/blog/building-a-linux-system-for-the-stm32mp1-setting-up-a-qt5-application-development-environment/>
+
+Questions: 
+
+  + [[https://stackoverflow.com/questions/1538398/how-do-i-use-qmake-to-build-multiple-binaries-in-a-single-project/1538639][qt - How do I use qmake to build multiple binaries in a single project? - Stack Overflow]]
+
+  + [[https://forum.qt.io/topic/15202/building-multiple-binaries-in-one-qt-project/4][Building multiple binaries in one qt project | Qt Forum]]
 
 * CMake Building System 
 ** Overview 
