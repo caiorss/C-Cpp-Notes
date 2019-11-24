@@ -154,11 +154,66 @@ Documentation:
    * [[https://www.boost.org/doc/libs/1_66_0/libs/iterator/doc/index.html][The Boost.Iterator Library Boost - 1.66.0]]
 
 *** Iterators 
+**** Overview 
 
 An iterator is a generalization of pointers for decouple data
 structures from algorithms and accessing data structures in a uniform
 way regardless they implementation details and memory
 layout. 
+
+ *General format of an iterator object* 
+
+An iterator object generally has the following structure: 
+ 
+See: 
+  + [[https://en.cppreference.com/w/cpp/iterator/iterator_traits][std::iterator_traits]] documentation
+  + [[https://en.cppreference.com/w/cpp/iterator/iterator_tags][iterator_tags]]
+ 
+
+#+BEGIN_SRC cpp 
+  template<typename T>
+  class SomeIteratorClass
+  {
+  public:      
+      // ----- Iterator type tags  ------------------//
+      // 
+      using value_type = T;                                  // Type that iterator refers to
+      using pointer = T*;                                    // Pointer
+      using reference = T&;                                  // Reference
+      using difference_type = int;                           // (int or ptrdiff) Type of difference between two iterators.
+
+      using iterator_category =  .... ;                      // Tag Indicates the iterator's capabilities  
+                                                             // can be std::forward_iterator_tag, std::input_iterator_tag and so on. 
+      // ----- Iterator Operationss  ------------------//
+      // 
+
+      // Dereference operator:
+      T& operator*();
+
+      // Dereference operator
+      const T&  operator*() const; 
+
+      // Dereference operator:
+      T* operator->() const
+
+      // Advance iterator operation:
+      // Prefix increment operator, allows ++iterator; 
+      SomeIteratorClass& operator++(); 
+
+      // Advance iterator operation:
+      // Postfix increment operator, allows iterator++ 
+      SomeIteratorClass& operator++(int);
+
+      // Equality operator 
+      bool operator==(const SomeIteratorClass& rhs) const; 
+
+      // Non-equality operator 
+      bool operator!=(const SomeIteratorClass& rhs) const; 
+      ... ... ... 
+  };
+
+#+END_SRC
+
 
  *Random Access Iterator*
 
@@ -355,6 +410,68 @@ Or:
    => high
 #+END_SRC
 
+**** Checking Iterators 
+
+Iterators of STL containers can be verified at compile-time using
+static_asserts, that yields a compile-time error when the predicate is
+false and do nothing when the predicate evaluates to true.
+
+ *File: iterator_check.cpp*
+
+Headers and macros: 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <deque>
+  #include <list>
+  #include <vector>
+
+
+  /** Compile-time static assertions that aborts compilation when types are not equal.
+    ,*
+    -----------------------------------------------------------------------------*/
+  #define ASSERT_TYPE_EQUAL(type, expr) \
+     static_assert(std::is_same<type, expr>::value, "Expected type equality")
+#+END_SRC
+
+Main Function: part 1 => Check vector<int>::iterator 
+
+#+BEGIN_SRC cpp 
+     using iter = std::vector<int>::iterator;
+
+     // Iterator iter::iterator_category type tag indicates its category and
+     // capabilities.
+     //
+     // Random access iterators can be manipulated like a pointer and accessed
+     // at any position.
+     ASSERT_TYPE_EQUAL(std::random_access_iterator_tag,  iter::iterator_category);
+     // Type of object that iterator refers to
+     ASSERT_TYPE_EQUAL(int ,      iter::value_type );
+     // Type of pointer to object that iterator refers to.
+     ASSERT_TYPE_EQUAL(int*,      iter::pointer);
+     // Type of references to object that iterator refers to
+     ASSERT_TYPE_EQUAL(int&,      iter::reference);
+
+     // Type equivalent to the difference between two iterators
+     ASSERT_TYPE_EQUAL(ptrdiff_t, iter::difference_type);
+#+END_SRC
+
+Main Function: part 2 => Check lsit<int>::iterator 
+
+#+BEGIN_SRC cpp 
+  // ======== std::list iterator assertions ===============//
+  using iterd = std::list<double>::iterator;
+  ASSERT_TYPE_EQUAL(std::bidirectional_iterator_tag,  iterd::iterator_category);
+  ASSERT_TYPE_EQUAL(double ,      iterd::value_type );
+  ASSERT_TYPE_EQUAL(double*,      iterd::pointer);
+  ASSERT_TYPE_EQUAL(double&,      iterd::reference);
+  ASSERT_TYPE_EQUAL(ptrdiff_t,    iterd::difference_type);
+
+  std::cout << " Successful OK! ..." << std::endl;
+#+END_SRC
+
+**** Example: Implementing a numeric range iterator 
+**** Example; Implementing an index-adapter iterator 
 *** Algorithms 
 **** distance 
 
