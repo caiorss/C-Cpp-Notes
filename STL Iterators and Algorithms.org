@@ -471,7 +471,400 @@ Main Function: part 2 => Check lsit<int>::iterator
 #+END_SRC
 
 **** Example: Implementing a numeric range iterator 
-**** Example; Implementing an index-adapter iterator 
+
+ + File: [[file:src/iterator-numeric-range1.cpp][file:src/iterator-numeric-range1.cpp]]
+
+Headers:
+
+#+BEGIN_SRC cpp 
+
+#+END_SRC
+
+Class RangeIterator:
+
+#+BEGIN_SRC cpp 
+
+  template<typename T>
+  class RangeIterator
+  {
+  public:
+
+      // Type that iterator refers to
+      using value_type = T;
+      // Pointer
+      using pointer = T*;
+      // Reference
+      using reference = T*;
+
+      // Tag Indicates the iterator's capabilities
+      using iterator_category = std::input_iterator_tag;
+
+      // Type of difference between two iterators.
+      using difference_type = int;
+
+      RangeIterator(T value)
+          : m_step(0), m_value(value)
+      { }
+
+      RangeIterator(T value, T step)
+          : m_step(step), m_value(value)
+      { }
+
+      // Dereference operator:
+      value_type& operator*() {
+          return m_value;
+      }
+
+      // Dereference operator:
+      const value_type&  operator*() const  {
+          return m_value;
+      }
+
+      value_type* operator->() {
+          return &m_value;
+      }
+
+      // Prefix increment operator
+      RangeIterator& operator++() {
+          m_value += m_step;
+          return *this;
+      }
+
+      // Postfix increment operator
+      RangeIterator& operator++(int) {
+          m_value += m_step;
+          return *this;
+      }
+
+      bool operator==(const RangeIterator& rhs) const
+      {
+          return this->m_value > rhs.m_value;
+      }
+
+      bool operator!=(const RangeIterator& rhs) const
+      {
+          return !this->operator==(rhs);
+      }
+
+  private:
+      T const m_step;
+      T  m_value;
+  };
+#+END_SRC
+
+Class NumericRange: 
+  + Class that can be iterator in for-loops with range-based for-loops
+    like STL containers std::vector, std::list and so on. 
+
+#+BEGIN_SRC cpp 
+  template<typename T>
+  class NumericRange {
+  public:
+
+      NumericRange(T start, T step, T stop):
+          m_start(start), m_step(step), m_stop(stop) { }
+
+      RangeIterator<T> begin()
+      {
+          return RangeIterator<T>(m_start, m_step);
+      }
+
+      RangeIterator<T> end()
+      {
+          return RangeIterator<T>(m_stop);
+      }
+
+  private:
+      T m_start;
+      T m_step;
+      T m_stop;
+
+  };
+
+#+END_SRC
+
+Main function: 
+
+#+BEGIN_SRC cpp 
+  std::cout << std::fixed << std::setprecision(3);
+
+   std::cout << "\n ==== EXPERIMENT 1 ==============================" << std::endl;
+
+   {
+       auto range = NumericRange(-10.0, 2.5, 10.0);
+       int n = 0;
+
+       for(auto it = range.begin(); it != range.end(); it++ )
+       {
+           auto label =  std::string(" x[") + std::to_string(n++) + "] = ";
+           std::cout << std::setw(10) << label
+                     << std::setw(6) << *it
+                     << std::endl;
+       }
+
+   }
+
+
+   std::cout << "\n ==== EXPERIMENT 2 ==============================" << std::endl;
+   {
+       int n = 0;
+
+       for(auto x: NumericRange(-10.0, 2.5, 10.0))
+       {
+           auto label =  std::string(" x[") + std::to_string(n++) + "] = ";
+           std::cout << std::setw(10) << label
+                     << std::setw(6) << x
+                     << std::endl;
+       }
+
+   }
+
+   std::cout << "\n ==== EXPERIMENT 3 - STL algorithms ============" << std::endl;
+   {
+       auto range = NumericRange(-10.0, 2.5, 10.0);
+
+       double result = std::accumulate( range.begin(), range.end()
+                                       , 0.0 // Initial value of accumulator
+                                       , [](double acc, double x)
+                                       {
+                                           return acc + x;
+                                       });
+
+       // Initialize container from iterators
+       std::vector<double> xs(range.begin(), range.end());
+
+
+       std::cout << " [INFO] Result = " << result << std::endl;
+   }
+
+   return 0;
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC sh 
+   ==== EXPERIMENT 1 ==============================
+     x[0] = -10.000
+     x[1] = -7.500
+     x[2] = -5.000
+     x[3] = -2.500
+     x[4] =  0.000
+     x[5] =  2.500
+     x[6] =  5.000
+     x[7] =  7.500
+     x[8] = 10.000
+
+   ==== EXPERIMENT 2 ==============================
+     x[0] = -10.000
+     x[1] = -7.500
+     x[2] = -5.000
+     x[3] = -2.500
+     x[4] =  0.000
+     x[5] =  2.500
+     x[6] =  5.000
+     x[7] =  7.500
+     x[8] = 10.000
+
+   ==== EXPERIMENT 3 - STL algorithms ============
+   [INFO] Result = 0.000
+#+END_SRC
+
+**** Example: Implementing an index-adapter iterator 
+
+ + Class: iterator_counter
+   + => Turns a given iterator passed as argument into an iterator
+     that can be looped over with an index. 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <vector>
+  #include <algorithm>
+  #include <map>
+
+  template<typename T>
+  class iterator_counter
+  {
+  public:
+
+      class itpair
+      {
+          // Only Class Iterator_counter can access the
+          // internals of this class
+          friend class iterator_counter<T>;
+
+          size_t counter;
+          T      iterator;
+      public:
+          itpair(size_t counter, T it)
+              : counter(counter), iterator(it) { }
+
+          size_t index() const
+          {
+              return counter;
+          }
+
+          typename T::value_type&
+          value()
+          {
+              return *iterator;
+          }
+
+          typename T::value_type const&
+          value() const
+          {
+              return *iterator;
+          }
+
+      };
+
+      using value_type = itpair;
+      using pointer = itpair*;
+      using reference = itpair&;
+
+      using iterator_category = std::input_iterator_tag;
+      using difference_type = int;
+
+  private:
+
+      itpair mCurrent;
+
+  public:
+      iterator_counter(T ptr): mCurrent(0, ptr) { }
+
+      // Dereference operator:
+      itpair&
+      operator*()
+      {
+          return mCurrent;
+      }
+
+      // Dereference operator:
+      const itpair&
+      operator*() const
+      {
+          return mCurrent;
+      }
+
+      itpair*
+      operator->()
+      {
+          return &mCurrent;
+      }
+
+      // Prefix increment operator
+      iterator_counter&
+      operator++()
+      {
+          mCurrent.counter++;
+          mCurrent.iterator++;
+          return *this;
+      }
+
+      bool operator==(const iterator_counter& rhs) const
+      {
+          return this->mCurrent.iterator == rhs.mCurrent.iterator;
+      }
+
+      bool operator!=(const iterator_counter& rhs) const
+      {
+          return this->mCurrent.iterator != rhs.mCurrent.iterator;
+      }
+
+  };
+#+END_SRC
+
+ + Class: CounterViewAdapter
+   + It can be iterated like a STL container, but it is not a
+     container, it is a _view_ and does not own or allocate any element.
+
+#+BEGIN_SRC cpp 
+  template<typename Container>
+  struct CounterViewAdapter
+  {
+      Container& mRef;
+      CounterViewAdapter(Container& cont): mRef(cont) { }
+      auto begin() { return iterator_counter(mRef.begin());  }
+      auto end()   { return iterator_counter(mRef.end());    }
+
+  };
+#+END_SRC
+
+ + Function main:
+
+#+BEGIN_SRC cpp 
+  int main()
+  {
+
+      auto words = std::vector<std::string>{
+            "C++", "C++11", "asm", "asm-armeabi-32bits"
+          , "PowerPC-PPC", "SuperH", "MIPS", "PLC S7-200" };
+
+
+      std::cout << " ======== Experiment 1 ===================" << std::endl;
+
+      auto it_beg = iterator_counter(words.begin());
+      auto it_end = iterator_counter(words.end());
+
+
+      for(auto it = it_beg; it != it_end; ++it)
+      {
+          std::cout << " Counter = " << it->index()  << " - value = " << it->value() << "\n";
+      }
+
+      std::cout << "\n ======== Experiment 2 ===================" << std::endl;
+
+
+      for(auto& x : CounterViewAdapter(words))
+      {
+          std::cout << " Counter = " << x.index()  << " - value = " << x.value() << "\n";
+      }
+
+      std::cout << "\n ======== Experiment 3 ===================" << std::endl;
+
+      auto view = CounterViewAdapter(words);
+
+      std::for_each(view.begin(), view.end(), [](auto& x){
+          std::cout << " Counter = " << x.index()  << " - value = " << x.value() << "\n";
+      });
+
+      return 0;
+  }
+#+END_SRC
+
+Program Output: 
+
+#+BEGIN_SRC sh 
+   ======== Experiment 1 ===================
+   Counter = 0 - value = C++
+   Counter = 1 - value = C++11
+   Counter = 2 - value = asm
+   Counter = 3 - value = asm-armeabi-32bits
+   Counter = 4 - value = PowerPC-PPC
+   Counter = 5 - value = SuperH
+   Counter = 6 - value = MIPS
+   Counter = 7 - value = PLC S7-200
+
+   ======== Experiment 2 ===================
+   Counter = 0 - value = C++
+   Counter = 1 - value = C++11
+   Counter = 2 - value = asm
+   Counter = 3 - value = asm-armeabi-32bits
+   Counter = 4 - value = PowerPC-PPC
+   Counter = 5 - value = SuperH
+   Counter = 6 - value = MIPS
+   Counter = 7 - value = PLC S7-200
+
+   ======== Experiment 3 ===================
+   Counter = 0 - value = C++
+   Counter = 1 - value = C++11
+   Counter = 2 - value = asm
+   Counter = 3 - value = asm-armeabi-32bits
+   Counter = 4 - value = PowerPC-PPC
+   Counter = 5 - value = SuperH
+   Counter = 6 - value = MIPS
+   Counter = 7 - value = PLC S7-200  
+#+END_SRC
+
 *** Algorithms 
 **** distance 
 
