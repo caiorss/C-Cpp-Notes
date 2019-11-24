@@ -470,6 +470,115 @@ Main Function: part 2 => Check lsit<int>::iterator
   std::cout << " Successful OK! ..." << std::endl;
 #+END_SRC
 
+**** Example: Making a class iterable 
+
+The following code shows how to make a class iterable with for-range
+based loop or the old iterator-based loop.
+
+ *File: iterable_class.cpp* 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <vector>
+  #include <deque>
+  #include <tuple>
+  #include <initializer_list>
+
+  struct Point2D
+  {
+      double x = 0.0;
+      double y = 0.0;
+      Point2D(double x, double y): x(x), y(y) { }
+  };
+
+  // Iterable class 
+  class Curve2D
+  {
+  private:
+      std::deque<Point2D> m_points;
+
+  public:
+
+      Curve2D() { }
+
+      // Initializer list constructor
+      Curve2D(std::initializer_list<Point2D> const& list)
+          : m_points(list.begin(), list.end()) { }
+
+      // Iterator pair constructor
+      template<typename Iterator>
+      Curve2D(Iterator it_begin, Iterator it_end)
+          : m_points(it_begin, it_end){ }
+
+
+      Curve2D& addPoint(double x, double y)
+      {
+          m_points.emplace_back(x, y);
+          return *this;
+      }
+
+      // Required for make the class iterable with for-range based loop
+      auto begin()  { return m_points.begin(); }
+      auto end()    { return m_points.end();   }
+
+      // Required for make the class iterable with for-range based loop
+      auto cbegin() { return m_points.cbegin(); }
+      auto cend()   { return m_points.cend();   }
+
+  };
+
+  int main()
+  {
+      std::cout << "\n === EXPERIMENT 1 == Iterator-based for-loop ============"
+                << std::endl;
+
+      {
+          std::vector<Point2D> curve_vector = {{10.0, 4.0}, {20.0, 12.5}, {4.5, 10.25}, {8.0, 3.51}};
+
+          // Range constructor
+          Curve2D curve(curve_vector.begin(), curve_vector.end());
+
+          std::cout << " Drawing curve: ";
+
+          for(auto it = curve.begin(); it != curve.end(); it++)
+          {
+              std::cout << " => Point( " << it->x << ", " << it->y << " ) ";
+          }
+
+          std::cout << std::endl;
+      }
+
+      std::cout << "\n === EXPERIMENT 2 -- Range-based for-loop =================="
+                << std::endl;
+      {
+          // Initializer list constructor
+          Curve2D curve = {{10.0, 4.0}, {20.0, 12.5}, {4.5, 10.25}, {8.0, 3.51}};
+
+          std::cout << " Drawing curve: ";
+
+          for(auto const& [x, y]: curve)
+          {
+              std::cout << " => Point( " << x << ", " << y << " ) ";
+          }
+
+          std::cout << std::endl;
+
+      }
+
+      return 0;
+  }
+#+END_SRC
+
+Program output: 
+
+#+BEGIN_SRC sh 
+   === EXPERIMENT 1 == Iterator-based for-loop ============
+   Drawing curve:  => Point( 10, 4 )  => Point( 20, 12.5 )  => Point( 4.5, 10.25 )  => Point( 8, 3.51 ) 
+
+   === EXPERIMENT 2 -- Range-based for-loop ==================
+   Drawing curve:  => Point( 10, 4 )  => Point( 20, 12.5 )  => Point( 4.5, 10.25 )  => Point( 8, 3.51 ) 
+#+END_SRC
+
 **** Example: Implementing a numeric range iterator 
 
  + File: [[file:src/iterator-numeric-range1.cpp][file:src/iterator-numeric-range1.cpp]]
