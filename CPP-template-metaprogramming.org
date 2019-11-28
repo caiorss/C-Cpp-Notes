@@ -1759,6 +1759,80 @@ Running on CLING REPL:
   s2 = C++ C++ C++ C++ 
   s2 = PlusPlus CPP ASM C++ 
 #+END_SRC
+** Templates with C-arrays 
+
+File: array_template.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <iomanip>
+
+  /* Pass array by reference: T (&arr) [N} */
+  template<typename T, size_t N>
+  auto array_info(  const char* name, T (& arr) [N] )
+  {
+      std::cout << "\n [INFO] Information of array: " << name << std::endl;
+      std::cout << " => Array size = " << N << std::endl;
+
+      std::cout <<" => Array value = ";
+      for(size_t i = 0; i < N ; i++) {
+          std::cout << " " << arr[i];
+      }
+      std::cout << std::endl;
+
+  }
+
+  // Template specialization for 'char'
+  template<size_t N>
+  auto array_info(const char* name, char (& arr) [N])
+  {
+      std::cout << "\n [INFO] Information of array: " << name << std::endl;
+      std::cout << " => Array size [1] = " << N << std::endl;
+      std::cout << " => Array size [2] = " << std::size(arr) << std::endl;
+
+      std::cout <<" => Array value [char] = ";
+      for(size_t i = 0; i < N ; i++) {
+          if(std::isprint(arr[i]))
+              std::cout << " " << arr[i];
+          else
+              std::cout << " \\x" << static_cast<int>(arr[i]);
+      }
+      std::cout << std::endl;
+  }
+
+  int main(int argc, char** argv)
+  {
+      std::cout << std::fixed << std::setprecision(3);
+
+      double arr1 [] = { 3.505, 10.5, -90.25, 100.56, 3.1515};
+      array_info("arr1", arr1);
+
+      char arr2 [10] = {'a', 'k', 'j', 'm'};
+      array_info("arr2", arr2);
+
+      const char* arr3 [] = { "Hello", "world", "C++20" };
+      array_info("arr3", arr3);
+      return 0;
+  }
+#+END_SRC
+
+Program output: 
+
+#+BEGIN_SRC sh 
+   [INFO] Information of array: arr1
+   => Array size = 5
+   => Array value =  3.505 10.500 -90.250 100.560 3.151
+
+   [INFO] Information of array: arr2
+   => Array size [1] = 10
+   => Array size [2] = 10
+   => Array value [char] =  a k j m \x0 \x0 \x0 \x0 \x0 \x0
+
+   [INFO] Information of array: arr3
+   => Array size = 3
+   => Array value =  Hello world C++20
+#+END_SRC
+
 ** Implementing Higher Order Functions with templates 
    :PROPERTIES:
    :ID:       20156a12-aa32-407d-8cc0-5c4b85ba9021
@@ -2889,7 +2963,6 @@ Output:
   Name = NSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE - id = 5774750460303204477
   Name = A6_c - id = 15419073316311588377
 #+END_SRC
-
 
 ** SFINAE - Substution Is Not a Failure
 *** Fundamentals 
