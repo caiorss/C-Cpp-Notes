@@ -500,7 +500,6 @@ MSV Visual C++ Compiler and MingW (GCC ported to Windows)
 
 
 
-
 ** std::any 
    :PROPERTIES:
    :ID:       9397a9a0-e641-4cb6-89b7-24a82fe12d99
@@ -955,7 +954,6 @@ Output:
 
 
 
-
 ** std::variant 
 
 C++17 new std::variant which comes from Boost.Variant provides a
@@ -1357,3 +1355,128 @@ Documentation:
  + [[http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/p0218r1.html][C++17 Filesystem -]]
  + [[https://www.boost.org/doc/libs/1_69_0/libs/filesystem/doc/tutorial.html][Boost Filesystem Tutorial]] (Note: it is not the std::filesystem
    library, but its predecessor, however it is worth reading it.)
+* C++20 New Features 
+** C++20 Compiler Support 
+
+   * https://en.cppreference.com/w/cpp/compiler_support
+     + Note: Not all C++20 features are supported by all compilers yet.
+
+   * [[https://www.reddit.com/r/cpp/comments/cfk9de/201907_cologne_iso_c_committee_trip_report_the/][2019-07 Cologne ISO C++ Committee Trip Report]]
+
+** std::endian - Detect processor endianess 
+
+ + Paper:  [[http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0463r1.html][P0463R1 - endian, Just endian]]
+
+File: cpp20_endian.cpp
+
+#+BEGIN_SRC cpp 
+  #include <iostream> 
+  #include <string>
+
+  // C++20 headers
+  #include <bit> 
+
+  int main()
+  {
+       std::cout << std::boolalpha;
+
+       std::cout << " => Processor is big endian?: "
+                 <<  (std::endian::native == std::endian::big) <<  "\n";
+
+       std::cout << " => Processor is little endian?: "
+                 <<  (std::endian::native == std::endian::little) <<  "\n";
+
+       return 0;
+  }
+#+END_SRC
+
+Building and running: 
+
+#+BEGIN_SRC sh 
+  # Clang version 8 
+  $ clang++ cpp20a.cpp -o cpp20a.bin -std=c++2a  -Wall -Wextra -pedantic -stdlib=libc++
+
+  $ ./cpp20a.bin
+   => Processor is big endian?: false
+   => Processor is little endian?: true
+#+END_SRC
+** Designated initialization 
+
+Allows to write constructors in a self-documenting way: 
+
+ + Paper: [[http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0329r4.pdf][P0329R4: Designated InitializationWording]]
+
+File: designated_initialization.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream> 
+  #include <string>
+
+  struct Point2D{
+       float x;
+       float y;
+
+       friend std::ostream& operator<<(std::ostream& os, Point2D const& p)
+       {
+           return os << " Point{ x = " << p.x << " ; " << p.y << " } " << std::endl;
+       }
+  };
+
+  class Product
+  {
+  public:
+       Product(int id, std::string name, double price)
+             : m_id(id), m_name(name), m_price(price)
+       {		
+       }
+
+       int         id()    const { return m_id; }
+       double      price() const { return m_price; }
+       std::string name()  const { return m_name; }
+	
+  private:
+       int         m_id;
+       std::string m_name;
+       double      m_price;
+  };
+
+
+  int main()
+  {
+      std::cout << std::boolalpha;
+
+      Point2D p1 { .x = 2.5f, .y = -10.20f};
+      std::cout << " =>> p1 = " << p1 << "\n";
+
+      Point2D p2 = { .x = -12.55f, .y = -3.5f};
+      std::cout << " =>> p2 = " << p2 << "\n";	
+
+      auto p3 = Point2D{ .x = -10.55f, .y = 13.5f};
+      std::cout << " =>> p3 = " << p3 << "\n";	
+
+      Product prod{ .id = 200, .name = "Colombian coffee", .price = 100.56};
+      std::cout << " Product => id = " << prod.id()
+                        << " ; name = " << prod.name()
+                        << " price = " << prod.price()
+                        << "\n";
+
+      return 0;
+  }
+#+END_SRC
+
+Building and running:  
+  + Note: built with GCC 8.3.1
+
+#+BEGIN_SRC sh 
+  $ g++ designated_initialization.cpp -o out.bin -std=c++2a  -Wall -Wextra -pedantic
+
+  $ ./out.bin
+   =>> p1 =  Point{ x = 2.5 ; -10.2 }
+
+   =>> p2 =  Point{ x = -12.55 ; -3.5 }
+
+   =>> p3 =  Point{ x = -10.55 ; 13.5 }
+
+   Product => id = 200 ; name = Colombian coffee price = 100.56
+#+END_SRC
+
