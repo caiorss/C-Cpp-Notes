@@ -974,7 +974,7 @@ Program Output:
    Counter = 7 - value = PLC S7-200  
 #+END_SRC
 
-*** Algorithms 
+*** Standard STL Algorithms 
 **** distance 
 
 Returns the number of elements within an iterator range, aka iterator
@@ -1772,4 +1772,238 @@ Example:
    (bool) false
 	
  #+END_SRC
+
+*** Implementing custom algorithms 
+**** Example - Implement algorithm similar to std::for_each 
+
+  + File: algorithm_for_each.cpp 
+
+Headers: 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <iomanip>
+  #include <vector>
+  #include <array>
+  #include <list>
+  #include <cassert>
+#+END_SRC
+
+Functions: 
+
+#+BEGIN_SRC cpp 
+  // Similar to std::for_each - using iterator
+  template<typename Iterator, typename Callable>
+  void for_each_iterator(Iterator begin, Iterator end, Callable&& callable)
+  {
+      size_t index = 0;
+      for(auto it = begin; it != end; ++it)
+          callable(*it, index++);
+  }
+
+   // Similar to std::for_each - using range
+  template<typename Container, typename Callable>
+  void for_each_range(Container const& container, Callable&& callable)
+  {
+      size_t index = 0;
+      for(auto& x: container)
+          callable(x, index++);
+  }
+#+END_SRC
+
+Convenience classes: 
+
+#+BEGIN_SRC cpp 
+  template<typename T, std::size_t N>
+  class ArrayView{
+  public:
+      template<typename U>
+      using Iterator_t = decltype(std::begin(std::declval<U>()));
+
+      using value_type = T;
+
+      ArrayView(T (& arr) [N])
+          : m_begin{ std::begin(arr) }
+           ,m_end{ std::end(arr) }
+      {
+      }
+      auto begin() const { return m_begin;  }
+      auto end()  const { return m_end;  }
+  private:
+      Iterator_t<T(&)[N]> m_begin;
+      Iterator_t<T(&)[N]> m_end;
+
+  };
+
+  struct Functor{
+      std::string m_name;
+
+      Functor(std::string name)
+          : m_name(std::move(name)){ }
+
+      void operator() (std::string const& str, size_t index)
+      {
+          std::cout << " ARR<" << m_name << "> ["
+                    << index << "] = " << str << "\n";
+      }
+  };
+#+END_SRC
+
+Main function: 
+
+#+BEGIN_SRC cpp 
+  int main(int argc, char** argv)
+  {
+
+      std::cout << "\n === EXPERIMENT 1.A ==================" << std::endl;
+      int arr1 [] = { 3, 10, -90, 100, 300};
+
+      for_each_iterator(std::begin(arr1), std::end(arr1),
+                        [](auto x, size_t index)
+                        {
+                            std::cout << " x[" << index << "] = " << x << "\n";
+                        });
+
+      std::cout << "\n === EXPERIMENT 1.B ==================" << std::endl;
+
+      for_each_range(ArrayView(arr1),
+                        [](auto x, size_t index)
+                        {
+                            std::cout << " x[" << index << "] = " << x << "\n";
+                        });
+
+      std::cout << "\n === EXPERIMENT 2.A ==================" << std::endl;
+
+      std::vector<std::string> vecA = {"C++", "C++17", "ADA Spark", "Rust", "C", "C11"};
+
+      for_each_iterator( vecA.begin(), vecA.end()
+                       ,[](auto x, size_t index)
+                        {
+                         std::cout << " x[" << index << "] = " << x << "\n";
+                        });
+
+      std::cout << "\n === EXPERIMENT 2.A ==================" << std::endl;
+      for_each_range(vecA, Functor("VecA"));
+      return 0;
+  }
+#+END_SRC
+
+Program output: 
+
+#+BEGIN_SRC sh 
+   === EXPERIMENT 1.A ==================
+   x[0] = 3
+   x[1] = 10
+   x[2] = -90
+   x[3] = 100
+   x[4] = 300
+
+   === EXPERIMENT 1.B ==================
+   x[0] = 3
+   x[1] = 10
+   x[2] = -90
+   x[3] = 100
+   x[4] = 300
+
+   === EXPERIMENT 2.A ==================
+   x[0] = C++
+   x[1] = C++17
+   x[2] = ADA Spark
+   x[3] = Rust
+   x[4] = C
+   x[5] = C11
+
+   === EXPERIMENT 2.A ==================
+   ARR<VecA> [0] = C++
+   ARR<VecA> [1] = C++17
+   ARR<VecA> [2] = ADA Spark
+   ARR<VecA> [3] = Rust
+   ARR<VecA> [4] = C
+   ARR<VecA> [5] = C11
+#+END_SRC
+
+**** Example - Sum of container elements 
+
+File: sum_algorithm.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <iomanip>
+  #include <vector>
+  #include <array>
+  #include <list>
+  #include <cassert>
+
+  template<typename Iterator, typename Acc = typename Iterator::value_type>
+  auto sum_of_elementsA(Iterator begin, Iterator end, Acc const& init = {}) -> Acc
+  {
+      Acc acc = init;
+      for(auto it = begin; it != end; it++) { acc = acc + *it; }
+      return acc;
+  }
+
+  template<typename Container>
+  typename Container::value_type
+  sum_of_elementsB(Container const& container
+                   , typename Container::value_type const& init)
+  {
+      typename Container::value_type acc = init;
+      for(auto const& elem: container) { acc = acc + elem; }
+      return acc;
+  }
+
+  template<typename T, std::size_t N>
+  class ArrayView{
+  public:
+      template<typename U>
+      using Iterator_t = decltype(std::begin(std::declval<U>()));
+
+      using value_type = T;
+
+      ArrayView(T (& arr) [N])
+          : m_begin{ std::begin(arr) }
+           ,m_end{ std::end(arr) }
+      {
+      }
+      auto begin() const { return m_begin;  }
+      auto end()  const { return m_end;  }
+  private:
+      Iterator_t<T(&)[N]> m_begin;
+      Iterator_t<T(&)[N]> m_end;
+
+  };
+
+  int main(int argc, char** argv)
+  {
+
+      int arr1 [] = { 3, 10, -90, 100, 300};
+
+      assert(sum_of_elementsA(std::begin(arr1), std::end(arr1), 0) == 323 );
+      assert(sum_of_elementsB(ArrayView(arr1), 0) == 323);
+
+      std::vector<int> vecA = { 10, 20, 50, 60, 90, 100};
+      assert(sum_of_elementsA(vecA.begin(), vecA.end(), 0) == 330);
+      assert(sum_of_elementsB(vecA, 0) == 330 );
+
+      std::array<int, 10> cppArr1 = { 10, -20, -50, 60, 90, 100};
+      assert(sum_of_elementsA(cppArr1.begin(), cppArr1.end(), 0) == 190);
+      assert(sum_of_elementsB(cppArr1, 0) == 190);
+
+
+      std::list<int> list1 = { 10, -20, -50, 60, 90, 100};
+      list1.push_back(20); list1.push_back(50);
+      assert(sum_of_elementsA(list1.begin(), list1.end(), 0) == 190 + 70);
+      assert(sum_of_elementsB(list1, 60) == 190 + 70 + 60);
+
+      std::cout << " [INFO] All tests passed. OK" << std::endl;
+      return 0;
+  }
+#+END_SRC
+
+Program output: 
+
+#+BEGIN_SRC sh 
+  [INFO] All tests passed. OK
+#+END_SRC
+
 
