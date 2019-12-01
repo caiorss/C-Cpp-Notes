@@ -3988,7 +3988,6 @@ Output:
     [ERROR] Failure = GSL: Precondition failure at ... .../_deps/gsl-src/include/gsl/span: 499
 #+END_SRC
 
-
 ** Range v3 (C++20)
 
 Ranges v3 is a header-only generic library that will be included in
@@ -5289,7 +5288,8 @@ Sample program output:
    serving directory = /home/user/pages
 #+END_SRC
 
-** Cereal - Serialization Library
+** Serialization 
+*** Cereal - Serialization library 
 
 Cereal is a lightweight header-only library for serialization which
 supports a wide variety of serialization formats such as binary, XML
@@ -5577,6 +5577,225 @@ Program output:
    DummyClass { x = 400 ; y = -641 ; N = 300 } =>  List[  ]
 #+END_SRC
 
+*** YAS - Yet Another Serialization Library
+
+YAS - Yet Another Serialization Library - High performance ligthweight
+header-only serialization library with support for all STL containers.
+
+Repository: 
+  + https://github.com/niXman/yas
+
+More Examples: 
+ + https://github.com/niXman/yas/tree/master/examples
+
+Supported Serialization Formats: 
+
+  + binary (portable, endianess-independent)
+  + text
+  + json (not fully compatible)
+
+Problems: 
+  + Less documentation
+  + Lack of doxygen comments 
+  + Not comptabile with C++'s standard library streams such as
+    std::ostream, std::fstream, std::cout.
+
+ *CMake Project Example*
+
+ + File: CMakeLists.txt 
+
+#+BEGIN_SRC cmake 
+   cmake_minimum_required(VERSION 3.9)
+   project(YAS_PROJECT)
+
+   #========== Global Configurations =============#
+   #----------------------------------------------#
+   set(CMAKE_CXX_STANDARD 17)     
+   set(CMAKE_VERBOSE_MAKEFILE ON)
+   set(CMAKE_CXX_EXTENSIONS OFF)
+
+   #------------- Fetch Serialization Library YAS -------------------#
+
+   include( FetchContent )
+   FetchContent_Declare( yas
+       GIT_REPOSITORY  "https://github.com/niXman/yas.git"
+       GIT_TAG         "7.0.4"
+   )
+   FetchContent_MakeAvailable(yas)
+   include_directories("${yas_SOURCE_DIR}/include/" )
+
+   #========== Targets Configurations ============#
+
+   add_executable(executable serialize.cpp)
+#+END_SRC
+
+ + File: serialize.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <deque>
+  #include <algorithm>
+  #include <numeric>
+  #include <initializer_list>
+  #include <fstream>
+
+  #include <yas/serialize.hpp>
+  #include <yas/std_types.hpp>
+  #include <yas/text_iarchive.hpp>
+  #include <yas/text_oarchive.hpp>
+
+  /** @brief Read whole input stream to a string and returns it
+    ,* Requires headers: <iostream> and <sstream>
+    ,*/
+  std::string
+  istreamToString(std::istream& is){
+      if(is.bad()){
+          throw std::runtime_error("Error: stream has errors.");
+      }
+      std::stringstream ss;
+      ss << is.rdbuf();
+      return ss.str();
+  }
+
+  class Stats
+  {
+
+      std::string m_name = "";
+      std::deque<double> m_data = {};
+  public:
+      Stats() { }
+
+      Stats(std::initializer_list<double> const& list)
+          : m_data(list.begin(), list.end()) { }
+
+      void   insert(double x){ m_data.push_back(x); }
+      double get(size_t index) const { return m_data[index]; }
+      size_t size()            const { return m_data.size(); }
+      auto begin() { return m_data.begin(); }
+      auto end()   { return m_data.end();   }
+
+      std::string name() const { return m_name; }
+      void set_name(std::string name) { m_name = name; }
+
+      double mean() const {
+          double total = std::accumulate(m_data.begin(), m_data.end(), 0.0);
+          return total / m_data.size();
+      }
+
+      double first() const { return m_data.front(); }
+      double last()  const{ return m_data.back(); }
+
+      /** Required friend function for making class printable */
+      friend std::ostream& operator<<(std::ostream& os, const Stats& stat)
+      {
+          os <<  "Stats { name = '" << stat.m_name << "' ; data = [ ";
+          for(auto x: stat.m_data) { os << x << ", "; }
+          return os << " ] }";
+      }
+
+      /** Required method for making the class serializable */
+      template<typename Archive>
+      void serialize(Archive& ar)
+      {
+          // NVP => Name-value-pair
+          ar & YAS_OBJECT_NVP(
+                "Stats"
+              ,("name", m_name)
+              ,("data", m_data)
+              );
+      }
+
+  };
+
+
+  int main()
+  {
+
+      const char* jsonfile = "program_data.json";
+
+      std::cout << "\n ==== EXPERIMENT 1 ====== Save data to file ========\n\n";
+
+      {
+          auto stats = Stats{4.5, -10.3, 58.66, 10.6, 9.615, 56.156, 90.51, -62.0};
+          stats.set_name("Price change");
+
+          // std::cout << " => Name " << stats.name() << std::endl;
+          std::cout << "   => stats = " << stats << std::endl;
+          std::cout << "   =>  mean = " << stats.mean() << std::endl;
+
+          // Remove file if it exists
+          std::remove(jsonfile);
+
+          // Save archive data in a JSON file
+          yas::save<yas::file | yas::json>(jsonfile, stats);
+      }
+
+      // Check file content
+      auto ifs = std::ifstream{jsonfile};
+      auto content = istreamToString(ifs);
+      std::cout << "\n File content = \n " << content
+                << std::endl;
+
+      std::cout << "\n ==== EXPERIMENT 2 ====== Load data from file ======\n\n";
+
+      {
+          auto statsB = Stats{};
+          yas::load<yas::file | yas::json>(jsonfile, statsB);
+          std::cout << "   => stats = " << statsB << std::endl;
+          std::cout << "   =>  mean = " << statsB.mean() << std::endl;
+      }
+
+      std::cout << "\n ==== EXPERIMENT 3 ====== Load/Save data from memory ======\n\n";
+
+      // Save to memory
+      yas::mem_ostream os;
+
+      auto statsX = Stats{14.5, 25.16, 18.66, -10.6, 62.615, +46.1566, 90.51, 62.61};
+      statsX.set_name("Oil prices");
+      {
+          auto archive = yas::binary_oarchive<yas::mem_ostream>(os);
+          archive(statsX);
+          std::cout << " StatsX = " << statsX << std::endl;
+          std::cout << " [TRACE] Saved to memory OK." << std::endl;
+      }
+
+      {
+          auto is = yas::mem_istream(os.get_intrusive_buffer());
+          auto archive = yas::binary_iarchive<yas::mem_istream>(is);
+          auto statsY = Stats();
+          archive(statsY);
+          std::cout << " [TRACE] Load from memory OK." << std::endl;
+          std::cout << " StatsY = " << statsY << std::endl;
+      }
+
+      return 0;
+  }
+
+#+END_SRC
+
+ + Program output: 
+
+#+BEGIN_SRC sh 
+   ==== EXPERIMENT 1 ====== Save data to file ========
+
+     => stats = Stats { name = 'Price change' ; data = [ 4.5, -10.3, 58.66, 10.6, 9.615, 56.156, 90.51, -62,  ] }
+     =>  mean = 19.7176
+
+   File content = 
+   {"name":"Price change","data":[4.5,-10.3,58.66,10.6,9.615,56.156,90.51,-62.0]}
+
+   ==== EXPERIMENT 2 ====== Load data from file ======
+
+     => stats = Stats { name = 'Price change' ; data = [ 4.5, -10.3, 58.66, 10.6, 9.615, 56.156, 90.51, -62,  ] }
+     =>  mean = 19.7176
+
+   ==== EXPERIMENT 3 ====== Load/Save data from memory ======
+
+   StatsX = Stats { name = 'Oil prices' ; data = [ 14.5, 25.16, 18.66, -10.6, 62.615, 46.1566, 90.51, 62.61,  ] }
+   [TRACE] Saved to memory OK.
+   [TRACE] Load from memory OK.
+   StatsY = Stats { name = 'Oil prices' ; data = [ 14.5, 25.16, 18.66, -10.6, 62.615, 46.1566, 90.51, 62.61,  ] }
+#+END_SRC
 ** Parsers 
 *** TinyXML2 - Lightweight XML parser 
 
@@ -6443,7 +6662,6 @@ Easy to use single-file header-only library for parsing and writing
      => element = 1000
 
  #+END_SRC
-
 
 
 
