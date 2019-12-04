@@ -974,6 +974,166 @@ Program Output:
    Counter = 7 - value = PLC S7-200  
 #+END_SRC
 
+**** Example: Implementing iterator with boost iterator facade 
+
+The boost [[https://www.boost.org/doc/libs/1_71_0/libs/iterator/doc/iterator_facade.html][iterator facade]] uses the CRTP - Curious Recurring Template
+technique or simplifying the implementation of custom STL
+iterators. The client code inherits the class _iterator_facade_ and
+implements some methods required by this class, then it generates all
+iterator member functions and operators. 
+
+Documentation: 
+ + https://www.boost.org/doc/libs/1_71_0/libs/iterator/doc/iterator_facade.html
+
+
+ *Example:* Numeric range iterator with Boost iterator_facade. 
+
+File: boost_iterator_range.cpp
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <iomanip>
+  #include <vector>
+  #include <algorithm>
+  #include <numeric>
+  #include <cassert>
+
+  #include <boost/iterator/iterator_facade.hpp>
+
+  class RangeIterator
+      : public boost::iterator_facade<
+            // CRTP parameter => The inherited class
+              RangeIterator
+            // Type referred by the iterator
+            , double
+            // Iterator tag
+            , boost::forward_traversal_tag
+            >
+  {
+      mutable double m_value;
+      double m_step;
+
+  public:
+      double value() const { return m_value; }
+
+      explicit RangeIterator(double value)
+          : m_value(value), m_step(0) { }
+
+      RangeIterator(double value, double step)
+          : m_value(value), m_step(step) { }
+
+  private:
+      friend class boost::iterator_core_access;
+
+      // Required by boost_iterator_facade CRTP
+      void increment()
+      {
+          m_value += m_step;
+      }
+
+      // Required by boost_iterator_facade CRTP
+      bool equal(RangeIterator const& that) const
+      {
+          return m_value >= that.m_value + m_step;
+      }
+
+      // Required by boost_iterator_facade CRTP
+      double& dereference() const { return m_value; }
+  };
+
+  class NumericRange
+  {
+      double m_start;
+      double m_step;
+      double m_stop;
+  public:
+      NumericRange(double start, double step, double stop):
+          m_start(start), m_step(step), m_stop(stop)
+      {
+          if(start > stop || step <= 0 ){
+              throw std::domain_error("Error: invalid range.");
+          }
+
+      }
+
+      RangeIterator
+      begin(){ return RangeIterator(m_start, m_step); }
+
+      RangeIterator
+      end(){ return RangeIterator(m_stop); }
+
+  };
+
+
+  int main(int argc, char** argv)
+  {
+      std::cout << "\n ==== EXPERIMENT 1 ==============================" << std::endl;
+      {
+          int n = 0;
+
+          for(auto const&x: NumericRange(-10.0, 2.5, 10.0))
+          {
+              auto label =  std::string(" x[") + std::to_string(n++) + "] = ";
+              std::cout << std::setw(10) << label
+                        << std::setw(6) << x
+                        << std::endl;
+          }
+
+      }
+
+      std::cout << "\n ==== EXPERIMENT 2 - STL algorithms ============" << std::endl;
+      {
+          auto range = NumericRange(-10.0, 2.5, 10.0);
+
+          // Sum of all elements within range
+          double result = std::accumulate( range.begin(), range.end()
+                                          // Initial value of accumulator
+                                          , 0.0
+                                          , [](double acc, double x)
+                                          {
+                                              return acc + x;
+                                          });
+
+          std::cout << " Result = " << result << std::endl;
+      }
+
+      std::cout << "\n ==== EXPERIMENT 3 - Initialize Container =====" << std::endl;
+
+      auto range = NumericRange(-12.0, 2.0, 12.0);
+
+      // Initialize container from iterators
+      // => Invoke iterator-pair constructor
+      std::vector<double> xs(range.begin(), range.end());
+
+      std::cout << "\n [INFO] xs = [ ";
+      for(auto const& x: xs){ std::cout << x << " "; }
+      std::cout << " ]\n";
+
+      return 0;
+  }
+#+END_SRC
+
+Program output: 
+
+#+BEGIN_SRC sh 
+   ==== EXPERIMENT 1 ==============================
+     x[0] =    -10
+     x[1] =   -7.5
+     x[2] =     -5
+     x[3] =   -2.5
+     x[4] =      0
+     x[5] =    2.5
+     x[6] =      5
+     x[7] =    7.5
+     x[8] =     10
+
+   ==== EXPERIMENT 2 - STL algorithms ============
+   Result = 0
+
+   ==== EXPERIMENT 3 - Initialize Container =====
+
+   [INFO] xs = [ -12 -10 -8 -6 -4 -2 0 2 4 6 8 10 12  ]
+#+END_SRC
 *** Standard STL Algorithms 
 **** distance 
 
