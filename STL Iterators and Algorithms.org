@@ -1134,6 +1134,226 @@ Program output:
 
    [INFO] xs = [ -12 -10 -8 -6 -4 -2 0 2 4 6 8 10 12  ]
 #+END_SRC
+**** Example: Implementing enumerate for-loop with boost iterator facade 
+
+The following code shows how to implement a Python-like enumerate
+for-loop with boost-iterator facade. This type of loop allows to
+iterate over sequence with a value and numeric index pair: 
+
+Python enumerate-loop: 
+
+#+BEGIN_SRC python 
+   $ python3
+   Python 3.6.8 (default, Mar 21 2019, 10:08:12)
+   [GCC 8.3.1 20190223 (Red Hat 8.3.1-2)] on linux
+   Type "help", "copyright", "credits" or "license" for more information.
+   >>>
+   >>> xs = ["C++", "Python3", "Python4", "Ruby", "OCaml", "F#"]
+   >>> for x in enumerate(xs): print(x)
+   ...
+   (0, 'C++')
+   (1, 'Python3')
+   (2, 'Python4')
+   (3, 'Ruby')
+   (4, 'OCaml')
+   (5, 'F#')
+
+
+   >>> for index, value in enumerate(xs): print(" x = {0} value = {1}".format(index, value))
+   ...
+    x = 0 value = C++
+    x = 1 value = Python3
+    x = 2 value = Python4
+    x = 3 value = Ruby
+    x = 4 value = OCaml
+    x = 5 value = F#
+
+#+END_SRC
+
+ + File: enumerate_iterator.cpp 
+
+Headers:
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <iomanip>
+  #include <vector>
+  #include <algorithm>
+  #include <numeric>
+  #include <cassert>
+
+  #include <boost/iterator/iterator_facade.hpp>
+#+END_SRC
+
+Class itpair: 
+
+#+BEGIN_SRC cpp 
+  // Forwared declaration
+  template<typename T>
+  class EnumerateIterator;
+
+  /// @brief Encapsulates index and iterator value pair
+  /// @tparam T - Iterator type
+  template<typename T>
+  class itpair
+  {
+      // Only Class Iterator_counter can access the
+      // internals of this class
+      friend class EnumerateIterator<T>;
+
+      size_t counter;
+      T      iterator;
+  public:
+      itpair(size_t counter, T it)
+          : counter(counter), iterator(it) { }
+
+      size_t index() const
+      {
+          return counter;
+      }
+
+      typename T::value_type&
+      value()
+      {
+          return *iterator;
+      }
+
+      typename T::value_type const&
+      value() const
+      {
+          return *iterator;
+      }
+  };
+#+END_SRC
+
+Class EnumerateIterator:
+
+#+BEGIN_SRC cpp 
+  template<typename T>
+  class EnumerateIterator
+      : public boost::iterator_facade<
+            // CRTP parameter => The inherited class
+            EnumerateIterator<T>
+            // Type referred by the iterator
+            , itpair<T>
+            // Iterator tag
+            , boost::forward_traversal_tag
+            >
+  {
+  public:
+
+      EnumerateIterator(T iterator): m_current(0, iterator)
+      {}
+
+  private:
+      mutable itpair<T> m_current;
+
+      friend class boost::iterator_core_access;
+
+      // Required by boost_iterator_facade CRTP
+      void increment()
+      {
+          m_current.counter++;
+          m_current.iterator++;
+      }
+
+      // Required by boost_iterator_facade CRTP
+      bool equal(EnumerateIterator const& that) const
+      {
+          return m_current.iterator == that.m_current.iterator;
+      }
+
+      // Required by boost_iterator_facade CRTP
+      itpair<T>& dereference() const { return m_current; }
+  };
+#+END_SRC
+
+Class Enumerate: 
+
+#+BEGIN_SRC cpp 
+  template<typename Container>
+  struct Enumerate
+  {
+      Container& mRef;
+      Enumerate(Container& cont): mRef(cont) { }
+      auto begin() { return EnumerateIterator(mRef.begin());  }
+      auto end()   { return EnumerateIterator(mRef.end());    }
+
+  };
+#+END_SRC
+
+Function main:
+
+#+BEGIN_SRC cpp 
+   auto words = std::vector<std::string>{
+       "C++", "C++11", "asm", "asm-armeabi-32bits"
+       , "PowerPC-PPC", "SuperH", "MIPS", "PLC S7-200" };
+
+
+   std::cout << " ======== Experiment 1 ===================" << std::endl;
+
+   auto it_beg = EnumerateIterator(words.begin());
+   auto it_end = EnumerateIterator(words.end());
+
+
+   for(auto it = it_beg; it != it_end; ++it)
+   {
+       std::cout << " Counter = " << it->index()  << " - value = " << it->value() << "\n";
+   }
+
+   std::cout << "\n ======== Experiment 2 ===================" << std::endl;
+
+
+   for(auto& x : Enumerate(words))
+   {
+       std::cout << " Counter = " << x.index()  << " - value = " << x.value() << "\n";
+   }
+
+   std::cout << "\n ======== Experiment 3 ===================" << std::endl;
+
+   auto view = Enumerate(words);
+
+   std::for_each(view.begin(), view.end(), [](auto& x){
+       std::cout << " Counter = " << x.index()  << " - value = " << x.value() << "\n";
+   });
+
+  return 0;
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC sh 
+   ======== Experiment 1 ===================
+   Counter = 0 - value = C++
+   Counter = 1 - value = C++11
+   Counter = 2 - value = asm
+   Counter = 3 - value = asm-armeabi-32bits
+   Counter = 4 - value = PowerPC-PPC
+   Counter = 5 - value = SuperH
+   Counter = 6 - value = MIPS
+   Counter = 7 - value = PLC S7-200
+
+   ======== Experiment 2 ===================
+   Counter = 0 - value = C++
+   Counter = 1 - value = C++11
+   Counter = 2 - value = asm
+   Counter = 3 - value = asm-armeabi-32bits
+   Counter = 4 - value = PowerPC-PPC
+   Counter = 5 - value = SuperH
+   Counter = 6 - value = MIPS
+   Counter = 7 - value = PLC S7-200
+
+   ======== Experiment 3 ===================
+   Counter = 0 - value = C++
+   Counter = 1 - value = C++11
+   Counter = 2 - value = asm
+   Counter = 3 - value = asm-armeabi-32bits
+   Counter = 4 - value = PowerPC-PPC
+   Counter = 5 - value = SuperH
+   Counter = 6 - value = MIPS
+   Counter = 7 - value = PLC S7-200
+#+END_SRC
+
 *** Standard STL Algorithms 
 **** distance 
 
