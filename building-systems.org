@@ -3484,6 +3484,107 @@ References:
  + https://stackoverflow.com/questions/31277186
  + https://stackoverflow.com/questions/15694347/
 
+*** Cross compiling for Android 
+
+See: 
+  + https://developer.android.com/ndk/guides/cmake
+  + http://www.ccp4.ac.uk/dist/checkout/cmake-3.1.3/Help/manual/cmake-toolchains.7.rst
+  + https://itk.org/Wiki/ITK/Cross_Compiling
+  + https://cristianadam.eu/20181202/a-better-qnx-cmake-toolchain-file/
+  + https://stackoverflow.com/questions/12844772/how-to-cross-compile-cmake-for-arm-with-cmake
+  + https://stackoverflow.com/questions/5098360/cmake-specifying-build-toolchain
+
+File: application1.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+
+  int main(int argc, char** argv)
+  {
+
+    std::cout << " [INFO] Hello world from application1" << std::endl;
+    ::system("whoami");
+
+    return 0;
+  }
+#+END_SRC
+
+File: CmakeLists.txt 
+
+#+BEGIN_SRC cmake 
+  cmake_minimum_required(VERSION 3.9)
+  project(Simple_Cmake_Project)
+
+  #========== Global Configurations =============#
+  #----------------------------------------------#
+  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+
+  #========== Targets Configurations ============#
+  add_executable(app1 application1.cpp)
+#+END_SRC
+
+ *Building*:
+
+STEP 1: Set CMake Configuration.
+
+#+BEGIN_SRC sh 
+   # Using Makefile (Linux)   
+   $ cmake -H. -B_build -G Ninja -DCMAKE_BUILD_TYPE=Debug \
+      -DCMAKE_TOOLCHAIN_FILE=$HOME/Android/Sdk/ndk-bundle/build/cmake/android.toolchain.cmake \
+      -DANDROID_ABI=armeabi-v7a \
+      -DANDROID_NATIVE_API_LEVEL=21
+
+   # OR Using Ninja build generator 
+   $ cmake -H. -B_build -G Ninja -DCMAKE_BUILD_TYPE=Debug \
+     -DCMAKE_TOOLCHAIN_FILE=$HOME/Android/Sdk/ndk-bundle/build/cmake/android.toolchain.cmake \
+     -DANDROID_ABI=armeabi-v7a \
+     -DANDROID_NATIVE_API_LEVEL=21
+#+END_SRC
+
+STEP 2: Build 
+
+#+BEGIN_SRC sh 
+   $ cmake --build _build --target
+   [4/4] Linking CXX executable app1
+
+   # Check executable 
+   $ file _build/app1
+   _build/app1: ELF 32-bit LSB shared object, ARM, EABI5 version 1 (SYSV), dynamically linked, 
+   interpreter /system/, BuildID[sha1]=8d6b159e0e65604fe1f65bca5ad9eef36aa4ab26, with debug_info, not stripped
+
+   # Attempt to run => Fails because the current machine (host) is Linux
+   # x86_64 - 64 bits, not ARM 32 bits
+   $ _build/app1
+   bash: _build/app1: cannot execute binary file: Exec format error
+#+END_SRC
+
+STEP 3: Deploy with ADB - Android Debug Bridge 
+
+#+BEGIN_SRC sh 
+  $ adb push _build/app1 /data/local/tmp
+  _build/app1: 1 file pushed. 18.6 MB/s (2848980 bytes in 0.146s)
+#+END_SRC
+
+STEP 4: Run application on Android.
+
+  + Run in adb shell
+
+#+BEGIN_SRC sh 
+  $ adb shell
+
+  on5xelte:/ $ /data/local/tmp/app1
+   [INFO] Hello world from application1
+  shell
+#+END_SRC
+
+  + Run with adb directly 
+
+#+BEGIN_SRC sh 
+  $ adb shell /data/local/tmp/app1
+   [INFO] Hello world from application1
+  shell
+#+END_SRC
 *** Detect Operating System 
 **** Detect operating system with predefined variables  
 
