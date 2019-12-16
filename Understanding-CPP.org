@@ -8110,6 +8110,7 @@ Output:
 #+END_SRC
 
 *** Placement new and delete operators 
+**** Overview 
 
 The _placement new_ operator has an additional parameter void* which
 allows instantiating a type or class in a specific memory
@@ -8193,6 +8194,230 @@ Usage example:
   void* operator delete[](void* p_object, void* location); 
 #+END_SRC
 
+**** Example - placement-new experiment in REPL
+
+Note: This example was run in the CERN's Root REPL.
+
+Class Dummmy: 
+
+#+BEGIN_SRC cpp 
+  class Dummy{   
+  public:
+      int x = 200;
+      int y = 25;
+      char name[200] = "Unnamed";
+   
+      Dummy()
+      {
+          std::printf(" [INFO] Default ctor called. => this = %p \n"
+                    , static_cast<void*>(this));
+      }
+
+      Dummy(int x, int y, const char* name)
+      {
+          std::strcpy(this->name, name);
+          this->x = x;
+          this->y = y;
+      }
+
+      ~Dummy()
+      {
+          std::printf(" [INFO] Dtor called. => this = %p \n"
+                      , static_cast<void*>(this));
+      }
+
+      void show() const
+      {
+          std::printf(" [INFO] Dummy { name = '%s' ; x = %d; y = %d } \n"
+                      , this->name, this->x, this->y);
+      }
+  };
+#+END_SRC
+
+ *REPL Session:* 
+
+Get size of type 'Dummy' in bytes 
+
+#+BEGIN_SRC cpp 
+  >> sizeof(Dummy)
+  (unsigned long) 208
+#+END_SRC
+
+Pre-allocated static (global) or stack buffer large enough for storing
+an instance of class dummy. 
+
+#+BEGIN_SRC cpp 
+  // Create a buffer with 416 bytes 
+  std::uint8_t buffer[416];
+#+END_SRC
+
+Buffer before instantiation: 
+
+#+BEGIN_SRC cpp 
+  >> buffer
+  (std::uint8_t [416]) { '0x00', '0x00', '0x00', '0x00', '0x00', '0x00', '0x00', .... '0x00', '0x00' }
+
+  >> (int) buffer[0]
+  (int) 0
+
+  >> (int) buffer[1]
+  (int) 0
+
+  >> (int) buffer[2]
+  (int) 0
+  >> 
+#+END_SRC
+
+Use the placment-new operator for creating an object of class Dummy in
+the buffer.
+
+#+BEGIN_SRC cpp 
+  >> Dummy* p = new (buffer) Dummy
+   [INFO] Default ctor called. => this = 0x7fda9fe7a010 
+  (Dummy *) 0x7fda9fe7a010
+
+  >> p->show()
+   [INFO] Dummy { name = 'Unnamed' ; x = 200; y = 25 } 
+  >> 
+
+  >> p->x
+  (int) 200
+
+  >> p->y
+  (int) 25
+
+  >> p->name
+  (char [200]) "Unnamed\0\0\0\0\0\0\0\0 ... ... \0\0\0"
+#+END_SRC
+
+Buffer after instantiation: 
+
+#+BEGIN_SRC cpp 
+  >> buffer
+  (std::uint8_t [416]) { 
+    '0xc8', '0x00', '0x00', '0x00', '0x19', '0x00', '0x00', '0x00', 'U', 'n', 'n', 'a', 'm', 'e', 'd',
+    '0x00', '0x00', '0x00', '0x00', '0x00', '0x00', '0x00', '0x00', '0x00', '0x00', '0x00' .... ... '0x00'}
+
+  >> (int) buffer[0]
+  (int) 200
+
+  >> (int) buffer[4]
+  (int) 25
+#+END_SRC
+
+Manipulating  object variable:
+
+#+BEGIN_SRC cpp 
+  >> int xx1 = 0x4ABC7852
+  (int) 1253865554
+
+  >> int yy1 = 0x3DFCA3E2
+  (int) 1039967202
+
+  >> p->x = xx1;
+  >> p->y = yy1;
+  >> std::strcpy(p->name, "I_am_dummy_object_in_C++1z");
+
+  >> p->show()
+   [INFO] Dummy { name = 'I_am_dummy_object_in_C++1z' ; x = 1253865554; y = 1039967202 } 
+#+END_SRC
+
+Check buffer: 
+
+#+BEGIN_SRC cpp 
+  >> buffer
+  (std::uint8_t [416]) { 'R', 'x', '0xbc', 'J', '0xe2', '0xa3', '0xfc'
+  , '=', 'I', '_', 'a', 'm', '_', 'd', 'u', 'm', 'm', 'y', '_', 'o', 'b', 'j', 'e'
+  , 'c', 't', '_', 'i', 'n', '_', 'C', '+', '+', '1', 'z', '0x00', '0x00', '0x00', '0x00' .. ... }
+#+END_SRC
+
+Create function display_buffer for showing buffer content in decimal,
+hexadecimal and char format: 
+
+#+BEGIN_SRC cpp 
+   void display_bytes(std::uint8_t* buffer, size_t min, size_t max){
+       if(min > max) throw std::runtime_error("Error: supposed min <= max");
+       for(size_t i = min; i < max; i++)
+       {
+           char ch = std::isprint(buffer[i]) ? buffer[i] : ' ';
+           std::printf(" => byte[%lu] = 0x%X %d %c\n", i
+                       , static_cast<int>(buffer[i])
+                       , static_cast<int>(buffer[i])
+                       , ch);
+       }
+   }
+#+END_SRC
+
+Analyze buffer bytes 0 to 3: 
+
+#+BEGIN_SRC cpp 
+  >> printf(" => xx1 = %X \n", xx1);
+   => xx1 = 4ABC7852 
+
+  // Value of p->x == 0x4ABC7852 
+  // 0x 4A BC 78 52 
+  >> display_bytes(buffer, 0, 4)
+   => byte[0] = 0x52 82 R
+   => byte[1] = 0x78 120 x
+   => byte[2] = 0xBC 188  
+   => byte[3] = 0x4A 74 J
+
+  >>  int x1_value = (buffer[3] << 24) + (buffer[2] << 16) + (buffer[1] << 8) + buffer[0]
+  (int) 1253865554
+
+  >> p->x
+  (int) 1253865554
+
+  x1_value == p->x
+  (bool) true
+
+  >> std::printf(" p->x = %X ; x1_value = %X \n", p->x, x1_value);
+   p->x = 4ABC7852 ; x1_value = 4ABC7852 
+#+END_SRC
+ 
+Analyze buffer bytes 4 to 7: 
+
+#+BEGIN_SRC cpp 
+  >> printf(" => yy1 = %X \n", yy1);
+   => yy1 = 3DFCA3E2 
+
+  // p->y = 0x3DFCA3E2 
+  // Bytes: 0x 3D FC A3 E2 
+  // In the buffer, the bytes are stored in "Little Endian Format" 
+  // as E2 A3 FC 3D
+  >> display_bytes(buffer, 4, 8)
+   => byte[4] = 0xE2 226  
+   => byte[5] = 0xA3 163  
+   => byte[6] = 0xFC 252  
+   => byte[7] = 0x3D 61 =
+
+  >> int y1_value = (buffer[7] << 24) + (buffer[6] << 16) + (buffer[5] << 8) +  buffer[4]
+  (int) 1039967202
+
+  >> printf(" p->y = %X ; y1_value = %X \n", p->y, y1_value);
+   p->y = 3DFCA3E2 ; y1_value = 3DFCA3E2 
+#+END_SRC
+
+Copy character portion to a std::string object.
+
+#+BEGIN_SRC cpp 
+  >> std::string str(buffer + 8, buffer + 40);
+
+  >> str
+  (std::string &) "I_am_dummy_object_in_C++1z\0\0\0\0\0\0"
+  >> 
+#+END_SRC
+
+Release memory: 
+
+#+BEGIN_SRC cpp
+  // Call destructor 
+  >> p->~Dummy() 
+   [INFO] Dtor called. => this = 0x7ff08c52c010 
+
+  // Call placement-delete operator 
+  >> ::operator delete(p, buffer)
+#+END_SRC
 
 *** References and further reading 
 
