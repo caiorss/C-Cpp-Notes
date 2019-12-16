@@ -7712,6 +7712,403 @@ File: [[file:src/stack-allocation-test.cpp][file:src/stack-allocation-test.cpp]]
     what():  std::bad_alloc
   Aborted (core dumped)
 #+END_SRC
+*** New and delete overloading functions 
+**** Many overloadings for new and delete operators  
+
+ *Global new and delete operators free functions* 
+
+  + size_t => Size of object being allocated in bytes. This parameter
+    is implicitly passed by the compiler. 
+
+  + Returns => A void* pointer to the beginning of the allocated
+    memory block.
+
+  + Note: The operator 'new' allocates objects in the heap memory
+    segment.
+
+ *Overloading for _new_ operator*
+
+  + Operator new for single object (throws std::bad_alloc on failure)
+
+  + For all overloadings se:
+    + https://en.cppreference.com/w/cpp/memory/new/operator_new
+
+#+BEGIN_SRC cpp 
+   // Signature 
+   void* operator new (std::size_t size);
+
+   // Example: allocate single object
+   //--------------------------------------------------//
+   BaseClass* ptr = nullptr;
+   try {
+       ptr = new DerivedClassA(param0, param1, param2, ...);
+       ptr->CallVirtualMethod1(); 
+       delete ptr;    // Always delete when the object is no longer needed 
+       ptr = nullptr; // Always set to nullptr 
+   catch(std::bad_alloc const& ex) {
+       printf(" [INFO] Allocation failed.")
+   }
+#+END_SRC
+
+  + Operator new for single object, without exception
+    + => Returns null pointer nullptr on failure. The second parameter
+      is type tag, used only for making the type signature different.
+
+#+BEGIN_SRC cpp 
+    // Signature 
+   void* operator new (std::size_t size, const std::nothrow_t& tag);
+
+   // Example: allocate single object
+   //--------------------------------------------------//
+   BaseClass* ptr = new (std::nowthrow) DerivedClassA(param0, param1, param2, ...);
+   ptr->CallVirtualMethod1(); 
+   if(!ptr){ 
+       std::printf(" [FAILURE] Abort operation. \n");
+       return;
+   }
+   delete ptr;    
+#+END_SRC
+
+ + Operator new for array allocation, throws _std::bad_alloc_ exception. 
+
+#+BEGIN_SRC cpp 
+    // Signature 
+    void* operator new[] (std::size_t size);
+
+    // Example: => Allocates 10 integers 
+    //----------------------------------------------------
+    int* pArray = nullptr;
+    try{ 
+      pArray = new int[10]
+    } catch (std::bad_alloc const& ex) {
+      // Abort operation 
+      return; 
+    }
+    pArray[0] = 100; pArray[2] = 25; 
+    delete [] pArray; // Always call delete 
+    pArray = nullptr; // Always set the pointer to nullptr after calling delete
+#+END_SRC
+
+**** Example: User-defined new and delete operators 
+ 
+It is possible to override the global _new_ and _delete_ operators free
+functions. 
+
+  + Note: replacing the default _new_ and _delete_ operators is not recommended.
+
+  + Instead of replacing the default _new_ and _delete_ operators, a
+    better alternative is defining class-specific operators as static
+    member functions. 
+
+ *File: new-delete-experiment1.cpp*
+
+ + File: [[file:src/new-delete-experiment1.cpp][file:src/new-delete-experiment1.cpp]]
+
+Class _SomeClass_: 
+
+#+BEGIN_SRC cpp 
+  class SomeClass{
+  public:
+      int x;
+      int y;
+      char buffer[200];
+
+      SomeClass(): x(125), y(2561), buffer("Hello world")
+      {
+          std::puts(" [TRACE] SomeClass object created OK");
+      }
+
+      void show() const
+      {
+          std::printf(" =>> SomeClass { x = %d, y = %d, buffer = %s } \n", x, y, buffer);
+      }
+
+      ~SomeClass()
+      {
+          std::puts(" [TRACE] SomeClass object destroyed OK");
+      }
+  };
+#+END_SRC
+
+Class _SomeClassB_:
+
+#+BEGIN_SRC cpp 
+  class SomeClassB{
+      char m_name[200] = "Unnamed";
+      int  m_id = -1;
+
+      SomeClassB()
+      {
+          std::printf(" [TRACE] <CTOR1> Object of SomeClassB created => addr = %p "
+                      " id = %d - name = '%s'"
+                      , static_cast<void*>(this), m_id, m_name);
+      }
+
+      ~SomeClassB()
+      {
+          std::printf(" [TRACE] <DTOR> Object of SomeClassC deleted => addr = %p \n"
+                      , static_cast<void*>(this));
+      }
+
+  };
+#+END_SRC
+
+Class _SomeClassC_:
+
+  + This class has class-specific _new_ and _delete_ operators defined as
+    static member functions. In this case, The keyword _static_ case can
+    be omitted, but it was used for making the code more explicit.
+
+#+BEGIN_SRC cpp 
+  class SomeClassC {
+  public:
+      char m_name[200] = "Unnamed";
+      int  m_id = -1;
+
+      SomeClassC()
+      {
+          std::printf(" [TRACE] <CTOR1> Object of SomeClassC created => addr = %p "
+                      " id = %d - name = '%s'"
+                      , static_cast<void*>(this), m_id, m_name);
+      }
+
+      SomeClassC(const char* name, int id)
+      {
+          std::strcpy(m_name, name);
+          m_id = id;
+          std::printf(" [TRACE] <CTOR2> Object of SomeClassC created => addr = %p "
+                      " id = %d - name = '%s' \n"
+                      , static_cast<void*>(this), m_id, m_name);
+      }
+
+      ~SomeClassC()
+      {
+          std::printf(" [TRACE] <DTOR> Object of SomeClassC deleted => addr = %p \n"
+                      , static_cast<void*>(this));
+      }
+
+      // Member fuction overloading of new operator
+      // -------------------------------------------------------
+      // Note: the keyword static is redundant, this operator is a static member function
+      // even without the keyword 'static'. It was added to make the declaration more explicit.
+      static void* operator new(size_t sz)
+      {
+          void* ptr = std::malloc(sz);
+          if(!ptr) std::puts(" [ERROR] Not enough memory");
+          std::printf(" [TRACE] SomeClassB => Custom new operator called. Allocated %lu Bytes => "
+                      " ptr = %p \n"
+                      , sz, ptr);
+          return ptr;
+      }
+
+      // Member fuction overloading of delete operator
+      // Static keyword redundant
+      static void operator delete(void* addr)
+      {
+          std::printf(" [TRACE] Custom delete operator called for SomeClassB => p = %p \n"
+                      , addr);
+          free(addr);
+      }
+  };
+#+END_SRC
+
+Global operator _new_ free-function:
+
+  + Note: This overloading throws exceptin std::bad_alloc when there
+    is no enough memory. 
+
+#+BEGIN_SRC cpp 
+  // Global free-function overloading of new operator Note: Cannot be
+  // declared inside a namespace Note: DO NOT DO IT!
+  void* operator new(size_t size)
+  {
+      std::printf(" [TRACE] NEW - Called operator new, Allocated %lu Bytes\n", size);
+      void* ptr = std::malloc(size);
+      if(!ptr) {
+          std::puts(" [ERROR] Not enough memory");
+          throw std::bad_alloc();
+      }
+      return ptr;
+  }
+#+END_SRC
+
+Global operator _new_ free-function (std::nothrow):
+
+ + Note: This overloading does not throw exception. It just returns a
+   null pointer when there is no enough memory.
+
+#+BEGIN_SRC cpp 
+  // Global free-function overloading of new operator (std::notrhow)
+  // Note: Cannot be declared inside a namespace
+  // Note: Does not throw exception, just returns a null pointer when there is no
+  //       memory available
+  void* operator new(size_t size, std::nothrow_t const& tag)
+  {
+      std::printf(" [TRACE] NEW (std::nothrow) - Called operator new, Allocated %lu Bytes\n", size);
+      void* ptr = std::malloc(size);
+      if(!ptr) {
+          std::puts(" [ERROR] Not enough memory");
+          return nullptr;
+      }
+      return ptr;
+  }
+#+END_SRC
+
+Global operator _delete_ free function: 
+
+#+BEGIN_SRC cpp 
+  // Global free-function overloading of delete operator
+  // Note: Cannot be delcared inside a namespace
+  void operator delete(void* ptr) noexcept
+  {
+      std::puts(" [TRACE] DELETE - Called operator delete");
+      free(ptr);
+  }
+#+END_SRC
+
+ *Main Function / Experiment 1*
+
+  + Allocate primitive type with custom _new_ operator. 
+
+#+BEGIN_SRC cpp 
+  std::puts("\n ==>> Experiment 1 == Global overloading -test with primitive type \n");
+  {
+      int* ptr = new int(25);
+      ,*ptr = 10 + *ptr;
+      std::printf(" Value of ptr[%p] = %d \n", static_cast<void*>(ptr), *ptr);
+      delete  ptr;
+  }
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC sh 
+   ==>> Experiment 1 == Global overloading -test with primitive type 
+
+   [TRACE] NEW - Called operator new, Allocated 4 Bytes
+   Value of ptr[0x2478e80] = 35 
+   [TRACE] DELETE - Called operator delete
+#+END_SRC
+
+ *Main Function / Experiment 2* 
+
+  + Allocate and instantiate an object of class SomeClass in the
+    process heap using the user-defined global _new_ (std::bad_alloc)
+    operator. Note: The default constructor is called. 
+
+#+BEGIN_SRC cpp 
+  std::puts("\n ==>> Experiment 2 == Global Overloading - test with class ====\n");
+  {
+      SomeClass* pcls = new SomeClass;
+      pcls->x = 25;
+      pcls->y = 1005;
+      pcls->show();
+      delete pcls;
+  }
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC sh 
+  ==>> Experiment 2 == Global Overloading - test with class ====
+
+  [TRACE] NEW - Called operator new, Allocated 208 Bytes
+  [TRACE] SomeClass object created OK
+  =>> SomeClass { x = 25, y = 1005, buffer = Hello world } 
+  [TRACE] SomeClass object destroyed OK
+  [TRACE] DELETE - Called operator delete
+#+END_SRC
+
+
+ *Main Function / Experiment 3*
+
+  + Allocate and instantiate an object of class SomeClass in the
+    process heap using the user-defined global _new_ (std::nothrow)
+    operator. Note: The default constructor is called. 
+
+#+BEGIN_SRC cpp 
+  std::puts("\n ==>> Experiment 3 == (std::notrhow) Global Overloading - test with class ====\n");
+  {
+      SomeClass* pcls = new (std::nothrow) SomeClass;
+      pcls->x = 25;
+      pcls->y = 1005;
+      pcls->show();
+      delete pcls;
+  }
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC sh 
+  ==>> Experiment 3 == (std::notrhow) Global Overloading - test with class ====
+
+   [TRACE] NEW (std::nothrow) - Called operator new, Allocated 208 Bytes
+   [TRACE] SomeClass object created OK
+   =>> SomeClass { x = 25, y = 1005, buffer = Hello world } 
+   [TRACE] SomeClass object destroyed OK
+   [TRACE] DELETE - Called operator delete
+#+END_SRC
+
+ *Main Function / Experiment 4*
+
+  + The global operator _new_ is used only for raw allocation, in the
+    same way as _malloc_. The object is not instantiated and no
+    constructor is called.
+
+#+BEGIN_SRC cpp 
+  std::puts("\n ==>> Experiment 4 - Explicit raw allocation  == Global Overloading - test with class ====\n");
+  {
+      // Raw memory allocation => Without calling the constructor
+      void* raw_pcls = ::operator new(sizeof(SomeClass));
+      // Note: The constructor is not called
+      SomeClass* pcls = static_cast<SomeClass*>(raw_pcls);
+      pcls->x = 251;
+      pcls->y = -1005;
+      std::strcpy(pcls->buffer, "raw-memory-allocated");
+      pcls->show();
+      delete pcls;
+  }
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC sh 
+   ==>> Experiment 4 - Explicit raw allocation  == Global Overloading - test with class ====
+
+   [TRACE] NEW - Called operator new, Allocated 208 Bytes
+   =>> SomeClass { x = 251, y = -1005, buffer = raw-memory-allocated } 
+   [TRACE] SomeClass object destroyed OK
+   [TRACE] DELETE - Called operator delete
+#+END_SRC
+
+ *Main Function / Experiment 5*
+
+  + Calls new and delete operators specific for SomeClassC defined as
+    static meber functions. 
+
+#+BEGIN_SRC cpp 
+  std::puts("\n ==>> Experiment 5 === Member Function Overloading ==========\n");
+  {
+      SomeClassC* pclassB = new SomeClassC("Hello", 2005);
+      std::printf(" =>>  Print object => pclassB->m_name = %s; pclassB->m_id = %d \n"
+                  , pclassB->m_name, pclassB->m_id);
+
+      delete pclassB;
+  }
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC sh 
+   ==>> Experiment 5 === Member Function Overloading ==========
+
+   [TRACE] SomeClassB => Custom new operator called. Allocated 204 Bytes =>  ptr = 0x2478ea0 
+   [TRACE] <CTOR2> Object of SomeClassC created => addr = 0x2478ea0  id = 2005 - name = 'Hello' 
+   =>>  Print object => pclassB->m_name = Hello; pclassB->m_id = 2005 
+   [TRACE] <DTOR> Object of SomeClassC deleted => addr = 0x2478ea0 
+   [TRACE] Custom delete operator called for SomeClassB => p = 0x2478ea0 
+#+END_SRC
+
 *** References and further reading 
 
 General: 
