@@ -7713,7 +7713,7 @@ File: [[file:src/stack-allocation-test.cpp][file:src/stack-allocation-test.cpp]]
   Aborted (core dumped)
 #+END_SRC
 *** New and delete overloading functions 
-**** Many overloadings for new and delete operators  
+**** Overloadings for new and delete operators  
 
  *Global new and delete operators free functions* 
 
@@ -8109,6 +8109,91 @@ Output:
    [TRACE] Custom delete operator called for SomeClassB => p = 0x2478ea0 
 #+END_SRC
 
+*** Placement new and delete operators 
+
+The _placement new_ operator has an additional parameter void* which
+allows instantiating a type or class in a specific memory
+location. 
+
+Notes: 
+
+  + This operator does not allocate any storage. It instantiantes
+    object at a pre-allocated storage or at specific memory
+    address.
+
+  + The global new and delete placement operators cannot be replaced
+    by user-defined ones.
+
+Some *use-cases* for this operator are: 
+
+  + Instantiate object in shared memory between two processes. 
+
+  + Instantiate object in memory mapped file. 
+
+  + Instantiate object in some pre-allocated buffer, it allows
+    instantiating polymorphic objects at runtime in a 
+    static-allocated buffer (global variable) or in a stack-allocated
+    buffer. This technique is useful in *embedded systems* for enabling
+    polymorphism without heap allocation.
+    + Note: A buffer in this cases is a byte array: _char buffer [BUFFER_SIZE]_
+
+  + Instantiate object in some specific hardware address - Memory
+    Mapped IO, MMIO (*embedded systems*)
+
+  + Custom allocators 
+
+ *Placemente new and delete operators for single object* 
+
+  + The parameter _size_ is the size of the data type to be
+    allocated. 
+
+  + The pointer _place_ holds the address where the object will be
+    instantiated.
+
+  + The return value is the pointer to the allocated object.
+
+  + Note: This gloabl new placement operator cannot be replaced by
+    an user-defined one. However, it is possible to define
+    class-specific one as static member function.
+
+#+BEGIN_SRC cpp 
+  // Placement new operator:
+  void* operator new(std::size_t size, void* location); 
+
+  // Placement delete operator: 
+  void delete(void* p_object, void* location);
+#+END_SRC
+
+Usage example: 
+
+#+BEGIN_SRC cpp 
+  // Allocate object in pre-allocated buffer 
+  constexpr size_t BUFFER_SIZE = 2048; // 2048 bytes or 2kb
+  char buffer[BUFFER_SIZE];
+
+  // Construct object at buffer 
+  BaseClass* obj = new (buffer) DerivedClass(arg0, arg1, arg2, ... argN-1)
+
+  obj->callVirtualMethod(); 
+  
+  // Invoke destructor when object is no longer needed
+  obj->~BaseClass();  
+
+  // Call placement delete operator 
+  ::operator delete(obj, buffer);
+#+END_SRC
+
+ *Placemente new and delete operators for arrays* 
+
+#+BEGIN_SRC cpp 
+  // Placement new operator for arrays
+  void* operator new[](std::size_t size, void* location); 
+
+  // Placement new operator for arrays 
+  void* operator delete[](void* p_object, void* location); 
+#+END_SRC
+
+
 *** References and further reading 
 
 General: 
@@ -8140,6 +8225,17 @@ General:
 
  + *Favorite Tools: C++11 std::array*
    + https://www.embeddedrelated.com/showarticle/1031.php
+
+Placement New and Delete Opeators:
+
+  + Wikipedia - *Placement syntax* 
+    * <https://en.wikipedia.org/wiki/Placement_syntax>
+
+  + *Thinking in C++, 2nd ed. Volume 1* - Dynamic Object Creation  - Bruce Eckel
+    + <http://www.cs.ust.hk/~dekai/library/ECKEL_Bruce/TICPP-2nd-ed-Vol-one/TICPP-2nd-ed-Vol-one-html/Chapter13.html>
+ 
+  + *Calling Constructors with Placement New*
+    + <https://www.drdobbs.com/cpp/calling-constructors-with-placement-new/232901023?pgno=2>
 
 C++ Idioms related to Heap-Allocation: 
 
