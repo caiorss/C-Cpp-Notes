@@ -157,6 +157,7 @@ Other useful header files:
 
 Native executables, shared libraries and project files.
 
+|--------------------------+---------------+----------------------------------------------------------------------------|
 | Extension                | Executable    | Description                                                                |
 |                          | Binary Format |                                                                            |
 |--------------------------+---------------+----------------------------------------------------------------------------|
@@ -189,6 +190,7 @@ Native executables, shared libraries and project files.
 
 Scripting Languages Files: 
 
+|--------------------+----------------------------+--------------------------------+-------------------------------------------------------------------------------------|
 | File Extension     | Interpreter                | Advantage                      | Description                                                                         |
 |--------------------+----------------------------+--------------------------------+-------------------------------------------------------------------------------------|
 | .bat               | cmd.exe                    | Simplicity                     | Batch Script - Legacy technology from MSDOS, but still useful for small automation. |
@@ -2874,10 +2876,6 @@ Main function:
 
    + [[https://www.mql5.com/en/articles/73][Using WinInet.dll for Data Exchange between Terminals via the Internet - MQL5 Articles]]
 
-   + [[https://rsdn.org/article/inet/wininet.xml][Введение в WinInet]] (In Russian.)
-
-   + [[https://www.cnblogs.com/zhcncn/articles/3289366.html][IEWinINet API，WinInet的异步使用方法 - 金石开 - 博客园]]
-
    + [[http://blog.lekevin.com/computer/using-the-wininet-api-to-access-the-internet-from-visual-basic-6/][Using the WinInet API to access the internet from Visual Basic 6 - Le Kevin]]
 
    + [[http://www.devx.com/getHelpOn/10MinuteSolution/20373][WinInet API Programming]]
@@ -3894,6 +3892,237 @@ Member functions of class DLLoader:
   }
 
 #+END_SRC
+** Making a runnable DLL - rundll32 
+*** Overview 
+
+Windows shared libraries DLLs, such as control panel applets, can be
+executed in a similar way to executable if they contain entry point
+functions matching the type signature expected by rundll32.exe
+application. 
+
+ *Some Runnable DLLs* 
+
+File Explorer Options: 
+ + The following command calls the _Options_RunDLL_ entry point of the
+   DLL shell32.dll which opens a window where is possible to set file
+   explorer options. 
+
+#+BEGIN_SRC sh 
+  $ RunDll32.exe shell32.dll,Options_RunDLL 0
+#+END_SRC
+
+Environment variables control panel applet: 
+ + It opens a Window where is possible to set and add news environment variables.
+
+#+BEGIN_SRC sh 
+  $ rundll32.exe sysdm.cpl,EditEnvironmentVariables
+#+END_SRC
+
+Check DLL locations: 
+
+#+BEGIN_SRC sh 
+  $ where shell32.dll
+  C:\Windows\System32\shell32.dll
+
+  $ where sysdm.cpl
+  C:\Windows\System32\sysdm.cpl
+
+  $ file C:\Windows\System32\sysdm.cpl
+  C:\Windows\System32\sysdm.cpl: PE32+ executable (DLL) (GUI) x86-64, for MS Windows
+#+END_SRC
+
+*** Example 
+
+ *File: runnable.cpp*
+
+Sample runnable DLL with two entry points. 
+
+#+BEGIN_SRC cpp 
+  #include <windows.h>
+  #include <iostream>
+  #include <string>
+  #include <sstream>
+
+  #define DLL_EXPORT extern "C" __declspec(dllexport)
+  #define DLL_EXPORT_STDCALL extern "C" __declspec(dllexport) __stdcall
+
+  DLL_EXPORT
+  void entryPoint1(HWND hwn, HINSTANCE hinst, LPSTR cmdLine, int nCmdShow)
+  {  
+    std::stringstream ss;
+    ss << __FILE__ << ":" << __LINE__ << ":" << "Entry point 1 running!";
+
+    // Note: Does not work because the DLL is loaded by a program built for
+    // the window subsystem.
+    std::cout << ss.str() << std::endl;
+    ss << " cmdLine = " << cmdLine;
+
+    //Print logging to shared memory 
+    OutputDebugStringA(ss.str().c_str());
+
+    // Show graphical messagebox 
+    MessageBoxA(NULL, ss.str().c_str(), "EntryPoint1-DLL", 0);
+  }
+
+  DLL_EXPORT
+  void entryPoint2(HWND hwn, HINSTANCE hinst, LPSTR cmdLine, int nCmdShow)
+  {  
+          // Show graphical messagebox 
+          MessageBoxA(nullptr, "Launching Notepad.exe", "EntryPoint2-DLL", 0);
+          // Launch Notepad.exe
+          ::system("notepad.exe");
+  }
+
+
+  /** DLL Entry Point on Windows, similar to main() function */
+  DLL_EXPORT BOOL
+  APIENTRY DllMain (HINSTANCE hInst, DWORD reason, LPVOID lpReserved)
+  {
+    std::stringstream ss;
+    ss << __FILE__ << ":" << __LINE__ << ": => DLL Loaded OK." << std::endl;
+    OutputDebugString(ss.str().c_str());
+    ss.clear();
+    switch (reason)
+      {
+      case DLL_PROCESS_ATTACH:
+        ss << __FILE__ << ":" << __LINE__ << ": => DLL attached." << std::endl;
+        OutputDebugString(ss.str().c_str());
+        ss.clear();
+        break;
+      case DLL_PROCESS_DETACH:
+        ss << __FILE__ << ":" << __LINE__ << ": => DLL detached." << std::endl;
+        OutputDebugString(ss.str().c_str());
+        ss.clear();      
+        break;
+      case DLL_THREAD_ATTACH:
+        ss << __FILE__ << ":" << __LINE__ << ": => DLL thread attached." << std::endl;
+        OutputDebugString(ss.str().c_str());
+        ss.clear();      
+         break;
+      case DLL_THREAD_DETACH:
+        ss << __FILE__ << ":" << __LINE__ << ": => DLL thread detached." << std::endl;
+        OutputDebugString(ss.str().c_str());
+        ss.clear();      
+        break;
+      }
+
+    return TRUE;
+  }
+#+END_SRC
+
+ *File: CMakeLists.txt* 
+
+#+BEGIN_SRC cmake 
+  cmake_minimum_required(VERSION 3.9)
+  project(RunnableDLL)
+
+  #----------------------------------------------#
+
+  set(CMAKE_CXX_STANDARD 17)     
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+  set(CMAKE_CXX_EXTENSIONS OFF)
+
+  #=========== CMake Functions ===================#
+
+  # Copy target file to current directory whenerver it is rebuilt
+  function(copy_after_build TARGET_NAME )
+      # Note: CMAKE_CURRENT_LIST_DIR is the directory where is this
+      # CMakeLists.txt file.
+      set(DESTDIR ${CMAKE_CURRENT_LIST_DIR}/bin/)
+      file(MAKE_DIRECTORY ${DESTDIR})
+
+      # Copy binary file to <CMakeLists.txt didctory>./bin
+      # after target is compiled.
+      add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy
+                                 $<TARGET_FILE:${TARGET_NAME}> ${DESTDIR}
+                                 )
+  endfunction()
+
+
+  #========== Targets Configurations ============#
+
+  # Generates DLL named: 'applet.cpl' 
+  add_library(runnable SHARED runnable.cpp)
+
+  # Change the DLL name from 'runnable.dll' to 'applet.cpl'
+  set_target_properties( runnable PROPERTIES
+    OUTPUT_NAME  "applet"
+    SUFFIX       ".cpl"
+  )
+
+  copy_after_build(runnable)
+#+END_SRC
+
+ *Building* 
+
+Building: 
+
+#+BEGIN_SRC sh 
+  $ cd <PROJECT-ROOT-DIRECTORY>
+
+  # Configure 
+  $ cmake -H. -B_build -G"Visual Studio 15 2017 Win64"
+
+  # Compile 
+  $ cmake --build _build --target
+#+END_SRC
+
+Check building system output: 
+  + Note: The tools 'ls' and 'file' are not native to Windows, they
+    come bundled with GIT.  
+
+#+BEGIN_SRC sh 
+   $ ls bin
+   applet.cpl*
+
+   $ file bin\applet.cpl
+   bin\applet.cpl: PE32+ executable (DLL) (console) x86-64, for MS Windows
+#+END_SRC
+
+ *Running* 
+
+Check where is rundll32:
+
+#+BEGIN_SRC sh 
+  $ where rundll32
+  C:\Windows\System32\rundll32.exe
+#+END_SRC
+
+Execute _entryPoint1_ function
+
+  + As the DLL applet.cpl is loaded by an executable compiled to the
+    Window-subsystem, the *cout* output is not displayed in the
+    terminal. A workaround to this issue is logging to a file;
+    redirect std::cout to a file output stream or using the
+    OutputDebugString API and *DebugView* application from SysInternals.
+
+#+BEGIN_SRC sh 
+  $ rundll32 bin\applet.cpl,entryPoint1 arg0 arg1 arg2
+#+END_SRC
+
+DebugView Output:
+
+#+BEGIN_SRC 
+  [5276] C:\Users\dummy-user\Desktop\Runnable-DLL\runnable.cpp:41: => DLL Loaded OK.
+  [5276] C:\Users\dummy-user\Desktop\Runnable-DLL\runnable.cpp:41: => DLL Loaded OK.
+  [5276] C:\Users\dummy-user\Desktop\Runnable-DLL\runnable.cpp:47: => DLL attached.
+  [5276] C:\Users\dummy-user\Desktop\Runnable-DLL\runnable.cpp:41: => DLL Loaded OK.
+  [5276] C:\Users\dummy-user\Desktop\Runnable-DLL\runnable.cpp:41: => DLL Loaded OK.
+  [5276] C:\Users\dummy-user\Desktop\Runnable-DLL\runnable.cpp:57: => DLL thread attached.
+  [5276] C:\Users\dummy-user\Desktop\Runnable-DLL\runnable.cpp:13:Entry point 1 running! cmdLine = arg0 arg1 arg2 
+  [5276] C:\Users\dummy-user\Desktop\Runnable-DLL\runnable.cpp:41: => DLL Loaded OK.
+  [5276] C:\Users\dummy-user\Desktop\Runnable-DLL\runnable.cpp:41: => DLL Loaded OK.
+  [5276] C:\Users\dummy-user\Desktop\Runnable-DLL\runnable.cpp:52: => DLL detached.
+#+END_SRC
+
+Execute _entryPoint2_ function 
+ + The entryPoint2 launches notepad.exe application.
+
+#+BEGIN_SRC sh 
+  $ rundll32 bin\applet.cpl,entryPoint2
+#+END_SRC
+
 ** Install Development Tools and Compilers 
 *** C++ Compilers 
 **** Install GCC/Mingw + a couple of GNU tools 
