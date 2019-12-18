@@ -664,7 +664,7 @@ between ANSI and Unicode:
 #+BEGIN_SRC cpp 
   "UTF8 - Unicode 8 bits multi-byte literal";
   // Note: It doesn't work with Windows APIs (Windows specific functions)
-  char utf8_text [] = "Random text in Chinese script (UTF8): 读写汉字1";
+  char utf8_text [] = "Random text in Georgian script (UTF8): ნუსხური";
 #+END_SRC
 
  + _Utf-16 string literal_ (wide characters - wchar_t). Windows Unicode
@@ -672,7 +672,7 @@ between ANSI and Unicode:
 
 #+BEGIN_SRC cpp   
   L"UTF16 Wchar wide chracters literal";
-  wchar_t utf16_text [] = L"Random text in Chinese script (UTF16): 读写汉字1";
+  wchar_t utf16_text [] = L"Random text in Georgian script (UTF16): ნუსხური";
 #+END_SRC
 
  + String prefixed with _T or TEXT. If Unicode is defined the string
@@ -680,21 +680,21 @@ between ANSI and Unicode:
    added to the string, otherwise nothing happens.
 
 #+BEGIN_SRC cpp 
-  TCHAR text [] = _T("Random text in Chinese script  读写汉字1");
+  TCHAR text [] = _T("Random text in Georgian script  ნუსხური");
   // OR 
-  TCHAR text [] = TEXT("Random text in Chinese script  读写汉字1");
+  TCHAR text [] = TEXT("Random text in Georgian script  ნუსხური");
 #+END_SRC
 
 If _UNICODE_ is not defined, it becomes: 
 
 #+BEGIN_SRC cpp 
-  char text [] = "Random text in Chinese script 读写汉字1";
+  char text [] = "Random text in Georgian script ნუსხური";
 #+END_SRC
 
 If Unicode is defined, it becomes: 
 
 #+BEGIN_SRC cpp
-  wchar_t text [] = L"Random text in Chinese script 读写汉字1";
+  wchar_t text [] = L"Random text in Georgian script ნუსხური";
 #+END_SRC
 
  *Windows APIs - ANSI X Unicode version*
@@ -3892,7 +3892,7 @@ Member functions of class DLLoader:
   }
 
 #+END_SRC
-** Making a runnable DLL - rundll32 
+** Runnable Shared Libraries DLLs - rundll32 
 *** Overview 
 
 Windows shared libraries DLLs, such as control panel applets, can be
@@ -3931,7 +3931,7 @@ Check DLL locations:
   C:\Windows\System32\sysdm.cpl: PE32+ executable (DLL) (GUI) x86-64, for MS Windows
 #+END_SRC
 
-*** Example 
+*** Creating a runnable DLL 
 
  *File: runnable.cpp*
 
@@ -4121,6 +4121,93 @@ Execute _entryPoint2_ function
 
 #+BEGIN_SRC sh 
   $ rundll32 bin\applet.cpl,entryPoint2
+#+END_SRC
+
+*** Creating a DLL runner 
+
+The following code is a DLL runner, akin to rundll32.exe built-in
+application. It can run any DLL containing entry rundll32 entry points
+or the functions with the same type signature as *Rundll32EntryPoint_t*.
+
+ *File: dll-runner.cpp*
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+  #include <cassert>
+  #include <windows.h>
+
+  #define DLL_EXPORT extern "C" __declspec(dllexport)
+  #define DLL_EXPORT_STDCALL extern "C" __declspec(dllexport) __stdcall
+
+  using Rundll32EntryPoint_t = void (*) (  HWND hwn
+                                         , HINSTANCE hinst
+                                         , LPSTR cmdLine
+                                         , int nCmdShow);
+
+  int main(int argc, const char* argv[])
+  {
+     if(argc < 4) {
+           std::cerr << " Usage: " << argv[0] << " <DLL-FILE> <ENTRY-POINT> <ENTRY_COMMAND_LINE> "
+                     << std::endl;
+           std::cerr << " [ERROR] Invalid arguments. Abort."
+                     << std::endl;		
+           return EXIT_FAILURE;
+     }
+
+     /// Shared library that will be executed 
+     std::string dll_file     = argv[1];
+     /// Entry point that will be called 
+     std::string entry_point  = argv[2];
+     /// Command line arguments to the called entry point 
+     std::string command_line = argv[3];
+
+    // Wide unicode version for LoadLibrary API
+     HMODULE hLib = ::LoadLibraryA(dll_file.c_str());
+     assert(hLib != nullptr);
+     FARPROC hFunc = ::GetProcAddress(hLib, entry_point.c_str());
+     assert(hFunc != nullptr);
+
+     //--- Execute Entry Point ----//
+     HINSTANCE hInstance = GetModuleHandle(NULL);
+
+     auto entry_point_handler = reinterpret_cast<Rundll32EntryPoint_t>(hFunc);
+     entry_point_handler(nullptr, hInstance, command_line.data(), 1);		
+
+     return EXIT_SUCCESS;
+  }
+#+END_SRC
+
+ *Testing* 
+
+Show usage: 
+
+#+BEGIN_SRC sh 
+  $ bin\dll-runner.exe
+   Usage: bin\dll-runner.exe <DLL-FILE> <ENTRY-POINT> <ENTRY_COMMAND_LINE>
+   [ERROR] Invalid arguments. Abort.
+#+END_SRC
+
+Execute _EditEnvironmentvariables_ entry point of sysdm.cpl DLL (Control
+Panel Applet). 
+
+#+BEGIN_SRC sh 
+  # $ RunDll32.exe sysdm.cpl,EditEnvironmentVariables
+
+  $ dll-runner.exe sysdm.cpl EditEnvironmentVariables ""
+
+  $ dll-runner.exe C:\\Windows\system32\sysdm.cpl EditEnvironmentVariables ""
+#+END_SRC
+
+Execute _Options_RunDLL_ entry point of shell32.dll which opens File
+Explorer Options window. 
+
+#+BEGIN_SRC sh 
+  # $ RunDll32.exe shell32.dll,Options_RunDLL 0
+
+  $ dll-runner.exe shell32.dll Options_RunDLL "0"
+
+  $ dll-runner.exe C:\\Windows\system32\shell32.dll Options_RunDLL "0"
 #+END_SRC
 
 ** Install Development Tools and Compilers 
