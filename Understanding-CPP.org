@@ -7789,6 +7789,155 @@ File: [[file:src/stack-allocation-test.cpp][file:src/stack-allocation-test.cpp]]
     pArray = nullptr; // Always set the pointer to nullptr after calling delete
 #+END_SRC
 
+**** Example: Raw memory allocation with new operator 
+
+The 'new' operator can be used for raw memory allocation without
+calling constructor, in the same way as the C-function malloc. 
+
+ *Experiment 1*
+
+Allocating an array in heap for 4 integers. (CERN's Root REPL)
+
+#+BEGIN_SRC cpp 
+   >> void* pi = ::operator new (4 * sizeof(int))
+   (void *) 0x3184af0
+
+   >> assert(pi != nullptr);
+
+   >> int* pint = static_cast<int*>(pi)
+   (int *) 0x3184af0
+
+   >> pint[0] = 20, pint[1] = 100, pint[2] = 3, pint[3] = 25;
+
+   >> pint[0]
+   (int) 20
+
+   >> pint[1]
+   (int) 100
+
+   >> pint[2]
+   (int) 3
+
+   >> pint[3]
+   (int) 25
+   >> 
+
+   >> std::for_each(pint, pint + 4, [](int x){ std::printf(" x = %d \n", x); });
+    x = 20 
+    x = 100 
+    x = 3 
+    x = 25 
+
+   // Call operator delete 
+   >> delete pint
+
+   // Set to null when no longer used. 
+   >> pi = nullptr; 
+   >> pint = nullptr;
+#+END_SRC
+
+ *Experiment 2* 
+
+Allocating raw memory for an instance of a class with new operator: 
+
+#+BEGIN_SRC cpp 
+  struct Circle{
+     int x; 
+     int y;  
+     int radius;
+
+     Circle(): x(10), y(20), radius(2) 
+     { 
+        std::printf(" [INFO] Cirlce constructed OK.\n");
+     }
+
+     ~Circle()
+     { 
+        std::printf(" [INFO] Cirlce destroyed OK.\n");
+     }
+
+     void set_radius(int r) 
+     {
+        radius = r;
+     }
+
+     void plot() const 
+     { 
+        std::printf(" [INFO] Draw circle at Point(%d, %d) with radius = %d\n"
+           , this->x, this->y, this->radius);
+     }
+  };
+#+END_SRC
+
+REPL Session part 1:
+ + The following call to operator 'new' only allocates memory for the
+   object without calling its constructor. 
+
+#+BEGIN_SRC cpp 
+   // Constructor is not called!!! 
+   // =>> Throws std::bad_alloc on failure. 
+   >> void* p = ::operator new(sizeof(Circle))
+   (void *) 0x1f30150
+
+   assert(p != nullptr); 
+
+   // Constructor is not called!!!
+   >> Circle* cp1 = (Circle*) p
+   (Circle *) 0x1f30150
+
+   // =========>>> Manually Initialize Object <<=============//
+   //--------------------------------------------------------- 
+
+
+   // Solution: Initialize object manually. 
+   >> cp1->x = 10;
+   >> cp1->y = 20;
+   >> cp1->radius = 25;
+
+   >> cp1->plot()
+    [INFO] Draw circle at Point(10, 20) with radius = 25
+   >> 
+
+   // =========>>> Destroy object and release memory <<=============//
+   //----------------------------------------------------------------- 
+
+   // Call destructor when the object is no longer needed
+   >> delete cp1
+    [INFO] Cirlce destroyed OK.
+
+   // Set pointer to null 
+   >> cp1 = nullptr
+#+END_SRC
+
+REPL Session Part 2:
+ + The constructor could be called if the placement-new operator was
+   used. 
+
+#+BEGIN_SRC cpp 
+  >> void* pp = ::operator new(sizeof(Circle))
+  (void *) 0x32acf00
+
+  // Abort computation if pp is null. 
+  assert( pp != nullptr ); 
+
+  // Now constructor is called. 
+
+  >> Circle* cpp = new (pp) Circle
+   [INFO] Cirlce constructed OK.
+  (Circle *) 0x32acf00
+
+  >> cpp->x
+  (int) 10
+
+  >> cpp->y
+  (int) 20
+
+  >> cpp->plot()
+   [INFO] Draw circle at Point(10, 20) with radius = 2
+
+  >> delete cpp
+   [INFO] Cirlce destroyed OK.
+#+END_SRC
 **** Example: User-defined new and delete operators 
  
 It is possible to override the global _new_ and _delete_ operators free
