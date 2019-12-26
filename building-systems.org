@@ -336,6 +336,578 @@ Comparative table:
  + Reddit /r/cpp - [[https://www.reddit.com/r/cpp/comments/40cfbk/hunter_crossplatform_package_manager_for_c/][Hunter - Cross-platform package manager for C++]]
  + [[https://news.ycombinator.com/item?id=16915195][Announcing a single C++ library manager for Linux, macOS and Windows: Vcpkg]]
 
+* Make and GNU Make - Makefiles 
+*** Overview 
+
+Despite being one of the oldest building systems for C and C++, dating
+back to 1976, Make is still widely used on Unix-like operating
+systems, such as Linux, BSD-variants, MacOSX and so on. Make is not
+only useful for C or C++, the tool can also be used with any other
+programming language or for any type of building automation such as
+compiling Latex (Tex) files. 
+
+Make Variants (Implementations):
+   + GNU Make (Most used)
+   + BSD Make
+   + NMake - Microsft's Make
+
+Note: 
+ + This text assumes that the *Make* used is *GNU Make*
+
+Advantages: 
+   + Easier usage
+   + Available on most Unix-like operating systems
+   + Can be used for automating any type of building. 
+
+Drawbacks: 
+
+   + Makefiles uses tabs instead of spaces which makes it brittle and
+     easier to break if the editor settings are not appropriate.
+
+   + Fragmentation: there is no a single Make tool, actually there are
+     many incompatible implementations, namely: BSD Make; GNU Make,
+     mostly used on Linux; Microsft's Make or NMake.
+
+   + Hard to use on Windows, Make requires many helper executables
+     such as echo, cp, ls, rm, ...
+
+   + Poor IDE support 
+
+   + No scalable for large projects
+
+   + Hard to change     
+
+   + Hard to add dependencies
+
+   + Hard to understand and modify
+
+ *Command Line Summary*
+
+|--------------------------------------------+----------------------------------------------------------------------------------------|
+| Make Command                               | Description                                                                            |
+|--------------------------------------------+----------------------------------------------------------------------------------------|
+| $ make --version                           | Show version                                                                           |
+| $ make --help                              | Show help                                                                              |
+|                                            |                                                                                        |
+| $ make                                     | Run the file 'Makefile' in the current directory, executing the 'all' target.          |
+| $ make CC=clang CXX=clang++                | Target 'all' for current Makefile, but sets C compiler to clang and C++ one to clang++ |
+| $ make <TARGET>                            | Run the target <TARGET>                                                                |
+| $ make <TARGET> VAR1=VAL1 VAR2=VAL2        | Run some target named <TARGET> setting variable VAR1 to VAL1, VAR2 to VAL2.            |
+| $ make clean                               | Run the target 'clean' for the Makefile in current directory.                          |
+| $ make install                             | Run the target 'install' for the current Makefile                                      |
+| $ make help                                | Run the target 'help' for the current Makefile.                                        |
+|                                            |                                                                                        |
+| $ make -C ~/path/dir~                        | Run the file 'Makefile' in the directory  ~/path/dir~, executes 'all' target.            |
+| $ make -C ~/path/dir~ <TARGET>               | Executes target <TARGET> of Makefile in  ~/path/dir~                                     |
+| $ make -f Other.make                       | Run the Makefile named 'Other.make' in current directory                               |
+| $ make -f Other.make <TARGET>              | Run the target <TARGET> of Makefile named 'Other.make' in current directory.           |
+| $ make -C ~/path/dir~ -f Other.make          | Run the Makefile named Other.make' in directory ~/path/dir~,  executes 'all' target      |
+| $ make -C ~/path/dir~ -f Other.make <TARGET> | Run the Makefile named Other.make' in directory ~/path/dir~,  executes 'all' target      |
+|                                            |                                                                                        |
+|--------------------------------------------+----------------------------------------------------------------------------------------|
+
+ *Common Make variables Summary*
+
+|----------+------------------------------------------------|
+| Variable | Description                                    |
+|----------+------------------------------------------------|
+| CC       | C compiler, most common value is 'gcc'         |
+| CXX      | C++ Compiler, most common value is 'g++'       |
+| LD       | Linker                                         |
+|          |                                                |
+| CFLAGS   | C compilation flags, i.e: -Wall -Wextra -g ... |
+| CXXFLAGS | C++ compilation flags                          |
+|          |                                                |
+|          |                                                |
+|----------+------------------------------------------------|
+*** Project Example 
+
+ *File: Makefile*
+
+#+BEGIN_SRC sh
+     #---------------------------------------------------#
+     #     Compilation and Linker Settings               #
+     #---------------------------------------------------#
+
+  CXX = g++   # C++ Compiler
+  CC  = gcc   # C Compiler
+
+  CCFLAGS  =                          # C compiler flags
+  CXXFLAGS = -std=c++1z -pedantic -Wall -Wextra # C++ Compiler flags
+
+  LDFLAGS   =   # C Linker Flags
+  LDXXFLAGS =   # C++ Linker flags
+
+  # DEBUG = 1 => Enables debug building
+  # DEBUG = 0 => Enable release building
+  DEBUG ?= 0
+  ifeq ($(DEBUG), 1)
+      # (-g)  => Enable debug symbols
+      # (-O0) => Disable optimizations
+      # -DNDEBUG => Enable assertions
+      CXXFLAGS  += -g -O0  -DNDEBUG
+  else
+       # Release mode =>> Enable optimization
+       CXXFLAGS += -O3
+       # Enable Link-time optimiztion
+       LDXXFLAGS += # -flto -ffunction-sections -fdata-sections
+  endif
+
+  APP2_OBJS = app2.o stats.o
+
+     #---------------------------------------------------#
+     #     Makefile Rules                                #
+     #---------------------------------------------------#
+
+  # Main rule executed when use runs '$ make' without
+  # any argument.
+  #---------------------------------------------------
+  all: app1.bin app2.bin
+
+  # This rule builds the executable 'app1.bin'
+  #----------------------------------------------------
+  #  $^ => Refers to all dependencies (app1.o, app1.o)
+  #  $@ => Refers to the target name, 'app1.bin'
+  app1.bin : app1.o stats.o
+          @echo -e "\n [INFO] Building executable 'app1.bin'"
+          $(CXX) -o $@ $^ $(LDXXFLAGS)
+
+  # This rule builds the executable 'app2.bin'
+  #----------------------------------------------------
+  #  $^ => Refers to all dependencies (app1.o, app1.o)
+  #  $@ => Refers to the target name, 'app1.bin'
+  app2.bin : $(APP2_OBJS)
+          @echo -e "\n [INFO] Building executable 'app2.bin'"
+          $(CXX) -o $@ $^ $(LDXXFLAGS)
+
+  # Compiles all *.cpp files to *.o (object-code files) which
+  # are inputs to the linker.
+  #
+  #--------------------------------------------------
+  #  $< => Name of dependency (on right-hand size, example: someFile.cpp)
+  #  $@ => Name of target (on the left-hand side)
+  #
+  %.o : %.cpp
+          @echo -e "\n [INFO] Building object code: $<"
+          $(CXX) -c $< -o $@  $(CXXFLAGS)
+
+  # This rule runs the executable app1.bin, the dependency is 'app1.bin'
+  #------------------------------------------------------------
+  app1_run: app1.bin
+          ./app1.bin
+
+  # This rule deletes all object-codes (*.o, *.bin, *.so, *.dll, *.exe ...)
+  #-------------------------------------------------------
+  clean:
+          @echo -e "\n [INFO] Cleaning compilation output."
+          rm -rf -v *.o *.bin
+
+  install: app1.bin app2.bin
+          @echo -e "\n [INFO] Installing application to: $(INSTALL_PATH)"
+          mkdir -p $(INSTALL_PATH)
+          cp -rv $^ $(INSTALL_PATH)
+#+END_SRC
+
+ *File: stats.hpp*
+
+#+BEGIN_SRC cpp 
+   #include <iostream>
+   #ifndef _STATS_HPP_
+   #define _STATS_HPP_
+
+   class Stats
+   {
+   public:
+           Stats();
+           ~Stats();
+           Stats(const Stats&) = delete;
+           Stats& operator=(const Stats&) = delete;
+           void   add(double x);
+           void   clear();
+           double mean() const;
+           double sum()  const;
+           size_t count() const;	
+   private:
+           struct pimpl;
+           pimpl* m_pimpl;
+   };
+
+   #endif 
+#+END_SRC
+
+ *File: stats.cpp* 
+
+#+BEGIN_SRC cpp 
+   #include <iostream>
+   #include <cmath>
+   #include <algorithm> 
+   #include <vector>
+   #include <numeric>
+
+   #include <stats.hpp>
+
+   struct Stats::pimpl {
+      std::vector<double> dataset = {};
+   };
+
+   Stats::Stats(): m_pimpl(new Stats::pimpl)
+   { }
+
+   Stats::~Stats() {
+       std::puts(" [INFO] ~Stats() destructor called. Ok. ");
+       delete m_pimpl;
+       m_pimpl = nullptr;
+   }
+
+   void Stats::add(double x) 
+   {
+       m_pimpl->dataset.push_back(x);
+   }
+
+   void Stats::clear()
+   {
+      m_pimpl->dataset.clear();
+   }
+
+   double Stats::sum() const
+   {
+       return std::accumulate( m_pimpl->dataset.begin()
+                             , m_pimpl->dataset.end(), 0.0);
+   }
+
+   double Stats::mean() const 
+   {
+       return this->sum() / m_pimpl->dataset.size();
+   }
+
+   size_t Stats::count() const {
+       return m_pimpl->dataset.size();
+   }
+#+END_SRC
+
+ *File: app1.cpp* 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <stats.hpp> 
+
+  int main()
+  {
+        std::cout << " [TRACE] Running application 'app1' - OK" << "\n";
+
+        Stats st;
+        st.add(10.0); st.add(20.6354); st.add(-5.62); st.add(8.623);
+        st.add(20.0); st.add(20.6354); st.add(-5.62); st.add(8.623);
+
+        std::cout << "  => st.count() = " << st.count() << "\n";
+        std::cout << "  =>   st.sum() = " << st.sum() << "\n";
+        std::cout << "  =>  st.mean() = " << st.mean() << "\n";
+
+        return 0;
+  }
+#+END_SRC
+
+ *File: app2.cpp* 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+
+  #include "stats.hpp"
+
+  int main(int argc, char** argv)
+  {
+       std::cout << " [INFO] Running application: 'app2' - OK" << "\n";
+
+       if(argc < 2){
+           return EXIT_FAILURE;
+       }
+
+       Stats st;
+
+       for(int i = 1; i < argc; i++)
+          try {
+             st.add( std::stod(argv[i]) );
+          } catch(std::invalid_argument const& ex)
+          {
+             std::cerr << " Error: invalid input <" << argv[i] << std::endl;
+             return EXIT_FAILURE;	
+          }
+
+       std::cout << "  => st.count() = " << st.count() << "\n";
+       std::cout << "  =>   st.sum() = " << st.sum() << "\n";
+       std::cout << "  =>  st.mean() = " << st.mean() << "\n";	
+
+       return EXIT_SUCCESS;
+  }
+#+END_SRC
+
+  *Run target 'all'* (Release mode)
+
+ + $ make => Runs rule 'all'
+
+#+BEGIN_SRC sh 
+  $ make
+
+   [INFO] Building object code: app1.cpp
+  g++    -c app1.cpp -o app1.o  -std=c++1z -pedantic -Wall -Wextra  -O3
+
+   [INFO] Building object code: stats.cpp
+  g++    -c stats.cpp -o stats.o  -std=c++1z -pedantic -Wall -Wextra  -O3
+
+   [INFO] Building executable 'app1.bin'
+  g++    -o app1.bin app1.o stats.o  
+
+   [INFO] Building object code: app2.cpp
+  g++    -c app2.cpp -o app2.o  -std=c++1z -pedantic -Wall -Wextra  -O3
+
+   [INFO] Building executable 'app2.bin'
+  g++    -o app2.bin app2.o stats.o  
+
+#+END_SRC
+
+ *Run target 'all'* (Debug Mode)
+
+Run target 'all' which builds target 'app1.bin', 'app2.bin'
+
+#+BEGIN_SRC sh 
+  $ make DEBUG=1
+
+   [INFO] Building object code: app1.cpp
+  g++    -c app1.cpp -o app1.o  -std=c++1z -pedantic -Wall -Wextra  -g -O0  -DNDEBUG
+
+   [INFO] Building object code: stats.cpp
+  g++    -c stats.cpp -o stats.o  -std=c++1z -pedantic -Wall -Wextra  -g -O0  -DNDEBUG
+
+   [INFO] Building executable 'app1.bin'
+  g++    -o app1.bin app1.o stats.o 
+
+   [INFO] Building object code: app2.cpp
+  g++    -c app2.cpp -o app2.o  -std=c++1z -pedantic -Wall -Wextra  -g -O0  -DNDEBUG
+
+   [INFO] Building executable 'app2.bin'
+  g++    -o app2.bin app2.o stats.o 
+
+#+END_SRC
+
+Debug application 'app1.bin'
+
+#+BEGIN_SRC sh
+   $ gdb --silent app1.bin 
+   Printing of typedefs defined in a class in on
+   Reading symbols from app1.bin...done.
+
+   (gdb) list
+   1	#include <iostream>
+   2	
+   3	#include <stats.hpp> 
+   ... ... ... ... 
+
+   # Set breaking point at main() 
+   (gdb) b main
+
+   # Run program app1.bin 
+   (gdb) r
+
+   gdb) n
+    [TRACE] Running application 'app1' - OK
+   9		Stats st;
+
+   (gdb) p st
+   $1 = {
+     m_pimpl = 0x616280
+   }
+ 
+   ... ...    ... ...    ... ...    ... ... 
+
+  (gdb) p st->m_pimpl->dataset
+  $5 = std::vector of length 8, capacity 8 = {10, 20.635400000000001, -5.6200000000000001, 
+    8.6229999999999993, 20, 20.635400000000001, -5.6200000000000001, 8.6229999999999993}
+  (gdb) 
+#+END_SRC
+
+ *Run target 'clean'*
+
+Clean all compilation files: 
+
+#+BEGIN_SRC sh 
+   $ make clean
+
+    [INFO] Cleaning compilation output.
+   rm -rf -v *.o *.bin
+   removed 'app1.o'
+   removed 'app2.o'
+   removed 'stats.o'
+   removed 'app1.bin'
+   removed 'app2.bin'
+#+END_SRC
+
+ *Run target 'app1.bin'*
+
+#+BEGIN_SRC sh 
+  $ make app1.bin
+
+   [INFO] Building object code: app1.cpp
+  g++    -c app1.cpp -o app1.o  -std=c++1z -pedantic -Wall -Wextra  -O3
+
+   [INFO] Building object code: stats.cpp
+  g++    -c stats.cpp -o stats.o  -std=c++1z -pedantic -Wall -Wextra  -O3
+
+   [INFO] Building executable 'app1.bin'
+  g++    -o app1.bin app1.o stats.o  
+#+END_SRC
+
+ *Run target 'app2.bin'*
+
+#+BEGIN_SRC sh
+  $ make app2.bin
+
+   [INFO] Building object code: app2.cpp
+  g++    -c app2.cpp -o app2.o  -std=c++1z -pedantic -Wall -Wextra  -O3
+
+   [INFO] Building executable 'app2.bin'
+  g++    -o app2.bin app2.o stats.o  
+#+END_SRC
+
+ *Run target 'app1_run'*
+
+The target app1_run runs the executable 'app1.bin'. It is only
+compiled if not built yet.
+
+#+BEGIN_SRC sh 
+  $ make app1_run
+
+   [INFO] Building object code: app1.cpp
+  g++    -c app1.cpp -o app1.o  -std=c++1z -pedantic -Wall -Wextra  -O3
+
+   [INFO] Building object code: stats.cpp
+  g++    -c stats.cpp -o stats.o  -std=c++1z -pedantic -Wall -Wextra  -O3
+
+   [INFO] Building executable 'app1.bin'
+  g++    -o app1.bin app1.o stats.o  
+  ./app1.bin
+   [TRACE] Running application 'app1' - OK
+    => st.count() = 8
+    =>   st.sum() = 77.2768
+    =>  st.mean() = 9.6596
+   [INFO] ~Stats() destructor called. Ok. 
+#+END_SRC
+
+Run target again: 
+
+#+BEGIN_SRC sh 
+  $ make app1_run
+  ./app1.bin
+   [TRACE] Running application 'app1' - OK
+    => st.count() = 8
+    =>   st.sum() = 77.2768
+    =>  st.mean() = 9.6596
+   [INFO] ~Stats() destructor called. Ok. 
+#+END_SRC
+
+ *Run target 'install'*
+
+Run target 'make install'
+
+#+BEGIN_SRC sh 
+  $ make install INSTALL_PATH=/tmp/bin DEBUG=1
+
+   [INFO] Building object code: app1.cpp
+  g++    -c app1.cpp -o app1.o  -std=c++1z -pedantic -Wall -Wextra  -g -O0  -DNDEBUG
+
+    ... ... ...   ... ... ...   ... ... ...   ... ... ...   ... ... ... 
+
+   [INFO] Installing application to: /tmp/bin
+  mkdir -p /tmp/bin
+  cp -rv app1.bin app2.bin /tmp/bin
+  'app1.bin' -> '/tmp/bin/app1.bin'
+  'app2.bin' -> '/tmp/bin/app2.bin'
+#+END_SRC
+
+Test applications/executables: 
+
+#+BEGIN_SRC sh 
+  $ /tmp/bin/app2.bin 10.354 -9.243  100.523 5.6154
+   [INFO] Running application: 'app2' - OK
+    => st.count() = 4
+    =>   st.sum() = 107.249
+    =>  st.mean() = 26.8123
+   [INFO] ~Stats() destructor called. Ok. 
+#+END_SRC
+
+*** Reading 
+
+ *Documentation*
+
+   * *GNU Make Manual*
+     * <http://www.chiark.greenend.org.uk/doc/make-doc/make.html/index.html#SEC_Contents>
+
+ *Useful Reading*
+
+   * *Make (Software)* - Wikipedia 
+     * <https://en.wikipedia.org/wiki/Make_(software)>
+
+   * *Tutorial on writing makefiles*
+     * <https://www.math.colostate.edu/~yzhou/computer/writemakefile.html>
+
+   * *Practical Makefiles, by example* - John Tsiombikas
+     * <http://nuclear.mutantstargoat.com/articles/make/>
+
+   * *Creating a Basic Makefile* - Flex Technologies
+     + <https://felixcrux.com/blog/creating-basic-makefile<> 
+
+   * *Debugging make -Tips and tricks to get make working for you, not
+     against you* - Peter Seebach
+     * <https://www.ibm.com/developerworks/library/l-debugmake/index.html>
+
+   * *What’s Wrong With GNU make?*
+     + <http://www.conifersystems.com/whitepapers/gnu-make/>
+
+   * *How can I configure my makefile for debug and release builds?*
+     + <https://stackoverflow.com/questions/1079832>
+
+ *Makefiles for Latex, Tex compilation* 
+
+   + *latex and Makefiles*
+     + <http://www.usenix.org.uk/content/latex.html>
+
+   + *Makefiles for Latex*
+     + <https://scaron.info/blog/makefiles-for-latex.html>
+
+   + *A simple Makefile for LaTeX projects.*
+     + <https://gist.github.com/Nemo157/539229>
+
+   + *Continuous integration and automatic deployment of LaTeX files*
+     + <https://ljvmiranda921.github.io/notebook/2018/02/04/continuous-integration-for-latex/>
+
+ *Makefiles for general automation*
+
+   + *Reproducibility with Make*
+     + <https://the-turing-way.netlify.com/make/make.html>
+
+   + *GNU Make for Reproducible Data Analysis*
+     + <http://zmjones.com/make/>
+
+   + *Using Make for reproducible scientific analysis*
+     + <https://www.software.ac.uk/blog/2016-10-06-using-make-reproducible-scientific-analyses>
+
+   + *Reproducible bioinformatics pipelines using Make*
+     + <http://byronjsmith.com/make-bml/>
+
+   + *Reproducible Data Processing: Make + Docker*
+     + <https://towardsdatascience.com/towards-efficient-and-reproducible-ml-workflows-part-1-analysis-a98c945d7616>
+
+   + *Makefiles for R/LaTex Projects*
+     + <https://dzone.com/articles/makefiles-rlatex-projects>
+
+   + *Makefiles in Python Projects*
+     + <https://krzysztofzuraw.com/blog/2016/makefiles-in-python-projects.html>
+
+   + *Makefiles with Python*
+     + <https://blog.horejsek.com/makefile-with-python/>
+
+   + *Makefile for Python projects* - GIST
+     + <https://gist.github.com/lumengxi/0ae4645124cd4066f676>
 * GNU Autotools Building System  
 ** Overview 
 
