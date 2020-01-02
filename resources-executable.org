@@ -159,6 +159,231 @@ application:
  $ g++ main.o file1.o file2.o program_asset.o -o program.exe 
 #+END_SRC
 
+** Embed Resources with CMake Resource Compiler (CMakeRC)
+
+A resource compiler is an application that appends  text and
+binary files to the executable object code without needing to store
+resource files in the file system. 
+
+The project [[https://github.com/vector-of-bool/cmrc][vector-of-bool/cmrc]] provides a convenient CMake resource
+compiler of easy usage in a single CMake script. 
+
+Benefits and possibilities: 
+
+  + Cross-platform => Doesn't rely on framework-specific resource
+    compiler such as Qt resource compiler or Windows resource
+    compiler. 
+
+  + Single CMake file
+
+  + Allows embedding any kind of data in the executable.
+
+  + Embed game assets
+
+  + Embed data and images in firmware.
+
+ *Project Example*:
+
+Project Structure: 
+
+  + CMakeLists.txt
+
+  + application1.cpp 
+
+  + resources/
+    + resources/hosts.txt
+    + resources/protocols.txt
+    + resources/terminal.jpeg 
+
+File: CMakeLists.txt 
+
+#+BEGIN_SRC cmake 
+   cmake_minimum_required(VERSION 3.9)
+   project(Simple_Cmake_Project)
+
+   #========== Global Configurations =============#
+   #----------------------------------------------#
+
+   set(CMAKE_CXX_STANDARD 17)     
+   set(CMAKE_VERBOSE_MAKEFILE ON)
+   set(CMAKE_CXX_EXTENSIONS OFF)
+
+   if(UNIX)
+     # Add file textension *.bin to all executables on Unix (Linux, OSX, BSD ...)
+     set(CMAKE_EXECUTABLE_SUFFIX ".bin")
+   endif()
+
+   # ------------ Download CmakeRC Resource compiler ----------------#
+
+   file(DOWNLOAD "https://raw.githubusercontent.com/vector-of-bool/cmrc/master/CMakeRC.cmake"
+                    "${CMAKE_BINARY_DIR}/CMakeRC.cmake")
+   include("${CMAKE_BINARY_DIR}/CMakeRC.cmake")
+
+   #========== Targets Configurations ============#
+
+   cmrc_add_resource_library(
+       app1-resources
+
+       ALIAS app1::rc
+       NAMESPACE app1
+
+       resources/protocols.txt
+       resources/hosts.txt
+       resources/terminal.jpeg
+       )
+
+   add_executable(app1 application1.cpp)
+   target_link_libraries(app1 app1::rc)
+#+END_SRC
+
+File: application1.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <fstream>
+  #include <cstdio>
+  #include <cassert>
+  #include <map>
+
+  #include <cmrc/cmrc.hpp>
+
+  CMRC_DECLARE(app1);
+
+  #define SHOW_EXPR(expr) \
+     std::cout << " =>> EXPR( " << #expr << " ) = " << (expr) << std::endl
+
+
+  /// Credits: https://stackoverflow.com/a/13059195
+  /// https://stackoverflow.com/questions/13059091/
+  struct membuf: std::streambuf {
+      membuf(char const* base, size_t size) {
+          char* p(const_cast<char*>(base));
+          this->setg(p, p, p + size);
+      }
+      virtual ~membuf() = default;
+  };
+
+  /// Credits: https://stackoverflow.com/a/13059195
+  /// https://stackoverflow.com/questions/13059091/
+  struct memstream: virtual membuf, std::istream {
+
+      memstream(char const* base, char* const end)
+          : membuf(base, reinterpret_cast<uintptr_t>(end) - reinterpret_cast<uintptr_t>(base) )
+          , std::istream(static_cast<std::streambuf*>(this)) { }
+
+      memstream(char const* base, size_t size)
+          : membuf(base, size)
+          , std::istream(static_cast<std::streambuf*>(this)) { }
+  };
+
+
+  int main(int argc, const char** argv)
+  {
+      auto fs = cmrc::app1::get_filesystem();
+
+      std::cout << std::boolalpha;
+
+      std::puts("\n ========= Experiment 1 ==>> Check resources ==========");
+
+      SHOW_EXPR( fs.is_file("resources/protocols.txt") );
+      SHOW_EXPR( fs.is_file("resources/hosts.txt") );
+      SHOW_EXPR( fs.is_file("/resources/hosts.txt") );
+      SHOW_EXPR( fs.is_file("resources/protoc.txt") );
+
+      std::puts("\n ========= Experiment 2 ==>> Read resource ==========");
+      {
+          auto fd1 = fs.open("resources/hosts.txt");
+
+          // Read whole file content to string
+          auto st1 = std::string(fd1.begin(), fd1.end());
+
+          std::cout << "\n Content of resources/hosts = \n" << st1 << std::endl;
+      }
+
+      std::puts("\n ========= Experiment 3 ===>> Read resource as stream ===");
+      {
+
+          auto fd2 = fs.open("resources/protocols.txt");
+
+          auto is = memstream ( const_cast<char*>(fd2.begin()),
+                                const_cast<char*>(fd2.end()) );
+
+          std::string line;
+          int  n = 0;
+          while(std::getline(is, line) && n < 25)
+              std::cout << " line[" << n++ << "] = " << line << std::endl;
+
+      }
+
+      std::puts("\n ========= Experiment 4 ===>> Extract resource to file ===");
+      {
+          auto fd = fs.open("resources/terminal.jpeg");
+
+          auto is = memstream ( const_cast<char*>(fd.begin()),
+                                const_cast<char*>(fd.end()) );
+
+
+          auto ofs = std::ofstream("/tmp/picture.jpeg");
+          // Redirect is to ofs
+          ofs << is.rdbuf();
+          // Force writing
+          ofs.flush();
+      }
+
+      return 0;
+  }
+#+END_SRC
+
+ *Output of application1:*
+
+#+BEGIN_SRC sh 
+   $ ./application1.bin 
+
+   ========= Experiment 1 ==>> Check resources ==========
+    =>> EXPR( fs.is_file("resources/protocols.txt") ) = true
+    =>> EXPR( fs.is_file("resources/hosts.txt") ) = true
+    =>> EXPR( fs.is_file("/resources/hosts.txt") ) = true
+    =>> EXPR( fs.is_file("resources/protoc.txt") ) = false
+
+    ========= Experiment 2 ==>> Read resource ==========
+
+    Content of resources/hosts = 
+   127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
+   ::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
+   127.0.0.1 hostname
+
+
+    ========= Experiment 3 ===>> Read resource as stream ===
+    line[0] = # /etc/protocols:
+    line[1] = # $Id: protocols,v 1.12 2016/07/08 12:27 ovasik Exp $
+    line[2] = #
+    line[3] = # Internet (IP) protocols
+    line[4] = #
+    line[5] = #	from: @(#)protocols	5.1 (Berkeley) 4/17/89
+    line[6] = #
+    line[7] = # Updated for NetBSD based on RFC 1340, Assigned Numbers (July 1992).
+    line[8] = # Last IANA update included dated 2011-05-03
+    line[9] = #
+    line[10] = # See also http://www.iana.org/assignments/protocol-numbers
+    line[11] = 
+    line[12] = ip	0	IP		# internet protocol, pseudo protocol number
+    line[13] = hopopt	0	HOPOPT		# hop-by-hop options for ipv6
+    line[14] = icmp	1	ICMP		# internet control message protocol
+    line[15] = igmp	2	IGMP		# internet group management protocol
+    line[16] = ggp	3	GGP		# gateway-gateway protocol
+    line[17] = ipv4	4	IPv4		# IPv4 encapsulation
+    line[18] = st	5	ST		# ST datagram mode
+    line[19] = tcp	6	TCP		# transmission control protocol
+    line[20] = cbt	7	CBT		# CBT, Tony Ballardie <A.Ballardie@cs.ucl.ac.uk>
+    line[21] = egp	8	EGP		# exterior gateway protocol
+    line[22] = igp	9	IGP		# any private interior gateway (Cisco: for IGRP)
+    line[23] = bbn-rcc	10	BBN-RCC-MON		# BBN RCC Monitoring
+    line[24] = nvp	11	NVP-II		# Network Voice Protocol
+
+    ========= Experiment 4 ===>> Extract resource to file ===
+
+#+END_SRC
+
 ** Base 64 Implementations 
 
 Taken from: https://stackoverflow.com/questions/342409
