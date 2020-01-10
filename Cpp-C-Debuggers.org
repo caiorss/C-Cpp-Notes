@@ -2365,6 +2365,655 @@ Display local variables:
  + http://csapp.cs.cmu.edu/public/docs/gdbnotes-ia32.pdf
 
  + [[https://cs.baylor.edu/~donahoo/tools/gdb/gdb.html][Debugging with GDB]]
+* TODO LLDB - Lllvm Debugger 
+** Overview 
+
+Outline: 
+
+ + "LLDB is a next generation, high-performance debugger. It is built
+   as a set of reusable components which highly leverage existing
+   libraries in the larger LLVM Project, such as the Clang expression
+   parser and LLVM disassembler." ([[https://lldb.llvm.org/][llvm]])
+
+Supported Platforms and Hardware:
+ 
+  + macOS desktop user space debugging for i386 and x86_64
+  + iOS, tvOS, and watchOS simulator debugging on i386 and x86_64
+  + iOS, tvOS, and watchOS device debugging on ARM and AArch64
+  + Linux local user-space debugging for i386, x86_64 and PPC64le
+  + FreeBSD local user-space debugging for i386 and x86_64
+  + Windows local user-space debugging for i386 (*)
+
+ *Command Summary* 
+
+|---------------------------+----------------------------------------------------------------------+---|
+| Command                   | Description                                                          |   |
+|---------------------------+----------------------------------------------------------------------+---|
+| *Breaking Point*            |                                                                      |   |
+|---------------------------+----------------------------------------------------------------------+---|
+| br list                   | List all breaking points                                             |   |
+| breakpoint list           | List all breaking points                                             |   |
+| b 200                     | Set breaking point at line 200                                       |   |
+| b main                    | Set breaking point at function main                                  |   |
+| b foo                     | Set breaking point at function foo                                   |   |
+| br del 1                  | Delete breaking point 1                                              |   |
+| br del 1 2 3 4            | Delete breaking points 1, 2, 3 and 4.                                |   |
+|                           |                                                                      |   |
+|---------------------------+----------------------------------------------------------------------+---|
+| *Execution*                 |                                                                      |   |
+|---------------------------+----------------------------------------------------------------------+---|
+| r or run                  | Run/Restart executable being debugged                                |   |
+| c                         | Continue to run program until the next breaking point                |   |
+| n                         | Step out - Execute next line or function wihout entering it.         |   |
+| s                         | Step in  - Enter the function                                        |   |
+|                           |                                                                      |   |
+|---------------------------+----------------------------------------------------------------------+---|
+| *Information*               |                                                                      |   |
+|---------------------------+----------------------------------------------------------------------+---|
+| frame variables           | Show local variables of current functions                            |   |
+| register read             | Show the CPU registers for the current process                       |   |
+| p/x $rip                  | Show RIP  IA64 - x64-86 CPU register in hex. format.                 |   |
+| p/i $eip                  | Show CPU instruction executed at the address stored in EIP register. |   |
+|                           |                                                                      |   |
+| x/20c  0x00007fffffffcaf0 | Show 10 characters from address 0x00007fffffffcaf0                   |   |
+|                           |                                                                      |   |
+| x/s    0x00007fffffffcaf0 | Show 1 string from address 0x00007fffffffcaf0                        |   |
+| x/3s   0x00007fffffffcaf0 | Show 3 strings from address 0x00007fffffffcaf0                       |   |
+|                           |                                                                      |   |
+| x/wx   0x00007fffffffc550 | Show 1 WORD (32 bits number) at address 0x00007fffffffc550           |   |
+| x/10wx 0x00007fffffffc550 | Show 10 WORDs from address 0x00007fffffffc550                        |   |
+|                           |                                                                      |   |
+|---------------------------+----------------------------------------------------------------------+---|
+| *Misc*                      |                                                                      |   |
+|---------------------------+----------------------------------------------------------------------+---|
+| gui                       | Open a TUI - Terminal User Interface GUI                             |   |
+|---------------------------+----------------------------------------------------------------------+---|
+
+
+Note: 
+
+  + CPU Instruction Pointer Registers.
+    + x86 - IA32 => EIP (Extended Instruction Pointer)
+    + x64-86 - IA64 => RIP
+
+  + String:
+    + In this context means (const char* or char*) null terminated
+      char array.
+
+** Example - Debugging a source code 
+*** Sample program 
+
+File: lldb-test.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <cmath>
+  #include <memory>
+  #include <functional>
+
+
+  struct Functor{
+    double a = 0.0;
+    double b = 0.0;
+
+    Functor(){};
+    Functor(double aa, double bb): a(aa), b(bb) { }
+
+    double operator()(double x) const {
+      return a * x + b;
+    }    
+  };
+
+
+  int factorial(int n){
+      int prod = 1;
+      for(int i = 1; i <= n; i++)
+          prod *= i;
+      return prod;
+  }
+
+  struct Date
+  {
+      int year;
+      int month;
+      int day;
+      Date(){}
+      Date(int year, int month, int day)
+          : year(year)
+          , month(month)
+          , day(day)
+      { }
+
+      // Comparison operator required by  EXPECT_EQ
+      bool operator==(Date const& rhs) const
+      {
+          return year  == rhs.year
+              && month == rhs.month
+              && day   == rhs.day;
+      }
+      // Necessary for make class printable in GTest
+      friend std::ostream& operator<<(std::ostream& os, Date const& rhs)
+      {
+          return os << "Date { " << rhs.year << " ; "
+                    << rhs.month << " ; "
+                    << rhs.day << " } ";
+      }
+  };
+
+  Date
+  GregorianEasterSunday(int y)
+  {
+      int c = y / 100;
+      int n = y - 19 * ( y / 19 );
+      int k = ( c - 17 ) / 25;
+      int i = c - c / 4 - ( c - k ) / 3 + 19 * n + 15;
+      i = i - 30 * ( i / 30 );
+      i = i - ( i / 28 ) * ( 1 - ( i / 28 )
+            ,* ( 29 / ( i + 1 ) )
+            ,* ( ( 21 - n ) / 11 ) );
+      int j = y + y / 4 + i + 2 - c + c / 4;
+      j = j - 7 * ( j / 7 );
+      int l = i - j;
+      int m = 3 + ( l + 40 ) / 44;
+      int d = l + 28 - 31 * ( m / 4 );
+      return Date(y, m, d);
+  }
+
+
+  int main(int argc, char** argv)
+  {
+    auto f1 = Functor(3, 5);
+    auto f2 = Functor(6, 10);
+
+    std::cout << "f1(5) = " << f1(5.0) << std::endl;
+    std::cout << "f1(7) = " << f1(7.0) << std::endl;
+    std::cout << "f1(8) = " << f1(8.0) << std::endl;
+
+    std::cout << "f2(5) = " << f2(5.0) << std::endl;
+    std::cout << "f2(7) = " << f2(7.0) << std::endl;
+    std::cout << "f2(8) = " << f2(8.0) << std::endl;
+
+    std::puts("=========================================");
+
+    // EXPECT_EQ(Date(2005, 3, 27), GregorianEasterSunday(2005));
+    // EXPECT_EQ(Date(2008, 3, 23), GregorianEasterSunday(2008));
+    // EXPECT_EQ(Date(2010, 4, 4),  GregorianEasterSunday(2010));
+    std::cout << " GregorianEasterSunday(2010)  = "
+              << GregorianEasterSunday(2010) << std::endl;
+
+    std::cout << " GregorianEasterSunday(208)  = "
+              << GregorianEasterSunday(2008) << std::endl;
+    return 0;
+  }
+#+END_SRC
+
+Building with debugging symbols: 
+
+#+BEGIN_SRC sh 
+  $ g++ lldb-test.cpp -o lldb-test.bin -std=c++1z -ggdb -O0 -Wall -Wextra
+#+END_SRC
+
+*** Debug Session 
+
+Load the executable in LLDB Debugger: 
+
+#+BEGIN_SRC sh 
+   $ lldb lldb-test.bin 
+  (lldb) target create "lldb-test.bin"
+  Current executable set to 'lldb-test.bin' (x86_64).
+#+END_SRC
+
+List current executable and all depedent shared libraries:
+
+#+BEGIN_SRC sh 
+   (lldb) image list
+   [  0] 45A7479B-D17E-3A06-A342-299376E7BAA9-E756535F                    /home/user/projects/lldb-test.bin
+#+END_SRC
+
+List main() function: 
+
+#+BEGIN_SRC sh 
+  (lldb) list main
+  File: /home/user/projects/lldb-test.cpp
+     70  	    int d = l + 28 - 31 * ( m / 4 );
+     71  	    return Date(y, m, d);
+     72  	}
+     73  	
+     74  	
+     75  	int main(int argc, char** argv)
+     76  	{
+     77  	  auto f1 = Functor(3, 5);
+     78  	  auto f2 = Functor(6, 10);
+     79  	
+     80  	  std::cout << "f1(5) = " << f1(5.0) << std::endl;
+  (lldb) 
+
+#+END_SRC
+
+Set breaking points at main():
+
+#+BEGIN_SRC sh 
+   (lldb) b main
+   Breakpoint 1: where = lldb-test.bin`main + 16 at lldb-test.cpp:77, address = 0x0000000000400aec
+#+END_SRC
+
+Set breaking points at lines 88 and 93: 
+
+#+BEGIN_SRC sh 
+  (lldb) b 88
+  Breakpoint 2: where = lldb-test.bin`main + 426 at lldb-test.cpp:88, address = 0x0000000000400c86
+
+  (lldb) b 93
+  Breakpoint 3: where = lldb-test.bin`main + 436 at lldb-test.cpp:93, address = 0x0000000000400c90
+#+END_SRC
+
+List breaking points: 
+
+#+BEGIN_SRC sh 
+  (lldb) breakpoint list
+  Current breakpoints:
+  1: name = 'main', locations = 1
+    1.1: where = lldb-test.bin`main + 16 at lldb-test.cpp:77, address = lldb-test.bin[0x0000000000400aec], unresolved, hit count = 0 
+
+  2: file = '/home/user/projects/lldb-test.cpp', line = 88, exact_match = 0, locations = 1
+    2.1: where = lldb-test.bin`main + 426 at lldb-test.cpp:88, address = lldb-test.bin[0x0000000000400c86], unresolved, hit count = 0 
+
+  3: file = '/home/user/projects/lldb-test.cpp', line = 93, exact_match = 0, locations = 1
+    3.1: where = lldb-test.bin`main + 436 at lldb-test.cpp:93, address = lldb-test.bin[0x0000000000400c90], unresolved, hit count = 0 
+
+  4: file = '/home/user/projects/lldb-test.cpp', line = 93, exact_match = 0, locations = 1
+    4.1: where = lldb-test.bin`main + 436 at lldb-test.cpp:93, address = lldb-test.bin[0x0000000000400c90], unresolved, hit count = 0 
+
+  5: name = 'list', locations = 0 (pending)
+#+END_SRC
+
+List breaking point (alternative): 
+
+#+BEGIN_SRC sh 
+  (lldb) br list
+  Current breakpoints:
+  1: name = 'main', locations = 1, resolved = 1, hit count = 2
+    1.1: where = lldb-test.bin`main + 16 at lldb-test.cpp:77, address = 0x0000000000400aec, resolved, hit count = 2 
+
+  2: file = '/home/user/projects/lldb-test.cpp', line = 88, exact_match = 0, locations = 1, resolved = 1, hit count = 2
+    2.1: where = lldb-test.bin`main + 426 at lldb-test.cpp:88, address = 0x0000000000400c86, resolved, hit count = 2 
+
+  3: file = '/home/user/projects/lldb-test.cpp', line = 93, exact_match = 0, locations = 1, resolved = 1, hit count = 2
+    3.1: where = lldb-test.bin`main + 436 at lldb-test.cpp:93, address = 0x0000000000400c90, resolved, hit count = 2 
+
+  4: file = '/home/user/projects/lldb-test.cpp', line = 93, exact_match = 0, locations = 1, resolved = 1, hit count = 2
+    4.1: where = lldb-test.bin`main + 436 at lldb-test.cpp:93, address = 0x0000000000400c90, resolved, hit count = 2 
+
+  5: name = 'list', locations = 0 (pending)
+#+END_SRC
+
+Run program: 
+  + (lldb) r
+  + (lldb) run 
+
+#+BEGIN_SRC sh 
+  (lldb) r
+
+  Process 713 launched: '/home/user/projects/lldb-test.bin' (x86_64)
+  Process 713 stopped
+  * thread #1, name = 'lldb-test.bin', stop reason = breakpoint 1.1
+      frame #0: 0x0000000000400aec lldb-test.bin`main(argc=1, argv=0x00007fffffffc668) at lldb-test.cpp:77
+     74  	
+     75  	int main(int argc, char** argv)
+     76  	{
+  -> 77  	  auto f1 = Functor(3, 5);
+     78  	  auto f2 = Functor(6, 10);
+     79  	
+     80  	  std::cout << "f1(5) = " << f1(5.0) << std::endl;
+  (lldb) 
+#+END_SRC
+
+Execute next step: 
+
+#+BEGIN_SRC sh 
+   (lldb) n
+   Process 713 stopped
+   * thread #1, name = 'lldb-test.bin', stop reason = step over
+       frame #0: 0x0000000000400b08 lldb-test.bin`main(argc=1, argv=0x00007fffffffc668) at lldb-test.cpp:78
+      75  	int main(int argc, char** argv)
+      76  	{
+      77  	  auto f1 = Functor(3, 5);
+   -> 78  	  auto f2 = Functor(6, 10);
+      79  	
+      80  	  std::cout << "f1(5) = " << f1(5.0) << std::endl;
+      81  	  std::cout << "f1(7) = " << f1(7.0) << std::endl;
+   (lldb) 
+#+END_SRC
+
+Execute next step: 
+
+#+BEGIN_SRC sh 
+  (lldb) n
+  f1(7) = 26
+  Process 713 stopped
+  * thread #1, name = 'lldb-test.bin', stop reason = step over
+      frame #0: 0x0000000000400b9a lldb-test.bin`main(argc=1, argv=0x00007fffffffc668) at lldb-test.cpp:82
+     79  	
+     80  	  std::cout << "f1(5) = " << f1(5.0) << std::endl;
+     81  	  std::cout << "f1(7) = " << f1(7.0) << std::endl;
+  -> 82  	  std::cout << "f1(8) = " << f1(8.0) << std::endl;
+     83  	
+     84  	  std::cout << "f2(5) = " << f2(5.0) << std::endl;
+     85  	  std::cout << "f2(7) = " << f2(7.0) << std::endl;
+#+END_SRC
+
+Show CPU registers for current process: 
+
+#+BEGIN_SRC sh 
+  (lldb) register read
+  General Purpose Registers:
+         rax = 0x0000000000602080  lldb-test.bin`_ZSt4cout@@GLIBCXX_3.4
+         rbx = 0x0000000000602080  lldb-test.bin`_ZSt4cout@@GLIBCXX_3.4
+         rcx = 0x0000000000000b40
+         rdx = 0x0000000000000000
+         rdi = 0x00007ffff7493760  _IO_2_1_stdout_
+         rsi = 0x00007ffff74948c0  libc.so.6`_IO_stdfile_1_lock
+         rbp = 0x00007fffffffc580
+         rsp = 0x00007fffffffc520
+          r8 = 0x00007ffff74948c0  libc.so.6`_IO_stdfile_1_lock
+          r9 = 0x00007ffff7fbff00
+         r10 = 0x00007ffff7df2230  ld-linux-x86-64.so.2`strcmp + 4464
+         r11 = 0x00007ffff7149ef0  libc.so.6`__GI__IO_fflush
+         r12 = 0x0000000000400790  lldb-test.bin`_start
+         r13 = 0x00007fffffffc660
+         r14 = 0x0000000000000000
+         r15 = 0x0000000000000000
+         rip = 0x0000000000400b5f  lldb-test.bin`main + 131 at lldb-test.cpp:81
+      rflags = 0x0000000000000213
+          cs = 0x0000000000000033
+          fs = 0x0000000000000000
+          gs = 0x0000000000000000
+          ss = 0x000000000000002b
+          ds = 0x0000000000000000
+          es = 0x0000000000000000
+#+END_SRC
+
+Show value of some CPU registers (rax, rip)
+
+#+BEGIN_SRC sh 
+  (lldb) register read rax
+       rax = 0x0000000000602080  lldb-test.bin`_ZSt4cout@@GLIBCXX_3.4
+
+  (lldb) register read rip
+       rip = 0x0000000000400b5f  lldb-test.bin`main + 131 at lldb-test.cpp:81
+  (lldb) 
+#+END_SRC
+
+Show CPU register values: 
+
+#+BEGIN_SRC sh 
+  (lldb) p $rbp
+  (unsigned long) $43 = 140737488340352
+
+  (lldb) p $rip
+  (unsigned long) $44 = 4197215
+
+  (lldb) p/x $rax
+  (unsigned long) $45 = 0x0000000000602080
+
+  (lldb) p/x $rip
+  (unsigned long) $46 = 0x0000000000400b5f
+
+  (lldb) p/i $rip
+  (unsigned long) $47 = 5f  popq   %rdi
+#+END_SRC
+
+Disassemble the whole code: 
+
+#+BEGIN_SRC sh 
+   (lldb) disassemble
+   lldb-test.bin`main:
+       0x400adc <+0>:   pushq  %rbp
+       0x400add <+1>:   movq   %rsp, %rbp
+       0x400ae0 <+4>:   pushq  %rbx
+       0x400ae1 <+5>:   subq   $0x58, %rsp
+       0x400ae5 <+9>:   movl   %edi, -0x54(%rbp)
+       0x400ae8 <+12>:  movq   %rsi, -0x60(%rbp)
+       0x400aec <+16>:  movsd  0x4f4(%rip), %xmm1        ; xmm1 = mem[0],zero
+       0x400af4 <+24>:  movsd  0x4f4(%rip), %xmm0        ; xmm0 = mem[0],zero
+       0x400afc <+32>:  leaq   -0x30(%rbp), %rax
+       0x400b00 <+36>:  movq   %rax, %rdi
+       0x400b03 <+39>:  callq  0x400d7e                  ; Functor::Functor at lldb-test.cpp:12
+       0x400b08 <+44>:  movsd  0x4e8(%rip), %xmm1        ; xmm1 = mem[0],zero
+       0x400b10 <+52>:  movsd  0x4e8(%rip), %xmm0        ; xmm0 = mem[0],zero
+       0x400b18 <+60>:  leaq   -0x40(%rbp), %rax
+       0x400b1c <+64>:  movq   %rax, %rdi
+       0x400b1f <+67>:  callq  0x400d7e                  ; Functor::Functor at lldb-test.cpp:12
+       0x400b24 <+72>:  movl   $0x400f34, %esi           ; imm = 0x400F34 
+       0x400b29 <+77>:  movl   $0x602080, %edi           ; imm = 0x602080 
+       0x400b2e <+82>:  callq  0x400720                  ; symbol stub for: std::basic_ostream<char, std::char_traits<char> >& std::operator<<<std::char_traits<char> >(std::basic_ostream<char, std::char_traits<char> >&, char const*)
+#+END_SRC
+
+Disassemble function factorial() 
+
+#+BEGIN_SRC 
+  (lldb) disassemble -n factorial
+  lldb-test.bin`factorial:
+      0x400876 <+0>:  pushq  %rbp
+      0x400877 <+1>:  movq   %rsp, %rbp
+      0x40087a <+4>:  movl   %edi, -0x14(%rbp)
+      0x40087d <+7>:  movl   $0x1, -0x4(%rbp)
+      0x400884 <+14>: movl   $0x1, -0x8(%rbp)
+      0x40088b <+21>: movl   -0x8(%rbp), %eax
+      0x40088e <+24>: cmpl   -0x14(%rbp), %eax
+      0x400891 <+27>: jg     0x4008a3                  ; <+45> at lldb-test.cpp:24
+      0x400893 <+29>: movl   -0x4(%rbp), %eax
+      0x400896 <+32>: imull  -0x8(%rbp), %eax
+      0x40089a <+36>: movl   %eax, -0x4(%rbp)
+      0x40089d <+39>: addl   $0x1, -0x8(%rbp)
+      0x4008a1 <+43>: jmp    0x40088b                  ; <+21> at lldb-test.cpp:22
+      0x4008a3 <+45>: movl   -0x4(%rbp), %eax
+      0x4008a6 <+48>: popq   %rbp
+      0x4008a7 <+49>: retq   
+
+
+#+END_SRC
+
+List local variables: 
+
+#+BEGIN_SRC sh 
+   (lldb) frame variable
+   (int) argc = 1
+   (char **) argv = 0x00007fffffffc668
+   (Functor) f1 = (a = 3, b = 5)
+   (Functor) f2 = (a = 6, b = 10)
+   (Date) d = (year = 32767, month = 4197755, day = 0)
+#+END_SRC
+
+Call function main() 
+
+#+BEGIN_SRC sh 
+   (lldb) call main(0, nullptr)
+   f1(5) = 20
+   f1(7) = 26
+   f1(8) = 29
+   f2(5) = 40
+   f2(7) = 52
+   f2(8) = 58
+   =========================================
+    GregorianEasterSunday(2010)  = Date { 2010 ; 4 ; 4 } 
+    GregorianEasterSunday(208)  = Date { 2008 ; 3 ; 23 } 
+   (int) $49 = 0
+#+END_SRC
+
+Print local variables: 
+
+#+BEGIN_SRC 
+  (lldb) p argc
+  (int) $0 = 1
+
+  (lldb) p argv[0]
+  (char *) $1 = 0x00007fffffffcaf0 "/home/user/projects/lldb-test.bin"
+
+  (lldb) p f1
+  (Functor) $3 = (a = 3, b = 5)
+
+  (lldb) p f2
+  (Functor) $4 = (a = 6, b = 10)
+
+  (lldb) p d
+  (Date) $5 = (year = 2010, month = 4, day = 4)
+#+END_SRC
+
+Manipulate functions _factorial()_: 
+
+#+BEGIN_SRC sh 
+  (lldb) call factorial(4)
+  (int) $7 = 24
+
+  (lldb) p factorial(5)
+  (int) $10 = 120
+
+  (lldb) call factorial(10)
+  (int) $8 = 3628800
+
+  (lldb) call factorial(100)
+  (int) $9 = 0
+#+END_SRC
+
+Call functors f1 and f2 function-call opeprator: 
+
+#+BEGIN_SRC sh 
+  (lldb) p f1(5.21)
+  (double) $13 = 20.629999999999999
+
+  (lldb) p f1(10.24)
+  (double) $14 = 35.719999999999999
+
+  (lldb) p f2(0.0)
+  (double) $15 = 10
+
+  (lldb) p f2(1.0)
+  (double) $16 = 16
+
+  (lldb) p f2(2.5)
+  (double) $17 = 25
+
+  (lldb) p f1.operator()(4.5)
+  (double) $19 = 18.5
+
+  (lldb) p f1.operator()(10.52)
+  (double) $20 = 36.560000000000002
+#+END_SRC
+
+Call function GregorianEasterSunday()
+
+#+BEGIN_SRC sh 
+  (lldb) p GregorianEasterSunday(2010)
+  (Date) $22 = (year = 2010, month = 4, day = 4)
+
+  (lldb) p GregorianEasterSunday(2011)
+  (Date) $23 = (year = 2011, month = 4, day = 24)
+
+  (lldb) p GregorianEasterSunday(2017)
+  (Date) $24 = (year = 2017, month = 4, day = 16)
+#+END_SRC
+
+Change variables: 
+
+#+BEGIN_SRC sh 
+  (lldb) expression f1.a = 10.5;
+  (double) $26 = 10.5
+
+  (lldb) expression f1.b = 100.0
+  (double) $27 = 100
+
+  (lldb) p f1
+  (Functor) $28 = (a = 10.5, b = 100)
+
+  (lldb) p f1(10.5)
+  (double) $29 = 210.25
+#+END_SRC
+
+Evaluating expressions: 
+
+#+BEGIN_SRC sh 
+  (lldb) expre)sion auto $a = GregorianEasterSunday(2017)
+
+  (lldb) p $a
+  (Date) $a = (year = 2017, month = 4, day = 16)
+
+  (lldb) p $a.year
+  (int) $30 = 2017
+
+  (lldb) p $a.month
+  (int) $31 = 4
+
+  (lldb) p $a.day
+  (int) $32 = 16
+
+  (lldb) p &$a
+  (Date *) $33 = 0x00007ffff7ff5030
+
+  (lldb) p ((Date*) 0x00007ffff7ff5030)->year
+  (int) $36 = 2017
+
+  (lldb) p ((Date*) 0x00007ffff7ff5030)->day
+  (int) $37 = 16
+#+END_SRC
+
+Continue execution: 
+
+#+BEGIN_SRC sh 
+  (lldb) c
+  Process 713 resuming
+   GregorianEasterSunday(2010)  = Date { 2010 ; 4 ; 4 } 
+   GregorianEasterSunday(208)  = Date { 2008 ; 3 ; 23 } 
+  Process 713 exited with status = 0 (0x00000000) 
+#+END_SRC
+
+Delete breaking points: 
+
+#+BEGIN_SRC sh 
+  (lldb) br del 1 2 3 4
+  4 breakpoints deleted; 0 breakpoint locations disabled.
+#+END_SRC
+
+Run program again: 
+
+#+BEGIN_SRC sh 
+  (lldb) r
+  There is a running process, kill it and restart?: [Y/n] y
+  Process 5443 exited with status = 9 (0x00000009) 
+  Process 6182 launched: '/home/user/projects/lldb-test.bin' (x86_64)
+  f1(5) = 20
+  f1(7) = 26
+  f1(8) = 29
+  f2(5) = 40
+  f2(7) = 52
+  f2(8) = 58
+  =========================================
+   GregorianEasterSunday(2010)  = Date { 2010 ; 4 ; 4 } 
+   GregorianEasterSunday(208)  = Date { 2008 ; 3 ; 23 } 
+  Process 6182 exited with status = 0 (0x00000000) 
+  (lldb) 
+#+END_SRC
+
+** References 
+
+ + *The LLDB Deugger*
+   + <https://lldb.llvm.org/>
+
+ + *LLDB Tutorial*
+   + <https://lldb.llvm.org/use/tutorial.html>
+
+ + *LLDB Quick Reference*
+   + <https://www.cs.williams.edu/~morgan/cs136-f15/lldb.html>
+
+ + *Advanced Debugging in IOS*
+   + <https://jayeshkawli.ghost.io/advanced-debugging-in-ios/> 
+
+ + *GDB to LLDB command map*
+   + <https://lldb.llvm.org/use/map.html>
+
+ + *LLDB Cheat Sheet*
+   + <https://www.nesono.com/sites/default/files/lldb%20cheat%20sheet.pdf>
+
 * WindBG - Windows Debugger 
 ** Overview 
 
