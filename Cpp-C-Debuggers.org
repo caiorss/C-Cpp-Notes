@@ -457,6 +457,952 @@ that the GDB shell is running.
   >>> c  
 #+END_SRC
 
+** Example with source code 
+*** File: gdb-test.cpp 
+
+See also: 
+  + [[https://www.slideshare.net/linaroorg/connect12-q2-gdb][Debugging with GDB - Linaro]] [BEST]
+  + [[https://stackoverflow.com/questions/6835728][How to break when a specific exception type is thrown in GDB?]]
+  + [[https://ftp.gnu.org/old-gnu/Manuals/gdb/html_node/gdb_28.html][GDB Manual - Setting Breakpoints]]
+  + [[https://undo.io/resources/gdb-watchpoint/gdb-catchpoints/][GDB Catchpoints]] - Undo.io
+  + [[https://reversed.top/2016-05-26/skipping-standard-library-in-gdb/][Skipping standard C++ library during debug session in gdb]]
+  + [[https://stackoverflow.com/questions/33661179/debug-c-template-with-gdb][debug c++ template with gdb]]
+
+Compilation: 
+
+#+BEGIN_SRC sh 
+  $ g++ gdb-test.cpp -o gdb-test.bin -std=c++1z -ggdb -O0 -Wall -Wextra -pedantic
+#+END_SRC
+
+File: gdb-test.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <cmath>
+  #include <memory>
+  #include <functional>
+
+  struct Functor{
+    double a = 0.0;
+    double b = 0.0;
+
+    Functor(){};
+    Functor(double aa, double bb): a(aa), b(bb) { }
+
+    double operator()(double x) const {
+      return a * x + b;
+    }    
+  };
+
+
+  int factorial(int n){
+      if(n <= 0) return 1;	
+      return n * factorial(n - 1);
+  }
+
+  struct Date
+  {
+      int year;
+      int month;
+      int day;
+
+      Date(){}
+      Date(int year, int month, int day)
+          : year(year)
+          , month(month)
+          , day(day)
+      { }
+
+      // Comparison operator required by  EXPECT_EQ
+      bool operator==(Date const& rhs) const
+      {
+          return year  == rhs.year
+              && month == rhs.month
+              && day   == rhs.day;
+      }
+      // Necessary for make class printable in GTest
+      friend std::ostream& operator<<(std::ostream& os, Date const& rhs)
+      {
+          return os << "Date { " << rhs.year << " ; "
+                    << rhs.month << " ; "
+                    << rhs.day << " } ";
+      }
+  };
+
+  Date
+  GregorianEasterSunday(int y)
+  {
+          if(y < 1000)
+                  throw std::domain_error("Invalid year");
+	
+      int c = y / 100;
+      int n = y - 19 * ( y / 19 );
+      int k = ( c - 17 ) / 25;
+      int i = c - c / 4 - ( c - k ) / 3 + 19 * n + 15;
+      i = i - 30 * ( i / 30 );
+      i = i - ( i / 28 ) * ( 1 - ( i / 28 )
+            ,* ( 29 / ( i + 1 ) )
+            ,* ( ( 21 - n ) / 11 ) );
+      int j = y + y / 4 + i + 2 - c + c / 4;
+      j = j - 7 * ( j / 7 );
+      int l = i - j;
+      int m = 3 + ( l + 40 ) / 44;
+      int d = l + 28 - 31 * ( m / 4 );
+      return Date(y, m, d);
+  }
+
+  int main(int argc, char** argv)
+  {
+    auto f1 = Functor(3, 5);
+    auto f2 = Functor(6, 10);
+
+    std::cout << "f1(5) = " << f1(5.0) << std::endl;
+    std::cout << "f1(7) = " << f1(7.0) << std::endl;
+    std::cout << "f1(8) = " << f1(8.0) << std::endl;
+
+    std::cout << "f2(5) = " << f2(5.0) << std::endl;
+    std::cout << "f2(7) = " << f2(7.0) << std::endl;
+    std::cout << "f2(8) = " << f2(8.0) << std::endl;
+
+    std::puts("=========================================");
+
+    // EXPECT_EQ(Date(2005, 3, 27), GregorianEasterSunday(2005));
+    // EXPECT_EQ(Date(2008, 3, 23), GregorianEasterSunday(2008));
+    // EXPECT_EQ(Date(2010, 4, 4),  GregorianEasterSunday(2010));
+    Date dt;
+  
+    dt = GregorianEasterSunday(2010);
+    std::cout << " GregorianEasterSunday(2010)  = " << dt << std::endl;
+
+    dt = GregorianEasterSunday(2008);
+    std::cout << " GregorianEasterSunday(208)  = " << dt << std::endl;
+
+    int y;
+    while(true) {	  
+       std::cout << " => Enter a year: ";
+       std::cin >> y;
+       auto date = GregorianEasterSunday(y);
+       std::cout << " Gregorian Easter Monday is: " << date << "\n";
+    }
+
+  
+    return 0;
+  }
+
+#+END_SRC
+
+*** Debugging with GDB 
+
+Load executable in GDB session: 
+
+  + (-q) => Don't show GDB startup banner.
+  + (--nh) and (--nx) => Do not read ~/.gdbinit and local ./.gdbinit
+  + (--args) => Pass arguments arg0 arg1 arg2 to program 
+
+#+BEGIN_SRC sh 
+  $ gdb -q --nh --nx --args ./gdb-test.bin arg0 arg1 arg2
+#+END_SRC
+
+List all info commands: 
+ + $ i 
+
+#+BEGIN_SRC sh 
+  (gdb) i
+  "info" must be followed by the name of an info command.
+  List of info subcommands:
+
+  info address -- Describe where symbol SYM is stored
+  info all-registers -- List of all registers and their contents
+  info args -- Argument variables of current stack frame
+  info auto-load -- Print current status of auto-loaded files
+  info auxv -- Display the inferior's auxiliary vector
+  info bookmarks -- Status of user-settable bookmarks
+
+   ... ... ... ... .... 
+#+END_SRC
+
+Show information about loaded symbols: 
+  + $ i file 
+
+#+BEGIN_SRC sh 
+  (gdb) i file
+
+  Symbols from "/home/archbox/projects/gdb-test.bin".
+  Native process:
+          Using the running image of child process 24301.
+          While running this, GDB does not access memory from...
+  Local exec file:
+          `/home/archbox/projects/gdb-test.bin', file type elf64-x86-64.
+          Entry point: 0x400b20
+          0x0000000000400238 - 0x0000000000400254 is .interp
+          0x0000000000400254 - 0x0000000000400274 is .note.ABI-tag
+          0x0000000000400274 - 0x0000000000400298 is .note.gnu.build-id
+          0x0000000000400298 - 0x00000000004002d8 is .gnu.hash
+        ... ... ... ... ... ... ... ... ... ... ... 
+      ... ... ... ... ... ... ... ... ... ... ... ... ... 
+
+          0x00007ffff74921a0 - 0x00007ffff7493860 is .data in /lib64/libc.so.6
+          0x00007ffff7493860 - 0x00007ffff7497ae0 is .bss in /lib64/libc.so.6
+#+END_SRC
+
+Show all available sources: 
+ + $ i source 
+
+#+BEGIN_SRC sh 
+   (gdb) i sources
+   Source files for which symbols have been read in:
+
+   /home/archbox/projects/gdb-test.cpp, /usr/include/c++/8/iostream, /usr/include/c++/8/cwchar, 
+   /usr/include/c++/8/new, /usr/include/c++/8/bits/exception_ptr.h, /usr/include/c++/8/type_traits, 
+   /usr/include/c++/8/x86_64-redhat-linux/bits/c++config.h, /usr/include/c++/8/bits/stl_pair.h, 
+
+   ... ... ... ... ... ... ... ... ... ... ... ... ... ... 
+#+END_SRC
+
+Disassembly function factorial (1)
+
+#+BEGIN_SRC sh 
+  (gdb) disas factorial
+  Dump of assembler code for function factorial(int):
+     0x0000000000400c06 <+0>:	push   %rbp
+     0x0000000000400c07 <+1>:	mov    %rsp,%rbp
+     0x0000000000400c0a <+4>:	sub    $0x10,%rsp
+     0x0000000000400c0e <+8>:	mov    %edi,-0x4(%rbp)
+     0x0000000000400c11 <+11>:	cmpl   $0x0,-0x4(%rbp)
+  ... ... ... ... ... ... ... ... ... ... ... ... 
+     0x0000000000400c24 <+30>:	mov    %eax,%edi
+     0x0000000000400c26 <+32>:	callq  0x400c06 <factorial(int)>
+     0x0000000000400c2b <+37>:	imul   -0x4(%rbp),%eax
+     0x0000000000400c2f <+41>:	leaveq 
+     0x0000000000400c30 <+42>:	retq   
+  End of assembler dump.
+#+END_SRC
+
+Disassembly function factorial  (2)
+
+#+BEGIN_SRC sh 
+  (gdb) disas /m factorial
+  Dump of assembler code for function factorial(int):
+  20	int factorial(int n){
+     0x0000000000400c06 <+0>:	push   %rbp
+     0x0000000000400c07 <+1>:	mov    %rsp,%rbp
+     0x0000000000400c0a <+4>:	sub    $0x10,%rsp
+     0x0000000000400c0e <+8>:	mov    %edi,-0x4(%rbp)
+
+  21	    if(n <= 0) return 1;	
+     0x0000000000400c11 <+11>:	cmpl   $0x0,-0x4(%rbp)
+     0x0000000000400c15 <+15>:	jg     0x400c1e <factorial(int)+24>
+     0x0000000000400c17 <+17>:	mov    $0x1,%eax
+     0x0000000000400c1c <+22>:	jmp    0x400c2f <factorial(int)+41>
+
+  22	    return n * factorial(n - 1);
+     0x0000000000400c1e <+24>:	mov    -0x4(%rbp),%eax
+     0x0000000000400c21 <+27>:	sub    $0x1,%eax
+     0x0000000000400c24 <+30>:	mov    %eax,%edi
+     0x0000000000400c26 <+32>:	callq  0x400c06 <factorial(int)>
+     0x0000000000400c2b <+37>:	imul   -0x4(%rbp),%eax
+
+  23	}
+     0x0000000000400c2f <+41>:	leaveq 
+     0x0000000000400c30 <+42>:	retq   
+
+  ---Type <return> to continue, or q <return> to quit---
+  End of assembler dump.
+
+#+END_SRC
+
+Disassembly function factorial with Intel syntaxe (3)
+
+#+BEGIN_SRC asm 
+  (gdb) set disassembly-flavor intel  
+
+  (gdb) disas /m factorial
+  Dump of assembler code for function factorial(int):
+  20	int factorial(int n){
+     0x0000000000400c06 <+0>:	push   rbp
+     0x0000000000400c07 <+1>:	mov    rbp,rsp
+     0x0000000000400c0a <+4>:	sub    rsp,0x10
+     0x0000000000400c0e <+8>:	mov    DWORD PTR [rbp-0x4],edi
+
+  21	    if(n <= 0) return 1;	
+     0x0000000000400c11 <+11>:	cmp    DWORD PTR [rbp-0x4],0x0
+     0x0000000000400c15 <+15>:	jg     0x400c1e <factorial(int)+24>
+     0x0000000000400c17 <+17>:	mov    eax,0x1
+     0x0000000000400c1c <+22>:	jmp    0x400c2f <factorial(int)+41>
+
+  22	    return n * factorial(n - 1);
+     0x0000000000400c1e <+24>:	mov    eax,DWORD PTR [rbp-0x4]
+     0x0000000000400c21 <+27>:	sub    eax,0x1
+     0x0000000000400c24 <+30>:	mov    edi,eax
+     0x0000000000400c26 <+32>:	call   0x400c06 <factorial(int)>
+     0x0000000000400c2b <+37>:	imul   eax,DWORD PTR [rbp-0x4]
+
+  23	}
+     0x0000000000400c2f <+41>:	leave  
+     0x0000000000400c30 <+42>:	ret    
+
+  ---Type <return> to continue, or q <return> to quit---
+  End of assembler dump.
+#+END_SRC
+
+Run program without any breaking points: 
+ + (r) or (run)
+
+#+BEGIN_SRC text 
+  (gdb) r
+  Starting program: /home/archbox/projects/gdb-test.bin arg0 arg1 arg2
+
+  f1(5) = 20
+  f1(7) = 26
+  f1(8) = 29
+  f2(5) = 40
+  f2(7) = 52
+  f2(8) = 58
+  =========================================
+   GregorianEasterSunday(2010)  = Date { 2010 ; 4 ; 4 } 
+   GregorianEasterSunday(208)  = Date { 2008 ; 3 ; 23 } 
+   => Enter a year: 2010
+   Gregorian Easter Monday is: Date { 2010 ; 4 ; 4 } 
+   => Enter a year: 2014
+   Gregorian Easter Monday is: Date { 2014 ; 4 ; 20 } 
+   => Enter a year: 2015
+   Gregorian Easter Monday is: Date { 2015 ; 4 ; 5 } 
+   => Enter a year: 0
+  terminate called after throwing an instance of 'std::domain_error'
+    what():  Invalid year
+#+END_SRC
+
+Show _backtrace_ - call stack until exception. 
+
+#+BEGIN_SRC sh 
+  (gdb) bt
+  #0  0x00007ffff7110efb in raise () from /lib64/libc.so.6
+  #1  0x00007ffff70fb5b9 in abort () from /lib64/libc.so.6
+  #2  0x00007ffff7ad0b3b in __gnu_cxx::__verbose_terminate_handler() [clone .cold.1] ()
+     from /lib64/libstdc++.so.6
+  #3  0x00007ffff7ad6fac in __cxxabiv1::__terminate(void (*)()) () from /lib64/libstdc++.so.6
+  #4  0x00007ffff7ad7007 in std::terminate() () from /lib64/libstdc++.so.6
+  #5  0x00007ffff7ad7268 in __cxa_throw () from /lib64/libstdc++.so.6
+  #6  0x0000000000400c74 in GregorianEasterSunday (y=0) at gdb-test.cpp:58
+  #7  0x0000000000401134 in main (argc=4, argv=0x7fffffffc668) at gdb-test.cpp:106
+  (gdb) 
+#+END_SRC
+
+Clear screen: 
+
+#+BEGIN_SRC sh 
+  (gdb) ! clear
+#+END_SRC
+
+Set breakpoint at function main: 
+
+#+BEGIN_SRC cpp 
+  (gdb) b main
+  Breakpoint 1 at 0x400ecc: file gdb-test.cpp, line 78.
+#+END_SRC
+
+Set breakpoint at line 80 
+
+#+BEGIN_SRC cpp 
+  (gdb) b 80
+  Breakpoint 3 at 0x400f04: file gdb-test.cpp, line 80.
+#+END_SRC
+
+Set breakpoint at line 102 
+
+#+BEGIN_SRC cpp 
+  (gdb) b 102
+  Breakpoint 4 at 0x40110a: file gdb-test.cpp, line 102.
+#+END_SRC
+
+Set breakpoint at line 88 of file gdb-test.cpp 
+
+#+BEGIN_SRC cpp 
+  (gdb) b gdb-test.cpp:88
+  Breakpoint 5 at 0x401066: file gdb-test.cpp, line 88.
+#+END_SRC
+
+List breakpoints: 
+ + $ i b 
+
+#+BEGIN_SRC sh 
+  (gdb) i b
+  Num     Type           Disp Enb Address            What
+  1       breakpoint     keep y   0x0000000000400ecc in main(int, char**) at gdb-test.cpp:78
+          breakpoint already hit 1 time
+  2       breakpoint     keep y   0x0000000000400ecc in main(int, char**) at gdb-test.cpp:78
+          breakpoint already hit 1 time
+  3       breakpoint     keep y   0x0000000000400f04 in main(int, char**) at gdb-test.cpp:80
+  4       breakpoint     keep y   0x000000000040110a in main(int, char**) at gdb-test.cpp:102
+  5       breakpoint     keep y   0x0000000000401066 in main(int, char**) at gdb-test.cpp:88
+#+END_SRC
+
+Run program again: 
+
+#+BEGIN_SRC sh 
+  (gdb) r arg0 arg1 arg2 arg3
+
+  The program being debugged has been started already.
+  Start it from the beginning? (y or n) y
+  Starting program: /home/archbox/projects/gdb-test.bin arg0 arg1 arg2 arg3
+
+  Breakpoint 1, main (argc=5, argv=0x7fffffffc658) at gdb-test.cpp:78
+  78	  auto f1 = Functor(3, 5);
+#+END_SRC
+
+Show current location: 
+ + $ where 
+
+#+BEGIN_SRC sh 
+  (gdb) where
+  #0  main (argc=5, argv=0x7fffffffc658) at gdb-test.cpp:78
+#+END_SRC
+
+Display information about current stack frame: 
+ + $ i frame 
+
+#+BEGIN_SRC sh 
+  (gdb) i frame
+  Stack level 0, frame at 0x7fffffffc580:
+   rip = 0x400ecc in main (gdb-test.cpp:78); saved rip = 0x7ffff70fd11b
+   source language c++.
+   Arglist at 0x7fffffffc570, args: argc=5, argv=0x7fffffffc658
+   Locals at 0x7fffffffc570, Previous frame's sp is 0x7fffffffc580
+   Saved registers:
+    rbx at 0x7fffffffc568, rbp at 0x7fffffffc570, rip at 0x7fffffffc578
+#+END_SRC
+
+Display arguments of current function: 
+  + $ i args 
+
+#+BEGIN_SRC sh 
+  (gdb) i args
+  argc = 5
+  argv = 0x7fffffffc658
+
+  (gdb) p argv[0]
+  $1 = 0x7fffffffcb0d "/home/archbox/projects/gdb-test.bin"
+
+  (gdb) p argv[1]
+  $2 = 0x7fffffffcb31 "arg0"
+
+  (gdb) p argv[2]
+  $3 = 0x7fffffffcb36 "arg1"
+
+  (gdb) p argv[3]
+  $4 = 0x7fffffffcb3b "arg2"
+
+  (gdb) p argv[4]
+  $5 = 0x7fffffffcb40 "arg3"
+#+END_SRC
+
+Display local variables (stack-allocated):
+
+#+BEGIN_SRC sh 
+  (gdb) i locals
+  f1 = {a = 2.0746567448655621e-317, b = 2.0736686135738796e-317}
+  f2 = {a = 6.9533490676080666e-310, b = 0}
+  dt = {year = 0, month = 4199221, day = 0}
+  y = 2
+#+END_SRC
+
+Display CPU register for the current process (context): 
+ + $ i reg 
+ 
+#+BEGIN_SRC sh 
+  (gdb) i reg
+  rax            0x400ebc	4198076
+  rbx            0x0	0
+  rcx            0xa0	160
+  rdx            0x7fffffffc688	140737488340616
+  rsi            0x7fffffffc658	140737488340568
+  rdi            0x5	5
+  rbp            0x7fffffffc570	0x7fffffffc570
+  rsp            0x7fffffffc510	0x7fffffffc510
+  r8             0x7ffff7493d80	140737342160256
+  r9             0x0	0
+  r10            0xfffffffffffff70d	-2291
+  r11            0x7ffff7113a60	140737338489440
+  r12            0x400b20	4197152
+  r13            0x7fffffffc650	140737488340560
+  r14            0x0	0
+  r15            0x0	0
+  rip            0x400ecc	0x400ecc <main(int, char**)+16>
+  eflags         0x202	[ IF ]
+  cs             0x33	51
+  ss             0x2b	43
+  ds             0x0	0
+  es             0x0	0
+  fs             0x0	0
+  gs             0x0	0
+#+END_SRC
+
+Single _step over_ without descending into function: 
+ + $ n 
+
+#+BEGIN_SRC sh 
+  (gdb) n
+  79	  auto f2 = Functor(6, 10);
+  (gdb) n
+
+  Breakpoint 3, main (argc=5, argv=0x7fffffffc658) at gdb-test.cpp:81
+  81	  std::cout << "f1(5) = " << f1(5.0) << std::endl;
+  (gdb) 
+  f1(5) = 20
+  82	  std::cout << "f1(7) = " << f1(7.0) << std::endl;
+  (gdb) 
+#+END_SRC
+
+Continue execution until next breakpoint: 
+ + $ c or $ cont 
+
+#+BEGIN_SRC sh 
+  (gdb) c
+  Continuing.
+  f1(7) = 26
+  f1(8) = 29
+  f2(5) = 40
+  f2(7) = 52
+  f2(8) = 58
+
+  Breakpoint 5, main (argc=5, argv=0x7fffffffc658) at gdb-test.cpp:89
+  89	  std::puts("=========================================");
+  (gdb) 
+#+END_SRC
+
+Check current location: 
+
+#+BEGIN_SRC sh 
+  (gdb) where
+  #0  main (argc=5, argv=0x7fffffffc658) at gdb-test.cpp:89
+#+END_SRC
+
+Show local variables: 
+
+#+BEGIN_SRC text 
+  (gdb) i locals
+
+  f1 = {a = 3, b = 5}
+  f2 = {a = 6, b = 10}
+  dt = {year = 0, month = 4199221, day = 0}
+  y = 2
+#+END_SRC
+
+Watch changes of variable *dt* 
+
+#+BEGIN_SRC sh
+  (gdb) watch dt
+  Hardware watchpoint 6: dt
+#+END_SRC
+
+List all watchpoints: 
+
+#+BEGIN_SRC sh 
+  (gdb) i watchpoints
+  Num     Type           Disp Enb Address            What
+  6       hw watchpoint  keep y                      dt
+          breakpoint already hit 4 times
+  (gdb) 
+#+END_SRC
+
+Keep executing with _step over_ (n):
+
+#+BEGIN_SRC sh 
+  (gdb) n
+   GregorianEasterSunday(2010)  = Date { 2010 ; 4 ; 4 } 
+  99	  dt = GregorianEasterSunday(2008);
+  (gdb) n
+
+  Hardware watchpoint 6: dt
+
+  Old value = {year = 2010, month = 4, day = 4}
+  New value = {year = 2008, month = 3, day = 4}
+  0x00000000004010d1 in main (argc=6, argv=0x7fffffffc648) at gdb-test.cpp:99
+  99	  dt = GregorianEasterSunday(2008);
+  (gdb) n
+
+  Hardware watchpoint 6: dt
+
+  Old value = {year = 2008, month = 3, day = 4}
+  New value = {year = 2008, month = 3, day = 23}
+  main (argc=6, argv=0x7fffffffc648) at gdb-test.cpp:100
+  100	  std::cout << " GregorianEasterSunday(208)  = " << dt << std::endl;
+  (gdb) n
+   GregorianEasterSunday(208)  = Date { 2008 ; 3 ; 23 } 
+
+  Breakpoint 4, main (argc=6, argv=0x7fffffffc648) at gdb-test.cpp:104
+  104		  std::cout << " => Enter a year: ";
+  (gdb) 
+#+END_SRC
+
+Rusume execution until next breakpoint: 
+
+#+BEGIN_SRC sh 
+  (gdb) c
+  Continuing.
+   => Enter a year: 2010
+   Gregorian Easter Monday is: Date { 2010 ; 4 ; 4 } 
+
+  Breakpoint 4, main (argc=6, argv=0x7fffffffc648) at gdb-test.cpp:104
+  104		  std::cout << " => Enter a year: ";
+  (gdb) c
+  Continuing.
+   => Enter a year: 2012
+   Gregorian Easter Monday is: Date { 2012 ; 4 ; 8 } 
+
+  Breakpoint 4, main (argc=6, argv=0x7fffffffc648) at gdb-test.cpp:104
+  104		  std::cout << " => Enter a year: ";
+  (gdb) c
+  Continuing.
+   => Enter a year: 234
+  terminate called after throwing an instance of 'std::domain_error'
+    what():  Invalid year
+
+  Program received signal SIGABRT, Aborted.
+  0x00007ffff7110efb in raise () from /lib64/libc.so.6
+  (gdb) 
+#+END_SRC
+
+Show backtrace: 
+
+#+BEGIN_SRC sh 
+  (gdb) bt
+  #0  0x00007ffff7110efb in raise () from /lib64/libc.so.6
+  #1  0x00007ffff70fb5b9 in abort () from /lib64/libc.so.6
+  #2  0x00007ffff7ad0b3b in __gnu_cxx::__verbose_terminate_handler() [clone .cold.1] ()
+     from /lib64/libstdc++.so.6
+  #3  0x00007ffff7ad6fac in __cxxabiv1::__terminate(void (*)()) () from /lib64/libstdc++.so.6
+  #4  0x00007ffff7ad7007 in std::terminate() () from /lib64/libstdc++.so.6
+  #5  0x00007ffff7ad7268 in __cxa_throw () from /lib64/libstdc++.so.6
+  #6  0x0000000000400c74 in GregorianEasterSunday (y=234) at gdb-test.cpp:58
+  #7  0x0000000000401134 in main (argc=6, argv=0x7fffffffc648) at gdb-test.cpp:106
+#+END_SRC
+
+Delete all breakpoints and set them again: 
+
+#+BEGIN_SRC sh 
+  (gdb) delete 1 2 3 4 5 6 
+
+  (gdb) b main
+  Breakpoint 7 at 0x400ecc: file gdb-test.cpp, line 78.
+
+  (gdb) b GregorianEasterSunday 
+  Breakpoint 8 at 0x400c3f: file gdb-test.cpp, line 57.
+
+
+  (gdb) i b
+  Num     Type           Disp Enb Address            What
+  7       breakpoint     keep y   0x0000000000400ecc in main(int, char**) at gdb-test.cpp:78
+  8       breakpoint     keep y   0x0000000000400c3f in GregorianEasterSunday(int) at gdb-test.cpp:57
+#+END_SRC
+
+Restart program: 
+
+#+BEGIN_SRC sh 
+  (gdb) r 
+  Breakpoint 7, main (argc=6, argv=0x7fffffffc648) at gdb-test.cpp:78
+  78	  auto f1 = Functor(3, 5);
+#+END_SRC
+
+Print local variables _f1_ and _f2_: 
+
+#+BEGIN_SRC sh 
+  (gdb) p f1
+  $6 = {a = 3, b = 5}
+
+  (gdb) p f2
+  $7 = {a = 6, b = 10}
+#+END_SRC
+
+Print type of variable _f1_ and _dt_: 
+
+#+BEGIN_SRC sh 
+  (gdb) ptype f1
+  type = struct Functor {
+      double a;
+      double b;
+    public:
+      Functor(void);
+      Functor(double, double);
+      double operator()(double) const;
+  }
+
+  (gdb) ptype dt
+  type = struct Date {
+      int year;
+      int month;
+      int day;
+    public:
+      Date(void);
+      Date(int, int, int);
+      bool operator==(const Date &) const;
+  }
+#+END_SRC
+
+Call functor:
+
+#+BEGIN_SRC sh 
+  (gdb) p f1
+  $22 = {a = 3, b = 5}
+
+  (gdb) call f1(10)
+  Invalid data type for function to be called.
+
+  (gdb) call f1.operator()(10)
+  $20 = 35
+
+  (gdb) call f1.operator()(2.56)
+  $21 = 12.68
+
+  (gdb) call f1.operator()(10)
+  $23 = 95.97999999999999
+
+  (gdb) call f1.operator()(5)
+  $24 = 43.364999999999995
+  (gdb) 
+
+#+END_SRC
+
+Call function factorial(): 
+
+#+BEGIN_SRC sh 
+  (gdb) call factorial(4)
+  $8 = 24
+
+  (gdb) call factorial(6)
+  $9 = 720
+
+  (gdb) call factorial(10)
+  $10 = 3628800
+#+END_SRC
+
+Disable breakpoint of function GregorianEasterSunday():
+
+#+BEGIN_SRC sh 
+  (gdb) i b
+  Num     Type           Disp Enb Address            What
+  7       breakpoint     keep y   0x0000000000400ecc in main(int, char**) at gdb-test.cpp:78
+          breakpoint already hit 1 time
+  8       breakpoint     keep y   0x0000000000400c3f in GregorianEasterSunday(int) at gdb-test.cpp:57
+          breakpoint already hit 1 time
+
+ (gdb) disable 8
+#+END_SRC
+
+Call function GregorianEasterSunday():
+
+#+BEGIN_SRC sh 
+  (gdb) call GregorianEasterSunday(2010)
+  $11 = {year = 2010, month = 4, day = 4}
+
+  (gdb) call GregorianEasterSunday(1995)
+  $12 = {year = 1995, month = 4, day = 16}
+#+END_SRC
+
+Create object (variable): 
+
+#+BEGIN_SRC sh 
+  (gdb) set $date_object = GregorianEasterSunday(1998)
+
+  (gdb) p $date_object
+  $13 = {year = 1998, month = 4, day = 12}
+  (gdb) p $date_object.year
+  $14 = 1998
+
+  (gdb) p $date_object.month
+  $15 = 4
+
+  (gdb) p $date_object.day
+  $16 = 12
+#+END_SRC
+
+Enable GregorianEasterSunday() breakpoint again: 
+
+#+BEGIN_SRC sh 
+  (gdb) enable 8
+#+END_SRC
+
+Continue execution until next breakpoint: 
+
+#+BEGIN_SRC sh 
+  (gdb) c
+  Continuing.
+  f1(5) = 43.365
+  f1(7) = 64.411
+  f1(8) = 74.934
+  f2(5) = 40
+  f2(7) = 52
+  f2(8) = 58
+  =========================================
+
+  Breakpoint 8, GregorianEasterSunday (y=2010) at gdb-test.cpp:57
+  57		if(y < 1000)
+  (gdb) 
+#+END_SRC
+
+Check current stack frame: 
+
+#+BEGIN_SRC sh 
+  (gdb) where
+  #0  GregorianEasterSunday (y=2010) at gdb-test.cpp:57
+  #1  0x0000000000401086 in main (argc=6, argv=0x7fffffffc648) at gdb-test.cpp:96
+
+  (gdb) list
+  52	};
+  53	
+  54	Date
+  55	GregorianEasterSunday(int y)
+  56	{
+  57		if(y < 1000)
+  58			throw std::domain_error("Invalid year");
+  59		
+  60	    int c = y / 100;
+  61	    int n = y - 19 * ( y / 19 );
+  (gdb) 
+#+END_SRC
+
+Check current stack frame: 
+
+#+BEGIN_SRC sh 
+  (gdb) i frame
+
+  Stack level 0, frame at 0x7fffffffc500:
+   rip = 0x400c3f in GregorianEasterSunday (gdb-test.cpp:57); saved rip = 0x401086
+   called by frame at 0x7fffffffc570
+   source language c++.
+   Arglist at 0x7fffffffc4f0, args: y=2010
+   Locals at 0x7fffffffc4f0, Previous frame's sp is 0x7fffffffc500
+   Saved registers:
+    rbx at 0x7fffffffc4e0, rbp at 0x7fffffffc4f0, r12 at 0x7fffffffc4e8, rip at 0x7fffffffc4f8
+#+END_SRC
+
+Check function arguments and local variables: 
+
+#+BEGIN_SRC sh 
+  (gdb) i args
+  y = 2010
+
+  (gdb) i locals
+  c = 0
+  n = 6299840
+  k = 0
+  i = 4197152
+  j = 32767
+  l = -149635822
+  m = 0
+  d = 4199368
+  (gdb) 
+#+END_SRC
+
+Watch local variables: 
+
+#+BEGIN_SRC sh 
+  (gdb) watch i
+  Hardware watchpoint 16: i
+
+  (gdb) watch j
+  Hardware watchpoint 17: j
+  (gdb) 
+#+END_SRC
+
+Continue execution step-by-step: 
+
+#+BEGIN_SRC 
+  (gdb) n
+  60	    int c = y / 100;
+  (gdb) 
+  61	    int n = y - 19 * ( y / 19 );
+  (gdb) 
+  62	    int k = ( c - 17 ) / 25;
+  (gdb) 
+  63	    int i = c - c / 4 - ( c - k ) / 3 + 19 * n + 15;
+  (gdb) 
+
+  Hardware watchpoint 16: i
+
+  Old value = 4197152
+  New value = 309
+  GregorianEasterSunday (y=2010) at gdb-test.cpp:64
+  64	    i = i - 30 * ( i / 30 );
+  (gdb) 
+
+  ... ... ... ... ... ... ... 
+#+END_SRC
+
+Show local variables: 
+
+#+BEGIN_SRC sh 
+  (gdb) i locals
+  c = 20
+  n = 15
+  k = 0
+  i = 9
+  j = 2
+  l = 7
+  m = 4
+  d = 4
+#+END_SRC
+
+Set a _throw_ catchpoint that will pause the program when an exception
+is thrown: 
+
+#+BEGIN_SRC sh 
+  (gdb) catch throw
+  Catchpoint 18 (throw)
+
+  (gdb) i b
+  Num     Type           Disp Enb Address            What
+  7       breakpoint     keep y   0x0000000000400ecc in main(int, char**) at gdb-test.cpp:78
+          breakpoint already hit 1 time
+  8       breakpoint     keep y   0x0000000000400c3f in GregorianEasterSunday(int) at gdb-test.cpp:57
+          breakpoint already hit 1 time
+  16      hw watchpoint  keep y                      i
+          breakpoint already hit 2 times
+  17      hw watchpoint  keep y                      j
+          breakpoint already hit 2 times
+  18      breakpoint     keep y   0x00007ffff7ad7231 exception throw
+
+  (gdb) delete 7 8 16 17
+
+  (gdb) b main
+  Breakpoint 19 at 0x400ecc: file gdb-test.cpp, line 78.
+#+END_SRC
+
+Restart program: 
+
+#+BEGIN_SRC sh 
+  (gdb) r
+  The program being debugged has been started already.
+  Start it from the beginning? (y or n) y
+  Breakpoint 19, main (argc=6, argv=0x7fffffffc648) at gdb-test.cpp:78
+  78	  auto f1 = Functor(3, 5);
+#+END_SRC
+
+Jump to line 101: 
+
+#+BEGIN_SRC sh 
+  (gdb) jump 101
+  Continuing at 0x40110a.
+   => Enter a year: 2010
+   Gregorian Easter Monday is: Date { 2010 ; 4 ; 4 } 
+   => Enter a year: 1995
+   Gregorian Easter Monday is: Date { 1995 ; 4 ; 16 } 
+   => Enter a year: 253
+
+  Catchpoint 18 (exception thrown), 0x00007ffff7ad7231 in __cxa_throw () from /lib64/libstdc++.so.6
+  (gdb) 
+
+  (gdb) bt
+  #0  0x00007ffff7ad7231 in __cxa_throw () from /lib64/libstdc++.so.6
+  #1  0x0000000000400c74 in GregorianEasterSunday (y=253) at gdb-test.cpp:58
+  #2  0x0000000000401134 in main (argc=6, argv=0x7fffffffc648) at gdb-test.cpp:106
+
+#+END_SRC
+
+
+
+
+
 ** Example and workflow 
 
 Compile program with Debug Symbols:
