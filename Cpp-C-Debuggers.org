@@ -458,6 +458,20 @@ that the GDB shell is running.
 #+END_SRC
 
 ** Example with source code 
+*** Overview 
+
+This GDB example shows how to: 
+
+  + Build a C++ program in debug mode.
+  + Monitor the program execution.
+  + Set and delete breakpoints
+  + Set and delete watchpoints for monitoring variable changes
+  + Inspect the call stack 
+  + Perform forensic analysis of the process being debugged 
+  + Change variables at runtime
+  + Create variables and objects without recompilation 
+  + Call functions without at recompilation
+
 *** File: gdb-test.cpp 
 
 See also: 
@@ -621,6 +635,55 @@ List all info commands:
    ... ... ... ... .... 
 #+END_SRC
 
+Show information about current process: 
+  + $ i proc 
+  + The current process ID (PID) is 840 (Unique identifier number)
+  + exe => Executable used to instantiate the process.
+  + cwd => Process' current directory.
+  + cmdline => Process command line argument
+
+#+BEGIN_SRC sh 
+  (gdb) i proc
+  process 840
+  warning: target file /proc/840/cmdline contained unexpected null characters
+  cmdline = '/home/archbox/projects/gdb-test.bin'
+  cwd = '/home/archbox/projects'
+  exe = '/home/archbox/projects/gdb-test.bin'
+  (gdb) 
+#+END_SRC
+
+Show environment variables of current process: 
+  + $ show env
+
+#+BEGIN_SRC sh 
+  (gdb) show env
+  GS_LIB=
+  QTINC=/usr/lib64/qt-3.3/include
+  KDE_FULL_SESSION=true
+  LC_ALL=en_US.UTF-8
+  LD_LIBRARY_PATH=:/home/archbox/opt/root/lib:/home/archbox/opt/cling_2018-09-16_fedora27/lib/:/home/archbox/opt/root/lib:/home/archbox/opt/cling_2018-09-16_fedora27/lib/
+  TERMINATOR_UUID=urn:uuid:34feab2a-6587-41dc-9901-b355f3144d59
+  XDG_MENU_PREFIX=kf5-
+  MODULES_RUN_QUARANTINE=LD_LIBRARY_PATH
+  LANG=en_CA.UTF-8
+   ... ...  ... ...  ... ...  ... ...  ... ...  ... ... 
+   ... ...  ... ...  ... ...  ... ...  ... ...  ... ... 
+#+END_SRC
+
+List all shared libraries loaded by the current process: 
+ + $ i sharedlib 
+
+#+BEGIN_SRC sh 
+  (gdb) i sharedlibrary 
+  From                To                  Syms Read   Shared Object Library
+  0x00007ffff7dd6f60  0x00007ffff7df50d0  Yes (*)     /lib64/ld-linux-x86-64.so.2
+  0x00007ffff7ad0630  0x00007ffff7b867fe  Yes (*)     /lib64/libstdc++.so.6
+  0x00007ffff76bb9f0  0x00007ffff776deda  Yes (*)     /lib64/libm.so.6
+  0x00007ffff749aad0  0x00007ffff74ab735  Yes (*)     /lib64/libgcc_s.so.1
+  0x00007ffff70fb3a0  0x00007ffff7241eaf  Yes (*)     /lib64/libc.so.6
+  (*): Shared library is missing debugging information.
+#+END_SRC
+
 Show information about loaded symbols: 
   + $ i file 
 
@@ -644,6 +707,34 @@ Show information about loaded symbols:
           0x00007ffff74921a0 - 0x00007ffff7493860 is .data in /lib64/libc.so.6
           0x00007ffff7493860 - 0x00007ffff7497ae0 is .bss in /lib64/libc.so.6
 #+END_SRC
+
+Look for all function symbols matching the name _factorial_:
+
+#+BEGIN_SRC sh 
+  (gdb) i function factorial
+  All functions matching regular expression "factorial":
+
+  File gdb-test.cpp:
+  int factorial(int);
+  static void _GLOBAL__sub_I__Z9factoriali();
+#+END_SRC
+
+Look for all variables symbols matching the name environ:
+
+#+BEGIN_SRC sh 
+  (gdb) i variable environ
+  All variables matching regular expression "environ":
+
+  Non-debugging symbols:
+  0x00007ffff7ffe0c8  __environ
+  0x00007ffff7ffe0c8  _environ
+  0x00007ffff7ffe0c8  environ
+  0x00007ffff7493d58  last_environ
+  0x00007ffff7495080  __environ
+  0x00007ffff7495080  _environ
+  0x00007ffff7495080  environ
+#+END_SRC
+
 
 Show all available sources: 
  + $ i source 
