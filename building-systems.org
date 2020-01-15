@@ -3928,6 +3928,368 @@ Taken from:
    Correctly set Visual Studio linker flag /SUBSYSTEM in CMAKE - Stack
    Overflow]]
 ** Snippets 
+*** Place build-tree object-code in source directory 
+
+The following sample project shows how to place build-tree
+object-codes (executables and libraries) in the source directory
+(project directory) for making easier to find them wihout browsing the
+build tree. 
+
+The sample project is comprised of two executables app1 and app2
+linked against a shared library libutils. 
+
+ *Sample Project* 
+
+File: CMakeLists.txt
+
+#+BEGIN_SRC cmake 
+  cmake_minimum_required(VERSION 3.5)
+  project(testbed_project)
+
+  #=========== Global Settings =================#
+
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_CXX_STANDARD_REQUIRED ON) 
+
+  #  => Place executable(s) in ${SOURCE DIRECTORY}/out/bin 
+  #  => Place libraries in ${SOURCE DIRECTORY}/out/lib 
+  #
+  #  => Note: ${SOURCE DIRECTORY} is the directory where is this CMakeLists.txt 
+  set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/out/lib)
+  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/out/lib)
+  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/out/bin)
+
+  # Set relative rpath to shared library in executable object code
+  # See:
+  #  => https://cmake.org/cmake/help/latest/prop_tgt/BUILD_RPATH_USE_ORIGIN.html
+  #  => https://gitlab.kitware.com/cmake/community/-/wikis/doc/cmake/RPATH-handling
+  if(UNIX)
+    SET(CMAKE_INSTALL_RPATH "$ORIGIN/../lib:$ORIGIN/")
+  endif()
+
+  # Export ALL DLLs symbols on Windows without __declspec(xxxx) annotations.
+  set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS true)
+
+  #=============== Targets-specific settings ====================#
+
+  # Target: libutil (Library)
+  add_library(utils SHARED utils.cpp utils.hpp)
+  add_library(utils_static STATIC utils.cpp utils.hpp)
+
+  # Target: app1 => Executable (Dynamically linked)
+  add_executable(app1 main1.cpp)
+  target_link_libraries(app1 utils)
+
+  # Target: app2 => Executable (Dynamically linked)
+  add_executable(app2 main2.cpp)
+  target_link_libraries(app2 utils)
+
+  # Target: app1_static => Executable (static linked)
+  add_executable(app1_static main1.cpp)
+  target_link_libraries(app1_static utils_static)
+
+  # Target: app1_static => Executable (static linked)
+  add_executable(app2_static main1.cpp)
+  target_link_libraries(app2_static utils_static)
+
+
+  #============== Target: Install ===============================#
+  # Equivalent to: $ make install 
+
+  install(TARGETS app1 app2 app1_static app2_static utils utils_static  
+    RUNTIME  DESTINATION bin # Executable: *.exe, 
+    LIBRARY  DESTINATION lib # Shared libraries: *.dll, *.so and so on 
+    ARCHIVE  DESTINATION lib # Static libraries: *.a 
+  )
+
+  install(FILES README.txt DESTINATION ./)
+
+#+END_SRC
+
+File: README.txt 
+
+#+BEGIN_SRC text 
+  ======= Application User Guide ==========
+
+    + app1 => Application for creating PCB - Printed Circuit Board
+    + app2 => App. for communicating with remote link
+
+    <INSERT TEXT HERE ....>  
+#+END_SRC
+
+File: utils.hpp (CMake targets: utils and utils_static)
+
+#+BEGIN_SRC cpp 
+  #ifndef _UTILS_HPP_
+  #define _UTILS_HPP_
+
+  #include <string>
+
+  namespace  utils {
+
+       class Dummy{
+       private:
+            std::string m_name = "<Untitled>";
+       public:
+            Dummy();
+            Dummy(std::string const& name);
+            void  showName() const;
+       };
+  }
+
+  #endif 
+#+END_SRC
+
+File: utils.hpp (CMake targets: utils and utils_static)
+
+#+BEGIN_SRC cpp 
+   #include <iostream> 
+
+   #include "utils.hpp"
+
+   namespace utils{
+
+        Dummy::Dummy() { }
+        Dummy::Dummy(std::string const& name): m_name(name) { }
+
+        void Dummy::showName() const
+        {
+            std::cout << " [TRACE] Object name is : " << m_name << "\n";
+        }
+
+   }
+#+END_SRC
+
+File: main1.cpp (CMake targets: app1 and app1_static )
+
+#+BEGIN_SRC cpp
+  #include <iostream>
+  #include "utils.hpp"
+
+  using utils::Dummy;
+
+  int main()
+  {
+      std::puts(" [TRACE] I am the application 1. Ok.");
+      Dummy dummy1("I_am_dummy_object_A");
+      dummy1.showName();
+
+      return 0;
+  }
+#+END_SRC
+
+File: main2.cpp (CMake targets: app2 and app2_static )
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include "utils.hpp"
+
+  int main()
+  {
+      std::puts(" [TRACE] I am the application 2. Ok.");
+      utils::Dummy dummy2("I_am_dummy_object_B");
+      dummy2.showName();
+
+      return 0;
+  }
+#+END_SRC
+
+ *Build and running on Linux* 
+
+Configure and build: 
+
+#+BEGIN_SRC sh
+  #  + (-B/tmp/_build2) => Place build tree at /tmp/_build2
+  #  + Install binaries (object-code) at ~/Desktop/appinstall
+  $ cmake -H. -B/tmp/_build2 -DCMAKE_INSTALL_PREFIX=~/Desktop/appinstall
+  $ cmake --build /tmp/build2 --target 
+#+END_SRC
+
+Check binaries in the source directory (project directory):
+
+#+BEGIN_SRC sh
+   # List source/project directory 
+   $ ls .
+   out/  CMakeLists.txt  main1.cpp  main2.cpp  README.txt  utils.cpp  utils.hpp
+
+   
+   $ tree .
+   .
+   ├── CMakeLists.txt
+   ├── main1.cpp
+   ├── main2.cpp
+   ├── out
+   │   ├── bin
+   │   │   ├── app1
+   │   │   ├── app1_static
+   │   │   ├── app2
+   │   │   └── app2_static
+   │   └── lib
+   │       ├── libutils.so
+   │       └── libutils_static.a
+   ├── README.txt
+   ├── utils.cpp
+   └── utils.hpp
+
+   3 directories, 12 files
+#+END_SRC
+
+Test executables: 
+
+#+BEGIN_SRC sh 
+  $ out/bin/app1
+   [TRACE] I am the application 1. Ok.
+   [TRACE] Object name is : I_am_dummy_object_A
+
+  $ out/bin/app2
+   [TRACE] I am the application 2. Ok.
+   [TRACE] Object name is : I_am_dummy_object_B
+
+  $ out/bin/app1_static 
+   [TRACE] I am the application 1. Ok.
+   [TRACE] Object name is : I_am_dummy_object_A
+
+  $ out/bin/app2_static 
+   [TRACE] I am the application 1. Ok.
+   [TRACE] Object name is : I_am_dummy_object_A
+
+
+  # Check app1 dependencies 
+  $ ldd out/bin/app1
+          linux-vdso.so.1 (0x00007ffff7ffa000)
+          libutils.so => /home/archbox/shared/demo-cmake-proj2/out/lib/libutils.so (0x00007ffff7bd0000)
+          libstdc++.so.6 => /lib64/libstdc++.so.6 (0x00007ffff783e000)
+          libm.so.6 => /lib64/libm.so.6 (0x00007ffff74aa000)
+          libgcc_s.so.1 => /lib64/libgcc_s.so.1 (0x00007ffff7292000)
+          libc.so.6 => /lib64/libc.so.6 (0x00007ffff6ed4000)
+          /lib64/ld-linux-x86-64.so.2 (0x00007ffff7dd6000)
+
+  # Check app1_static dependencies 
+  $ ldd out/bin/app2_static 
+          linux-vdso.so.1 (0x00007ffff7ffa000)
+          libstdc++.so.6 => /lib64/libstdc++.so.6 (0x00007ffff7a44000)
+          libm.so.6 => /lib64/libm.so.6 (0x00007ffff76b0000)
+          libgcc_s.so.1 => /lib64/libgcc_s.so.1 (0x00007ffff7498000)
+          libc.so.6 => /lib64/libc.so.6 (0x00007ffff70da000)
+          /lib64/ld-linux-x86-64.so.2 (0x00007ffff7dd6000)
+#+END_SRC
+
+Build and install (execute CMake's intall target):
+
+#+BEGIN_SRC sh 
+  $ cmake --build /tmp/_build2/ --target install
+#+END_SRC
+
+Check intalled files: 
+
+#+BEGIN_SRC sh 
+  $ ls ~/Desktop/appinstall/
+  bin/  lib/  README.txt
+
+  $ tree ~/Desktop/appinstall/
+  ├── bin
+  │   ├── app1
+  │   ├── app1_static
+  │   ├── app2
+  │   └── app2_static
+  ├── lib
+  │   ├── libutils.so
+  │   └── libutils_static.a
+  └── README.txt
+
+  $ ~/Desktop/appinstall/bin/app1
+   [TRACE] I am the application 1. Ok.
+   [TRACE] Object name is : I_am_dummy_object_A
+
+  $ ~/Desktop/appinstall/bin/app2
+   [TRACE] I am the application 2. Ok.
+   [TRACE] Object name is : I_am_dummy_object_B
+
+  $ ~/Desktop/appinstall/bin/app1_static 
+   [TRACE] I am the application 1. Ok.
+   [TRACE] Object name is : I_am_dummy_object_A
+#+END_SRC
+
+Check dependencies of app1:
+
+#+BEGIN_SRC sh 
+  $ ldd ~/Desktop/appinstall/bin/app1
+          linux-vdso.so.1 (0x00007ffff7ffa000)
+          libutils.so => /home/archbox/Desktop/appinstall/bin/../lib/libutils.so (0x00007ffff7bd0000)
+          libstdc++.so.6 => /lib64/libstdc++.so.6 (0x00007ffff783e000)
+          libm.so.6 => /lib64/libm.so.6 (0x00007ffff74aa000)
+          libgcc_s.so.1 => /lib64/libgcc_s.so.1 (0x00007ffff7292000)
+          libc.so.6 => /lib64/libc.so.6 (0x00007ffff6ed4000)
+          /lib64/ld-linux-x86-64.so.2 (0x00007ffff7dd6000)
+#+END_SRC
+
+ *Build and running on Windows 10 with MSVC 2017*  
+
+#+BEGIN_SRC sh 
+  $ cmake -H. -B..\_build_proj -G "Visual Studio 15 2017 Win64" -DCMAKE_INSTALL_RPEFIX=%USERPROFILE%\appinstall
+  $ cmake --build ..\_build_proj --target 
+#+END_SRC
+
+List directory: 
+
+#+BEGIN_SRC sh 
+  λ ls
+  CMakeLists.txt  README.txt  main1.cpp  main2.cpp  out/  utils.cpp  utils.hpp
+#+END_SRC
+
+List binaries in the source directory: 
+
+#+BEGIN_SRC sh 
+  λ ls out\bin\Debug\
+  app1.exe*  app1.pdb          app1_static.ilk  app2.exe*  app2.pdb          app2_static.ilk  utils.dll*  utils.pdb
+  app1.ilk   app1_static.exe*  app1_static.pdb  app2.ilk   app2_static.exe*  app2_static.pdb  utils.ilk
+#+END_SRC
+
+Test executables: 
+
+#+BEGIN_SRC sh 
+  λ out\bin\Debug\app1.exe
+   [TRACE] I am the application 1. Ok.
+   [TRACE] Object name is : I_am_dummy_object_A
+
+  λ out\bin\Debug\app2.exe
+   [TRACE] I am the application 2. Ok.
+   [TRACE] Object name is : I_am_dummy_object_B
+
+  λ out\bin\Debug\app1_static.exe
+   [TRACE] I am the application 1. Ok.
+   [TRACE] Object name is : I_am_dummy_object_A
+#+END_SRC
+
+Install: 
+
+#+BEGIN_SRC sh 
+  λ cmake --build ..\_build_proj --target install
+#+END_SRC
+
+Check installation: 
+
+#+BEGIN_SRC sh 
+  λ ls C:\\Users\archbox\appinstall\
+  README.txt  bin/  lib/
+
+  λ ls %USERPROFILE%\appinstall/bin
+  app1.exe*  app1_static.exe*  app2.exe*  app2_static.exe*  utils.dll*
+
+  λ ls %USERPROFILE%\appinstall/lib
+  utils.lib  utils_static.lib
+
+  λ type %USERPROFILE%\appinstall\README.txt
+  ======= Application User Guide ==========
+
+    + app1 => Application for creating PCB - Printed Circuit Board
+    + app2 => App. for communicating with remote link
+
+    <INSERT TEXT HERE ....>
+#+END_SRC
+
+
 *** Set common file extension for all executables
 
 Unlike Windows, native executables files on Unix-like operating
