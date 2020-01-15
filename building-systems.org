@@ -3787,7 +3787,7 @@ Output:
 
 #+END_SRC
 
-** Windows OS Specific Snippets
+** Microsft Windows OS Specific Snippets
 *** Executable Target with resource icon
 
 This section provides an example about how to add a resource icon to a
@@ -3927,6 +3927,129 @@ Taken from:
  + [[https://stackoverflow.com/questions/33873735/correctly-set-visual-studio-linker-flag-subsystem-in-cmake][c++ -
    Correctly set Visual Studio linker flag /SUBSYSTEM in CMAKE - Stack
    Overflow]]
+*** Export all shared library symbols 
+
+CMake has a handy option _CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS_ that can
+export all DLL shared library symbols without any
+~__declspec(dllexport)~ or ~__declspec(dllimport)~ annotation.
+
+ *Example:* 
+
+File: main.cpp (executable main.exe)
+
+#+BEGIN_SRC cmake 
+   cmake_minimum_required(VERSION 3.5)
+   project(testbed_project)
+
+   #=========== Global Settings ==============================#
+   # ... omit other settings ... 
+ 
+   # Export ALL DLLs symbols on Windows without __declspec(xxxx) annotations.
+   set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS true)
+
+   #=============== Targets-specific settings ====================#
+
+   # Target: libutil (Library)
+   add_library(utils SHARED utils.cpp utils.hpp)
+
+   # Target: app1 => Executable (Dynamically linked)
+   add_executable(main main1.cpp)
+   target_link_libraries(main utils)
+#+END_SRC
+
+File: utils.hpp (Shared library utils.dll)
+
+#+BEGIN_SRC cpp 
+   #ifndef _UTILS_HPP_
+   #define _UTILS_HPP_
+
+   #include <string>
+
+   namespace  utils {
+
+        class Dummy{
+        private:
+             std::string m_name = "<Untitled>";
+        public:
+            Dummy();
+            Dummy(std::string const& name);
+            void  showName() const;
+        };
+   }
+   #endif 
+#+END_SRC
+
+File: utils.cpp (Shared library utils.dll)
+
+#+BEGIN_SRC cpp 
+   #include <iostream> 
+   #include "utils.hpp"
+
+   namespace utils{
+         Dummy::Dummy() { }
+         Dummy::Dummy(std::string const& name): m_name(name) { }
+
+         void Dummy::showName() const
+         {
+             std::cout << " [TRACE] Object name is : " << m_name << "\n";
+         }
+   }
+#+END_SRC
+
+Without the CMake option _CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS_, the class
+Dummy would need the __declspec annotation and the code would be: 
+
+#+BEGIN_SRC cpp 
+     class __declspec(dllexport) Dummy{
+     private:
+          std::string m_name = "<Untitled>";
+     public:
+         Dummy();
+         Dummy(std::string const& name);
+         void  showName() const;
+     };
+#+END_SRC
+
+To make a symbol private (visible only the _utils.cpp_ compilation-unit)
+annotate it with the _static_ keyword or place the symbols in a
+_anonymous namespace_, example:
+
+#+BEGIN_SRC cpp 
+   static void internal_function(int) {
+     // ... code here ... 
+   }
+
+   static class InternalClass {
+     // ... code here ... 
+   }
+
+   static struct MyStruct{
+      double x; 
+      double y;
+   }; 
+
+  // ---- OR make the symbols private with anonymous namespace  ------// 
+
+  namespace {
+
+     void internal_function(int) {
+       // ... code here ... 
+     }
+
+     class InternalClass {
+       // ... code here ... 
+     }
+
+     static struct MyStruct{
+        double x; 
+        double y;
+     }; 
+
+  }
+
+#+END_SRC
+
+
 ** Snippets 
 *** Place build-tree object-code in source directory 
 
