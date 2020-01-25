@@ -2985,7 +2985,7 @@ Finding targets defined by spdlog and CppUtest libraries:
   .
   Errors (1 failures, 1 tests, 1 ran, 4 checks, 0 ignored, 0 filtered out, 1 ms)
 #+END_SRC
-*** Dependencies with FetchContent module 
+*** Dependencies with FetchContent module (Approach 1)
 
 The CMake module [[https://cmake.org/cmake/help/v3.15/module/FetchContent.html][FetchContent]] can fetch dependencies at configuration
 time from many possible sources such as GIT remote repositories, http
@@ -3192,7 +3192,7 @@ Running:
    Errors (1 failures, 1 tests, 1 ran, 4 checks, 0 ignored, 0 filtered out, 0 ms)
 #+END_SRC
 
-*** Dependencies with FetchContent module - simplified usage 
+*** Dependencies with FetchContent module (Approach 2)
 
 The usage of the CMake module FetchContent can be simplified by
 defining functions and macros encapsulating its functionalities.
@@ -3333,6 +3333,186 @@ Running:
   C5Q7J833C5S6WRBC41R6RSB1EDTQ4S8
 #+END_SRC
 
+*** Dependencies with FetchContent_makeAvailable (Approach 3) :opengl:glfw:graphics:
+
+This example demonstrates how to use FetchContent for building an
+OpenGL application that uses the GLFW library downloaded from github
+releases URL. The commands FetchContent_Declare and
+FetchContent_MakeAvaiable can be used with any other library as long
+as it has CMakeLists.txt in its root directory.
+
+Key CMake Commands Uses: 
+
+  + FetchContent_MakeAvailable
+  + FetchContent_Declare
+
+See: 
+
+  + GLFW Official Web Site
+    + https://www.glfw.org/
+
+  + Documentation:
+    + https://www.glfw.org/documentation.html
+
+  + GLFW Repository
+    + https://github.com/glfw/glfw
+
+  + GLWF Releases
+    + https://github.com/glfw/glfw/releases
+
+  + Glut Teapot 
+    + https://github.com/Balajanovski/teapot-demo
+    + https://www.sjbaker.org/wiki/index.php?title=The_History_of_The_Teapot#Images_of_the_Complete_Dataset
+
+
+  *Sample Project* 
+
+File: CMakeLists.txt 
+
+#+BEGIN_SRC cmake 
+   cmake_minimum_required(VERSION 3.5)
+   project(GLFW_project)
+
+   set(CMAKE_CXX_STANDARD 17)
+   set(CMAKE_CXX_STANDARD_REQUIRED ON)
+   set(CMAKE_VERBOSE_MAKEFILE ON)
+
+   #================ GLFW Settings  ===============#
+
+   include(FetchContent)
+
+   # Set GLFW Options before FectchContent_MakeAvailable 
+   set( GLFW_BUILD_EXAMPLES OFF CACHE BOOL  "GLFW lib only" )
+   set( GLFW_BUILD_TESTS OFF CACHE BOOL     "GLFW lib only" )
+   set( GLFW_BUILD_DOCS OFF CACHE BOOL      "GLFW lib only" )
+   set( GLFW_BUILD_INSTALL OFF CACHE BOOL   "GLFW lib only" )
+
+   FetchContent_Declare(
+     glfwlib
+     URL   https://github.com/glfw/glfw/releases/download/3.3.2/glfw-3.3.2.zip
+   )
+
+   FetchContent_MakeAvailable(glfwlib)
+
+   #========= Find Packages =========================#
+
+   find_package(OpenGL REQUIRED)
+
+   #========== Target Configurations ================#
+
+   add_executable(app1 main.cpp)
+   target_link_libraries(app1 glfw OpenGL::GL glut GLU)
+#+END_SRC
+
+File: main.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <GLFW/glfw3.h>
+  #include <GL/glu.h>
+  #include <GL/glut.h>
+
+  int main(int argc, char** argv)
+  {
+      GLFWwindow* window;
+
+      /* Initialize the library */
+      if (!glfwInit())
+          return -1;
+
+      glutInit(&argc, argv);
+
+      /* Create a windowed mode window and its OpenGL context */
+      window = glfwCreateWindow(640, 480, "Hello World", NULL, NULL);
+      if (!window)
+      {
+          glfwTerminate();
+          return -1;
+      }
+
+      /* Make the window's context current */
+      glfwMakeContextCurrent(window);
+
+      glClearColor(0.0f, 0.5f, 0.6f, 1.0f);
+
+
+      /* Loop until the user closes the window */
+      while (!glfwWindowShouldClose(window))
+      {
+          /* Render here */
+          glClear(GL_COLOR_BUFFER_BIT);
+
+          glRotated(15.0, 1.0, 1.0, 1.0);
+          ::glutWireTeapot(0.65);
+
+          /* Swap front and back buffers */
+          glfwSwapBuffers(window);
+
+          /* Poll for and process events */
+          glfwPollEvents();
+      }
+
+      glfwTerminate();
+      return 0;
+  }
+#+END_SRC
+
+ *Building from Command Line* 
+
+ _Configuration step_
+
+  +  $ cmake -H. -B_build -DCMAKE_BUILD_TYPE=Debug 
+
+#+BEGIN_SRC sh 
+  $ cmake -H. -B_build -DCMAKE_BUILD_TYPE=Debug 
+  -- The C compiler identification is GNU 8.3.1
+  -- The CXX compiler identification is GNU 8.3.1
+      ... ... ... .... ... 
+
+  -- Found OpenGL: /usr/lib64/libOpenGL.so   
+  -- Configuring done
+  -- Generating done
+  -- Build files have been written to: /home/archbox/projects/glfw-learning/_build
+
+#+END_SRC
+
+ _Building step_
+
+  + $ cmake --build _build --target 
+
+#+BEGIN_SRC sh 
+   $ cmake --build _build --target 
+
+   ... ... ... ... ... ... 
+   ... ... ... ... ... ... 
+
+   Scanning dependencies of target glfw
+   gmake[2]: Leaving directory '/home/archbox/projects/glfw-learning/_build'
+   /usr/bin/gmake -f _deps/glfwlib-build/src/CMakeFiles/glfw.dir/build.make _deps/glfwlib-build/src/CMakeFiles/glfw.dir/build
+   gmake[2]: Entering directory '/home/archbox/projects/glfw-learning/_build'
+   [  5%] Building C object _deps/glfwlib-build/src/CMakeFiles/glfw.dir/context.c.o
+
+    ... ... ... ... ... .. 
+   ... ... ... ... ... ... 
+
+   [ 10%] Building C object _deps/glfwlib-build/src/CMakeFiles/glfw.dir/init.c.o
+
+   ... ... ... ... ... ... 
+   ... ... ... ... ... ... 
+
+   [ 89%] Linking C static library libglfw3.a
+
+   [100%] Linking CXX executable app1
+
+#+END_SRC
+
+ _Running_ 
+
+#+BEGIN_SRC sh 
+  $ _build/app1 
+ #+END_SRC
+
+#+CAPTION: Graphics Output
+[[file:images/opengl_glut_teapot1.png][file:images/opengl_glut_teapot1.png]]
 ** Common Variables 
 *** CMAKE_CURRENT_LIST_DIR - Directory where is CMakeLists.txt 
 
