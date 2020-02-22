@@ -2117,3 +2117,450 @@ compiler:
 
 
 
+** Numerical Libraries Evaluation 
+*** Eigen - Linear Algebra Library 
+**** Overview 
+
+Eigen is a high-performance and header-only linear algebra library
+suitable for a wide variety of applications, including, numerical
+linear algebra, numerical statistics and numerical methods. 
+
+Advantages: 
+
+  + Permissive license
+
+  + No linking issues: Eigen is header-only, all what is needed is to
+    add the path to eigen headers in the include-directories.
+
+  + Many types of linear algebra operations:
+    * scalar X vector operations 
+    * scalar X matrix operations
+    * vector X matrix operations
+    * matrix X matrix operations
+    * solution of linear systems
+    * norm of vectors and norm of matrices
+    * eigenvalues and eigenvectors
+    * Matrix decomposition: QR, SVD, LU, Cholesky and so on.
+
+Applications: 
+
+  + Science 
+
+  + Physics
+
+  + Engineering 
+
+  + Implementation of numerical methods which requires linear algebra.
+
+  + Multivariate statistics 
+
+  + PDE - Partial Differential Equations 
+
+  + FEM - Finite Elements Methods
+
+  + Computer graphics
+
+Perofmance: Eigen uses the following techniques for achieving high performance.
+
+  + _Expression templates_ and lazy evaluation for optmizing loops. For
+    instance, with just operator overloadings, the sum of three
+    vectors would require three loops. Due the usage of expression
+    templates, the sum of three vectors can be computed in a single
+    loop.
+
+  + _CRTP_ Curious Recurring Template for virtual member-function call
+    overhead, specially in loops.
+
+  + Classes for _sparse matrices_ which avoids storing all non-zero
+    elements.
+
+  + Specific matrices and vector classes for computer graphics of 2, 3
+    and 4 dimensions.
+
+  + Fixed-size matrices without dynamic meory allocation.
+
+Some high-profile projects using Eigen: 
+
+  + Google's TensorFlow => Library for Machine Learning
+
+  + Shogun => a large scale machine learning toolbox. 
+
+  + [[https://github.com/gnudatalanguage/gdl][Gnu Data Language]], a GPL interpretor of IDL syntax codes.
+
+  + [[http://avogadro.cc/][Avogadro]] - an opensource advanced molecular editor. 
+ 
+
+ *Official Repository* 
+
+  + https://gitlab.com/libeigen/eigen/
+  
+ *Documentation* / Doxygen 
+
+  + https://eigen.tuxfamily.org/dox/index.html
+
+  + https://eigen.tuxfamily.org/dox/TopicCMakeGuide.html
+
+  + [[https://eigen.tuxfamily.org/dox/TopicInsideEigenExample.html][Eigen: What happens inside Eigen, on a simple example]]
+
+ *Miscellaneous* 
+
+  + [[http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1417r0.pdf][P1417R0: Historical lessons for C++ linear algebra librarystandardization]]
+
+  + [[https://indico.cern.ch/event/766995/contributions/3295785/attachments/1802777/2940991/Mikhail_Sizov_-_Efficient_C_implementation_of_custom_FEM_kernel_with_Eigen_FEM_Sizov.pdf][Efficient C++ implementation of custom FEM kernelwith Eigen]] - CERN
+
+  + [[https://dritchie.github.io/csci2240/assignments/eigen_tutorial.pdf][Eigen Tutorial - CS2240 Interactive Computer Graphic]]
+**** Sample CMake Project 
+
+ *Project Files* 
+
+File: CMakeLists.txt 
+  + This sample CmakeLists.txt requires any dependencies and no
+    previous installation of the Eigen library. It has a macro for
+    automating the library.
+
+#+BEGIN_SRC cmake 
+   cmake_minimum_required(VERSION 3.5)
+   project(Eigen_test)
+
+   set(CMAKE_CXX_STANDARD 17)
+   set(CMAKE_CXX_STANDARD_REQUIRED ON)
+   set(CMAKE_VERBOSE_MAKEFILE ON)
+
+   macro(Download_Eigen version is_via_git)
+       include(FetchContent)
+         IF(${is_via_git})
+          message( [TRACE] " DOWNLOADING Eigen via GIT - Wait ....")
+          FetchContent_Declare(
+           eigenlib
+           GIT_REPOSITORY  https://gitlab.com/libeigen/eigen
+           GIT_TAG         ${version}
+           )
+       ELSE()
+         message( [TRACE] " DOWNLOADING Eigen ZIP source archive - Wait ....")
+         FetchContent_Declare(
+           eigenlib
+           URL https://gitlab.com/libeigen/eigen/-/archive/${version}/eigen-${version}.zip
+           )
+       ENDIF()    
+       FetchContent_GetProperties(eigenlib)    
+       if(NOT eigenlib_POPULATED)
+           FetchContent_Populate(eigenlib)
+       endif()
+       include_directories(${CMAKE_BINARY_DIR}/_deps/eigenlib-src )
+   endmacro()  
+
+   #========== Target Configurations ================#
+   Download_Eigen(3.3.7 true)
+   add_executable(main1 main1.cpp)
+#+END_SRC
+
+File: main1.cpp 
+
+#+BEGIN_SRC cpp  
+  #include <iostream>
+  #include <iomanip>
+  #include <Eigen/Dense>
+
+  using Eigen::MatrixXd;
+
+  int main()
+  {
+      std::puts("\n >>>[EXPERIMENT 1] ========= Create Matrix ================");
+
+      // Matrix of variable size.
+      MatrixXd m(3,3);
+
+      std::cout << " Matrix features "
+                << "=> rows = " << m.rows()
+                << "; cols = " << m.cols()
+                << std::endl;
+
+      std::cout << "\n  m = \n" << m << std::endl;
+
+      std::puts("\n >>>[EXPERIMENT 3] ====== Initialize Matrix  ================");
+      {
+
+          m(0,0) = 3;
+          m(1,0) = 2.5;
+          m(0,1) = -1;
+          m(0,2) = 9.23;
+
+          m(1,1) = m(1,0) + m(0,1);
+          m(1,2) = 10.523;
+
+          m(2, 0) = 7.24;
+          m(2, 2) = 4.56;
+          m(2, 1) = 2.5;
+          std::cout << " m = \n" << m << std::endl;
+
+          std::cout << "\n Transpose matrix =>>\n m^T = \n" << m.transpose() << std::endl;
+
+          std::cout << "\n Inverse matrix =>>\n m^-1 = \n" << m.inverse() << std::endl;
+      }
+
+      std::puts("\n >>>[EXPERIMENT 4] === Create Initialized Matrix =========");
+      {
+          MatrixXd A(3, 4);
+          A <<  10.255, -21.5, 5.15, 9.5
+               ,9.251,   18.4, 7.25, 25.1
+               ,56.13,   24.5, 8.25, 17.55;
+
+          std::cout << " Matrix A  = \n" << A << std::endl;
+      }
+
+      std::puts("\n >>>[EXPERIMENT 5] === Multiply matrix by scalar =========");
+      {
+          std::cout << "\n 10 * m = \n" << 10.0 * m << std::endl;
+          std::cout << "\n m  / 5 = \n" << m / 5 << std::endl;
+      }
+
+      std::puts("\n >>>[EXPERIMENT 6] === Matrix-Matrix operations ==========");
+      {
+          // Create a 3 x 3 random matrix multiplied by 10
+          auto rndm1 =  10 * MatrixXd::Random(3, 3);
+
+          std::cout << "\n rndm1 = \n" << rndm1 << std::endl;
+          std::cout << "\n m + rndm1 = \n" << m + rndm1 << std::endl;
+
+          std::cout << "\n m * rndm1 = \n" << m * rndm1 << std::endl;
+          std::cout << "\n rndm1 * m = \n" << m * rndm1 << std::endl;
+      }
+
+      std::puts("\n >>>[EXPERIMENT 7] === Eigenvalues and Eigenvectors ==========");
+      {
+          MatrixXd A(3, 3);
+
+          A <<  2.50000E-02, 3.25000E-02,   1.75000E-03
+               ,3.25000E-02, 2.17000E-01,  -2.15000E-03
+               ,1.75000E-03, -2.15000E-03,  4.30000E-04;
+
+          std::cout << std::fixed << std::setprecision(5);
+
+          std::cout << " A = \n" << A << std::endl;
+
+          auto eigsolver = Eigen::SelfAdjointEigenSolver<MatrixXd>(A);
+          assert(eigsolver.info() == Eigen::Success
+                  && "[ERROR] Unable to find eigenvalues");
+
+          std::cout << "\n Eigenvalues = \n"
+                    << eigsolver.eigenvalues() << std::endl;
+
+          std::cout << "\n Eigenvectiors = \n"
+                    << eigsolver.eigenvectors() << std::endl;
+      }
+
+  }
+#+END_SRC
+
+ *Program Output* 
+
+#+BEGIN_SRC text 
+    >>>[EXPERIMENT 1] ========= Create Matrix ================
+    Matrix features => rows = 3; cols = 3
+
+     m = 
+   0 0 0
+   0 0 0
+   0 0 0
+
+    >>>[EXPERIMENT 3] ====== Initialize Matrix  ================
+    m = 
+        3     -1   9.23
+      2.5    1.5 10.523
+     7.24    2.5   4.56
+
+    Transpose matrix =>>
+    m^T = 
+        3    2.5   7.24
+       -1    1.5    2.5
+     9.23 10.523   4.56
+
+    Inverse matrix =>>
+    m^-1 = 
+    0.117459 -0.166738  0.147026
+   -0.390894  0.320655 0.0512492
+   0.0278148 0.0889348 -0.042235
+
+    >>>[EXPERIMENT 4] === Create Initialized Matrix =========
+    Matrix A  = 
+   10.255  -21.5   5.15    9.5
+    9.251   18.4   7.25   25.1
+    56.13   24.5   8.25  17.55
+
+    >>>[EXPERIMENT 5] === Multiply matrix by scalar =========
+
+    10 * m = 
+       30    -10   92.3
+       25     15 105.23
+     72.4     25   45.6
+
+    m  / 5 = 
+      0.6   -0.2  1.846
+      0.5    0.3 2.1046
+    1.448    0.5  0.912
+
+    >>>[EXPERIMENT 6] === Matrix-Matrix operations ==========
+
+    rndm1 = 
+    6.80375   5.9688 -3.29554
+   -2.11234  8.23295  5.36459
+    5.66198 -6.04897 -4.44451
+
+    m + rndm1 = 
+     4.0794 -3.70431  17.5539
+    2.04794  1.76802  13.2372
+    9.81742  11.5446  8.90594
+
+    m * rndm1 = 
+   -112.934  47.9796 -86.9588
+    -116.51  40.2783  -98.052
+   -90.6609 -27.6275 -88.4288
+
+    rndm1 * m = 
+    -85.4597    14.787  -10.5057
+    -63.8875   34.5262 -0.960369
+    -57.3932    29.101   -20.442
+
+    >>>[EXPERIMENT 7] === Eigenvalues and Eigenvectors ==========
+    A = 
+    0.02500  0.03250  0.00175
+    0.03250  0.21700 -0.00215
+    0.00175 -0.00215  0.00043
+
+    Eigenvalues = 
+   0.00019
+   0.01987
+   0.22237
+
+    Eigenvectiors = 
+    0.10336 -0.98130  0.16240
+   -0.02535  0.16062  0.98669
+   -0.99432 -0.10610 -0.00828
+
+#+END_SRC
+
+ *Project in QtCreator IDE* 
+
+Just open the CMakeLists.txt file or run the following comamnd from
+command line: 
+
+#+BEGIN_SRC sh 
+  $ qtcreator /path/to/project/CMakeLists.txt & 
+#+END_SRC
+
+ *Project in CodeBlocks IDE*
+
+Generate CodeBlocks project: 
+
+#+BEGIN_SRC sh 
+  $ cmake -B_build -H. -G "CodeBlocks - Unix Makefiles" -DCMAKE_BUILD_TYPE=Debug
+  -- The C compiler identification is GNU 8.3.1
+  -- The CXX compiler identification is GNU 8.3.1
+  -- Check for working C compiler: /usr/lib64/ccache/cc
+  -- Check for working C compiler: /usr/lib64/ccache/cc -- works
+  -- Detecting C compiler ABI info
+  -- Detecting C compiler ABI info - done
+  -- Detecting C compile features
+  -- Detecting C compile features - done
+  -- Check for working CXX compiler: /usr/lib64/ccache/c++
+  -- Check for working CXX compiler: /usr/lib64/ccache/c++ -- works
+  -- Detecting CXX compiler ABI info
+  -- Detecting CXX compiler ABI info - done
+  -- Detecting CXX compile features
+  -- Detecting CXX compile features - done
+  [TRACE] DOWNLOADING Eigen via GIT - Wait ....
+   ....  ....  ....  ....  ....  ....  ....  ....  .... 
+   ....  ....  ....  ....  ....  ....  ....  ....  .... 
+#+END_SRC
+ 
+List generated project files: 
+
+#+BEGIN_SRC sh 
+  $ ls _build/
+  CMakeFiles/  _deps/  CMakeCache.txt  cmake_install.cmake  Eigen_test.cbp  Makefile
+
+  $ file _build/Eigen_test.cbp 
+  _build/Eigen_test.cbp: XML 1.0 document, ASCII text
+
+  $ ls _build/_deps/eigenlib-src/
+  bench/  doc/       test/           COPYING.LGPL       CTestCustom.cmake.in
+  blas/   Eigen/     unsupported/    COPYING.MINPACK    eigen3.pc.in
+  cmake/  failtest/  CMakeLists.txt  COPYING.MPL2       INSTALL
+  debug/  lapack/    COPYING.BSD     COPYING.README     README.md
+  demos/  scripts/   COPYING.GPL     CTestConfig.cmake  signature_of_eigen3_matrix_library
+#+END_SRC
+
+Show CodeBlocks project file: 
+
+#+BEGIN_SRC sh 
+   $ head -n 10 _build/Eigen_test.cbp 
+
+   <?xml version="1.0" encoding="UTF-8"?>
+   <CodeBlocks_project_file>
+           <FileVersion major="1" minor="6"/>
+           <Project>
+                   <Option title="Eigen_test"/>
+                   <Option makefile_is_custom="1"/>
+                   <Option compiler="gcc"/>
+                   <Option virtualFolders="CMake Files\;"/>
+                   <Build>
+                           <Target title="all">
+#+END_SRC
+
+Open the following file in CodeBlocks IDE
+
+  + '/path/to/project-root-dir/_build/Eigen_test.cbp'
+
+ *Compiling from command line* 
+
+Configuration step: 
+
+#+BEGIN_SRC sh 
+  $ cmake -B_build -H. -DCMAKE_BUILD_TYPE=Debug 
+  -- The C compiler identification is GNU 8.3.1
+  -- The CXX compiler identification is GNU 8.3.1
+  -- Check for working C compiler: /usr/lib64/ccache/cc
+  -- Check for working C compiler: /usr/lib64/ccache/cc -- works
+  -- Detecting C compiler ABI info
+  -- Detecting C compiler ABI info - done
+  -- Detecting C compile features
+  -- Detecting C compile features - done
+  -- Check for working CXX compiler: /usr/lib64/ccache/c++
+  -- Check for working CXX compiler: /usr/lib64/ccache/c++ -- works
+  -- Detecting CXX compiler ABI info
+  -- Detecting CXX compiler ABI info - done
+  -- Detecting CXX compile features
+  -- Detecting CXX compile features - done
+  [TRACE] DOWNLOADING Eigen via GIT - Wait ....
+  -- Configuring done
+  -- Generating done
+  -- Build files have been written to: /home/user/projects/eigen/_build
+
+#+END_SRC
+
+Building step: 
+
+#+BEGIN_SRC sh 
+  $ cmake --build _build --target 
+  .... .... .... .... ... ... ... ... 
+  [100%] Linking CXX executable main1
+  /usr/bin/cmake -E cmake_link_script CMakeFiles/main1.dir/link.txt --verbose=1
+  /usr/lib64/ccache/c++  -g   CMakeFiles/main1.dir/main1.cpp.o  -o main1 
+  gmake[2]: Leaving directory '/home/user/projects/eigen/_build'
+  [100%] Built target main1
+  gmake[1]: Leaving directory '/home/user/projects/eigen/_build'
+  /usr/bin/cmake -E cmake_progress_start /home/user/projects/eigen/_build/CMakeFiles 
+#+END_SRC
+
+Running application: 
+
+#+BEGIN_SRC sh 
+   $ _build/main1 
+
+    >>>[EXPERIMENT 1] ========= Create Matrix ================
+    Matrix features => rows = 3; cols = 3
+
+   ... .... ... ... .... ... ... .... ... ... .... ... ... .... ... 
+#+END_SRC
+
+
