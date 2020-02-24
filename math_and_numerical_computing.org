@@ -2118,7 +2118,7 @@ compiler:
 
 
 ** Numerical Libraries Evaluation 
-*** Eigen - Linear Algebra Library 
+*** Eigen - Linear Algebra
 **** Overview 
 
 Eigen is a high-performance and header-only linear algebra library
@@ -2605,4 +2605,322 @@ Running application:
    ... .... ... ... .... ... ... .... ... ... .... ... ... .... ... 
 #+END_SRC
 
+*** Armadillo - Linear Algebra 
+**** Overview 
 
+Armadillo is high performance numerical linear algebra library built
+on top of battle tested BLAS, Lapack and OpenBLAS libraries. The
+library provides an easy-to-use interface and functionality similar to
+©Matlab and Octave (Matlab open source clone).
+
+ *Benefits*
+
+  + Expression templates for compile-time optimization.
+
+  + BLAS and LAPACK backend which are the de-factor standard for
+    numerical linear algebra and scientific computing.
+
+  + Support for OpenMP 
+
+  + Classes for:
+    + Vectors, column vectors
+    + Matrices
+    + Sparces matrices 
+    + Tensors (multi-dimensional arrays)
+
+  + Functionalities similar to Matlab and Octave 
+
+ *Drawbacks* 
+
+  + Requires BLAS, OpenBLAS, SuperLU and arpack binary
+    depedencies. Some, of those depedencies are written in
+    Fortran. However, it is not hard to install Armadillo using Linux
+    distributions' package managers. 
+
+ *Official Web Site* 
+
+  + http://arma.sourceforge.net/
+
+ *Documentation* 
+
+  + General Documentation:
+    + http://arma.sourceforge.net/docs.html
+
+  + Matlab/Octave translation table:
+    + http://arma.sourceforge.net/docs.html#syntax
+
+ *Further Reading* 
+
+  * *Armadillo: An Open Source C++ Linear AlgebraLibrary for Fast*
+    *Prototyping and Computationally Intensive Experiments*
+    + https://pdfs.semanticscholar.org/b9f4/06b0db574b39ba16f21ff1d8ffcbfc03b57b.pdf
+
+  * *Matrix Computing in C++ADVANCED PROGRAMMING IN SCIENCE AND TECHNOLOGY 2012*
+    * http://libvolume3.xyz/electronics/btech/semester6/datastructureusingc++/arraysandmatrics/arraysandmatricstutorial2.pdf
+
+  * *Armadillo* - Colin Rundel
+    + http://www2.stat.duke.edu/~cr173/Sta790_Sp19/slides/Lec11.html#1
+
+  * *RcppArmadillo: Accelerating Rwith High-Performance C++ Linear Algebra1*
+    + https://cran.r-project.org/web/packages/RcppArmadillo/vignettes/RcppArmadillo-intro.pdf
+
+  * *Seamless R and C++Integration with Rcpp:Part 2 – RcppArmadillo
+    Examples* - Dirk Eddelbuettel
+    + http://dirk.eddelbuettel.com/papers/rcpp_ku_nov2013-part2.pdf
+
+  * [[https://cmake.org/cmake/help/latest/module/FindArmadillo.html][FindArmadillo — CMake 3.17.0-rc1 Documentation]] 
+
+**** Sample CMake Project 
+
+ *Installing Armadillo* 
+
+Armadillo can be installed by building from sources. However, it is
+not so easy due to the BLAS and LAPACK binary dependencies. Another
+easier way to install the library by using Linux distributions'
+package managers.
+
+Install on Fedora Linux: 
+
+#+BEGIN_SRC sh 
+  $ sudo dnf install armadillo-devel.x86_64
+#+END_SRC
+
+Install on Ubuntu or Debian: 
+
+#+BEGIN_SRC sh 
+  $ apt-get install libarmadillo-dev
+#+END_SRC
+
+ *Project Files* 
+
+File: CMakeListst.txt 
+
+#+BEGIN_SRC cmake 
+   make_minimum_required(VERSION 3.5)
+   project(Armadillo_eval)
+
+   set(CMAKE_CXX_STANDARD 17)
+   set(CMAKE_CXX_STANDARD_REQUIRED ON)
+   set(CMAKE_VERBOSE_MAKEFILE ON)
+
+   find_package(Armadillo REQUIRED)
+
+   #========== Target Configurations ================#
+   add_executable(armadillo-test armadillo-test.cpp)
+   target_link_libraries(armadillo-test ${ARMADILLO_LIBRARIES})
+#+END_SRC
+
+File: armadillo1.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <iomanip>
+
+  #include <armadillo>
+  #include <cmath>
+  #include <cassert>
+
+  using arma::mat;
+  using arma::randu;
+
+  int main()
+  {
+      std::cout << " [INFO] Armadillo version = " << arma::arma_version::as_string()
+                << "\n\n";
+
+      std::cout << "======== EXPERIMENT 1 === Create Random Matrices ==========\n\n";
+      {
+
+          // Random 3 x 4 matrix
+          mat matrixA = randu<mat>(3, 4);
+          std::cout << " =>    Number of rows of matrixA = " << matrixA.n_rows << "\n";
+          std::cout << " => Number of columns of matrixA = " << matrixA.n_cols << "\n";
+
+          //std::cout << " Dimensions of matrix A: rows = " << matrixA.rows()  << std::endl;
+
+          // Random 4 x 5 matrix
+          auto matrixB = randu<mat>(4, 5);
+          std::cout << "matrixB = \n" << matrixA << std::endl;
+
+          auto matrixC = matrixA * matrixB;
+          matrixC.print(" C = A * B = ");
+      }
+
+      std::cout << "======== EXPERIMENT 2 === Special Matrices ====================\n\n";
+      {
+          auto identity3 = arma::mat(3, 3, arma::fill::eye);
+
+          std::cout << " Identity(3x3) = \n"  << identity3;
+
+          auto zeromatrix = arma::mat(4, 5);
+          zeromatrix.fill(0.0);
+          std::cout << " ZeroMatrix = \n" << zeromatrix << "\n";
+
+          auto zeromatrix2 = arma::zeros<arma::mat>(3, 3);
+          std::cout << " ZeroMatrix2 = \n" << zeromatrix2 << "\n";
+
+
+      }
+
+      std::cout << "======== EXPERIMENT 3 === Initialize matrix manually ==========\n\n";
+      {
+          // Note: matrices are zero-based not one-based like Fortran or Matlab
+          mat A(3, 3);
+          A(0, 0) = 10.0;
+          A(0, 1) = 5.6;
+          A(0, 2) = -8.24;
+          A(1, 0) = 7.251;
+          A(1, 1) = 18.62;
+          A(1, 2) = 20.51;
+          A(2, 0) = -8.0;
+          A(2, 1) = 1.351E-3;
+          A(2, 2) = 100.0;
+
+          mat B;
+          B << 2.541 <<  9.251 << 7.51  << arma::endr
+            << 9.871 << -12.56 << 81.25 << arma::endr
+            << 10.52 <<  72.15 << -67.23 << arma::endr;
+
+          std::cout << " Determinant of A = " << arma::det(A) << "\n";
+          std::cout << " Determinant of B = " << arma::det(B) << "\n";
+          std::cout << " Sum of elements of A => SUM(A) = " << arma::accu(A) << "\n";
+          std::cout << " Sum of elements of B => SUM(B) = " << arma::accu(B) << "\n";
+          std::cout << " Trace of elements of A => TRACE(A) = " << arma::trace(A) << "\n";
+
+          A.print("\n matrix A = ");
+
+          B.print("\n matrix B = ");
+
+          // Tranpose of matrix A
+          std::cout << "\n transpose(A) = A^t = \n" << A.t() << "\n";
+
+          // Inverse of matrix A
+          auto Ainv = arma::inv(A);
+          Ainv.print("\n [1] A^-1 = inv(A) = ");
+
+          std::cout << "\n [2] A^-1 = inv(A) = \n" << A.i() << "\n";
+
+          // Linear comnbination of A and B
+          auto C = 3.0 * A + 4.0 * B;
+          C.print("\n C = 3A + 4B = ");
+      }
+
+      std::cout << "\n======== EXPERIMENT 4 === Solving Linear Systems ==========\n\n";
+      {
+          auto b = arma::vec{51.0,  61.0, 21.0};
+          b.print(" b = ");
+
+          arma::mat A{  {3.0,  5.0, 6.0}
+                      , {8.0, 10.0, 3.0}
+                      , {4.0, 1.0, 2.0}};
+
+          A.print(" A = ");
+
+          // Solve linear equation: A.x = b
+          // or perform the operation x = A \ b (Matlab notation)
+          // Expects results [2.0 3.0 5.0]'
+          arma::vec x = arma::solve(A, b);
+          x.print(" x = ");
+
+          std::cout << "normL2(x) = euclidianNorm(x) " << arma::norm(x) << "\n";
+
+          auto x_expected = arma::vec{2.0, 3.0, 5.0};
+          assert(arma::norm(x_expected - x) < 1e-3);
+
+          std::cout << " [INFO] Tests passed Ok." << "\n";
+      }
+  }
+#+END_SRC
+
+Program output: 
+
+#+BEGIN_SRC text 
+    [INFO] Armadillo version = 9.400.2 (Surrogate Miscreant)
+
+   ======== EXPERIMENT 1 === Create Random Matrices ==========
+
+    =>    Number of rows of matrixA = 3
+    => Number of columns of matrixA = 4
+   matrixB = 
+      0.7868   0.9467   0.2513   0.3447
+      0.2505   0.0193   0.0227   0.2742
+      0.7107   0.4049   0.5206   0.5610
+
+    C = A * B = 
+      1.0516   1.0632   0.7769   0.8944   0.8861
+      0.2924   0.2185   0.1320   0.3470   0.2753
+      1.0723   1.0523   0.8662   1.1705   0.9633
+   ======== EXPERIMENT 2 === Special Matrices ====================
+
+    Identity(3x3) = 
+      1.0000        0        0
+           0   1.0000        0
+           0        0   1.0000
+    ZeroMatrix = 
+           0        0        0        0        0
+           0        0        0        0        0
+           0        0        0        0        0
+           0        0        0        0        0
+
+    ZeroMatrix2 = 
+           0        0        0
+           0        0        0
+           0        0        0
+
+   ======== EXPERIMENT 3 === Initialize matrix manually ==========
+
+    Determinant of A = 12412.8
+    Determinant of B = 7637.21
+    Sum of elements of A => SUM(A) = 145.742
+    Sum of elements of B => SUM(B) = 113.303
+    Trace of elements of A => TRACE(A) = 128.62
+
+    matrix A = 
+      1.0000e+01   5.6000e+00  -8.2400e+00
+      7.2510e+00   1.8620e+01   2.0510e+01
+     -8.0000e+00   1.3510e-03   1.0000e+02
+
+    matrix B = 
+       2.5410    9.2510    7.5100
+       9.8710  -12.5600   81.2500
+      10.5200   72.1500  -67.2300
+
+    transpose(A) = A^t = 
+      1.0000e+01   7.2510e+00  -8.0000e+00
+      5.6000e+00   1.8620e+01   1.3510e-03
+     -8.2400e+00   2.0510e+01   1.0000e+02
+
+
+    [1] A^-1 = inv(A) = 
+      0.1500  -0.0451   0.0216
+     -0.0716   0.0753  -0.0213
+      0.0120  -0.0036   0.0117
+
+    [2] A^-1 = inv(A) = 
+      0.1500  -0.0451   0.0216
+     -0.0716   0.0753  -0.0213
+      0.0120  -0.0036   0.0117
+
+
+    C = 3A + 4B = 
+      4.0164e+01   5.3804e+01   5.3200e+00
+      6.1237e+01   5.6200e+00   3.8653e+02
+      1.8080e+01   2.8860e+02   3.1080e+01
+
+   ======== EXPERIMENT 4 === Solving Linear Systems ==========
+
+    b = 
+      51.0000
+      61.0000
+      21.0000
+    A = 
+       3.0000    5.0000    6.0000
+       8.0000   10.0000    3.0000
+       4.0000    1.0000    2.0000
+    x = 
+      2.0000
+      3.0000
+      5.0000
+   normL2(x) = euclidianNorm(x) 6.16441
+    [INFO] Tests passed Ok.
+#+END_SRC
