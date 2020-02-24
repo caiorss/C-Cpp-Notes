@@ -2194,6 +2194,10 @@ Some high-profile projects using Eigen:
 
   + https://gitlab.com/libeigen/eigen/
   
+ *Conan Recipe* 
+
+  + https://bintray.com/conan-community/conan/eigen%3Aconan
+
  *Documentation* / Doxygen 
 
   + https://eigen.tuxfamily.org/dox/index.html
@@ -2213,7 +2217,8 @@ Some high-profile projects using Eigen:
 
  *Project Files* 
 
-File: CMakeLists.txt 
+File: CMakeLists.txt / Version 1 - without Conan 
+
   + This sample CmakeLists.txt requires any dependencies and no
     previous installation of the Eigen library. It has a macro for
     automating the library.
@@ -2251,6 +2256,43 @@ File: CMakeLists.txt
 
    #========== Target Configurations ================#
    Download_Eigen(3.3.7 true)
+   add_executable(main1 main1.cpp)
+#+END_SRC
+
+File: CMakeLists.txt / Version 2 - using Conan package manager.
+  + The advantage of this CMakeLists.txt file is that the library is
+    donwload only once saving disk space, while the first version of
+    the CMakeLists.txt downloads the entire library, about 160 MB.
+
+#+BEGIN_SRC cmake 
+   cmake_minimum_required(VERSION 3.5)
+   project(Eigen_test)
+
+   set(CMAKE_CXX_STANDARD 17)
+   set(CMAKE_CXX_STANDARD_REQUIRED ON)
+   set(CMAKE_VERBOSE_MAKEFILE ON)
+
+   # ============= Conan Bootstrap =============================#
+
+   # Download automatically, you can also just copy the conan.cmake file
+   if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan.cmake")
+      message(STATUS "Downloading conan.cmake from https://github.com/conan-io/cmake-conan")
+      file(DOWNLOAD "https://github.com/conan-io/cmake-conan/raw/v0.13/conan.cmake"
+                    "${CMAKE_BINARY_DIR}/conan.cmake")
+   endif()
+
+   include(${CMAKE_BINARY_DIR}/conan.cmake)
+
+   conan_cmake_run(REQUIRES
+                   eigen/3.3.7@conan/stable
+
+                   BASIC_SETUP
+                   BUILD missing
+                   )
+
+   # find_package (Eigen3 3.3 REQUIRED NO_MODULE)
+
+   #========== Target Configurations ================#
    add_executable(main1 main1.cpp)
 #+END_SRC
 
