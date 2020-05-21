@@ -142,11 +142,24 @@ See:
  + [[https://stackoverflow.com/questions/7241993/is-it-smart-to-replace-boostthread-and-boostmutex-with-c11-equivalents][c++ -
    Is it smart to replace boost::thread and boost::mutex with c++11
    equivalents? - Stack Overflow]]
-** Compiling a Boost project with CMake 
+** Boost projects with CMake / system-wide boost installation 
 
 Some boost libraries are not header-only and requires linking against
 a pre-compiled static or shared library. The compilation procedure can
-be simplified with the CMake module [[https://cmake.org/cmake/help/latest/module/FindBoost.html][FindBoost.]]
+be simplified with the CMake module [[https://cmake.org/cmake/help/latest/module/FindBoost.html][FindBoost.]]  
+
+  + Note: This procedure assumes a _system-wide installation_ of Boost
+    libraries a Unix-like operating system at directories _/usr/include_
+    and _/lib_. It may not work if the boost libraries are installed on
+    those directories.
+
+  + Note: Boost can be installed in a system-wide way by manual
+    compilation or by using the current Linux distribution package
+    manager. Although the system-wide setup is easier to use, it has
+    some drawbacks, it is not possible to control the version of the
+    library installed, if the setup method was the package manager and
+    also multiple versions of the library cannot coexist as new
+    version will override the existing library headers [Dependency Hell].
 
 Some non header-only Boost libraries are:
  + date_time 
@@ -296,7 +309,396 @@ Program output:
    wpB =  Waypoint{ location = Bern ; lat = 40.948 ; long = 7.4474 } 
 #+END_SRC
 
-** Compiling a Boost project with CMake and Conan 
+** Boost projects with CMake / local boost installation 
+*** Overview 
+
+This section shows how to install boost manually to a custom directory
+on a Linux system without overriding any system installation of boost
+at /usr/include, /lib or /lib64. 
+
+Rationale: 
+
+  + Although the package managers of Linux distributions are
+    convenient for installing development libraries, they have the
+    following drawbacks: they do not allow installing a specific
+    version of a library; installing a new version of the library,
+    overrides the old one and multiple versions cannot coexist.
+
+Documentation:
+
+  + [[https://www.boost.org/doc/libs/1_73_0/more/getting_started/unix-variants.html#get-boost][Boost Getting Started on Unix Variants - 1.73.0]]
+
+  + [[https://www.boost.org/doc/libs/1_73_0/libs/log/doc/html/log/installation/config.html][Configuring and building the library - 1.73.0]]
+
+  + [[https://stackoverflow.com/questions/9751271/how-to-build-boost-static-libs][c++ - How to build boost static libs? - Stack Overflow]]
+*** Downloading and installing the BOost sources 
+
+Download boost sources with GIT shallow clone:
+
+  + Clone just a single commit of boost repository
+    ([[https://github.com/boostorg/boost][boostorg/boost]]) which tag is 'boost-1.70.0' into directory
+    ./boost-src 
+
+#+BEGIN_SRC sh 
+  $ git clone -b boost-1.70.0  https://github.com/boostorg/boost --depth=1 boost-src 
+  $ cd boost-src 
+#+END_SRC
+
+Create the directory _libs_  ($HOME/libs)for installing the Boost libraries 
+
+#+BEGIN_SRC sh  
+  $ mkdir -p ~/libs
+#+END_SRC
+
+  + Build the *b2* 
+
+#+BEGIN_SRC sh 
+  $ ./bootstrap.sh --prefix=$HOME/libs/boost/1.70.0 
+  Building Boost.Build engine with toolset gcc... 
+  ... ... ...   ... ... ...   ... ... ...   ... ... ...   ... ... ... 
+  ... ... ...   ... ... ...   ... ... ...   ... ... ...   ... ... ... 
+#+END_SRC
+
+  + Install and compile (Drink a coffee ☕ and wait the compilation ... ...)
+    + It installs the library to the directory $HOME/libs  
+
+#+BEGIN_SRC sh 
+$ ./b2 install --prefix=$HOME/libs --link=static                                        │boost/
+Performing configuration checks                                                         │
+                                                                                        │mxpkf8@localhost 16:05 ~/libs
+    - default address-model    : 64-bit (cached)                                        │$ rm -rf boost 
+    - default architecture     : x86 (cached)                                           │
+    - symlinks supported       : yes (cached)                                           │mxpkf8@localhost 16:06 ~/libs
+    - C++11 mutex              : yes (cached)                                           │$ ls
+    - lockfree boost::atomic_flag : no  (cached)            
+  ... ... ...   ... ... ...   ... ... ...   ... ... ... 
+  ... ... ...   ... ... ...   ... ... ...   ... ... ... 
+#+END_SRC
+
+ + Check installation 
+
+#+BEGIN_SRC sh 
+   $ tree -L 3 ~/libs
+   ├── include
+   │   └── boost
+   │       ├── aligned_storage.hpp
+   │       ├── call_traits.hpp
+   │       ├── compressed_pair.hpp
+   ... ... ...    ... ... ...    ... ... ...    ... ... ... 
+   ... ... ...    ... ... ...    ... ... ...    ... ... ... 
+   │       ├── variant
+   │       ├── variant.hpp
+   │       └── vmd
+   └── lib
+       ├── cmake
+       │   ├── boost_fiber-1.70.0
+       │   ├── boost_fiber_numa-1.70.0
+   ... ... ...    ... ... ...    ... ... ...    ... ... ... 
+   ... ... ...    ... ... ...    ... ... ...    ... ... ... 
+       ├── libboost_filesystem.so.1.70 -> libboost_filesystem.so.1.70.0
+       └── libboost_filesystem.so.1.70.0
+
+   17 directories, 19 files
+#+END_SRC
+*** Manual compilation
+
+ *Sample file* 
+
+File: test_boost.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <fstream>
+  #include <string>
+  #include <boost/date_time/gregorian/gregorian.hpp>
+
+  namespace gr = boost::gregorian;
+  namespace dt = boost::date_time;
+
+  int main()
+  {
+    std::puts("=========== Boost Date Time ===============\n");
+    auto d1 = gr::date(2009, 10, 20);
+    std::cout << " date1 = " << d1 << std::endl;
+    auto mdate = gr::date(2012, 06, 21);
+    std::string text = " Date mdate is equal to: " + gr::to_iso_string(mdate) + "\n";
+    std::cout << " Text => " << text;
+    return 0;
+  }
+#+END_SRC
+ 
+  *Manual compilation with dynamic linking* 
+
+#+BEGIN_SRC sh 
+  $ g++ test-boost.cpp -o test-boost1.elf -g -lboost_date_time -I$HOME/libs/include -L$HOME/libs/lib
+#+END_SRC
+
+Attempt to run: 
+  + Failure happens because the linker cannot find the boost_date
+    shared library in any the default directories in the search order:
+    directories in binary artifact RPATH; $LD_LIBRARY_PATH variable;
+    directories in /etc/ld.conf; /lib or /usr/lib.
+  + On Windows, the search order is different, the first directory to
+    be searched is the current directory. 
+
+#+BEGIN_SRC sh
+  $ ./test-boost1.elf 
+  ./test-boost1.elf: error while loading shared libraries
+ : libboost_date_time.so.1.70.0: cannot open shared object file: No such file or directory
+#+END_SRC
+
+Check dependencies: 
+
+#+BEGIN_SRC sh 
+  $ ldd test-boost1.elf 
+          linux-vdso.so.1 (0x00007fffe5d76000)
+          libboost_date_time.so.1.70.0 => not found
+          libstdc++.so.6 => /lib64/libstdc++.so.6 (0x00007f48b78bc000)
+          libm.so.6 => /lib64/libm.so.6 (0x00007f48b7776000)
+          libgcc_s.so.1 => /lib64/libgcc_s.so.1 (0x00007f48b775b000)
+          libc.so.6 => /lib64/libc.so.6 (0x00007f48b7591000)
+          /lib64/ld-linux-x86-64.so.2 (0x00007f48b7acf000)
+#+END_SRC
+
+Solution 1: 
+ + Put the shared library in LD_LIBRARY_PATH environment variable. 
+
+#+BEGIN_SRC sh 
+  $ env LD_LIBRARY_PATH=$HOME/libs/lib ./test-boost1.elf
+  =========== Boost Date Time ===============
+
+   date1 = 2009-Oct-20
+   Text =>  Date mdate is equal to: 20120621
+#+END_SRC
+
+Solution 2: 
+
+  + Bundle the library with the application in the same directory and
+    run the application setting LD_LIBRARY_PATH 
+
+#+BEGIN_SRC sh 
+  $ cp ~/libs/lib/libboost_date_time.so.1.70.0 .
+
+  $ env LD_LIBRARY_PATH=$PWD ldd ./test-boost1.elf
+          linux-vdso.so.1 (0x00007ffff9f1b000)
+          libboost_date_time.so.1.70.0 => /home/mxpkf8/libboost_date_time.so.1.70.0 (0x00007fad75ba5000)
+          libstdc++.so.6 => /lib64/libstdc++.so.6 (0x00007fad75994000)
+    ... .... .... ....   ... .... .... ....   ... .... .... ....   ... .... .... .... 
+    ... .... .... ....   ... .... .... ....   ... .... .... ....   ... .... .... .... 
+
+  $ env LD_LIBRARY_PATH=$PWD ./test-boost1.elf
+  =========== Boost Date Time ===============
+
+   date1 = 2009-Oct-20
+   Text =>  Date mdate is equal to: 20120621
+#+END_SRC
+
+Solution 3, compile with RPATH containing the executable's directory (./):
+
+  + This procedure allows running the application without setting
+    LD_LIBRARY_PATH environment variable.
+
+  + By setting the rpath to "$ORIGIN", the application becomes
+    relocatable, it can be moved with the shared libraries to other
+    directories without any linking errors. The linker searches the
+    shared libraries at the executable's directory just like in
+    Windows.
+
+#+BEGIN_SRC sh 
+  # Copy shared library to current directory 
+  $ cp ~/libs/lib/libboost_date_time.so.1.70.0 .
+
+  # Compile with dynamic linking, setting the RPATH to the executable's directory 
+  $ g++ test-boost.cpp -o test-boost3.elf -g -Wl,-rpath='$ORIGIN'  -lboost_date_time -I$HOME/libs/include -L$HOME/libs/lib 
+
+  # --- Check Dependencies ------------------#
+  $ ldd test-boost3.elf 
+          linux-vdso.so.1 (0x00007ffe49d83000)
+          libboost_date_time.so.1.70.0 => ./libboost_date_time.so.1.70.0 (0x00007f8d96229000)
+          libstdc++.so.6 => /lib64/libstdc++.so.6 (0x00007f8d96018000
+     ... ....    ... ....    ... ....    ... ....    ... ....    ... .... 
+     ... ....    ... ....    ... ....    ... ....    ... ....    ... .... 
+
+   # ----- Run the application -------------#
+   $ ./test-boost3.elf 
+   =========== Boost Date Time ===============
+
+    date1 = 2009-Oct-20
+    Text =>  Date mdate is equal to: 20120621
+
+   # -------- Move the app to a new directory -------#
+   $ mkdir -p app 
+   $ mv test-boost3.elf libboost_date_time.so.1.70.0 app
+
+   # ------ Test the application again --------------#
+   $ app/test-boost3.elf 
+   =========== Boost Date Time ===============
+
+    date1 = 2009-Oct-20
+    Text =>  Date mdate is equal to: 20120621
+#+END_SRC
+
+Display all libraries used by the application: 
+
+#+BEGIN_SRC sh 
+   env LD_DEBUG=libs app/test-boost3.elf                                                                                                                              
+      431158:     find library=libboost_date_time.so.1.70.0 [0]; searching                                                                                             
+      431158:      search path=/home/mxpkf8/app/tls/haswell/x86_64:/home/mxpkf8/app/tls/haswell:/home/mxpkf8/app/tls/x86_64:/home/mxpkf8/app/tls:/home/mxpkf8/app/haswe
+  ll/x86_64:/home/mxpkf8/app/haswell:/home/mxpkf8/app/x86_64:/home/mxpkf8/app             (RPATH from file app/test-boost3.elf)
+      431158:       trying file=/home/mxpkf8/app/tls/haswell/x86_64/libboost_date_time.so.1.70.0
+
+   ... ... ....  ... ... ....  ... ... ....  ... ... .... 
+    ... ... ....  ... ... ....  ... ... ....  ... ... .... 
+
+      431158:     find library=libstdc++.so.6 [0]; searching                                                                                                           
+      431158:      search path=/home/mxpkf8/app           (RPATH from file app/test-boost3.elf)
+      431158:       trying file=/home/mxpkf8/app/libstdc++.so.6
+      431158:      search cache=/etc/ld.so.cache
+      431158:       trying file=/lib64/libstdc++.so.6
+      431158:
+      431158:     find library=libm.so.6 [0]; searching
+      431158:      search path=/home/mxpkf8/app           (RPATH from file app/test-boost3.elf)
+      431158:       trying file=/home/mxpkf8/app/libm.so.6
+      431158:      search cache=/etc/ld.so.cache
+      431158:       trying file=/lib64/libm.so.6
+   ... ... ....  ... ... ....  ... ... ....  ... ... .... 
+
+#+END_SRC
+
+  *Manual compilation with static linking* 
+
+ + Static linking appends the library's object code to the executable
+   binary which makes the distribution and deployment easier.
+
+ + Note: some open source licenses, such as LGPL, GPL2 and GPL3, only
+   allow static linking with the application only if it is also
+   open source licensed under the same license with source code
+   disclosure. 
+
+ + Compile manually with static linking against boost libraries
+   [Approach 1]
+   * -I./<PATH-TO-HEADERS> (Files: *.h, *.hxx, *.hpp)
+   * -L./<PATH-TO-LIBRARIES> (Files: *.so, *.)
+
+#+BEGIN_SRC sh 
+  $ g++ test-boost.cpp -o test-boost2.elf -g \
+      $HOME/libs/lib/libboost_date_time.a \
+      -I$HOME/libs/include \
+      -L$HOME/libs/lib 
+#+END_SRC
+
+ + Run executable 
+
+#+BEGIN_SRC sh 
+  $ ./test-boost2.elf 
+  =========== Boost Date Time ===============
+
+   date1 = 2009-Oct-20
+   Text =>  Date mdate is equal to: 20120621
+#+END_SRC
+*** Compilation with CMake 
+
+ *Building with CMake / Approach 1* 
+
+File: CMakeLists.txt [VERSION 1]
+
+#+BEGIN_SRC sh 
+  cmake_minimum_required(VERSION 2.8)
+  project(boost-manually)
+
+  #========================================#
+  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+
+  #=========== Find-Package =============#
+  set(Boost_USE_STATIC_LIBS ON)
+  set(Boost_NO_SYSTEM_PATHS TRUE)
+
+  find_package(Boost REQUIRED date_time serialization )
+
+  #=========== Targets ======================#
+  add_executable(test-boost-app test-boost.cpp)
+  target_link_libraries(test-boost-app Boost::date_time)
+#+END_SRC
+
+Build from command line: 
+
+#+BEGIN_SRC sh 
+  # Configure 
+  #--------------------------------------------
+  $ cmake -H. -B_build -DCMAKE_BUILD_TYPE=Debug \
+              -DBoost_NO_BOOST_CMAKE=TRUE \
+              -DBoost_NO_SYSTEM_PATHS=TRUE \
+              -DBOOST_ROOT:PATHNAME=$HOME/libs \
+              -DBoost_LIBRARY_DIR:FILEPATH=$HOME/libs/lib
+
+  # Compile 
+  #--------------------------------------------
+  $ cmake --build _build --target 
+
+  # Run 
+  #--------------------------------------------
+  $ _build/test-boost-app 
+  =========== Boost Date Time ===============
+
+   date1 = 2009-Oct-20
+   Text =>  Date mdate is equal to: 20120621
+
+#+END_SRC
+
+ *Building with CMake / Approach 2* 
+
+ + The CMake-related variables are set in the CMakeLists.txt file. 
+
+File: CMakeLists.txt [VERSION 2]
+
+#+BEGIN_SRC sh 
+   cmake_minimum_required(VERSION 2.8)
+   project(boost-manually)
+   #========================================#
+
+   set(CMAKE_CXX_STANDARD 17)
+   set(CMAKE_VERBOSE_MAKEFILE ON)
+
+   #=========== Find-Package =============#
+
+   set(Boost_USE_STATIC_LIBS      ON)
+   set(Boost_NO_SYSTEM_PATHS      TRUE)
+   set(BOOST_ROOT        $ENV{HOME}/libs)
+   set(BOOST_LIBRARY_DIR $ENV{HOME}/libs)
+
+   message([TRACE] " BOOST_LIBRARY_DIR = ${BOOST_LIBRARY_DIR}")
+
+   find_package(Boost REQUIRED date_time serialization )
+
+   #=========== Targets ======================#
+
+   add_executable(test-boost-app test-boost.cpp)
+   target_link_libraries(test-boost-app Boost::date_time)
+#+END_SRC
+
+Build: 
+
+#+BEGIN_SRC sh 
+   #--------- Configure -----------#
+   $ cmake -H. -B_build 
+   [TRACE] BOOST_LIBRARY_DIR = /home/mxpkf8/libs
+   -- Configuring done
+   -- Generating done
+   -- Build files have been written to: /home/mxpkf8/_build
+
+   #--------- Build / Compile -----#
+   $ cmake --build _build --target
+
+   #--------- Run -----------------#
+   $ _build/test-boost-app 
+   =========== Boost Date Time ===============
+
+    date1 = 2009-Oct-20
+    Text =>  Date mdate is equal to: 20120621
+#+END_SRC
+
+** Boost project with CMake and Conan 
 
 Conan package manager allows a project use mutiple versions of Boost
 libraries without prior manual installation that is time consuming as
