@@ -3,1479 +3,1572 @@
 #+DESCRIPTION: cpp c++ code examples, demonstrations, design pattern and integration.
 #+STARTUP: content 
 
-* C++17 New Features and Containers
-** Structured Bindings
+* C++ New Features 
+** Reference Implementations 
+*** Overview 
 
- C++17 structured bindings allows to decompose data structures such as
- pairs, tuples, C-arrays and structs or classes with public fields in
- an uniform way. 
+Reference implementations of C++ libraries from C++17, C++20 and
+upcoming C++ standards. Note: Some C++ compilers still not provide those
+libraries and most compilers still does not provide the C++17 parallel
+algorithms, which allows taking advantage of multi-core processors and
+SIMD CPU instructions. 
+*** C++17 Standard
+
+ *Parallel Algorithms of C++17*
+
+  + Note: Most compilers does not provide this part of standard
+    library yet, only Intel compiler is shipped with this library.
+
+  + Standard Library Reference:
+    + [[https://en.cppreference.com/w/cpp/algorithm/execution_policy_tag_t][Standard library algorithms execution policy - parallel algorithms]]
+
+  + Reference Implementation: 
+    + https://github.com/intel/parallelstl
+    + "Parallel STL is an implementation of the C++ standard library
+      algorithms with support for execution policies, as specified in
+      ISO/IEC 14882:2017 standard, commonly called C++17. The
+      implementation also supports the unsequenced execution policy
+      specified in Parallelism TS version 2 and proposed for the next
+      version of the C++ standard in the C++ working group paper
+      P1001R1. Parallel STL offers a portable implementation of
+      threaded and vectorized execution of standard C++ algorithms,
+      optimized and validated for Intel(R) 64 processors. For
+      sequential execution, it relies on an available implementation
+      of the C++ standard library."
+
+  + Articles:
+    + [[https://devblogs.microsoft.com/cppblog/using-c17-parallel-algorithms-for-better-performance/][Using C++17 Parallel Algorithms for Better Performance | C++ Team Blog]]
+    + [[https://www.bfilipek.com/2018/11/parallel-alg-perf.html][Bartek's coding blog: The Amazing Performance of C++17 Parallel Algorithms, is it Possible?]]
+*** C++20 Standard 
+
+  *C++20 std::span* 
+
+   * Standard Library Reference:
+     + https://en.cppreference.com/w/cpp/container/span
+     + "The class template span describes an object that can refer to
+       a contiguous sequence of objects with the first element of the
+       sequence at position zero. A span can either have a static
+       extent, in which case the number of elements in the sequence is
+       known and encoded in the type, or a dynamic extent. A typical
+       implementation holds only two members: a pointer to T and a
+       size."
+
+   * Reference Implementation:
+     + https://github.com/Microsft/GSL
+
+   * Alternative Implementation:
+     + https://github.com/martinmoene/gsl-lite
+
+   * Papers:
+     + P0122R33 - span: bounds-safe views for sequences
+       + http://open-std.org/JTC1/SC22/WG21/docs/papers/2016/p0122r3.pdf
+
+     + P0298R1 - A byte type definition
+       + http://open-std.org/JTC1/SC22/WG21/docs/papers/2016/p0298r1.pdf
+
+
+  *C++20 Ranges* 
+
+  + Standard Library Reference:
+    + https://en.cppreference.com/w/cpp/ranges
+
+  + Reference Implementation:
+    + https://github.com/ericniebler/range-v3
+    + "Range library for C++14/17/20. This code was the basis of a
+      formal proposal to add range support to the C++ standard
+      library. That proposal evolved through a Technical
+      Specification, and finally into P0896R4 "The One Ranges
+      Proposal" which was merged into the C++20 working drafts in
+      November 2018."
+  
+
+  *C++20 Format Library* 
+
+    + Note: This library provide a better type-safe printf API, which
+      is based on Python.
+
+    + Standard Library Reference:
+      + https://en.cppreference.com/w/cpp/utility/format
+      + https://en.cppreference.com/w/cpp/utility/format
+      + "The text formatting library offers a safe and extensible
+        alternative to the printf family of functions. It is intended
+        to complement the existing C++ I/O streams library and reuse
+        some of its infrastructure such as overloaded insertion
+        operators for user-defined types."
+
+    + Reference Implementation:
+      + https://fmt.dev/
+      + https://github.com/fmtlib/fmt
+  
+** C++17 New Features and Containers
+*** Structured Bindings
+
+  C++17 structured bindings allows to decompose data structures such as
+  pairs, tuples, C-arrays and structs or classes with public fields in
+  an uniform way. 
+
+  Example: 
+   + File: [[file:src/cpp17/cpp17-structured-bindings.cpp][file:src/cpp17/cpp17-structured-bindings.cpp]]
+   + GIST: [[https://gist.github.com/caiorss/3fbb30bb6a9bc7672492bd8d9a7b5f41][cpp17-structured-bindings.cpp]]
+
+  Compiling and running: 
+
+  #+BEGIN_SRC sh 
+   $ clang++ -std=c++1z -g -Wall -Wextra cpp17-structured-bindings.cpp -o cpp17-structured-bindings.bin  
+   $ ./cpp17-structured-bindings.bin
+  #+END_SRC
+
+   *Parts in Main Function* 
+
+   + Experiment 1 - Decompose pair. 
+
+  #+BEGIN_SRC cpp 
+      std::puts("\n=== EXPERIMENT 1: Decompose: pair - binding - pair =====");
+      auto p = std::pair<std::string, int>("C++", 17);
+      auto [name, version] = p;
+      std::cout << " name = " << name << " ; version = " << version << std::endl;
+  #+END_SRC
+
+  Output: 
+
+  #+BEGIN_SRC sh 
+    === EXPERIMENT 1: Decompose: pair - binding - pair =====
+     name = C++ ; version = 17
+  #+END_SRC
+
+   + Experiment 2 -  Decompose: map / 'hash-table' 
+
+  #+BEGIN_SRC cpp 
+     std::puts("\n=== EXPERIMENT 2: Decompose: map / 'hash-table' - =====");
+     auto database = std::map<std::string, int>{{"c++", 17}, {"rust", 10}, {"Forth", 200}};
+     for(const auto& [key, value] : database)
+             std::cout << "key = " << key << " ; value = " << value << std::endl;
+  #+END_SRC
+
+  Output: 
+
+  #+BEGIN_SRC sh 
+    === EXPERIMENT 2: Decompose: map / 'hash-table' - =====
+    key = Forth ; value = 200
+    key = c++ ; value = 17
+    key = rust ; value = 10
+  #+END_SRC
+
+   + Experiment 3 - Decompose: tuple
+
+  #+BEGIN_SRC cpp 
+     std::puts("\n=== EXPERIMENT 3: Decompose: tuple - =====");
+     using DatabaseRow = std::tuple<int, std::string, double>;
+     auto database = std::vector<DatabaseRow>{
+             {100, "Fried tasty fresh cheese",   3.45},
+             {400, "Super hot toasted coffee.", 6.25},
+             {500, "Fresh Orange Juice",        4.50},
+     };
+
+     for(const auto& [id, name, price]: database)
+             std::cout << " ROW=> id = " << id
+                       << " ; name = "   << name
+                       << " ; price = "  << price 
+                       << std::endl;
+  #+END_SRC
+
+  Output:
+
+  #+BEGIN_SRC sh 
+    === EXPERIMENT 3: Decompose: tuple - =====
+     ROW=> id = 100 ; name = Fried tasty fresh cheese ; price = 3.45
+     ROW=> id = 400 ; name = Super hot toasted coffee. ; price = 6.25
+     ROW=> id = 500 ; name = Fresh Orange Juice ; price = 4.5
+  #+END_SRC
+
+   + Experiment 4 - Decompose Structs 
+
+  #+BEGIN_SRC cpp 
+     std::puts("\n=== EXPERIMENT 4: Decompose: Structs - =====");
+     struct GeoCoordinate{
+             std::string name;
+             double      latitude;
+             double      longitude;
+     };
+
+     auto geoDatabase = std::deque<GeoCoordinate>{
+              {"Bogota",         4.7110,  -74.0721}
+             ,{"São Paulo",    -23.5505,  -46.6333}
+             ,{"Gauteng",      -26.2708,   28.1123}			
+             ,{"Buenos Aires", -34.6037,  -58.3816}
+             ,{"Brasilia",     -15.8267,  -47.9218}
+     };
+     std::cout << std::setprecision(3);
+
+     std::for_each(geoDatabase.begin(), geoDatabase.end(),
+                   [](const auto& city){
+                       // Decompose struct into name, latitude and longitude
+                       const auto& [name, lat, lon] = city;
+                       std::cout << std::setw(15) << std::left  << name
+                                 << std::setw(8) << std::right << lat
+                                 << std::setw(8) << lon 
+                                 << "\n";						  
+                   }); 
+  #+END_SRC
+
+  Output: 
+
+  #+BEGIN_SRC text 
+     === EXPERIMENT 4: Decompose: Structs - =====
+     Bogota             4.71   -74.1
+     Sâo Paulo         -23.5   -46.6
+     Gauteng           -26.3    28.1
+     Buenos Aires      -34.6   -58.4
+     Brasilia          -15.8   -47.9
+  #+END_SRC
+
+   +  Decompose: C-Array 
+
+  #+BEGIN_SRC cpp 
+     std::puts("\n=== EXPERIMENT 5: Decompose: C-Array - =====");
+     double array [3] = {10.23, 90.23, 100.0};
+     auto [x, y, z] = array;
+     std::printf(" array { x = %.3f ; y = %.3f ; z = %.3f }", x, y, z);
+  #+END_SRC
+
+  Output: 
+
+  #+BEGIN_SRC sh 
+    === EXPERIMENT 5: Decompose: C-Array - =====
+     array { x = 10.230 ; y = 90.230 ; z = 100.000 }
+  #+END_SRC
+
+*** Functions and algorithms 
+**** Algorithm std::clamp 
+
+ Clamps the the input value to range [LOW, HIGH]: 
+
+  + Header: [[https://en.cppreference.com/w/cpp/header/algorithm][<algorithm>]]
+  + Documentation: [[https://en.cppreference.com/w/cpp/algorithm/clamp][std::clamp]]
+
+ Pseudo-Signature:
+
+ #+BEGIN_SRC cpp 
+    T std::clamp(T input, T low, T high);
+ #+END_SRC
+
+ Algorithm: 
+
+ #+BEGIN_SRC text 
+   + if INPUT < LOW        => returns LOW
+   + if INPUT > HIGH       => returns HIGH
+   + If LOW < INPUT < HIGH => returns INPUT 
+ #+END_SRC
+
+ This function could be implemented as: 
+
+ #+BEGIN_SRC cpp 
+   template<typename T>
+   auto clamp(T const& input, T const& low, T const& high) ->T 
+   {
+           return std::max(low, std::min(high, input));
+   }
+ #+END_SRC
+
+ Testing code: 
+  + If any assert predicate statement evaluates to false, it will cause
+    an runtime error that will shutdown the application and show an error
+    message with the error location and the assertion failure.  
+
+ #+BEGIN_SRC cpp 
+   #include <iostream>
+   #include <algorithm>
+   #include <cassert>
+
+   int main (void)
+   {
+       assert(30 == std::clamp(10, 30, 100));
+       assert(50 == std::clamp(50, 30, 100));
+       assert(60 == std::clamp(60, 30, 100));
+       assert(100 == std::clamp(100, 30, 100));
+       assert(100 == std::clamp(160, 30, 100));
+
+       std::puts(" [INFO] All tests passed.  OK");
+       return 0;
+   }
+ #+END_SRC
+
+**** Function std::apply - apply function to tuple 
+
+ Apply a function to a tuple: 
+
+  + Header:  [[https://en.cppreference.com/w/cpp/utility][<utility>]]
+  + Documentation: [[https://en.cppreference.com/w/cpp/utility/apply][<apply>]] 
 
  Example: 
-  + File: [[file:src/cpp17/cpp17-structured-bindings.cpp][file:src/cpp17/cpp17-structured-bindings.cpp]]
-  + GIST: [[https://gist.github.com/caiorss/3fbb30bb6a9bc7672492bd8d9a7b5f41][cpp17-structured-bindings.cpp]]
-
- Compiling and running: 
-
- #+BEGIN_SRC sh 
-  $ clang++ -std=c++1z -g -Wall -Wextra cpp17-structured-bindings.cpp -o cpp17-structured-bindings.bin  
-  $ ./cpp17-structured-bindings.bin
- #+END_SRC
-
-  *Parts in Main Function* 
-
-  + Experiment 1 - Decompose pair. 
 
  #+BEGIN_SRC cpp 
-     std::puts("\n=== EXPERIMENT 1: Decompose: pair - binding - pair =====");
-     auto p = std::pair<std::string, int>("C++", 17);
-     auto [name, version] = p;
-     std::cout << " name = " << name << " ; version = " << version << std::endl;
- #+END_SRC
+   #include <iostream>
+   #include <tuple>       // Import: std::tuple
+   #include <utility>     // Import: std::appply
 
- Output: 
+   using Coord2d = std::tuple<std::string, float, float>;
 
- #+BEGIN_SRC sh 
-   === EXPERIMENT 1: Decompose: pair - binding - pair =====
-    name = C++ ; version = 17
- #+END_SRC
+   void print_coord2d(std::string const& name, float x, float y)
+   {
+       std::printf(" Coord2D{ name = %s ; x = %.3f; y = %.3f } \n", name.c_str(), x, y);
+   }
 
-  + Experiment 2 -  Decompose: map / 'hash-table' 
+   // Higher order function => Returns a lambda that applies a function of
+   // (string, float, float) into a tuple argument.
+   template<typename Function>
+   auto make_function(Function func)
+   {
+       return [=](Coord2d const& coord){
+           std::apply(func, coord);
+       };
+   }
 
- #+BEGIN_SRC cpp 
-    std::puts("\n=== EXPERIMENT 2: Decompose: map / 'hash-table' - =====");
-    auto database = std::map<std::string, int>{{"c++", 17}, {"rust", 10}, {"Forth", 200}};
-    for(const auto& [key, value] : database)
-            std::cout << "key = " << key << " ; value = " << value << std::endl;
- #+END_SRC
+   int main (void)
+   {
+       auto p1 = std::make_tuple("p1", -20.415f, 9.01f);
+       Coord2d p2 { "p2", 10.251, 89.245};
+       Coord2d p3 = { "p3", 10.251, 89.245};
+       // Calls move constructor
+       auto p4 = Coord2d { "p4", 20.671, 90.156};
 
- Output: 
+       std::apply(print_coord2d, p1);
+       std::apply(print_coord2d, p2);
+       std::apply(print_coord2d, p3);
+       std::apply(print_coord2d, p4);
 
- #+BEGIN_SRC sh 
-   === EXPERIMENT 2: Decompose: map / 'hash-table' - =====
-   key = Forth ; value = 200
-   key = c++ ; value = 17
-   key = rust ; value = 10
- #+END_SRC
+       std::cout << "\n";
 
-  + Experiment 3 - Decompose: tuple
+       std::apply([](std::string const& name, float x, float y)
+                  {
+           std::cout << " Plot point { "
+                     <<  name << " ; "
+                     << x << y << " } " << "\n";
+                  },
+                  p1);
 
- #+BEGIN_SRC cpp 
-    std::puts("\n=== EXPERIMENT 3: Decompose: tuple - =====");
-    using DatabaseRow = std::tuple<int, std::string, double>;
-    auto database = std::vector<DatabaseRow>{
-            {100, "Fried tasty fresh cheese",   3.45},
-            {400, "Super hot toasted coffee.", 6.25},
-            {500, "Fresh Orange Juice",        4.50},
-    };
+       std::cout << "\n ==== Test transformed functions ===== " << std::endl;
 
-    for(const auto& [id, name, price]: database)
-            std::cout << " ROW=> id = " << id
-                      << " ; name = "   << name
-                      << " ; price = "  << price 
-                      << std::endl;
- #+END_SRC
+       auto tuple_printer = make_function(print_coord2d);
 
- Output:
+       tuple_printer(p1);
+       tuple_printer(p2);
 
- #+BEGIN_SRC sh 
-   === EXPERIMENT 3: Decompose: tuple - =====
-    ROW=> id = 100 ; name = Fried tasty fresh cheese ; price = 3.45
-    ROW=> id = 400 ; name = Super hot toasted coffee. ; price = 6.25
-    ROW=> id = 500 ; name = Fresh Orange Juice ; price = 4.5
- #+END_SRC
-
-  + Experiment 4 - Decompose Structs 
-
- #+BEGIN_SRC cpp 
-    std::puts("\n=== EXPERIMENT 4: Decompose: Structs - =====");
-    struct GeoCoordinate{
-            std::string name;
-            double      latitude;
-            double      longitude;
-    };
-
-    auto geoDatabase = std::deque<GeoCoordinate>{
-             {"Bogota",         4.7110,  -74.0721}
-            ,{"São Paulo",    -23.5505,  -46.6333}
-            ,{"Gauteng",      -26.2708,   28.1123}			
-            ,{"Buenos Aires", -34.6037,  -58.3816}
-            ,{"Brasilia",     -15.8267,  -47.9218}
-    };
-    std::cout << std::setprecision(3);
-
-    std::for_each(geoDatabase.begin(), geoDatabase.end(),
-                  [](const auto& city){
-                      // Decompose struct into name, latitude and longitude
-                      const auto& [name, lat, lon] = city;
-                      std::cout << std::setw(15) << std::left  << name
-                                << std::setw(8) << std::right << lat
-                                << std::setw(8) << lon 
-                                << "\n";						  
-                  }); 
+       return 0;
+   }
  #+END_SRC
 
  Output: 
 
  #+BEGIN_SRC text 
-    === EXPERIMENT 4: Decompose: Structs - =====
-    Bogota             4.71   -74.1
-    Sâo Paulo         -23.5   -46.6
-    Gauteng           -26.3    28.1
-    Buenos Aires      -34.6   -58.4
-    Brasilia          -15.8   -47.9
+    Coord2D{ name = p1 ; x = -20.415; y = 9.010 } 
+    Coord2D{ name = p2 ; x = 10.251; y = 89.245 } 
+    Coord2D{ name = p3 ; x = 10.251; y = 89.245 } 
+    Coord2D{ name = p4 ; x = 20.671; y = 90.156 } 
+
+    Plot point { p1 ; -20.4159.01 } 
+
+    ==== Test transformed functions ===== 
+    Coord2D{ name = p1 ; x = -20.415; y = 9.010 } 
+    Coord2D{ name = p2 ; x = 10.251; y = 89.245 } 
  #+END_SRC
 
-  +  Decompose: C-Array 
+**** Function std::invoke - invoke anything callable 
+     :PROPERTIES:
+     :ID:       5754cb0e-f4d3-434c-85e0-5ea55655a22f
+     :END:
+
+ Function which provides an uniform interface for invoking anything
+ callable such as class member functions (ordinary methods), static
+ member functions (static methods), functios and etc.
+
+  See: https://en.cppreference.com/w/cpp/utility/functional/invoke
+
+   + File: [[file:src/cpp17/cpp17-invoke.cpp][file:src/cpp17/cpp17-invoke.cpp]]
+   + Online Compiler: http://rextester.com/IPY88297
+
+ Headers:
 
  #+BEGIN_SRC cpp 
-    std::puts("\n=== EXPERIMENT 5: Decompose: C-Array - =====");
-    double array [3] = {10.23, 90.23, 100.0};
-    auto [x, y, z] = array;
-    std::printf(" array { x = %.3f ; y = %.3f ; z = %.3f }", x, y, z);
+    #include <iostream>
+    #include <string>
+    #include <ostream>
+
+    // std::invoke is provide by header functional
+    #include <functional> 
+ #+END_SRC
+
+
+ Class Dummy:
+
+ #+BEGIN_SRC cpp 
+    struct Dummy{
+        double evalme(double x)	{
+            std::cerr << __FILE__ << ":" << __LINE__ << " I was evaluated ; 2x = " << 2 *x << '\n';
+            return 2 * x;
+        }
+        double operator()(double x){
+            std::cerr << __FILE__ << ":" << __LINE__ << " Call function-operator << 4 * x = " << 4 * x << '\n';
+            return 4 * x;
+        }
+    };
+ #+END_SRC
+
+ Function computeDouble:
+
+ #+BEGIN_SRC cpp 
+    double computeDouble(double x){
+        std::cerr << __FILE__ << ":" << __LINE__ << " Computed double of 2x = " << 2 * x << '\n';
+        return 2 * x;
+    }
+ #+END_SRC
+
+ Main function:
+
+ #+BEGIN_SRC cpp 
+    int main(){
+        std::invoke(computeDouble, 3.0);
+        Dummy dummy;
+        std::invoke(dummy, 3.0);
+        std::invoke(Dummy(), 2.0);
+        // Call method: .evalme indirectly 
+        std::invoke(&Dummy::evalme, dummy, 3.0);
+        return 0;
+    }
+ #+END_SRC
+
+  Compile and run: 
+
+  #+BEGIN_SRC sh 
+    $ g++ cpp17-invoke.cpp -o out.bin -std=c++1z -Wall -Wextra && ./out.bin
+
+    cpp17-invoke.cpp:20 Computed double of 2x = 6
+    cpp17-invoke.cpp:14 Call function-operator << 4 * x = 12
+    cpp17-invoke.cpp:14 Call function-operator << 4 * x = 8
+    cpp17-invoke.cpp:9 I was evaluated ; 2x = 6
+  #+END_SRC
+
+*** Attributes 
+
+ Attributes are annotations that provide unified syntax to language
+ extensions and additional information to compilers that can be used
+ for issue warning when certain conditions are met, apply special logic
+ to the code or perform optimization. 
+
+ The C++11 and C++17 standard defines the following new attributes:
+
+   + noreturn
+     + Annoation indicating that the function does not return. 
+
+   + deprecated or deprecated("reason")
+     + Indicates that the usage of the function or member function is
+       discouraged issuing a compile warning when the annotated code is
+       used. 
+
+   + falltrhough (C++17)
+
+   + nodiscard (C++17)
+
+   + maybe_unused (C++17)
+     + Disables compile warning for unnused function parameters,
+       variables or member variables.
+
+  *Examples of Language/Compiler Extensions which attributes could replace* 
+
+ GNU GCC or G++ and Clang LLVM 
+
+ #+BEGIN_SRC cpp 
+    __attribute___(aligned(16)) class Something{ ... };
+
+    double variable __attribute__((unnused));
+ #+END_SRC
+
+ MSV Visual C++ Compiler and MingW (GCC ported to Windows)
+
+ #+BEGIN_SRC cpp 
+     // Function exportd from DLL 
+   __declspec(dllexport) bool function_export() { ... }
+
+    // Function imported from DLL 
+   __declspec(dllimport) void function_imported() { ... }
+
+   class __declspec(dllexport)  ClassExported
+   {
+     // .... code here ... //
+   };
+ #+END_SRC
+
+  *Example of Attribute Usage:*
+
+  + Attribute _depreacted_ 
+
+ #+BEGIN_SRC cpp 
+   [[deprecated]]
+   bool check_disk()
+   {
+       // ... code here ...
+       return true; 
+   }
+
+   [[deprecated("DO NOT USE IT. It will phased out on next release.")]]
+   void process_function()
+   {
+     /* ... Code here ... */    
+   }
+ #+END_SRC
+
+  + Attribute _noreturn_
+
+ #+BEGIN_SRC cpp 
+   void process_action(std::string const&);
+
+   [[noreturn]]
+   void process_input_event_loop()
+   {
+       std::string line;
+       // Infinite loop function never returns 
+       for (;;) {
+           std::getline(std::cin, line);
+           if(line == "exit") { std::puts(" Ciau."); std::exit(0); }
+           process_action(line);
+       };
+    
+   }
+ #+END_SRC
+
+  + Attribute _maybe_unused_ (C++17)
+    + Suppress warnings for unused function parameters. 
+
+ #+BEGIN_SRC cpp 
+   double compute_sum(size_t size, double xs [], [[maybe_unused]] int flags)
+   {
+       double sum = 0.0;
+       for(size_t i = 0; i < size; ++i) { sum+= xs[i]; }
+       return sum; 
+   }
+ #+END_SRC
+
+  + Attribute _nodiscard_ (C++17)
+    + Raises a compiler warning when a return value of an annoated
+      function is discarded. It is useful to annotate functions which
+      returns error codes when exceptions cannot be used. 
+
+ #+BEGIN_SRC cpp 
+   [[nodiscard]]
+   bool set_temperature(int t)
+   {
+       std::cout << " Set oven temperature to: " << t << " Celsius" << "\n";
+       // ... some code  ... //
+       return false;
+   }
+
+   int main() 
+   {
+      // Raises compiler warning 
+      set_temperature(100); 
+
+      // Do not raise compiler WARNING 
+      if(set_temperature(100)) 
+      { 
+         // do something else ... 
+      } else 
+      {
+         // Report failure to end use. 
+      }
+
+      return 0; 
+   }
+
+ #+END_SRC
+
+  *See:* 
+
+   + [[https://en.cppreference.com/w/cpp/language/attributes][attribute specifier sequence(since C++11)]] (Cpp reference)
+
+   + [[https://docs.microsoft.com/en-us/cpp/cpp/attributes?view=vs-2019][Attributes in C++ | Microsoft Docs]]
+
+   + [[https://clang.llvm.org/docs/LanguageExtensions.html#non-standard-c-11-attributes][Clang Language Extensions — Clang 10 documentation]]
+
+   + WG21 Paper - *Towards supporrt for attributes in C++ (Revision 6)*
+     + <http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2008/n2761.pdf>
+     + C++ Proposal for attributes language extension. One of the main
+       cases presented for this proposal is the easier usage of OpenMP
+       language extension pragmas. 
+
+*** std::any 
+    :PROPERTIES:
+    :ID:       9397a9a0-e641-4cb6-89b7-24a82fe12d99
+    :END:
+
+ This example shows how to use the C++17 std::any container which comes
+ froom boost::any.
+
+ See: https://en.cppreference.com/w/cpp/utility/any
+
+ File:  [[file:src/cpp17/cpp17-any.cpp][file:src/cpp17/cpp17-any.cpp]] 
+
+ #+BEGIN_SRC cpp :tangle src/cpp17/cpp17-any.cpp
+   #include <iostream>
+   #include <string>
+   #include <iomanip>
+   #include <ostream>
+
+   #include <any>
+
+   struct Point{
+       double x;
+       double y;
+       Point(double x, double y): x(x), y(y) {}
+
+       // Copy constructor
+       Point(const Point& p){
+           std::cerr << " -->> Copy constructor" << '\n';
+           x = p.x;
+           y = p.y;
+       }   
+   };
+
+   std::ostream& operator<<(std::ostream& os, const Point& p){
+       os << "Point(" << p.x << ", " << p.y << ") ";
+       return os;
+   }
+
+   template<typename T>
+   auto printInfo(std::any x) -> void{
+       std::cout << " x.type = " << x.type().name()
+                 << " ; value(x) = "
+                 << std::any_cast<T>(x)
+                 << '\n';  
+   }
+
+   int main(){
+       // Print boolean as 'true', 'false', instead of 0 or 1
+       std::cout << std::boolalpha;
+       std::any x = 1;
+       printInfo<int>(x);
+       x = 10.233;
+       printInfo<double>(x);
+       x = 'k';
+       printInfo<char>(x);
+       x = "hello world";
+       printInfo<const char*>(x);
+       x = std::string("hello world");
+       printInfo<std::string>(x);  
+       x = Point(100.0, 20.0);
+       printInfo<Point>(x);
+       std::cout << "Has value: x.has_value() = " << x.has_value() << '\n';
+       x.reset();                                                         
+       std::cout << "Has value: x.has_value() = " << x.has_value() << '\n';                                                               
+       std::cout << "Try casting " << std::endl;
+       x = "testing type casting";
+       try{
+           std::any_cast<int>(x);
+       } catch (const std::bad_any_cast& ex) {
+           std::cerr << " >>> Exception: what = " << ex.what() << '\n'; 
+       }
+       std::cerr << " >>> End the program gracefully" << '\n'; 
+       return 0;
+   }
+
+ #+END_SRC
+
+ Compiling with gcc: 
+
+ #+BEGIN_SRC sh 
+   $ g++ --version
+   g++ (GCC) 7.3.1 20180130 (Red Hat 7.3.1-2)
+   .. ... ... ... 
+
+   $ g++ cpp17-any.cpp -o out.bin -std=c++1z -Wall -Wextra && ./out.bin
+    x.type = i ; value(x) = 1
+    x.type = d ; value(x) = 10.233
+    x.type = c ; value(x) = k
+    x.type = PKc ; value(x) = hello world
+    x.type = NSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE ; value(x) = hello world
+    -->> Copy constructor
+    -->> Copy constructor
+    x.type = 5Point ; value(x) =  -->> Copy constructor
+   Point(100, 20) 
+   Has value: x.has_value() = true
+   Has value: x.has_value() = false
+   Try casting 
+    >>> Exception: what = bad any_cast
+    >>> End the program gracefully
+ #+END_SRC
+
+ Compile with MSVC / VC++ on Windows: 
+
+ #+BEGIN_SRC sh 
+   $ cl.exe cpp17-any.cpp /EHsc /Zi /nologo /std:c++17 /Fe:out.exe && out.exe
+   cpp17-any.cpp
+    x.type = int ; value(x) = 1
+    x.type = double ; value(x) = 10.233
+    x.type = char ; value(x) = k
+    x.type = char const * __ptr64 ; value(x) = hello world
+    x.type = class std::basic_string<char,struct std::char_traits<char>,class std::allocator<char> > ; value(x) = hello world
+    -->> Copy constructor
+    -->> Copy constructor
+    -->> Copy constructor
+    x.type = struct Point ; value(x) = Point(100, 20) 
+   Has value: x.has_value() = true
+   Has value: x.has_value() = false
+   Try casting 
+    >>> Exception: what = Bad any_cast
+    >>> End the program gracefully
+ #+END_SRC
+
+*** std::optional 
+**** Overview 
+
+ The container std::optional allows expressing in a concise and
+ type-safe way that a function may return nothing, the function
+ parameter may be empty or that a class field may be empty as well.
+ This type is a disjoint union similar to Haskell's Maybe or OCaml
+ optional. A common approach used by many C++ APIs for dealing with
+ empty return values is to return a pointer to the returned value and
+ return null pointer when no value is found or the function retuned
+ nothing. The drawback of this approach is the possibility of null
+ pointer dereference which is a undefined behavior and may unexpectedly
+ crash the program. In other language this common problem is known as
+ the infamous null pointer exception.
+
+ Documentation: 
+  + [[https://en.cppreference.com/w/cpp/utility/optional/optional][std::optional::optional - cppreference.com]]
+  + [[https://en.cppreference.com/w/cpp/utility/optional/value_or][std::optional::value_or - cppreference.com]]
+  + [[https://www.boost.org/doc/libs/1_69_0/libs/optional/doc/html/index.html][Boost.Optional]] (Predecessor of std::optional)
+
+  *Constructors:*
+
+ Create empty std::optional object (default).
+
+ #+BEGIN_SRC cpp 
+   std::optional<T> value;
+ #+END_SRC
+
+ Create an empty std::optional object  (std::nullopt) explicity: 
+
+ #+BEGIN_SRC cpp 
+   std::optional<T> value = std::nullopt;
+   std::optional<T> value{std::nullopt};
+   std::optional<T> value = {}
+
+   auto value = std::optional<int> {std::nullopt};
+   auto value = std::optional<int> {};
+ #+END_SRC
+
+ Create a std::optional instance set to some value
+
+ #+BEGIN_SRC cpp 
+   std::optional<int> value = 100;
+   std::optional<int> value{100};
+   auto value = std::optional<int> {100};
+ #+END_SRC
+
+  *Check whether std::optional instance has a value or not*
+
+ #+BEGIN_SRC cpp 
+   std::optional<int> x = 100;
+   if(x) 
+     std::cout << "x is NOT EMPTY x = " << x.value() << std::endl;
+   else
+     std::cout << "x is EMPTY. " << std::endl;
+ #+END_SRC
+
+**** Example 
+
+ Source:
+  + File: [[file:src/cpp17/optional1.cpp][file:src/cpp17/optional1.cpp]]
+  + GIST: [[https://gist.github.com/caiorss/4cae2aca1b9ad6ee315bc887e36a1938][optional1.cpp]]
+
+ Compiling and running:
+
+ #+BEGIN_SRC sh 
+   $ clang++ optional1.cpp -o optional1.bin -std=c++1z -g -O0 -Wall 
+   $ ./optional1.bin
+  #+END_SRC
+
+ Headers:
+
+ #+BEGIN_SRC cpp 
+   #include <iostream>
+   #include <string>  // std::stof 
+   #include <ostream> // operator (<<) and class ostream 
+   #include <vector>
+   #include <iomanip> // setprecision
+
+   #include <optional>
+ #+END_SRC
+
+ Class _Location_ contains an optional field: 
+
+ #+BEGIN_SRC cpp 
+   // Class with optional field.
+   struct Location{
+        double lat;
+        double lon;
+        std::optional<std::string> name; 
+   };
+ #+END_SRC
+
+ Insertion operator overload to make the class Location printable: 
+
+ #+BEGIN_SRC cpp 
+   // Make std::optional<Location> printable 
+   std::ostream& operator<<(std::ostream& os, const Location& x){
+        os << std::setprecision(2) << std::fixed;
+        if(x.name)
+           os << "Location("
+              << "x = " << x.lat
+              << " ; y = " << x.lon
+              << " ; name = "
+              << x.name.value() << ")";
+        else
+           os << "Location("
+              << "x = " << x.lat
+              << " ; y = " << x.lon
+              << " ; name = "
+              << "<unknown>" << ")";       
+        return os;  
+   }
+ #+END_SRC
+
+ Insertion operator overload (<<) for making the value
+ std::optiona<double> printable:
+
+ #+BEGIN_SRC cpp 
+   // Make std::optional<double> printable
+   std::ostream& operator<<(std::ostream& os, const std::optional<double>& x){
+       if(x)
+          os << "Some[Double](" << x.value() << ")";
+       else
+          os << "None[Double]";
+       return os;  
+   }
+ #+END_SRC
+
+ Function _parseDouble_ may return nothing if the function fails:
+
+ #+BEGIN_SRC cpp 
+   std::optional<double>
+   parseDouble(const std::string& str)  
+   {
+       try{
+  	   // Return some value 
+           return std::make_optional(stod(str));
+       } catch (const std::invalid_argument& ex) {
+  	   // Return nothing 
+           return std::nullopt;
+       }
+   }
+ #+END_SRC
+
+ Function: getEnvVar attempts to return the value environment variable,
+ if it fails returns nothing: 
+
+ #+BEGIN_SRC cpp 
+   auto getEnvVar(std::string const& varname) -> std::optional<std::string>
+   {
+       if(const char* v = std::getenv(varname.c_str()))
+            // Returns some value 
+            return v;
+       else
+            // Returns nothing (same as std::nullopt)
+            return {};
+   }  
+ #+END_SRC
+
+ Function main: 
+
+  + Experiment 1: Print optional values 
+
+ #+BEGIN_SRC cpp 
+    char endl = '\n';
+
+    std::optional<double> oa;
+    std::optional<double> ob = std::nullopt;
+    std::optional<double> oc = 10.233;
+    std::optional<double> od(1e3);
+    std::optional<double> oe {};
+
+    std::puts("==== EXPERIMENT 1 === Print optional value");
+    std::cout << "oa = " << oa << endl;
+    std::cout << "ob = " << ob << endl;
+    std::cout << "oc = " << oc << endl;
+    std::cout << "od = " << od << endl;
+    std::cout << "oe = " << oe << endl; 
  #+END_SRC
 
  Output: 
 
  #+BEGIN_SRC sh 
-   === EXPERIMENT 5: Decompose: C-Array - =====
-    array { x = 10.230 ; y = 90.230 ; z = 100.000 }
+    ==== EXPERIMENT 1 === Print optional value
+    oa = None[Double]
+    ob = None[Double]
+    oc = Some[Double](10.233)
+    od = Some[Double](1000)
+    oe = None[Double]
  #+END_SRC
 
-** Functions and algorithms 
-*** Algorithm std::clamp 
 
-Clamps the the input value to range [LOW, HIGH]: 
-
- + Header: [[https://en.cppreference.com/w/cpp/header/algorithm][<algorithm>]]
- + Documentation: [[https://en.cppreference.com/w/cpp/algorithm/clamp][std::clamp]]
-
-Pseudo-Signature:
-
-#+BEGIN_SRC cpp 
-   T std::clamp(T input, T low, T high);
-#+END_SRC
-
-Algorithm: 
-
-#+BEGIN_SRC text 
-  + if INPUT < LOW        => returns LOW
-  + if INPUT > HIGH       => returns HIGH
-  + If LOW < INPUT < HIGH => returns INPUT 
-#+END_SRC
-
-This function could be implemented as: 
-
-#+BEGIN_SRC cpp 
-  template<typename T>
-  auto clamp(T const& input, T const& low, T const& high) ->T 
-  {
-          return std::max(low, std::min(high, input));
-  }
-#+END_SRC
-
-Testing code: 
- + If any assert predicate statement evaluates to false, it will cause
-   an runtime error that will shutdown the application and show an error
-   message with the error location and the assertion failure.  
-
-#+BEGIN_SRC cpp 
-  #include <iostream>
-  #include <algorithm>
-  #include <cassert>
-
-  int main (void)
-  {
-      assert(30 == std::clamp(10, 30, 100));
-      assert(50 == std::clamp(50, 30, 100));
-      assert(60 == std::clamp(60, 30, 100));
-      assert(100 == std::clamp(100, 30, 100));
-      assert(100 == std::clamp(160, 30, 100));
-
-      std::puts(" [INFO] All tests passed.  OK");
-      return 0;
-  }
-#+END_SRC
-
-*** Function std::apply - apply function to tuple 
-
-Apply a function to a tuple: 
-
- + Header:  [[https://en.cppreference.com/w/cpp/utility][<utility>]]
- + Documentation: [[https://en.cppreference.com/w/cpp/utility/apply][<apply>]] 
-
-Example: 
-
-#+BEGIN_SRC cpp 
-  #include <iostream>
-  #include <tuple>       // Import: std::tuple
-  #include <utility>     // Import: std::appply
-
-  using Coord2d = std::tuple<std::string, float, float>;
-
-  void print_coord2d(std::string const& name, float x, float y)
-  {
-      std::printf(" Coord2D{ name = %s ; x = %.3f; y = %.3f } \n", name.c_str(), x, y);
-  }
-
-  // Higher order function => Returns a lambda that applies a function of
-  // (string, float, float) into a tuple argument.
-  template<typename Function>
-  auto make_function(Function func)
-  {
-      return [=](Coord2d const& coord){
-          std::apply(func, coord);
-      };
-  }
-
-  int main (void)
-  {
-      auto p1 = std::make_tuple("p1", -20.415f, 9.01f);
-      Coord2d p2 { "p2", 10.251, 89.245};
-      Coord2d p3 = { "p3", 10.251, 89.245};
-      // Calls move constructor
-      auto p4 = Coord2d { "p4", 20.671, 90.156};
-
-      std::apply(print_coord2d, p1);
-      std::apply(print_coord2d, p2);
-      std::apply(print_coord2d, p3);
-      std::apply(print_coord2d, p4);
-
-      std::cout << "\n";
-
-      std::apply([](std::string const& name, float x, float y)
-                 {
-          std::cout << " Plot point { "
-                    <<  name << " ; "
-                    << x << y << " } " << "\n";
-                 },
-                 p1);
-
-      std::cout << "\n ==== Test transformed functions ===== " << std::endl;
-
-      auto tuple_printer = make_function(print_coord2d);
-
-      tuple_printer(p1);
-      tuple_printer(p2);
-
-      return 0;
-  }
-#+END_SRC
-
-Output: 
-
-#+BEGIN_SRC text 
-   Coord2D{ name = p1 ; x = -20.415; y = 9.010 } 
-   Coord2D{ name = p2 ; x = 10.251; y = 89.245 } 
-   Coord2D{ name = p3 ; x = 10.251; y = 89.245 } 
-   Coord2D{ name = p4 ; x = 20.671; y = 90.156 } 
-
-   Plot point { p1 ; -20.4159.01 } 
-
-   ==== Test transformed functions ===== 
-   Coord2D{ name = p1 ; x = -20.415; y = 9.010 } 
-   Coord2D{ name = p2 ; x = 10.251; y = 89.245 } 
-#+END_SRC
-
-*** Function std::invoke - invoke anything callable 
-   :PROPERTIES:
-   :ID:       5754cb0e-f4d3-434c-85e0-5ea55655a22f
-   :END:
-
-Function which provides an uniform interface for invoking anything
-callable such as class member functions (ordinary methods), static
-member functions (static methods), functios and etc.
-
- See: https://en.cppreference.com/w/cpp/utility/functional/invoke
-
-  + File: [[file:src/cpp17/cpp17-invoke.cpp][file:src/cpp17/cpp17-invoke.cpp]]
-  + Online Compiler: http://rextester.com/IPY88297
-
-Headers:
-
-#+BEGIN_SRC cpp 
-   #include <iostream>
-   #include <string>
-   #include <ostream>
-
-   // std::invoke is provide by header functional
-   #include <functional> 
-#+END_SRC
-
-
-Class Dummy:
-
-#+BEGIN_SRC cpp 
-   struct Dummy{
-       double evalme(double x)	{
-           std::cerr << __FILE__ << ":" << __LINE__ << " I was evaluated ; 2x = " << 2 *x << '\n';
-           return 2 * x;
-       }
-       double operator()(double x){
-           std::cerr << __FILE__ << ":" << __LINE__ << " Call function-operator << 4 * x = " << 4 * x << '\n';
-           return 4 * x;
-       }
-   };
-#+END_SRC
-
-Function computeDouble:
-
-#+BEGIN_SRC cpp 
-   double computeDouble(double x){
-       std::cerr << __FILE__ << ":" << __LINE__ << " Computed double of 2x = " << 2 * x << '\n';
-       return 2 * x;
-   }
-#+END_SRC
-
-Main function:
-
-#+BEGIN_SRC cpp 
-   int main(){
-       std::invoke(computeDouble, 3.0);
-       Dummy dummy;
-       std::invoke(dummy, 3.0);
-       std::invoke(Dummy(), 2.0);
-       // Call method: .evalme indirectly 
-       std::invoke(&Dummy::evalme, dummy, 3.0);
-       return 0;
-   }
-#+END_SRC
-
- Compile and run: 
+  + Experiment 2: Reset optional values
 
  #+BEGIN_SRC sh 
-   $ g++ cpp17-invoke.cpp -o out.bin -std=c++1z -Wall -Wextra && ./out.bin
-
-   cpp17-invoke.cpp:20 Computed double of 2x = 6
-   cpp17-invoke.cpp:14 Call function-operator << 4 * x = 12
-   cpp17-invoke.cpp:14 Call function-operator << 4 * x = 8
-   cpp17-invoke.cpp:9 I was evaluated ; 2x = 6
+    std::puts("==== EXPERIMENT 2 === Reset optional value");
+    std::cout << "Reset variable oc " << endl;
+    oc.reset();
+    std::cout << "oc = " << oc << endl;
  #+END_SRC
 
-** Attributes 
+ Output: 
 
-Attributes are annotations that provide unified syntax to language
-extensions and additional information to compilers that can be used
-for issue warning when certain conditions are met, apply special logic
-to the code or perform optimization. 
+ #+BEGIN_SRC text 
+    ==== EXPERIMENT 2 === Reset optional value
+    Reset variable oc 
+    oc = None[Double]
+ #+END_SRC
 
-The C++11 and C++17 standard defines the following new attributes:
+ 
+  + Experiment 3: Check whether optional has value. (is not empty)
 
-  + noreturn
-    + Annoation indicating that the function does not return. 
+ #+BEGIN_SRC cpp 
+    std::puts("==== EXPERIMENT 3 ==== check whether optional has value. (is not empty) ====");
+    if(oc)
+       std::cout << ">> oc has a vaule" << endl;
+    else
+       std::cout << ">> oc is empty" << endl;
+ #+END_SRC
 
-  + deprecated or deprecated("reason")
-    + Indicates that the usage of the function or member function is
-      discouraged issuing a compile warning when the annotated code is
-      used. 
+ Output: 
 
-  + falltrhough (C++17)
-
-  + nodiscard (C++17)
-
-  + maybe_unused (C++17)
-    + Disables compile warning for unnused function parameters,
-      variables or member variables.
-
- *Examples of Language/Compiler Extensions which attributes could replace* 
-
-GNU GCC or G++ and Clang LLVM 
-
-#+BEGIN_SRC cpp 
-   __attribute___(aligned(16)) class Something{ ... };
-
-   double variable __attribute__((unnused));
-#+END_SRC
-
-MSV Visual C++ Compiler and MingW (GCC ported to Windows)
-
-#+BEGIN_SRC cpp 
-    // Function exportd from DLL 
-  __declspec(dllexport) bool function_export() { ... }
-
-   // Function imported from DLL 
-  __declspec(dllimport) void function_imported() { ... }
-
-  class __declspec(dllexport)  ClassExported
-  {
-    // .... code here ... //
-  };
-#+END_SRC
-
- *Example of Attribute Usage:*
-
- + Attribute _depreacted_ 
-
-#+BEGIN_SRC cpp 
-  [[deprecated]]
-  bool check_disk()
-  {
-      // ... code here ...
-      return true; 
-  }
-
-  [[deprecated("DO NOT USE IT. It will phased out on next release.")]]
-  void process_function()
-  {
-    /* ... Code here ... */    
-  }
-#+END_SRC
-
- + Attribute _noreturn_
-
-#+BEGIN_SRC cpp 
-  void process_action(std::string const&);
-
-  [[noreturn]]
-  void process_input_event_loop()
-  {
-      std::string line;
-      // Infinite loop function never returns 
-      for (;;) {
-          std::getline(std::cin, line);
-          if(line == "exit") { std::puts(" Ciau."); std::exit(0); }
-          process_action(line);
-      };
-    
-  }
-#+END_SRC
-
- + Attribute _maybe_unused_ (C++17)
-   + Suppress warnings for unused function parameters. 
-
-#+BEGIN_SRC cpp 
-  double compute_sum(size_t size, double xs [], [[maybe_unused]] int flags)
-  {
-      double sum = 0.0;
-      for(size_t i = 0; i < size; ++i) { sum+= xs[i]; }
-      return sum; 
-  }
-#+END_SRC
-
- + Attribute _nodiscard_ (C++17)
-   + Raises a compiler warning when a return value of an annoated
-     function is discarded. It is useful to annotate functions which
-     returns error codes when exceptions cannot be used. 
-
-#+BEGIN_SRC cpp 
-  [[nodiscard]]
-  bool set_temperature(int t)
-  {
-      std::cout << " Set oven temperature to: " << t << " Celsius" << "\n";
-      // ... some code  ... //
-      return false;
-  }
-
-  int main() 
-  {
-     // Raises compiler warning 
-     set_temperature(100); 
-
-     // Do not raise compiler WARNING 
-     if(set_temperature(100)) 
-     { 
-        // do something else ... 
-     } else 
-     {
-        // Report failure to end use. 
-     }
-
-     return 0; 
-  }
-
-#+END_SRC
-
- *See:* 
-
-  + [[https://en.cppreference.com/w/cpp/language/attributes][attribute specifier sequence(since C++11)]] (Cpp reference)
-
-  + [[https://docs.microsoft.com/en-us/cpp/cpp/attributes?view=vs-2019][Attributes in C++ | Microsoft Docs]]
-
-  + [[https://clang.llvm.org/docs/LanguageExtensions.html#non-standard-c-11-attributes][Clang Language Extensions — Clang 10 documentation]]
-
-  + WG21 Paper - *Towards supporrt for attributes in C++ (Revision 6)*
-    + <http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2008/n2761.pdf>
-    + C++ Proposal for attributes language extension. One of the main
-      cases presented for this proposal is the easier usage of OpenMP
-      language extension pragmas. 
+ #+BEGIN_SRC txt 
+    ==== EXPERIMENT 3 ==== check whether optional has value. (is not empty) ====
+    >> oc is empty
+ #+END_SRC
 
 
+  + Experiment 4: Try to parse double. 
 
-** std::any 
-   :PROPERTIES:
-   :ID:       9397a9a0-e641-4cb6-89b7-24a82fe12d99
-   :END:
+ #+BEGIN_SRC cpp 
+    std::puts("==== EXPERIMENT 4 ==== try parse double ====");      
+    std::cout << "x0 = " << parseDouble("-1.0e3") << endl;
+    std::cout << "x1 = " << parseDouble("1.351 ") << endl;
+    std::cout << "x2 = " << parseDouble("1.asdasd351 xxgh") << endl;
+    std::cout << "x4 = " << parseDouble("sad4543fgx") << endl;
+ #+END_SRC
 
-This example shows how to use the C++17 std::any container which comes
-froom boost::any.
+ Output: 
 
-See: https://en.cppreference.com/w/cpp/utility/any
+ #+BEGIN_SRC txt 
+    ==== EXPERIMENT 4 ==== try parse double ====
+    x0 = Some[Double](-1000)
+    x1 = Some[Double](1.351)
+    x2 = Some[Double](1)
+    x4 = None[Double]
+ #+END_SRC
 
-File:  [[file:src/cpp17/cpp17-any.cpp][file:src/cpp17/cpp17-any.cpp]] 
 
-#+BEGIN_SRC cpp :tangle src/cpp17/cpp17-any.cpp
-  #include <iostream>
-  #include <string>
-  #include <iomanip>
-  #include <ostream>
+  + Experiment 5: Struct/class with optional field. 
 
-  #include <any>
+ #+BEGIN_SRC cpp
+    std::puts("=== EXPERIMENT 5 ======== Structs/Classes with optional fields ====");
+    std::vector<Location> xs {
+        {10.31, 23.4, "Waypoint Delta"},
+        {-46.23, 145.13, "Waypoint gamma"},
+        {90.43, 100.345, std::nullopt},
+        {0, 0, {}},
+    };
+    int i = 0;
+    for(auto x: xs){
+       std::cout << "x[" << i << "]" << " = " << x << endl;
+       i++;
+    }
+ #+END_SRC
 
-  struct Point{
-      double x;
-      double y;
-      Point(double x, double y): x(x), y(y) {}
+ Output:
 
-      // Copy constructor
-      Point(const Point& p){
-          std::cerr << " -->> Copy constructor" << '\n';
-          x = p.x;
-          y = p.y;
-      }   
-  };
+ #+BEGIN_SRC txt 
+   === EXPERIMENT 5 ======== Structs/Classes with optional fields ====
+   x[0] = Location(x = 10.31 ; y = 23.40 ; name = Waypoint Delta)
+   x[1] = Location(x = -46.23 ; y = 145.13 ; name = Waypoint gamma)
+   x[2] = Location(x = 90.43 ; y = 100.34 ; name = <unknown>)
+   x[3] = Location(x = 0.00 ; y = 0.00 ; name = <unknown>)
 
-  std::ostream& operator<<(std::ostream& os, const Point& p){
-      os << "Point(" << p.x << ", " << p.y << ") ";
-      return os;
-  }
+ #+END_SRC
 
-  template<typename T>
-  auto printInfo(std::any x) -> void{
-      std::cout << " x.type = " << x.type().name()
-                << " ; value(x) = "
-                << std::any_cast<T>(x)
-                << '\n';  
-  }
 
-  int main(){
-      // Print boolean as 'true', 'false', instead of 0 or 1
-      std::cout << std::boolalpha;
-      std::any x = 1;
-      printInfo<int>(x);
-      x = 10.233;
-      printInfo<double>(x);
-      x = 'k';
-      printInfo<char>(x);
-      x = "hello world";
-      printInfo<const char*>(x);
-      x = std::string("hello world");
-      printInfo<std::string>(x);  
-      x = Point(100.0, 20.0);
-      printInfo<Point>(x);
-      std::cout << "Has value: x.has_value() = " << x.has_value() << '\n';
-      x.reset();                                                         
-      std::cout << "Has value: x.has_value() = " << x.has_value() << '\n';                                                               
-      std::cout << "Try casting " << std::endl;
-      x = "testing type casting";
-      try{
-          std::any_cast<int>(x);
-      } catch (const std::bad_any_cast& ex) {
-          std::cerr << " >>> Exception: what = " << ex.what() << '\n'; 
-      }
-      std::cerr << " >>> End the program gracefully" << '\n'; 
+  + Experiment 6: Print environment variables.
+
+ #+BEGIN_SRC cpp 
+     std::puts("=== EXPERIMENT 6 - Print environment variables. ===== ");
+     auto var_home =  getEnvVar("HOME");
+     if(var_home.has_value())
+         std::cout << "$HOME = " << var_home.value() << endl;
+     else
+         std::cout << "$HOME = " << "UNKNOWN" << endl;
+
+     auto var_dummy =  getEnvVar("DUMMY-VAR");
+     if(var_dummy.has_value())
+         std::cout << "$DUMMYVAR = " << var_dummy.value() << endl;
+     else
+         std::cout << "$DUMMYVAR = " << "UNKNOWN" << endl;
+ #+END_SRC
+
+ Output: 
+
+ #+BEGIN_SRC txt 
+    === EXPERIMENT 6 - Print environment variables. ===== 
+    $HOME = /home/archbox
+    $DUMMYVAR = UNKNOWN
+ #+END_SRC
+
+
+  + Experiment 6: Test member function .value_or() 
+
+ #+BEGIN_SRC cpp 
+      std::puts("==== EXPERIMENT 7 - Test member function .value_or() ====");
+      std::cout << "$XDG_SESSION_PATH = "
+                << getEnvVar("XDG_SESSION_PATH").value_or("<<error: not set>>") << '\n';
+      std::cout << "$HOMEX = "
+                << getEnvVar("HOMEX").value_or("<<error: not set>>") << '\n';
+
       return 0;
-  }
-
-#+END_SRC
-
-Compiling with gcc: 
-
-#+BEGIN_SRC sh 
-  $ g++ --version
-  g++ (GCC) 7.3.1 20180130 (Red Hat 7.3.1-2)
-  .. ... ... ... 
-
-  $ g++ cpp17-any.cpp -o out.bin -std=c++1z -Wall -Wextra && ./out.bin
-   x.type = i ; value(x) = 1
-   x.type = d ; value(x) = 10.233
-   x.type = c ; value(x) = k
-   x.type = PKc ; value(x) = hello world
-   x.type = NSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE ; value(x) = hello world
-   -->> Copy constructor
-   -->> Copy constructor
-   x.type = 5Point ; value(x) =  -->> Copy constructor
-  Point(100, 20) 
-  Has value: x.has_value() = true
-  Has value: x.has_value() = false
-  Try casting 
-   >>> Exception: what = bad any_cast
-   >>> End the program gracefully
-#+END_SRC
-
-Compile with MSVC / VC++ on Windows: 
-
-#+BEGIN_SRC sh 
-  $ cl.exe cpp17-any.cpp /EHsc /Zi /nologo /std:c++17 /Fe:out.exe && out.exe
-  cpp17-any.cpp
-   x.type = int ; value(x) = 1
-   x.type = double ; value(x) = 10.233
-   x.type = char ; value(x) = k
-   x.type = char const * __ptr64 ; value(x) = hello world
-   x.type = class std::basic_string<char,struct std::char_traits<char>,class std::allocator<char> > ; value(x) = hello world
-   -->> Copy constructor
-   -->> Copy constructor
-   -->> Copy constructor
-   x.type = struct Point ; value(x) = Point(100, 20) 
-  Has value: x.has_value() = true
-  Has value: x.has_value() = false
-  Try casting 
-   >>> Exception: what = Bad any_cast
-   >>> End the program gracefully
-#+END_SRC
-
-** std::optional 
-*** Overview 
-
-The container std::optional allows expressing in a concise and
-type-safe way that a function may return nothing, the function
-parameter may be empty or that a class field may be empty as well.
-This type is a disjoint union similar to Haskell's Maybe or OCaml
-optional. A common approach used by many C++ APIs for dealing with
-empty return values is to return a pointer to the returned value and
-return null pointer when no value is found or the function retuned
-nothing. The drawback of this approach is the possibility of null
-pointer dereference which is a undefined behavior and may unexpectedly
-crash the program. In other language this common problem is known as
-the infamous null pointer exception.
-
-Documentation: 
- + [[https://en.cppreference.com/w/cpp/utility/optional/optional][std::optional::optional - cppreference.com]]
- + [[https://en.cppreference.com/w/cpp/utility/optional/value_or][std::optional::value_or - cppreference.com]]
- + [[https://www.boost.org/doc/libs/1_69_0/libs/optional/doc/html/index.html][Boost.Optional]] (Predecessor of std::optional)
-
- *Constructors:*
-
-Create empty std::optional object (default).
-
-#+BEGIN_SRC cpp 
-  std::optional<T> value;
-#+END_SRC
-
-Create an empty std::optional object  (std::nullopt) explicity: 
-
-#+BEGIN_SRC cpp 
-  std::optional<T> value = std::nullopt;
-  std::optional<T> value{std::nullopt};
-  std::optional<T> value = {}
-
-  auto value = std::optional<int> {std::nullopt};
-  auto value = std::optional<int> {};
-#+END_SRC
-
-Create a std::optional instance set to some value
-
-#+BEGIN_SRC cpp 
-  std::optional<int> value = 100;
-  std::optional<int> value{100};
-  auto value = std::optional<int> {100};
-#+END_SRC
-
- *Check whether std::optional instance has a value or not*
-
-#+BEGIN_SRC cpp 
-  std::optional<int> x = 100;
-  if(x) 
-    std::cout << "x is NOT EMPTY x = " << x.value() << std::endl;
-  else
-    std::cout << "x is EMPTY. " << std::endl;
-#+END_SRC
-
-*** Example 
-
-Source:
- + File: [[file:src/cpp17/optional1.cpp][file:src/cpp17/optional1.cpp]]
- + GIST: [[https://gist.github.com/caiorss/4cae2aca1b9ad6ee315bc887e36a1938][optional1.cpp]]
-
-Compiling and running:
-
-#+BEGIN_SRC sh 
-  $ clang++ optional1.cpp -o optional1.bin -std=c++1z -g -O0 -Wall 
-  $ ./optional1.bin
  #+END_SRC
 
-Headers:
-
-#+BEGIN_SRC cpp 
-  #include <iostream>
-  #include <string>  // std::stof 
-  #include <ostream> // operator (<<) and class ostream 
-  #include <vector>
-  #include <iomanip> // setprecision
-
-  #include <optional>
-#+END_SRC
-
-Class _Location_ contains an optional field: 
-
-#+BEGIN_SRC cpp 
-  // Class with optional field.
-  struct Location{
-       double lat;
-       double lon;
-       std::optional<std::string> name; 
-  };
-#+END_SRC
-
-Insertion operator overload to make the class Location printable: 
-
-#+BEGIN_SRC cpp 
-  // Make std::optional<Location> printable 
-  std::ostream& operator<<(std::ostream& os, const Location& x){
-       os << std::setprecision(2) << std::fixed;
-       if(x.name)
-          os << "Location("
-             << "x = " << x.lat
-             << " ; y = " << x.lon
-             << " ; name = "
-             << x.name.value() << ")";
-       else
-          os << "Location("
-             << "x = " << x.lat
-             << " ; y = " << x.lon
-             << " ; name = "
-             << "<unknown>" << ")";       
-       return os;  
-  }
-#+END_SRC
-
-Insertion operator overload (<<) for making the value
-std::optiona<double> printable:
-
-#+BEGIN_SRC cpp 
-  // Make std::optional<double> printable
-  std::ostream& operator<<(std::ostream& os, const std::optional<double>& x){
-      if(x)
-         os << "Some[Double](" << x.value() << ")";
-      else
-         os << "None[Double]";
-      return os;  
-  }
-#+END_SRC
-
-Function _parseDouble_ may return nothing if the function fails:
-
-#+BEGIN_SRC cpp 
-  std::optional<double>
-  parseDouble(const std::string& str)  
-  {
-      try{
-  	  // Return some value 
-          return std::make_optional(stod(str));
-      } catch (const std::invalid_argument& ex) {
-  	  // Return nothing 
-          return std::nullopt;
-      }
-  }
-#+END_SRC
-
-Function: getEnvVar attempts to return the value environment variable,
-if it fails returns nothing: 
-
-#+BEGIN_SRC cpp 
-  auto getEnvVar(std::string const& varname) -> std::optional<std::string>
-  {
-      if(const char* v = std::getenv(varname.c_str()))
-           // Returns some value 
-           return v;
-      else
-           // Returns nothing (same as std::nullopt)
-           return {};
-  }  
-#+END_SRC
-
-Function main: 
-
- + Experiment 1: Print optional values 
-
-#+BEGIN_SRC cpp 
-   char endl = '\n';
-
-   std::optional<double> oa;
-   std::optional<double> ob = std::nullopt;
-   std::optional<double> oc = 10.233;
-   std::optional<double> od(1e3);
-   std::optional<double> oe {};
-
-   std::puts("==== EXPERIMENT 1 === Print optional value");
-   std::cout << "oa = " << oa << endl;
-   std::cout << "ob = " << ob << endl;
-   std::cout << "oc = " << oc << endl;
-   std::cout << "od = " << od << endl;
-   std::cout << "oe = " << oe << endl; 
-#+END_SRC
-
-Output: 
-
-#+BEGIN_SRC sh 
-   ==== EXPERIMENT 1 === Print optional value
-   oa = None[Double]
-   ob = None[Double]
-   oc = Some[Double](10.233)
-   od = Some[Double](1000)
-   oe = None[Double]
-#+END_SRC
-
-
- + Experiment 2: Reset optional values
-
-#+BEGIN_SRC sh 
-   std::puts("==== EXPERIMENT 2 === Reset optional value");
-   std::cout << "Reset variable oc " << endl;
-   oc.reset();
-   std::cout << "oc = " << oc << endl;
-#+END_SRC
-
-Output: 
-
-#+BEGIN_SRC text 
-   ==== EXPERIMENT 2 === Reset optional value
-   Reset variable oc 
-   oc = None[Double]
-#+END_SRC
-
- 
- + Experiment 3: Check whether optional has value. (is not empty)
-
-#+BEGIN_SRC cpp 
-   std::puts("==== EXPERIMENT 3 ==== check whether optional has value. (is not empty) ====");
-   if(oc)
-      std::cout << ">> oc has a vaule" << endl;
-   else
-      std::cout << ">> oc is empty" << endl;
-#+END_SRC
-
-Output: 
-
-#+BEGIN_SRC txt 
-   ==== EXPERIMENT 3 ==== check whether optional has value. (is not empty) ====
-   >> oc is empty
-#+END_SRC
-
-
- + Experiment 4: Try to parse double. 
-
-#+BEGIN_SRC cpp 
-   std::puts("==== EXPERIMENT 4 ==== try parse double ====");      
-   std::cout << "x0 = " << parseDouble("-1.0e3") << endl;
-   std::cout << "x1 = " << parseDouble("1.351 ") << endl;
-   std::cout << "x2 = " << parseDouble("1.asdasd351 xxgh") << endl;
-   std::cout << "x4 = " << parseDouble("sad4543fgx") << endl;
-#+END_SRC
-
-Output: 
-
-#+BEGIN_SRC txt 
-   ==== EXPERIMENT 4 ==== try parse double ====
-   x0 = Some[Double](-1000)
-   x1 = Some[Double](1.351)
-   x2 = Some[Double](1)
-   x4 = None[Double]
-#+END_SRC
-
-
- + Experiment 5: Struct/class with optional field. 
-
-#+BEGIN_SRC cpp
-   std::puts("=== EXPERIMENT 5 ======== Structs/Classes with optional fields ====");
-   std::vector<Location> xs {
-       {10.31, 23.4, "Waypoint Delta"},
-       {-46.23, 145.13, "Waypoint gamma"},
-       {90.43, 100.345, std::nullopt},
-       {0, 0, {}},
-   };
-   int i = 0;
-   for(auto x: xs){
-      std::cout << "x[" << i << "]" << " = " << x << endl;
-      i++;
-   }
-#+END_SRC
-
-Output:
-
-#+BEGIN_SRC txt 
-  === EXPERIMENT 5 ======== Structs/Classes with optional fields ====
-  x[0] = Location(x = 10.31 ; y = 23.40 ; name = Waypoint Delta)
-  x[1] = Location(x = -46.23 ; y = 145.13 ; name = Waypoint gamma)
-  x[2] = Location(x = 90.43 ; y = 100.34 ; name = <unknown>)
-  x[3] = Location(x = 0.00 ; y = 0.00 ; name = <unknown>)
-
-#+END_SRC
-
-
- + Experiment 6: Print environment variables.
-
-#+BEGIN_SRC cpp 
-    std::puts("=== EXPERIMENT 6 - Print environment variables. ===== ");
-    auto var_home =  getEnvVar("HOME");
-    if(var_home.has_value())
-        std::cout << "$HOME = " << var_home.value() << endl;
-    else
-        std::cout << "$HOME = " << "UNKNOWN" << endl;
-
-    auto var_dummy =  getEnvVar("DUMMY-VAR");
-    if(var_dummy.has_value())
-        std::cout << "$DUMMYVAR = " << var_dummy.value() << endl;
-    else
-        std::cout << "$DUMMYVAR = " << "UNKNOWN" << endl;
-#+END_SRC
-
-Output: 
-
-#+BEGIN_SRC txt 
-   === EXPERIMENT 6 - Print environment variables. ===== 
-   $HOME = /home/archbox
-   $DUMMYVAR = UNKNOWN
-#+END_SRC
-
-
- + Experiment 6: Test member function .value_or() 
-
-#+BEGIN_SRC cpp 
-     std::puts("==== EXPERIMENT 7 - Test member function .value_or() ====");
-     std::cout << "$XDG_SESSION_PATH = "
-               << getEnvVar("XDG_SESSION_PATH").value_or("<<error: not set>>") << '\n';
-     std::cout << "$HOMEX = "
-               << getEnvVar("HOMEX").value_or("<<error: not set>>") << '\n';
-
-     return 0;
-#+END_SRC
-
-Output: 
-
-#+BEGIN_SRC txt 
-   === EXPERIMENT 6 - Print environment variables. ===== 
-   $HOME = /home/archbox
-   $DUMMYVAR = UNKNOWN
-   ==== EXPERIMENT 7 - Test member function .value_or() ====
-   $XDG_SESSION_PATH = <<error: not set>>
-   $HOMEX = <<error: not set>>
-#+END_SRC
-
-
-
-
-
-** std::variant 
-
-C++17 new std::variant which comes from Boost.Variant provides a
-type-safe discriminated union or sum type which is similar to pattern
-matching from functional programming languages like Haskell, OCaml and
-Scala. In addition to those benefits, the std::variant is an
-out-of-the-box generic visitor design pattern and a type-safe
-replacement for old C-unions.
-
-Potential Applications: 
- + Implement visitor OOP pattern.
- + Simulate or emulate pattern matching from functional languages.
- + Manipulate abstract syntax trees.
-
-Useful concepts references: 
- + [[https://en.wikipedia.org/wiki/Tagged_union][Tagged union - Wikipedia]]
- + [[https://en.wikipedia.org/wiki/Algebraic_data_type][Algebraic data type - Wikipedia]]
-
-Documentation: 
- + https://en.cppreference.com/w/cpp/utility/variant
- + [[https://www.boost.org/doc/libs/1_64_0/doc/html/variant.html][Chapter 45. Boost.Variant - 1.64.0]]
-
-Code example: 
-
- - File: [[file:src/cpp17/variant.cpp][file:src/cpp17/variant.cpp]] 
-
-#+BEGIN_SRC cpp :tangle src/cpp17/variant.cpp
-  #include <iostream>
-  #include <variant> // C++17
-  #include <string>
-  #include <ostream>
-  #include <deque>
-  #include <vector>
-  #include <iomanip>
-
-  template <class T>
-  auto display(const std::string& name, const T& t) -> void;
-
-  // Pattern matching using constexpr => May be the more performant way 
-  template<class T>
-  auto identifyAndPrint(const T& v) -> void;
-
-  struct VisitorOperation{
-          auto operator()(int num) -> void {
-                  std::cout << "type = int     => value = " << num << "\n";
-          }
-          auto operator()(double num) -> void {
-                  std::cout << "type = double  => value = " << num << "\n";
-          }
-          auto operator()(const std::string& s){
-                  std::cout << "type = string  => value = " << s << "\n";
-          }
-  };
-
-  int main(){
-          // using <1>, <2>, ... <n> => Only available at C++17
-          using std::cout, std::endl, std::cerr;
-          auto nl = "\n";
-          std::cout << std::boolalpha;
-          cout << "========== Test 1 ==================" << nl;	
-	
-          // std::variant<int, double, std::string> somevar;
-          auto x = std::variant<int, double, std::string>();
-          x = 100;
-          std::cout << "variant has int    = " << std::holds_alternative<int>(x) << nl;
-          std::cout << "variant has double = " << std::holds_alternative<double>(x) << nl;
-          std::cout << "variant has string = " << std::holds_alternative<std::string>(x) << nl;
-          display("x", x);
-          std::cout << "-------------------" << nl;
-          x = 204.45;
-          std::cout << "variant has double = " << std::holds_alternative<double>(x) << nl;	
-          display("x", x);
-          std::cout << "-------------------" << nl;
-          x = "std::variant is awesome!";
-          std::cout << "variant has string = " << std::holds_alternative<std::string>(x) << nl;
-          display("x", x);
-
-          cout << "========== Test 2 ==================" << nl;
-          try{ 
-                  // Try to get int 
-                  int m = std::get<int>(x);
-                  std::cout << "m = " << m << "\n";
-          } catch(const std::bad_variant_access& ex){
-                  std::cerr << "Error: Failed to extract int." << nl;
-          }
-          try{ 
-                  // Try to get string 
-                  auto s = std::get<std::string>(x);
-                  std::cout << "s = " << s << nl;
-          } catch(const std::bad_variant_access& ex){
-                  std::cerr << "Error: Failed to extract string." << nl;
-          }
-
-          cout << "========== Test 3 ==================" << nl;
-          x = -100;
-          std::visit([](auto&& p){
-                                     std::cout << "x = " << p << '\n';
-                             }, x);
-          x = 20.52;
-          std::visit([](auto&& p){
-                                     std::cout << "x = " << p << '\n';
-                             }, x);
-
-          x = "<hello world std::variant>";
-          std::visit([](auto&& p){
-                                     std::cout << "x = " << p << '\n';
-                             }, x);
-
-          cout << "========== Test 4 ==================" << nl;
-          // auto + uniform initialization 
-          auto xs = std::deque<std::variant<int, double, std::string>>{10.0, 20, 5, "hello", 10, "world"};
-          for(const auto& e: xs){
-                  identifyAndPrint(e);
-          }
-          cout << "========== Test 5 ==================" << nl;
-          for(const auto& e: xs){
-                  std::visit(VisitorOperation(), e);
-          }	
-          return 0;
-  }
-
-  // It works in a similar fashion to functional languages with
-  // pattern matching such as Haskell, Scala, OCaml and so on.
-  // std::variant is also a type-safe alternative to old C-unions.
-  template <class T>
-  auto display(const std::string& name, const T& t) -> void {
-          auto nl = "\n";
-          // Boost.Variant uses boost::get<TYPE>(&t), now changed to std::get_if
-          if(auto n = std::get_if<int>(&t)){
-                  std::cout << " = " << *n << nl;
-                  return; // Early return 
-          }
-          if(auto d = std::get_if<double>(&t)){
-                  std::cout << name << " = " << *d << nl;
-                  return;
-          }	
-          if(auto s = std::get_if<std::string>(&t)){
-                  std::cout << name << " = " << *s << nl;
-                  return;
-          }
-          std::cout << "<UNKNOWN>" << std::endl;
-  }
-
-  template<class T>
-  auto identifyAndPrint(const T& v) -> void{
-          std::visit([](auto&& a){
-              using C = std::decay_t<decltype(a)>;
-              if constexpr(std::is_same_v<C, int>){
-                              std::cout << "Type is int => value = " << a << "\n";
-                              return;
-              }
-              if constexpr(std::is_same_v<C, double>){
-                              std::cout << "Type is double => value = " << a << "\n";
-                              return;
-              }
-              if constexpr(std::is_same_v<C, std::string>){
-                              std::cout << "Type is string => value = " << a << "\n";
-                              return;
-              }
-              std::cout << "Type is unknown" << "\n";
-                             }, v);
-  } // End of func. identifyAndPrint() ---//
-
-#+END_SRC
-
-Compile with GCC:
-
-#+BEGIN_SRC sh 
- $ g++ variant.cpp -o variant.bin -std=c++1z -Wall -Wextra  && ./variant.bin 
-#+END_SRC
-
-Compile with Clang:
-
-#+BEGIN_SRC sh 
- $ g++ variant.cpp -o variant.bin -std=c++1z -Wall -Wextra  && ./variant.bin 
-#+END_SRC
-
-Running: 
-
-#+BEGIN_SRC sh 
-  g++ variant.cpp -o variant.bin -std=c++1z -Wall -Wextra  && ./variant.bin
-
-  ========== Test 1 ==================
-  variant has int    = true
-  variant has double = false
-  variant has string = false
-   = 100
-  -------------------
-  variant has double = true
-  x = 204.45
-  -------------------
-  variant has string = true
-  x = std::variant is awesome!
-  ========== Test 2 ==================
-  Error: Failed to extract int.
-  s = std::variant is awesome!
-  ========== Test 3 ==================
-  x = -100
-  x = 20.52
-  x = <hello world std::variant>
-  ========== Test 4 ==================
-  Type is double => value = 10
-  Type is int => value = 20
-  Type is int => value = 5
-  Type is string => value = hello
-  Type is int => value = 10
-  Type is string => value = world
-  ========== Test 5 ==================
-  type = double  => value = 10
-  type = int     => value = 20
-  type = int     => value = 5
-  type = string  => value = hello
-  type = int     => value = 10
-  type = string  => value = world
-
-
-#+END_SRC
-** File system library 
-
-The C++17 File system library, based on Boost file systems, provides
-platform-agnostic file system operation such as listing directories,
-checking file permissions, creating directories, copying files and so
-on.
-
- *Small example about the library functionality*
-
-Source: 
- + File: [[file:src/cpp17/cpp17-filesys1.cpp][file:src/cpp17/cpp17-filesys1.cpp]]
- + GIST: [[https://gist.github.com/caiorss/440dbcfadee02c2a81f925fa31078bbe][cpp17-filesys1.cpp]]
-
-Compiling and running: 
-  + Note: it is necessary to link against stdc++fs.
- 
-#+BEGIN_SRC sh 
-  $ g++ cpp17-filesys.cpp -o cpp17-filesys.bin -std=c++1z -O3 -Wall -Wextra -lstdc++fs  
-  $ ./cpp17-filesys.bin
-#+END_SRC
-
-Used headers and namespaces: 
-
-#+BEGIN_SRC cpp
-  #include <iostream>
-  #include <string>
-  #include <iterator>
-  #include <iomanip>
-
-  // C++17 - Requires compiler linking flag: -lstdc++fs on CLang or GCC.
-  #include <filesystem>
-
-  namespace fs = std::filesystem;
-#+END_SRC
-
-Helper template function for applying a function to the first N
-entries.
-
-#+BEGIN_SRC cpp 
-   /** Iterate over first N entries of a file system iterator. */
-   template<typename Range, typename Function>
-   auto dotimes(size_t n, Range&& iterable, Function fun){
-           size_t i = 0;
-           auto it = fs::begin(iterable);
-           auto end = fs::end(iterable);
-           while(i < n && it != end ){
-                   fun(it);
-                   ++it;
-                   i++;
+ Output: 
+
+ #+BEGIN_SRC txt 
+    === EXPERIMENT 6 - Print environment variables. ===== 
+    $HOME = /home/archbox
+    $DUMMYVAR = UNKNOWN
+    ==== EXPERIMENT 7 - Test member function .value_or() ====
+    $XDG_SESSION_PATH = <<error: not set>>
+    $HOMEX = <<error: not set>>
+ #+END_SRC
+
+
+
+*** std::variant 
+
+ C++17 new std::variant which comes from Boost.Variant provides a
+ type-safe discriminated union or sum type which is similar to pattern
+ matching from functional programming languages like Haskell, OCaml and
+ Scala. In addition to those benefits, the std::variant is an
+ out-of-the-box generic visitor design pattern and a type-safe
+ replacement for old C-unions.
+
+ Potential Applications: 
+  + Implement visitor OOP pattern.
+  + Simulate or emulate pattern matching from functional languages.
+  + Manipulate abstract syntax trees.
+
+ Useful concepts references: 
+  + [[https://en.wikipedia.org/wiki/Tagged_union][Tagged union - Wikipedia]]
+  + [[https://en.wikipedia.org/wiki/Algebraic_data_type][Algebraic data type - Wikipedia]]
+
+ Documentation: 
+  + https://en.cppreference.com/w/cpp/utility/variant
+  + [[https://www.boost.org/doc/libs/1_64_0/doc/html/variant.html][Chapter 45. Boost.Variant - 1.64.0]]
+
+ Code example: 
+
+  - File: [[file:src/cpp17/variant.cpp][file:src/cpp17/variant.cpp]] 
+
+ #+BEGIN_SRC cpp :tangle src/cpp17/variant.cpp
+   #include <iostream>
+   #include <variant> // C++17
+   #include <string>
+   #include <ostream>
+   #include <deque>
+   #include <vector>
+   #include <iomanip>
+
+   template <class T>
+   auto display(const std::string& name, const T& t) -> void;
+
+   // Pattern matching using constexpr => May be the more performant way 
+   template<class T>
+   auto identifyAndPrint(const T& v) -> void;
+
+   struct VisitorOperation{
+           auto operator()(int num) -> void {
+                   std::cout << "type = int     => value = " << num << "\n";
            }
+           auto operator()(double num) -> void {
+                   std::cout << "type = double  => value = " << num << "\n";
+           }
+           auto operator()(const std::string& s){
+                   std::cout << "type = string  => value = " << s << "\n";
+           }
+   };
+
+   int main(){
+           // using <1>, <2>, ... <n> => Only available at C++17
+           using std::cout, std::endl, std::cerr;
+           auto nl = "\n";
+           std::cout << std::boolalpha;
+           cout << "========== Test 1 ==================" << nl;	
+	
+           // std::variant<int, double, std::string> somevar;
+           auto x = std::variant<int, double, std::string>();
+           x = 100;
+           std::cout << "variant has int    = " << std::holds_alternative<int>(x) << nl;
+           std::cout << "variant has double = " << std::holds_alternative<double>(x) << nl;
+           std::cout << "variant has string = " << std::holds_alternative<std::string>(x) << nl;
+           display("x", x);
+           std::cout << "-------------------" << nl;
+           x = 204.45;
+           std::cout << "variant has double = " << std::holds_alternative<double>(x) << nl;	
+           display("x", x);
+           std::cout << "-------------------" << nl;
+           x = "std::variant is awesome!";
+           std::cout << "variant has string = " << std::holds_alternative<std::string>(x) << nl;
+           display("x", x);
+
+           cout << "========== Test 2 ==================" << nl;
+           try{ 
+                   // Try to get int 
+                   int m = std::get<int>(x);
+                   std::cout << "m = " << m << "\n";
+           } catch(const std::bad_variant_access& ex){
+                   std::cerr << "Error: Failed to extract int." << nl;
+           }
+           try{ 
+                   // Try to get string 
+                   auto s = std::get<std::string>(x);
+                   std::cout << "s = " << s << nl;
+           } catch(const std::bad_variant_access& ex){
+                   std::cerr << "Error: Failed to extract string." << nl;
+           }
+
+           cout << "========== Test 3 ==================" << nl;
+           x = -100;
+           std::visit([](auto&& p){
+                                      std::cout << "x = " << p << '\n';
+                              }, x);
+           x = 20.52;
+           std::visit([](auto&& p){
+                                      std::cout << "x = " << p << '\n';
+                              }, x);
+
+           x = "<hello world std::variant>";
+           std::visit([](auto&& p){
+                                      std::cout << "x = " << p << '\n';
+                              }, x);
+
+           cout << "========== Test 4 ==================" << nl;
+           // auto + uniform initialization 
+           auto xs = std::deque<std::variant<int, double, std::string>>{10.0, 20, 5, "hello", 10, "world"};
+           for(const auto& e: xs){
+                   identifyAndPrint(e);
+           }
+           cout << "========== Test 5 ==================" << nl;
+           for(const auto& e: xs){
+                   std::visit(VisitorOperation(), e);
+           }	
+           return 0;
    }
-#+END_SRC
 
- *Main Function* 
+   // It works in a similar fashion to functional languages with
+   // pattern matching such as Haskell, Scala, OCaml and so on.
+   // std::variant is also a type-safe alternative to old C-unions.
+   template <class T>
+   auto display(const std::string& name, const T& t) -> void {
+           auto nl = "\n";
+           // Boost.Variant uses boost::get<TYPE>(&t), now changed to std::get_if
+           if(auto n = std::get_if<int>(&t)){
+                   std::cout << " = " << *n << nl;
+                   return; // Early return 
+           }
+           if(auto d = std::get_if<double>(&t)){
+                   std::cout << name << " = " << *d << nl;
+                   return;
+           }	
+           if(auto s = std::get_if<std::string>(&t)){
+                   std::cout << name << " = " << *s << nl;
+                   return;
+           }
+           std::cout << "<UNKNOWN>" << std::endl;
+   }
 
- + Experiment 1: 
+   template<class T>
+   auto identifyAndPrint(const T& v) -> void{
+           std::visit([](auto&& a){
+               using C = std::decay_t<decltype(a)>;
+               if constexpr(std::is_same_v<C, int>){
+                               std::cout << "Type is int => value = " << a << "\n";
+                               return;
+               }
+               if constexpr(std::is_same_v<C, double>){
+                               std::cout << "Type is double => value = " << a << "\n";
+                               return;
+               }
+               if constexpr(std::is_same_v<C, std::string>){
+                               std::cout << "Type is string => value = " << a << "\n";
+                               return;
+               }
+               std::cout << "Type is unknown" << "\n";
+                              }, v);
+   } // End of func. identifyAndPrint() ---//
 
-#+BEGIN_SRC cpp 
-    std::cout << std::boolalpha;
-    std::cout << "\n EXPERIMENT 1 ===== Checking files in the system." << std::endl;
-    fs::path p1 = "/etc/iscsi/initiatorname.iscsi";
-    std::cout << "          p1 = " << p1 << std::endl;
-    std::cout << "p1.string()  = " << p1.string() << std::endl;
-    std::cout << "p1 ? exists  = " << fs::exists(p1) << std::endl;
-    std::cout << "p1 ? is File = " << fs::is_regular_file(p1) << std::endl;
-    std::cout << "p1 ? is Dir  = " << fs::is_directory(p1) << std::endl;
+ #+END_SRC
 
-    fs::path p2 = "/boot";
-    std::cout << "          p2 = " << p2 << std::endl;
-    std::cout << "p2.string()  = " << p2.string() << std::endl;
-    std::cout << "p2 ? exists  = " << fs::exists(p2) << std::endl;
-    std::cout << "p2 ? is File = " << fs::is_regular_file(p2) << std::endl;
-    std::cout << "p2 ? is Dir  = " << fs::is_directory(p2) << std::endl;
+ Compile with GCC:
 
-    fs::path p3 = "/boot/does/not/exist";
-    std::cout << "          p3 = " << p3 << std::endl;
-    std::cout << "p3.string()  = " << p3.string() << std::endl;
-    std::cout << "p3 ? exists  = " << fs::exists(p3) << std::endl;
-    std::cout << "p3 ? is File = " << fs::is_regular_file(p3) << std::endl;
-    std::cout << "p3 ? is Dir  = " << fs::is_directory(p3) << std::endl;
-#+END_SRC
+ #+BEGIN_SRC sh 
+  $ g++ variant.cpp -o variant.bin -std=c++1z -Wall -Wextra  && ./variant.bin 
+ #+END_SRC
 
-Output: 
+ Compile with Clang:
 
-#+BEGIN_SRC sh 
-   EXPERIMENT 1 ===== Checking files in the system.
-            p1 = "/etc/iscsi/initiatorname.iscsi"
-  p1.string()  = /etc/iscsi/initiatorname.iscsi
-  p1 ? exists  = true
-  p1 ? is File = true
-  p1 ? is Dir  = false
-            p2 = "/boot"
-  p2.string()  = /boot
-  p2 ? exists  = true
-  p2 ? is File = false
-  p2 ? is Dir  = true
-            p3 = "/boot/does/not/exist"
-  p3.string()  = /boot/does/not/exist
-  p3 ? exists  = false
-  p3 ? is File = false
-  p3 ? is Dir  = false
+ #+BEGIN_SRC sh 
+  $ g++ variant.cpp -o variant.bin -std=c++1z -Wall -Wextra  && ./variant.bin 
+ #+END_SRC
 
-#+END_SRC
+ Running: 
 
- + Experiment 2: 
+ #+BEGIN_SRC sh 
+   g++ variant.cpp -o variant.bin -std=c++1z -Wall -Wextra  && ./variant.bin
 
-#+BEGIN_SRC cpp 
-   std::cout << "\n EXPERIMENT 2 ===== Listing directory /etc =====" << std::endl;
-   // Show first 10 files of directory /etc 
-   dotimes(10, fs::directory_iterator("/etc"),
-               [](auto p){
-                   auto path = p->path();
-                   std::cout << std::left
-                             << std::setw(0) << path.filename().string()
-                             << " " << std::setw(35)
-                             << std::right << std::setw(40) << path
-                             << std::endl;				
-               });
-#+END_SRC
-
-Output:
-
-#+BEGIN_SRC sh 
-    EXPERIMENT 2 ===== Listing directory /etc =====
-   chkconfig.d                       "/etc/chkconfig.d"
-   DIR_COLORS.lightbgcolor           "/etc/DIR_COLORS.lightbgcolor"
-   crypttab                          "/etc/crypttab"
-   iscsi                             "/etc/iscsi"
-   depmod.d                          "/etc/depmod.d"
-   vbox                              "/etc/vbox"
-   rhashrc                           "/etc/rhashrc"
-   issue.net                         "/etc/issue.net"
-   java                              "/etc/java"
-   authselect                        "/etc/authselect"
-#+END_SRC
-
- + Experiment 3: 
-
-#+BEGIN_SRC cpp 
-   std::cout << "\n EXPERIMENT 3 = Listing directory /etc (recursive) =====" << std::endl;
-   dotimes(20, fs::recursive_directory_iterator("/etc/"),
-                   [](auto p){
-                       std::cout << std::right
-                                 << std::setw(10)  << fs::is_directory(p->path())
-                                 << std::setw(10)  << fs::is_regular_file(p->path())
-                                 << std::setw(10)  << fs::is_symlink(p->path())
-                                 << std::setw(10)  << " "
-                                 << std::setw(5)   << std::left << p->path()					  
-                                 << std::endl;
-                   });
-#+END_SRC
-
-Output: 
-
- + 1st colum  => Directory
- + 2nd column => File
- + 3rd column => Symbolic link
- + 4th column => Absolute file path.
-
-#+BEGIN_SRC sh 
-   EXPERIMENT 3 = Listing directory /etc (recursive) =====
-        true     false     false          "/etc/chkconfig.d"
-       false      true     false          "/etc/DIR_COLORS.lightbgcolor"
-       false      true     false          "/etc/crypttab"
-        true     false     false          "/etc/iscsi"
-       false      true     false          "/etc/iscsi/iscsid.conf"
-       false      true     false          "/etc/iscsi/initiatorname.iscsi"
-        true     false     false          "/etc/depmod.d"
-        true     false     false          "/etc/vbox"
-       false      true     false          "/etc/vbox/vbox.cfg"
-       false      true     false          "/etc/rhashrc"
-       false      true      true          "/etc/issue.net"
-        true     false     false          "/etc/java"
-       false      true     false          "/etc/java/font.properties"
-       false      true     false          "/etc/java/java.conf"
-#+END_SRC
+   ========== Test 1 ==================
+   variant has int    = true
+   variant has double = false
+   variant has string = false
+    = 100
+   -------------------
+   variant has double = true
+   x = 204.45
+   -------------------
+   variant has string = true
+   x = std::variant is awesome!
+   ========== Test 2 ==================
+   Error: Failed to extract int.
+   s = std::variant is awesome!
+   ========== Test 3 ==================
+   x = -100
+   x = 20.52
+   x = <hello world std::variant>
+   ========== Test 4 ==================
+   Type is double => value = 10
+   Type is int => value = 20
+   Type is int => value = 5
+   Type is string => value = hello
+   Type is int => value = 10
+   Type is string => value = world
+   ========== Test 5 ==================
+   type = double  => value = 10
+   type = int     => value = 20
+   type = int     => value = 5
+   type = string  => value = hello
+   type = int     => value = 10
+   type = string  => value = world
 
 
-Documentation: 
+ #+END_SRC
+*** File system library 
 
- + [[https://en.cppreference.com/w/cpp/filesystem][Filesystem library - cppreference.com]]
- + [[http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/p0218r1.html][C++17 Filesystem -]]
- + [[https://www.boost.org/doc/libs/1_69_0/libs/filesystem/doc/tutorial.html][Boost Filesystem Tutorial]] (Note: it is not the std::filesystem
-   library, but its predecessor, however it is worth reading it.)
-* C++20 New Features 
-** C++20 Compiler Support 
+ The C++17 File system library, based on Boost file systems, provides
+ platform-agnostic file system operation such as listing directories,
+ checking file permissions, creating directories, copying files and so
+ on.
 
-   * https://en.cppreference.com/w/cpp/compiler_support
-     + Note: Not all C++20 features are supported by all compilers yet.
+  *Small example about the library functionality*
 
-   * [[https://www.reddit.com/r/cpp/comments/cfk9de/201907_cologne_iso_c_committee_trip_report_the/][2019-07 Cologne ISO C++ Committee Trip Report]]
+ Source: 
+  + File: [[file:src/cpp17/cpp17-filesys1.cpp][file:src/cpp17/cpp17-filesys1.cpp]]
+  + GIST: [[https://gist.github.com/caiorss/440dbcfadee02c2a81f925fa31078bbe][cpp17-filesys1.cpp]]
 
-** std::endian - Detect processor endianess 
+ Compiling and running: 
+   + Note: it is necessary to link against stdc++fs.
+ 
+ #+BEGIN_SRC sh 
+   $ g++ cpp17-filesys.cpp -o cpp17-filesys.bin -std=c++1z -O3 -Wall -Wextra -lstdc++fs  
+   $ ./cpp17-filesys.bin
+ #+END_SRC
 
- + Paper:  [[http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0463r1.html][P0463R1 - endian, Just endian]]
+ Used headers and namespaces: 
 
-File: cpp20_endian.cpp
+ #+BEGIN_SRC cpp
+   #include <iostream>
+   #include <string>
+   #include <iterator>
+   #include <iomanip>
 
-#+BEGIN_SRC cpp 
-  #include <iostream> 
-  #include <string>
+   // C++17 - Requires compiler linking flag: -lstdc++fs on CLang or GCC.
+   #include <filesystem>
 
-  // C++20 headers
-  #include <bit> 
+   namespace fs = std::filesystem;
+ #+END_SRC
 
-  int main()
-  {
+ Helper template function for applying a function to the first N
+ entries.
+
+ #+BEGIN_SRC cpp 
+    /** Iterate over first N entries of a file system iterator. */
+    template<typename Range, typename Function>
+    auto dotimes(size_t n, Range&& iterable, Function fun){
+            size_t i = 0;
+            auto it = fs::begin(iterable);
+            auto end = fs::end(iterable);
+            while(i < n && it != end ){
+                    fun(it);
+                    ++it;
+                    i++;
+            }
+    }
+ #+END_SRC
+
+  *Main Function* 
+
+  + Experiment 1: 
+
+ #+BEGIN_SRC cpp 
+     std::cout << std::boolalpha;
+     std::cout << "\n EXPERIMENT 1 ===== Checking files in the system." << std::endl;
+     fs::path p1 = "/etc/iscsi/initiatorname.iscsi";
+     std::cout << "          p1 = " << p1 << std::endl;
+     std::cout << "p1.string()  = " << p1.string() << std::endl;
+     std::cout << "p1 ? exists  = " << fs::exists(p1) << std::endl;
+     std::cout << "p1 ? is File = " << fs::is_regular_file(p1) << std::endl;
+     std::cout << "p1 ? is Dir  = " << fs::is_directory(p1) << std::endl;
+
+     fs::path p2 = "/boot";
+     std::cout << "          p2 = " << p2 << std::endl;
+     std::cout << "p2.string()  = " << p2.string() << std::endl;
+     std::cout << "p2 ? exists  = " << fs::exists(p2) << std::endl;
+     std::cout << "p2 ? is File = " << fs::is_regular_file(p2) << std::endl;
+     std::cout << "p2 ? is Dir  = " << fs::is_directory(p2) << std::endl;
+
+     fs::path p3 = "/boot/does/not/exist";
+     std::cout << "          p3 = " << p3 << std::endl;
+     std::cout << "p3.string()  = " << p3.string() << std::endl;
+     std::cout << "p3 ? exists  = " << fs::exists(p3) << std::endl;
+     std::cout << "p3 ? is File = " << fs::is_regular_file(p3) << std::endl;
+     std::cout << "p3 ? is Dir  = " << fs::is_directory(p3) << std::endl;
+ #+END_SRC
+
+ Output: 
+
+ #+BEGIN_SRC sh 
+    EXPERIMENT 1 ===== Checking files in the system.
+             p1 = "/etc/iscsi/initiatorname.iscsi"
+   p1.string()  = /etc/iscsi/initiatorname.iscsi
+   p1 ? exists  = true
+   p1 ? is File = true
+   p1 ? is Dir  = false
+             p2 = "/boot"
+   p2.string()  = /boot
+   p2 ? exists  = true
+   p2 ? is File = false
+   p2 ? is Dir  = true
+             p3 = "/boot/does/not/exist"
+   p3.string()  = /boot/does/not/exist
+   p3 ? exists  = false
+   p3 ? is File = false
+   p3 ? is Dir  = false
+
+ #+END_SRC
+
+  + Experiment 2: 
+
+ #+BEGIN_SRC cpp 
+    std::cout << "\n EXPERIMENT 2 ===== Listing directory /etc =====" << std::endl;
+    // Show first 10 files of directory /etc 
+    dotimes(10, fs::directory_iterator("/etc"),
+                [](auto p){
+                    auto path = p->path();
+                    std::cout << std::left
+                              << std::setw(0) << path.filename().string()
+                              << " " << std::setw(35)
+                              << std::right << std::setw(40) << path
+                              << std::endl;				
+                });
+ #+END_SRC
+
+ Output:
+
+ #+BEGIN_SRC sh 
+     EXPERIMENT 2 ===== Listing directory /etc =====
+    chkconfig.d                       "/etc/chkconfig.d"
+    DIR_COLORS.lightbgcolor           "/etc/DIR_COLORS.lightbgcolor"
+    crypttab                          "/etc/crypttab"
+    iscsi                             "/etc/iscsi"
+    depmod.d                          "/etc/depmod.d"
+    vbox                              "/etc/vbox"
+    rhashrc                           "/etc/rhashrc"
+    issue.net                         "/etc/issue.net"
+    java                              "/etc/java"
+    authselect                        "/etc/authselect"
+ #+END_SRC
+
+  + Experiment 3: 
+
+ #+BEGIN_SRC cpp 
+    std::cout << "\n EXPERIMENT 3 = Listing directory /etc (recursive) =====" << std::endl;
+    dotimes(20, fs::recursive_directory_iterator("/etc/"),
+                    [](auto p){
+                        std::cout << std::right
+                                  << std::setw(10)  << fs::is_directory(p->path())
+                                  << std::setw(10)  << fs::is_regular_file(p->path())
+                                  << std::setw(10)  << fs::is_symlink(p->path())
+                                  << std::setw(10)  << " "
+                                  << std::setw(5)   << std::left << p->path()					  
+                                  << std::endl;
+                    });
+ #+END_SRC
+
+ Output: 
+
+  + 1st colum  => Directory
+  + 2nd column => File
+  + 3rd column => Symbolic link
+  + 4th column => Absolute file path.
+
+ #+BEGIN_SRC sh 
+    EXPERIMENT 3 = Listing directory /etc (recursive) =====
+         true     false     false          "/etc/chkconfig.d"
+        false      true     false          "/etc/DIR_COLORS.lightbgcolor"
+        false      true     false          "/etc/crypttab"
+         true     false     false          "/etc/iscsi"
+        false      true     false          "/etc/iscsi/iscsid.conf"
+        false      true     false          "/etc/iscsi/initiatorname.iscsi"
+         true     false     false          "/etc/depmod.d"
+         true     false     false          "/etc/vbox"
+        false      true     false          "/etc/vbox/vbox.cfg"
+        false      true     false          "/etc/rhashrc"
+        false      true      true          "/etc/issue.net"
+         true     false     false          "/etc/java"
+        false      true     false          "/etc/java/font.properties"
+        false      true     false          "/etc/java/java.conf"
+ #+END_SRC
+
+
+ Documentation: 
+
+  + [[https://en.cppreference.com/w/cpp/filesystem][Filesystem library - cppreference.com]]
+  + [[http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/p0218r1.html][C++17 Filesystem -]]
+  + [[https://www.boost.org/doc/libs/1_69_0/libs/filesystem/doc/tutorial.html][Boost Filesystem Tutorial]] (Note: it is not the std::filesystem
+    library, but its predecessor, however it is worth reading it.)
+** C++20 New Features 
+*** C++20 Compiler Support 
+
+    * https://en.cppreference.com/w/cpp/compiler_support
+      + Note: Not all C++20 features are supported by all compilers yet.
+
+    * [[https://www.reddit.com/r/cpp/comments/cfk9de/201907_cologne_iso_c_committee_trip_report_the/][2019-07 Cologne ISO C++ Committee Trip Report]]
+
+*** std::endian - Detect processor endianess 
+
+  + Paper:  [[http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0463r1.html][P0463R1 - endian, Just endian]]
+
+ File: cpp20_endian.cpp
+
+ #+BEGIN_SRC cpp 
+   #include <iostream> 
+   #include <string>
+
+   // C++20 headers
+   #include <bit> 
+
+   int main()
+   {
+        std::cout << std::boolalpha;
+
+        std::cout << " => Processor is big endian?: "
+                  <<  (std::endian::native == std::endian::big) <<  "\n";
+
+        std::cout << " => Processor is little endian?: "
+                  <<  (std::endian::native == std::endian::little) <<  "\n";
+
+        return 0;
+   }
+ #+END_SRC
+
+ Building and running: 
+
+ #+BEGIN_SRC sh 
+   # Clang version 8 
+   $ clang++ cpp20a.cpp -o cpp20a.bin -std=c++2a  -Wall -Wextra -pedantic -stdlib=libc++
+
+   $ ./cpp20a.bin
+    => Processor is big endian?: false
+    => Processor is little endian?: true
+ #+END_SRC
+*** Designated initialization 
+
+ Allows to write constructors in a self-documenting way: 
+
+  + Paper: [[http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0329r4.pdf][P0329R4: Designated InitializationWording]]
+
+ File: designated_initialization.cpp 
+
+ #+BEGIN_SRC cpp 
+   #include <iostream> 
+   #include <string>
+
+   struct Point2D{
+        float x;
+        float y;
+
+        friend std::ostream& operator<<(std::ostream& os, Point2D const& p)
+        {
+           return os << " Point{ x = " << p.x << " ; y = " << p.y << " } " << std::endl;
+        }
+   };
+
+   class Product
+   {
+   public:
+       Product(int id, std::string name, double price)
+               : m_id(id), m_name(name), m_price(price)
+       {		
+       }
+
+       int         id()    const { return m_id; }
+       double      price() const { return m_price; }
+       std::string name()  const { return m_name; }
+	
+   private:
+       int         m_id;
+       std::string m_name;
+       double      m_price;
+   };
+
+
+   int main()
+   {
        std::cout << std::boolalpha;
 
-       std::cout << " => Processor is big endian?: "
-                 <<  (std::endian::native == std::endian::big) <<  "\n";
+       Point2D p1 { .x = 2.5f, .y = -10.20f};
+       std::cout << " =>> p1 = " << p1 << "\n";
 
-       std::cout << " => Processor is little endian?: "
-                 <<  (std::endian::native == std::endian::little) <<  "\n";
+       Point2D p2 = { .x = -12.55f, .y = -3.5f};
+       std::cout << " =>> p2 = " << p2 << "\n";	
+
+       auto p3 = Point2D{ .x = -10.55f, .y = 13.5f};
+       std::cout << " =>> p3 = " << p3 << "\n";	
+
+       Product prod{ .id = 200, .name = "Colombian coffee", .price = 100.56};
+       std::cout << " Product => id = " << prod.id()
+                 << " ; name = " << prod.name()
+                 << " ; price = " << prod.price()
+                 << "\n";
 
        return 0;
-  }
-#+END_SRC
+   }
 
-Building and running: 
+ #+END_SRC
 
-#+BEGIN_SRC sh 
-  # Clang version 8 
-  $ clang++ cpp20a.cpp -o cpp20a.bin -std=c++2a  -Wall -Wextra -pedantic -stdlib=libc++
+ Building and running:  
+   + Note: built with GCC 8.3.1
 
-  $ ./cpp20a.bin
-   => Processor is big endian?: false
-   => Processor is little endian?: true
-#+END_SRC
-** Designated initialization 
+ #+BEGIN_SRC sh 
+    $ ./out.bin
+     =>> p1 =  Point{ x = 2.5 ; y = -10.2 }
 
-Allows to write constructors in a self-documenting way: 
+     =>> p2 =  Point{ x = -12.55 ; y = -3.5 }
 
- + Paper: [[http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0329r4.pdf][P0329R4: Designated InitializationWording]]
+     =>> p3 =  Point{ x = -10.55 ; y = 13.5 }
 
-File: designated_initialization.cpp 
-
-#+BEGIN_SRC cpp 
-  #include <iostream> 
-  #include <string>
-
-  struct Point2D{
-       float x;
-       float y;
-
-       friend std::ostream& operator<<(std::ostream& os, Point2D const& p)
-       {
-          return os << " Point{ x = " << p.x << " ; y = " << p.y << " } " << std::endl;
-       }
-  };
-
-  class Product
-  {
-  public:
-      Product(int id, std::string name, double price)
-              : m_id(id), m_name(name), m_price(price)
-      {		
-      }
-
-      int         id()    const { return m_id; }
-      double      price() const { return m_price; }
-      std::string name()  const { return m_name; }
-	
-  private:
-      int         m_id;
-      std::string m_name;
-      double      m_price;
-  };
-
-
-  int main()
-  {
-      std::cout << std::boolalpha;
-
-      Point2D p1 { .x = 2.5f, .y = -10.20f};
-      std::cout << " =>> p1 = " << p1 << "\n";
-
-      Point2D p2 = { .x = -12.55f, .y = -3.5f};
-      std::cout << " =>> p2 = " << p2 << "\n";	
-
-      auto p3 = Point2D{ .x = -10.55f, .y = 13.5f};
-      std::cout << " =>> p3 = " << p3 << "\n";	
-
-      Product prod{ .id = 200, .name = "Colombian coffee", .price = 100.56};
-      std::cout << " Product => id = " << prod.id()
-                << " ; name = " << prod.name()
-                << " ; price = " << prod.price()
-                << "\n";
-
-      return 0;
-  }
-
-#+END_SRC
-
-Building and running:  
-  + Note: built with GCC 8.3.1
-
-#+BEGIN_SRC sh 
-   $ ./out.bin
-    =>> p1 =  Point{ x = 2.5 ; y = -10.2 }
-
-    =>> p2 =  Point{ x = -12.55 ; y = -3.5 }
-
-    =>> p3 =  Point{ x = -10.55 ; y = 13.5 }
-
-    Product => id = 200 ; name = Colombian coffee ; price = 100.56
-#+END_SRC
+     Product => id = 200 ; name = Colombian coffee ; price = 100.56
+ #+END_SRC
 
