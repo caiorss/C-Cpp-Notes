@@ -1,0 +1,476 @@
+#+INCLUDE: theme/style.org 
+#+TITLE: Embedded Scripting Languages Survery 
+#+DESCRIPTION: cpp/c++ embedded scripting languages survey 
+#+STARTUP: content 
+
+* Embedded Scripting Languages 
+** Features of Embedded Scripting Languages 
+
+Reasonable Features that a language designed to be embedded as
+library should have: 
+
+   + _Ligthweight_ -  Small footprint, small size and memory requirements. 
+
+   + _Scripting Engine as a library_:
+     + Must be available as C or C++ library which exposes the
+       interpreter API allowing the client code to evaluate scripting
+       code from strings or files and also to retrieve objects from the
+       virtual machine memory.
+
+   + _Sandboxing or capability limitations_
+     + A reasonable requirement for an embedded scripting language is
+       limiting the capabilities and APIs which can be used possibly
+       allowing the execution of non-trusted scripts. Example: the
+       Javascript engines of most web browsers do not allow the script
+       to interact with file systems or operating system APIs. 
+
+   + _Use Cases_
+     + DSL - Domain Specific Languages 
+     + Game Engines 
+     + Configuration files => Data Description language. 
+     + User content
+     + Allow application runtime changes without recompilation.
+     + User extension without modification of source code. 
+
+Examples: 
+
+     + TCL - Tool Command Language => Used by many EDA - Electronic
+       Design Automation Sofware in electronic engineering.
+
+     + JavaScript => Used in Web Browsers, which are written mostly in
+       C++, for controlling user interaction, animation and etc. 
+
+     + TinyScheme => Used by GNU GIMP drawing application ans Apple's
+       MacOSX sandbox configuration. 
+
+     + Lua language => Used by many game engines and also by
+       applications such as: Nginx web server; Linux Conky; Geany
+       Editor; NMap editor and so on.
+
+     + Squirrel Language => Used in game engines
+
+     + AutoLisp [proprietary] => Lisp-like language used in Autocad.
+
+     + Emacs Lisp => Emacs core, including the LISP
+       engine/interpreter, is written in C and other parts are
+       written in Emacs Lisp. This lisp dialect allows extending Emacs
+       at with custom extensions (plugins) and also modifying the
+       application behavior at runtime. 
+
+     + VBA - Visual Basic for Application [proprietary] => Used in
+       Microsft Office Suite, specially in Microsft Excel.
+
+** Squirrel Scripting Language 
+*** Overview 
+
+   + Squirrel is a embedded scripting language, similar to Lua, but with
+     C-like syntax, designed to be embedded in larger C or C++
+     applications such as game engines. Squirrel is written in C++, but
+     it only exposes a C API, which makes binding C++ code
+     cumbersome. However, there are many libraries which simplifies the
+     embedding of squirrel in C++ codebases.
+
+ *Official Web Site*
+
+   + http://www.squirrel-lang.org/
+
+ *Official Repository* 
+
+   + https://github.com/albertodemichelis/squirrel
+
+ *Squirrel fork with a more C++-like syntax*
+
+ + https://github.com/mingodad/squilu
+
+ *Articles about squirrel language*
+
+  + [[https://developer.electricimp.com/squirrel/squirrelcrib][Squirrel Programming Guide | Dev Center]]
+
+  + [[https://www.ibm.com/developerworks/aix/library/au-spunix_squirrel/index.html][Speaking UNIX: The Squirrel portable shell and scripting language]]
+
+  + http://wiki.ogre3d.org/Squirrel+Scripting+Language
+
+ *Applications using Squirrel*
+
+  * CodeBlocks IDE for C and C++
+
+  * OpenTTD Game - http://www.openttd.org/en/
+
+ 
+ *Libraries for simplifying embedding squirrel in C++ code* 
+ 
+Libraries for simplifying squirrel embedding in C++ code (binding
+C++ code):
+
+     + *SQPlus*
+       + http://wiki.squirrel-lang.org/default.aspx/SquirrelWiki/SqPlus.html
+
+     + *SQrat*
+       + http://scrat.sourceforge.net/
+
+     + *Squal*
+       + https://github.com/jonigata/squall
+
+     + *SimpleSquirrel*
+       + https://github.com/matusnovak/simplesquirrel
+
+*** Building Squirrel standalone REPL interpreter 
+
+Download and build: 
+
+
+#+BEGIN_SRC sh 
+  $ mkdir ~/build && cd build 
+  $ git clone https://github.com/albertodemichelis/squirrel
+  $ cmake -H. -B_build -DCMAKE_BUILD_TYPE=Debug 
+  $ cmake --build _build --target
+#+END_SRC
+
+Play with squirrel interactive shell (REPL):
+
+#+BEGIN_SRC sh 
+  $ _build/bin/sq
+  Squirrel 3.1 stable Copyright (C) 2003-2017 Alberto Demichelis (64 bits)
+
+  sq> print(" === Hello world Squirrel === ")
+   === Hello world Squirrel === 
+
+  sq> function add_to_10(x){ return x + 10; }
+
+  sq>print(add_to_10(25))
+  35
+
+  sq> x <- cos(3.1415 / 2) + 10 
+
+  sq>print(" x = " + x.tostring())
+   x = 10
+
+  sq> for(local i = 0; i < 5; i++) print(" \n [TRACE] i = " + i.tostring());
+
+   [TRACE] i = 0 
+   [TRACE] i = 1 
+   [TRACE] i = 2 
+   [TRACE] i = 3 
+   [TRACE] i = 4
+#+END_SRC
+
+*** Example - embedding Squirrel with Squall Library 
+
+This example demonstrates how to embed the Squirrel programming
+language in a C++ application using the Squall header-only library. 
+
+   + Squal Repository: https://github.com/jonigata/squall
+
+   + Note: This project is self-contained, no library needs to be
+     installed on the system as Squall automatically fetches Squirrel
+     sources using Cmake FetchContent. 
+
+ *Sample Project* 
+
+File: CMakeLists.txt 
+
+#+BEGIN_SRC cmake 
+   cmake_minimum_required (VERSION 3.11)
+   project(squirrel_squall_test)
+
+   set(CMAKE_CXX_STANDARD 17)
+   set(CMAKE_CXX_STANDARD_REQUIRED on)
+   set(BUILD_EXAMPLES off)
+
+   # -----------------------------------------------#
+   include(FetchContent)
+
+   FetchContent_Declare(
+     squall 
+     URL      https://github.com/jonigata/squall/archive/master.zip
+     )
+
+   FetchContent_MakeAvailable(squall)
+
+   #-------- TARGET DEFINITIONS --------------------#
+   message([TRACE] " squall_SOURCE_DIR = ${squall_SOURCE_DIR}/squall  ")
+
+               add_executable ( squirrel-test squirrel_test.cpp)
+        target_link_libraries ( squirrel-test squirrel_static sqstdlib_static)
+   target_include_directories ( squirrel-test PUBLIC
+                                  ${squirrel_SOURCE_DIR}/include
+                                  ${squall_SOURCE_DIR}
+                                  )
+#+END_SRC
+
+File: squirrel_test.cpp 
+
+#+BEGIN_SRC cpp 
+   #include <iostream>
+   #include <string>
+   #include <algorithm>
+   #include <vector> 
+
+   #include <squall/squall_vmstd.hpp>
+   #include <squall/squall_klass.hpp>
+
+   void some_cpp_fun(int n )
+   {
+       for(int i = 0; i < n; i++)
+           std::printf("\n   [some_cpp_function] => i = %d ", i);
+   }
+
+   class ChartXY
+   {
+       int m_width; 
+       int m_height;
+   public:
+       ChartXY(): m_width(20), m_height(50) 
+       {
+           std::cout << " [ChartXY] Ctor() - I was created!. OK. " << std::endl;
+       }
+
+       void set_width(int x){ m_width = x; }
+       void set_height(int x){ m_height = x; }
+
+       void draw() const 
+       { 
+           std::printf(" [ChartXY] draw() => Draw chart with: width = %d ; height = %d"
+                       , m_width, m_height);
+       }
+   };
+
+   int main()
+   {
+       // Create a virtual-machine object for Squirrel language 
+       // Note: throws squall::squirrel_error
+       squall::VMStd vm; 
+
+       // ------------------------------------------------------------------------//
+       // [EXPERIMENT 1] Evaluate scripts provided as strings                     //
+       //-------------------------------------------------------------------------//
+       std::puts(" =>> [EXPERIMENT] 1 - Evaluating code as string. ");  
+       std::puts(" ---------------------------------------------\n");
+
+       try {
+
+           vm.dostring(R"( 
+               // --- Squirrel Comment ----- // 
+               print(" <SQUIRREL>  =>> Hello world squirrel!");
+
+               function myfunc(x) {  
+                   local a = x + 5;
+                   local b = 7 * a + x;
+                   return b - a + 10;  
+               }
+
+               function myfunc2() {
+                   print(" \n  <SQUIRREL> I was called by the C++ code ");
+               }
+
+               print("\n <SQUIRREL> =>> myfunc(4) = " + myfunc(4).tostring() );
+
+               print("\n\n <SQUIRREL> --- For Loop test ---- ");
+               for(local i = 0; i < 5; i++) { 
+                    print("\n   i = " + i.tostring() );  
+               }
+           )");
+
+       } catch( squall::squirrel_error const& ex )
+       {
+           std::cerr << "\n [SQUIRREL ERROR] Error =>  " << ex.what() << std::endl;        
+       }
+
+       // ------------------------------------------------------------------------//
+       // [EXPERIMENT 2] Evaluate scripts provided as strings                     //
+       //-------------------------------------------------------------------------//
+       std::puts("\n =>> [EXPERIMENT] 2 - Getting variables defined in the code.");  
+       std::puts(" -----------------------------------------------------------\n");
+
+       {
+           vm.dostring(R"( 
+               // ---- Global varibles for configuration ------ // 
+               ::myvar_width <- 100;
+               ::myvar_float <- 122.56161;
+               ::myvar_string <- "/path/to/interpreter.exe"; 
+           )");
+
+           squall::TableBase table = vm.root_table();
+           auto myvar_float = table.get<float>("myvar_float");       
+           auto myvar_width = table.get<int>("myvar_width");
+           auto myvar_string = table.get<std::string>("myvar_string");
+           std::cout << "  =>>  myvar_width = " << myvar_width << std::endl;
+           std::cout << "  =>>  myvar_float = " << myvar_float << std::endl;
+           std::cout << "  =>> myvar_string = " << myvar_string << std::endl;
+       } 
+
+       // ------------------------------------------------------------------------//
+       // [EXPERIMENT 3] Call functions defined in the script (Virtual Machine )  //
+       //-------------------------------------------------------------------------//    
+       std::puts("\n\n =>> [EXPERIMENT] 3 - Calling functions defined in the script (VM)");
+       std::puts(" ------------------------------------------------------------------\n");    
+       // Throws: 'squall::squirrel_error' 
+       int result = vm.call<int>("myfunc", 10);
+       std::cout << "   =>>> myfunc(4) = " << result << std::endl;
+
+       vm.call<void>("myfunc2");
+
+       // ------------------------------------------------------------------------//
+       // [EXPERIMENT 4] Call C++ functions from the script                       //
+       //-------------------------------------------------------------------------//    
+       std::puts("\n\n =>> [EXPERIMENT] 4 - Calling functions defined in the script (VM)");
+       std::puts(" ------------------------------------------------------------------\n");
+
+       // Register C++ function pointer 
+       vm.defun("some_cpp_fun", &some_cpp_fun);
+
+       vm.dostring(R"(
+           print(" \n [SQUIRREL] => Call C++ function some_cpp_fun() ");
+           some_cpp_fun(5);
+        )");
+
+
+       // Register C++ lambda object 
+       vm.defun("call_me", [=](std::string const& param) {
+           std::cout << "\n [TRACE] call_me() Parameter = " << param << "\n";
+           return  " name = " + param;
+       });
+
+       vm.dostring(R"(
+           local x = call_me("<SQUIRREL-INTERPRETER>");
+           print(" [SQUIRREL] \n x <- " + x);
+        )");
+
+       // ------------------------------------------------------------------------//
+       // [EXPERIMENT 5] Call C++ classes from Squirrel-side                     //
+       //-------------------------------------------------------------------------//    
+       std::puts("\n\n =>> [EXPERIMENT] 5 - Calling C++ classes from Squirrel        ");
+       std::puts(" ------------------------------------------------------------------\n");
+
+       // Create metaobject 'k' that describes ChartXY class 
+       squall::Klass<ChartXY> k(vm, "ChartXY");
+       k.func("set_width",  &ChartXY::set_width);
+       k.func("set_height", &ChartXY::set_height);
+       k.func("draw",       &ChartXY::draw);
+
+       vm.dostring(R"( 
+           function manipulate_chart(ch){           
+               ch.set_width(25);
+               ch.set_height(10);
+               ch.draw();
+           }
+
+           function draw_with(ch, w, h)
+           {
+               print(" \n [SQUIRREL LOG] Function draw_with called. OK. \n");
+               ch.set_width(w);
+               ch.set_height(h);
+               ch.draw();
+           }
+        )");
+
+       ChartXY mychart;
+       vm.call<void>("manipulate_chart", &mychart);
+       vm.call<void>("draw_with", &mychart, 100, 200);
+
+       std::cout << "\n\n";
+
+       squall::TableBase table = vm.root_table();
+
+       // Pass object to Squirrel side 
+       table.set("mychart", mychart);
+
+       vm.dostring(R"(
+           mychart.set_width(250);
+           mychart.set_width(600);
+           mychart.draw();
+       )");
+
+
+   #if 0  
+       // Segmentation Falt Coredump if the C++ object 
+       // is created on the Squirrel-side.
+       vm.dostring(R"(
+           local c = ChartXY();
+           c.set_width(150);
+           c.set_height(175);
+           c.draw();
+       )");
+   #endif 
+
+       return 0;
+   }
+#+END_SRC
+
+Build: 
+
+#+BEGIN_SRC sh 
+   $ cmake -H. -B_build -DCMAKE_BUILD_TYPE=Debug 
+   $ cmake --build _build --target 
+#+END_SRC
+
+Check executable dependencies: 
+
+#+BEGIN_SRC sh 
+ $ ldd _build/squirrel-test 
+	linux-vdso.so.1 (0x00007ffe34dd6000)
+	libstdc++.so.6 => /lib64/libstdc++.so.6 (0x00007fd3ebd2a000)
+	libm.so.6 => /lib64/libm.so.6 (0x00007fd3ebbe4000)
+	libgcc_s.so.1 => /lib64/libgcc_s.so.1 (0x00007fd3ebbc9000)
+	libc.so.6 => /lib64/libc.so.6 (0x00007fd3eb9ff000)
+	/lib64/ld-linux-x86-64.so.2 (0x00007fd3ebf3e000)
+#+END_SRC
+
+Run application: 
+
+#+BEGIN_SRC sh 
+   $ _build/squirrel-test 
+
+   =>> [EXPERIMENT] 1 - Evaluating code as string. 
+   ---------------------------------------------
+
+   <SQUIRREL>  =>> Hello world squirrel!
+   <SQUIRREL> =>> myfunc(4) = 68
+
+   <SQUIRREL> --- For Loop test ---- 
+     i = 0
+     i = 1
+     i = 2
+     i = 3
+     i = 4
+   =>> [EXPERIMENT] 2 - Getting variables defined in the code.
+   -----------------------------------------------------------
+
+    =>>  myvar_width = 100
+    =>>  myvar_float = 122.562
+    =>> myvar_string = /path/to/interpreter.exe
+
+
+   =>> [EXPERIMENT] 3 - Calling functions defined in the script (VM)
+   ------------------------------------------------------------------
+
+     =>>> myfunc(4) = 110
+
+    <SQUIRREL> I was called by the C++ code 
+
+   =>> [EXPERIMENT] 4 - Calling functions defined in the script (VM)
+   ------------------------------------------------------------------
+
+
+   [SQUIRREL] => Call C++ function some_cpp_fun() 
+     [some_cpp_function] => i = 0 
+     [some_cpp_function] => i = 1 
+     [some_cpp_function] => i = 2 
+     [some_cpp_function] => i = 3 
+     [some_cpp_function] => i = 4 
+   [TRACE] call_me() Parameter = <SQUIRREL-INTERPRETER>
+   [SQUIRREL] 
+   x <-  name = <SQUIRREL-INTERPRETER>
+
+   =>> [EXPERIMENT] 5 - Calling C++ classes from Squirrel        
+   ------------------------------------------------------------------
+
+   [ChartXY] Ctor() - I was created!. OK. 
+   [ChartXY] draw() => Draw chart with: width = 25 ; height = 10 
+   [SQUIRREL LOG] Function draw_with called. OK. 
+   [ChartXY] draw() => Draw chart with: width = 100 ; height = 200
+
+   [ChartXY] draw() => Draw chart with: width = 600 ; height = 200
+
+
+#+END_SRC
