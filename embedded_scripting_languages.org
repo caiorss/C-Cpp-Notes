@@ -4,10 +4,10 @@
 #+STARTUP: content 
 
 * Embedded Scripting Languages 
-** Features of Embedded Scripting Languages 
+** Reasonable Features of Embedded Scripting Languages
 
-Reasonable Features that a language designed to be embedded as
-library should have: 
+This section lsits some reasonable features that a language designed
+to be embedded should have:
 
    + _Ligthweight_ -  Small footprint, small size and memory requirements. 
 
@@ -22,7 +22,9 @@ library should have:
        limiting the capabilities and APIs which can be used possibly
        allowing the execution of non-trusted scripts. Example: the
        Javascript engines of most web browsers do not allow the script
-       to interact with file systems or operating system APIs. 
+       to interact with file systems or operating system APIs.
+
+   + _Permissive License for static linking_ 
 
    + _Use Cases_
      + DSL - Domain Specific Languages 
@@ -34,30 +36,39 @@ library should have:
 
 Examples: 
 
-     + TCL - Tool Command Language => Used by many EDA - Electronic
+     * TCL - Tool Command Language => Used by many EDA - Electronic
        Design Automation Sofware in electronic engineering.
 
-     + JavaScript => Used in Web Browsers, which are written mostly in
+     * JavaScript => Used in Web Browsers, which are written mostly in
        C++, for controlling user interaction, animation and etc. 
 
-     + TinyScheme => Used by GNU GIMP drawing application ans Apple's
+     * TinyScheme => Used by GNU GIMP drawing application ans Apple's
        MacOSX sandbox configuration. 
 
-     + Lua language => Used by many game engines and also by
+     * Lua language => Used by many game engines and also by
        applications such as: Nginx web server; Linux Conky; Geany
        Editor; NMap editor and so on.
 
-     + Squirrel Language => Used in game engines
+     * Squirrel Language => Used in game engines
 
-     + AutoLisp [proprietary] => Lisp-like language used in Autocad.
+     * Python
+       + => Python is used as embedded scripting language by GDB - GNU
+         Debugger ; WinDBG  - Windows Debugger; IDA - Debugger for
+         Reverse Engineering.
+       + Disadvantages: Python has a large footprint; it was not
+         designed as an embedded scripting language and it is not
+         possible to forbid the interpreter from calling file system
+         and process creation APIs.
 
-     + Emacs Lisp => Emacs core, including the LISP
+     * AutoLisp [proprietary] => Lisp-like language used in Autocad.
+
+     * Emacs Lisp => Emacs core, including the LISP
        engine/interpreter, is written in C and other parts are
        written in Emacs Lisp. This lisp dialect allows extending Emacs
        at with custom extensions (plugins) and also modifying the
        application behavior at runtime. 
 
-     + VBA - Visual Basic for Application [proprietary] => Used in
+     * VBA - Visual Basic for Application [proprietary] => Used in
        Microsft Office Suite, specially in Microsft Excel.
 
 ** Squirrel Scripting Language 
@@ -471,6 +482,335 @@ Run application:
    [ChartXY] draw() => Draw chart with: width = 100 ; height = 200
 
    [ChartXY] draw() => Draw chart with: width = 600 ; height = 200
+
+
+#+END_SRC
+** Duktape - Embeddable Javascript Engine 
+*** Overview 
+
+  + Duktape is a small footprint embeddable Javascript (ECMAScript)
+    engine, written in C, which can be used for providing scripting
+    capabilities for C or C++ applications.
+
+  + License: MIT
+
+  + Possible Use Cases:
+    + Configuration
+    + Data description language
+    + User plugins
+    + User extensions
+    + Scripting for games 
+
+  + Features:
+    + Embeddable, portable, compact: can run on platforms with 160kB
+      flash and 64kB RAM 
+    + Built-in debugger
+    + Built-in regular expression engine
+    + Minimal, retargetable platform dependencies
+    + Combined reference counting and mark-and-sweep garbage
+      collection with finalization 
+    + Bytecode dump/load for caching compiled functions
+    + Distributable includes an optional logging framework,
+      CommonJS-based module loading implementations, etc 
+
+ *Official Website* 
+
+  + https://duktape.org/
+
+  + https://duktape.org/download.html
+   
+ *Official Repository* 
+
+   + https://github.com/svaarala/duktape 
+
+  *C++ Binding Libraries*  
+
+   + https://github.com/Aloshi/dukglue/    
+
+   + https://github.com/stfwi/duktape-cc
+*** Example project with DukGlue C++ binding library 
+
+This following project CMakeLists.txt automatically downloads _dukglue_
+binding library and _duktape_ engine sources and builds a C++ demonstration
+code embedding duktape JavaScript engine. 
+
+  + DukGlue Binding Library: https://github.com/Aloshi/dukglue
+    + Advantage:
+      * Easy to use and lots of examples. 
+    + Drawbacks:
+      * Lack of namespaces which enhances API discoverability
+      * Lack of C++ wrappers to some Duktape C-types 
+
+File: CMakeLists.txt 
+
+#+BEGIN_SRC cmake 
+  cmake_minimum_required(VERSION 3.0)
+  project(duktap-embed)
+
+  include(FetchContent)
+
+  # Download library archive (zip, *.tar.gz, ...) from URL
+  macro(Download_Library_Url NAME URL)
+    FetchContent_Declare(${NAME} URL  ${URL})
+    FetchContent_GetProperties(${NAME})
+    if(NOT ${NAME}_POPULATED)
+      FetchContent_Populate(${NAME})
+     # add_subdirectory(${${NAME}_SOURCE_DIR} ${${NAME}_BINARY_DIR})
+    endif()
+  endmacro()
+
+
+  # ====>> Duktape JavaScript Engine Configuration <<===========#
+
+  Download_Library_Url(duktape
+    "https://duktape.org/duktape-2.5.0.tar.xz"
+    )
+
+  # FetchContent_MakeAvailable(duktape)
+
+  message( [TRACE] " =>> duktape_SOURCE_DIR = ${duktape_SOURCE_DIR} ")
+
+
+  file(GLOB_RECURSE duktape_sources "${duktape_SOURCE_DIR}/src/*.c")
+  file(GLOB_RECURSE duktape_headers "${duktape_SOURCE_DIR}/src/*.h")
+
+  message( [TRACE] " duktape_sources = ${duktape_sources} ")
+
+                add_library (duktape ${duktape_sources} ${duktape_headers} )
+  target_include_directories(duktape PUBLIC ${duktape_SOURCE_DIR}/src  )
+
+  # ----------- DukGlue Library ----------------------------#
+
+  FetchContent_Declare(
+    dukglue 
+    URL       https://github.com/Aloshi/dukglue/archive/master.zip
+    )
+
+  FetchContent_MakeAvailable(dukglue)
+
+  #----- Main Target Definition ----------------------------#
+  add_executable(duktape-embed duktape-embed.cpp)
+  target_link_libraries(duktape-embed duktape dukglue)
+
+#+END_SRC
+
+File: duktape-embed.cpp 
+
+#+BEGIN_SRC cpp 
+   #include <iostream>
+   #include <string>
+   #include <vector>
+   #include <cassert> 
+
+   // Repository: https://github.com/Aloshi/dukglue
+   #include <dukglue/dukglue.h>
+
+   void print_number(int x)
+   {
+     std::cout << " [TRACE] number passed is = " << x << std::endl;
+   }
+
+   void log_text(std::string const& text)
+   {
+       std::cout <<  " =>> [C++-LOG] - " << text << std::endl;
+   }
+
+   int eval_code(duk_context* ctx, std::string const& code)
+   {
+       return duk_peval_string(ctx, code.c_str());
+   }
+
+   void plot_points(std::vector<float> const& points)
+   {
+     std::cout << "  =>> [TRACE] Plot points  =>> ";
+     for(auto const& x: points) { std::cout << " x = " << x; }
+     std::cout << " \n";
+   }
+
+   class Counter {
+   private: 
+       std::string m_name;
+       int         m_counter;
+
+   public: 
+
+       // Ctor [1] => Default ctor 
+       Counter(): Counter("untitled", 0) { }
+
+       // Ctor [2]
+       Counter(std::string name, int counter)
+         : m_name{std::move(name)}, m_counter{counter}
+       { 
+           std::cout << " [TRACE] Counter created with =>  { " 
+                     <<   " name = " << m_name 
+                     << " ; counter = " << m_counter 
+                     << " } \n";
+       }
+
+       int getCounter() const { return m_counter; }
+       void setCounter(int n) {       
+         m_counter = n; 
+         std::cout << " [TRACE] I was set to value " << n << std::endl;
+       }
+
+       void increment() {       
+         m_counter++; 
+         std::cout << " [TRACE] increment event =>> counter = {  " 
+                   << m_name << " ; " << m_counter 
+                   << " } " << std::endl;
+       }    
+
+   };
+
+
+   int main()
+   {
+         // Create Duktape Virtual machine 
+         duk_context* ctx = duk_create_heap_default();
+
+         /* ========================== EXPERIMENT 1 =============*/
+         std::puts("\n === [EXPERIMENT 1] ==>> Register and call C++ functions <<===== ");
+         {
+             // Register pointer to functions function (function pointer) in 
+             // the JS engine (aka virtual machine)
+             dukglue_register_function(ctx, &print_number, "print_number"); 
+             dukglue_register_function(ctx, log_text, "log_text");
+             dukglue_register_function(ctx, plot_points, "plot_points");
+
+             const char* code1 = R"(
+                 print_number(10);
+                 log_text(" Hello world from Javascript" ); 
+                 log_text(" Toke is equal to " + 100 ); 
+                 log_text( " " + 1000 );      
+
+                 plot_points( [ 20.5, 100.23, -125.254, 8.251, 100.0 ]);
+             )";
+
+             // Evaluate code, returns false on error 
+             auto n = eval_code(ctx, code1);
+
+             if(n) { std::cerr << " [ERROR] A duktape evaluation error has happened. "  << std::endl; }
+
+         }
+
+         /* ========================== EXPERIMENT 2 ====================*/
+         std::puts("\n === [EXPERIMENT 2] ==>> Register and call C++ classes <<===== \n");
+         {
+             // Register class counter 
+             dukglue_register_constructor<Counter>(ctx, "Counter");      
+             dukglue_register_constructor<Counter, std::string, int>(ctx,  "Counter");     
+             dukglue_register_method(ctx, &Counter::getCounter , "getCounter");
+             dukglue_register_method(ctx, &Counter::setCounter , "setCounter");
+             dukglue_register_method(ctx, &Counter::increment , "increment");
+
+             dukglue_register_property(ctx                   // Pointer to engine (VM)
+                                     , &Counter::getCounter  // Getter 
+                                     , &Counter::setCounter  // Setter 
+                                     , "number"              // Property name 
+                                     );
+
+             int ret = eval_code(ctx, R"( 
+                 var counter = new Counter("mycounter", 10); 
+
+                 for(i = 0 ; i < 5; i++) { counter.increment(); }
+
+                 var n = counter.getCounter(); 
+                 log_text(" [BEFORE] Counter value = " + n );
+
+                 counter.setCounter(100);
+                 log_text(" [AFTER 1 ] Counter value = " + counter.getCounter() );
+
+                 counter.number = 400;
+                 log_text(" [AFTER 2] Counter value = " + counter.number );
+             )");
+             assert( ret == 0 );
+
+         }
+
+         /* ======= Calling Javascript Engine from C++ ====================*/
+         // Note: It is useful for reading data or user configuration 
+         std::puts("\n === [EXPERIMENT 3] ==>> Calling engine objects from C++ <<===== \n");
+         {
+             const char* code = R"(
+               // Global variables for configuration 
+               points = 200; 
+               asset_path = "C:\\\\Users\\dummy\\data\\graphics";
+
+               function my_js_function(n){
+                   log_text( " <my_js_function> =>> n = " + n );
+                   var k = 20 * n + 100;
+                   return k; 
+               }
+
+             )";
+             eval_code(ctx, code);
+
+             // Throws error: DukErrorException
+             auto points = dukglue_peval<int>(ctx, "points");
+             std::cout << "  [*] =>> points = " << points << std::endl;
+
+             // Throws error: DukErrorException
+             auto asset_path = dukglue_peval<std::string>(ctx, "asset_path");
+             std::cout << "  [*] =>> asset_path = " << asset_path << std::endl;
+
+             auto jsexpr = dukglue_peval<double>(ctx, "3.51 * 10.52 - 8.251 / 100");
+             std::cout << "  [*] jsexpr = " << jsexpr << std::endl;
+
+             // Call Javascript function from C++ 
+             auto func = dukglue_peval<DukValue>(ctx, "my_js_function");
+             int res = dukglue_pcall<int>(ctx, func, 20);
+             std::cout << "  [*] res = " << res << std::endl;
+
+         }
+
+       // Release Javascript engine object (aka virtual machine)
+       ::duk_destroy_heap(ctx);
+
+       return 0;
+   }
+
+#+END_SRC
+
+Build: 
+
+#+BEGIN_SRC sh 
+ $ cmake -H. -B_build -DCMAKE_BUILD_TYPE=Debug
+ $ cmake --build _build --target 
+#+END_SRC
+
+Program output: 
+
+#+BEGIN_SRC sh 
+   $ ./build/duktape-embed 
+
+   === [EXPERIMENT 1] ==>> Register and call C++ functions <<===== 
+   [TRACE] number passed is = 10
+   =>> [C++-LOG] -  Hello world from Javascript
+   =>> [C++-LOG] -  Toke is equal to 100
+   =>> [C++-LOG] -  1000
+    =>> [TRACE] Plot points  =>>  x = 20.5 x = 100.23 x = -125.254 x = 8.251 x = 100 
+
+   === [EXPERIMENT 2] ==>> Register and call C++ classes <<===== 
+
+   [TRACE] Counter created with =>  {  name = mycounter ; counter = 10 } 
+   [TRACE] increment event =>> counter = {  mycounter ; 11 } 
+   [TRACE] increment event =>> counter = {  mycounter ; 12 } 
+   [TRACE] increment event =>> counter = {  mycounter ; 13 } 
+   [TRACE] increment event =>> counter = {  mycounter ; 14 } 
+   [TRACE] increment event =>> counter = {  mycounter ; 15 } 
+   =>> [C++-LOG] -  [BEFORE] Counter value = 15
+   [TRACE] I was set to value 100
+   =>> [C++-LOG] -  [AFTER 1 ] Counter value = 100
+   [TRACE] I was set to value 400
+   =>> [C++-LOG] -  [AFTER 2] Counter value = 400
+
+   === [EXPERIMENT 3] ==>> Calling engine objects from C++ <<===== 
+
+    [*] =>> points = 200
+    [*] =>> asset_path = C:\\Users\dummy\data\graphics
+    [*] jsexpr = 36.8427
+   =>> [C++-LOG] -  <my_js_function> =>> n = 20
+    [*] res = 500
 
 
 #+END_SRC
