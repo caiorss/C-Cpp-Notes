@@ -1405,7 +1405,6 @@ Run the application:
   $ /home/archbox/opt/app-test/bin/app 
   Hello world autotools
 #+END_SRC
-
 ** Further Reading 
 
   + [[https://eklitzke.org/how-to-autotools][How To Use Autotools]] 
@@ -3797,152 +3796,6 @@ File: main.cpp
 
 #+CAPTION: Graphics Output
 [[file:images/opengl_glut_teapot1.png][file:images/opengl_glut_teapot1.png]]
-** Common Variables 
-*** CMAKE_CURRENT_LIST_DIR - Directory where is CMakeLists.txt 
-
-Prints the directory where CMAkeLists.
-
-#+BEGIN_SRC cmake 
-  message(" [INFO] CMakeLists.txt is in the directory ${CMAKE_CURRENT_LIST_DIR}")
-#+END_SRC
-
-*** CMAKE_CXX_STANDARD - Set C++ Standard
-
-The variable ~CMAKE_CXX_STANDARD~ sets the project current C++
-standard. This variable can be set to 98 (for C++98); 11 (C++11); 14
-(C++14); 17 (C++17) and 20 (C++20 - experimental yet.)
-
- + Documentation: [[https://cmake.org/cmake/help/latest/prop_tgt/CXX_STANDARD.html#prop_tgt:CXX_STANDARD][CXX_STANDARD — CMake 3.13.2 Documentation]] 
-
-Example: Set project to compile with C++11 ISO standard.
-
-#+BEGIN_SRC cmake 
-  set(CMAKE_CXX_STANDARD 11)
-#+END_SRC
-
-Usage: (File CMAKELists.txt)
-
-#+BEGIN_SRC cmake 
-  cmake_minimum_required(VERSION 3.9)
-  project(MY_PROJECT_NAME)
-
-  set(CMAKE_CXX_STANDARD 17)
-  ... ... .... .... 
-#+END_SRC
-
-*** CMAKE_BUILD_TYPE - Set default building type to DEBUG 
-
-In the debug building type optimization flags are disabled and flags
-for generating debugging symbols are enabled, for GGC or GCC/Mingw and
-Clang the (-g) is automatically added and for MSVC, aka VC++ (cl.exe),
-the flag /Zi is also passed to the compiler. The default building type
-can be set to DEBUG with the following code.
-
-#+BEGIN_SRC cmake 
-  # Set default building type to debug if it was not set
-  # in command line with -DCMAKE_BUILD_TYPE=release
-  if(NOT DEFINED CMAKE_BUILD_TYPE OR CMAKE_BUILD_TYPE MATCHES "")
-    set(CMAKE_BUILD_TYPE  debug)
-  endif()
-#+END_SRC
-
-The building type can be changed by running cmake with the flag
- (-DCMAKE_BUILD_TYPE=release). Example: 
-
-#+BEGIN_SRC sh 
- $ cmake -H. -Bbuild -DCMAKE_BUILD_TYPE=DEBUG -G "Visual Studio 15 2017 Win64"
-#+END_SRC
-
-Note: CMake is not case sensitive, so it does not matter using
-'release' or RELEASE; if or IF; endif or ENDIF and so on. 
-
-*** CMAKE_CXX_FLAGS - Compiler flags 
-
-The globals compiler flags used to build all targets can be extended
-by setting the variable CMAKE_CXX_FLAGS. However, as the compiler
-flags depends on the compiler, the custom settings may not be portable
-if one uses a different compiler, for instance the (-g) flag used to
-generate debug symbols with GCC or Clang does not work with MSVC
-(visual c++ compiler, vc++) as it uses the flag /Zi for generating
-debugging symbols.
-
-Example 1: 
-
-#+BEGIN_SRC cmake
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}"  "-std=c++17 -g -Wall -Wextra -pendantic -O0" )
-#+END_SRC
-
-Example 2 (better):
-
-#+BEGIN_SRC cmake
-  if(NOT MSVC)
-     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}"  "-std=c++17 -g -Wall -Wextra -pendantic -O0" )
-  endif()
-#+END_SRC
-
-** CMake Map 
-
- + Global configuration/settings 
-   + add_definitions
-   + set(<VARIABLE> <VALUE>)
-   + add_subdirectory 
-
- + Target defintions
-   + add_executable => Create target for building executable. 
-   + add_library    => Create target for building static or shared library.
-   + add_custom_target
-
- + Target Configuration:
-   + set_target_properties(<TARGET> PROPERTIES <KEY> <VALUE> [<KEY <VALUE>] ...)
-   + set_target_properties(testlib PROPERTIES CXX_VISIBILITY_PRESET hidden)
-     + Make  symbols of shared or static library hidden by default,
-       only explicitly annotated symbols are visible. It avoids name
-       clashing which can lead to undefined behavior.
-
-   + target_link_libraries(<executable-target> PUBLIC testlib)
-
- + Auxiliary targets:
-   + install  => Install packages to some directoriy.
-
- + Find Commands:
-   + find_path 
-   + find_package
-   + find_library
-   + include_directory
-
- + Global Variables:
-   + set(CMAKE_CXX_STANDARD 14)
-   + set(CMAKE_VERBOSE_MAKEFILE ON)
-   + set(CMAKE_BUILD_TYPE  debug)
-
-Typical CMake Variables:
-
-|--------------------------+----------------+-----------------------------------------------------------|
-| Variable                 | Compiler flags | Description                                               |
-|                          | affected       |                                                           |
-|--------------------------+----------------+-----------------------------------------------------------|
-| *Misc*                     |                |                                                           |
-| PROJECT_NAME             | -              | Sets project name.                                        |
-|                          |                |                                                           |
-| *Compiler*                 |                |                                                           |
-|                          |                |                                                           |
-| CMAKE_CXX_STANDARD       | -std=c++11     | Set the C++ standard used for compoling all sources       |
-| CMAKE_CXX_FLAGS          | -              | Additional compiler flags for all targets.                |
-| CMAKE_BUILD_TYPE         |                | Set whether build type is release or debug                |
-|                          |                |                                                           |
-| *Location*                 |                |                                                           |
-| CMAKE_BINARY_DIR         |                |                                                           |
-| CMAKE_CURRENT_LIST_DIR   |                | Get location of current CMakeLists.txt file.              |
-| CMAKE_INSTALL_PREFIX     |                | Location where targets will be installed (target _install_) |
-| CMAKE_CURRENT_BINARY_DIR |                |                                                           |
-|                          |                |                                                           |
-|--------------------------+----------------+-----------------------------------------------------------|
-
-Notes: 
-
- + The default value of the variable CMAKE_INSTALL_PREFIX are:
-   + Windows:        C:/Program Files/${PROJECT_NAME}
-   + Unix-like OS:   /usr/local
 ** Build a project from command line - detailed 
 
 A project using Cmake as building system contains a build script at
@@ -4543,8 +4396,6 @@ _anonymous namespace_, example:
   }
 
 #+END_SRC
-
-
 ** Snippets 
 *** Place build-tree object-code in source directory 
 
@@ -5556,6 +5407,152 @@ block set the C and C++ compiler to Clang and Clang++.
       set(CMAKE_CXX_COMPILER clang++)
   endif()
 #+END_SRC
+** Cross references
+*** Common Variables 
+**** CMAKE_CURRENT_LIST_DIR - Directory where is CMakeLists.txt 
+
+ Prints the directory where CMAkeLists.
+
+ #+BEGIN_SRC cmake 
+   message(" [INFO] CMakeLists.txt is in the directory ${CMAKE_CURRENT_LIST_DIR}")
+ #+END_SRC
+
+**** CMAKE_CXX_STANDARD - Set C++ Standard
+
+ The variable ~CMAKE_CXX_STANDARD~ sets the project current C++
+ standard. This variable can be set to 98 (for C++98); 11 (C++11); 14
+ (C++14); 17 (C++17) and 20 (C++20 - experimental yet.)
+
+  + Documentation: [[https://cmake.org/cmake/help/latest/prop_tgt/CXX_STANDARD.html#prop_tgt:CXX_STANDARD][CXX_STANDARD — CMake 3.13.2 Documentation]] 
+
+ Example: Set project to compile with C++11 ISO standard.
+
+ #+BEGIN_SRC cmake 
+   set(CMAKE_CXX_STANDARD 11)
+ #+END_SRC
+
+ Usage: (File CMAKELists.txt)
+
+ #+BEGIN_SRC cmake 
+   cmake_minimum_required(VERSION 3.9)
+   project(MY_PROJECT_NAME)
+
+   set(CMAKE_CXX_STANDARD 17)
+   ... ... .... .... 
+ #+END_SRC
+
+**** CMAKE_BUILD_TYPE - Set default building type to DEBUG 
+
+ In the debug building type optimization flags are disabled and flags
+ for generating debugging symbols are enabled, for GGC or GCC/Mingw and
+ Clang the (-g) is automatically added and for MSVC, aka VC++ (cl.exe),
+ the flag /Zi is also passed to the compiler. The default building type
+ can be set to DEBUG with the following code.
+
+ #+BEGIN_SRC cmake 
+   # Set default building type to debug if it was not set
+   # in command line with -DCMAKE_BUILD_TYPE=release
+   if(NOT DEFINED CMAKE_BUILD_TYPE OR CMAKE_BUILD_TYPE MATCHES "")
+     set(CMAKE_BUILD_TYPE  debug)
+   endif()
+ #+END_SRC
+
+ The building type can be changed by running cmake with the flag
+  (-DCMAKE_BUILD_TYPE=release). Example: 
+
+ #+BEGIN_SRC sh 
+  $ cmake -H. -Bbuild -DCMAKE_BUILD_TYPE=DEBUG -G "Visual Studio 15 2017 Win64"
+ #+END_SRC
+
+ Note: CMake is not case sensitive, so it does not matter using
+ 'release' or RELEASE; if or IF; endif or ENDIF and so on. 
+
+**** CMAKE_CXX_FLAGS - Compiler flags 
+
+ The globals compiler flags used to build all targets can be extended
+ by setting the variable CMAKE_CXX_FLAGS. However, as the compiler
+ flags depends on the compiler, the custom settings may not be portable
+ if one uses a different compiler, for instance the (-g) flag used to
+ generate debug symbols with GCC or Clang does not work with MSVC
+ (visual c++ compiler, vc++) as it uses the flag /Zi for generating
+ debugging symbols.
+
+ Example 1: 
+
+ #+BEGIN_SRC cmake
+   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}"  "-std=c++17 -g -Wall -Wextra -pendantic -O0" )
+ #+END_SRC
+
+ Example 2 (better):
+
+ #+BEGIN_SRC cmake
+   if(NOT MSVC)
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}"  "-std=c++17 -g -Wall -Wextra -pendantic -O0" )
+   endif()
+ #+END_SRC
+*** CMake Map 
+
+  + Global configuration/settings 
+    + add_definitions
+    + set(<VARIABLE> <VALUE>)
+    + add_subdirectory 
+
+  + Target defintions
+    + add_executable => Create target for building executable. 
+    + add_library    => Create target for building static or shared library.
+    + add_custom_target
+
+  + Target Configuration:
+    + set_target_properties(<TARGET> PROPERTIES <KEY> <VALUE> [<KEY <VALUE>] ...)
+    + set_target_properties(testlib PROPERTIES CXX_VISIBILITY_PRESET hidden)
+      + Make  symbols of shared or static library hidden by default,
+        only explicitly annotated symbols are visible. It avoids name
+        clashing which can lead to undefined behavior.
+
+    + target_link_libraries(<executable-target> PUBLIC testlib)
+
+  + Auxiliary targets:
+    + install  => Install packages to some directoriy.
+
+  + Find Commands:
+    + find_path 
+    + find_package
+    + find_library
+    + include_directory
+
+  + Global Variables:
+    + set(CMAKE_CXX_STANDARD 14)
+    + set(CMAKE_VERBOSE_MAKEFILE ON)
+    + set(CMAKE_BUILD_TYPE  debug)
+
+ Typical CMake Variables:
+
+ |--------------------------+----------------+-----------------------------------------------------------|
+ | Variable                 | Compiler flags | Description                                               |
+ |                          | affected       |                                                           |
+ |--------------------------+----------------+-----------------------------------------------------------|
+ | *Misc*                     |                |                                                           |
+ | PROJECT_NAME             | -              | Sets project name.                                        |
+ |                          |                |                                                           |
+ | *Compiler*                 |                |                                                           |
+ |                          |                |                                                           |
+ | CMAKE_CXX_STANDARD       | -std=c++11     | Set the C++ standard used for compoling all sources       |
+ | CMAKE_CXX_FLAGS          | -              | Additional compiler flags for all targets.                |
+ | CMAKE_BUILD_TYPE         |                | Set whether build type is release or debug                |
+ |                          |                |                                                           |
+ | *Location*                 |                |                                                           |
+ | CMAKE_BINARY_DIR         |                |                                                           |
+ | CMAKE_CURRENT_LIST_DIR   |                | Get location of current CMakeLists.txt file.              |
+ | CMAKE_INSTALL_PREFIX     |                | Location where targets will be installed (target _install_) |
+ | CMAKE_CURRENT_BINARY_DIR |                |                                                           |
+ |                          |                |                                                           |
+ |--------------------------+----------------+-----------------------------------------------------------|
+
+ Notes: 
+
+  + The default value of the variable CMAKE_INSTALL_PREFIX are:
+    + Windows:        C:/Program Files/${PROJECT_NAME}
+    + Unix-like OS:   /usr/local
 * Conan package Manager
 ** Main Web Sites
 
