@@ -34,7 +34,7 @@ to be embedded should have:
      + Allow application runtime changes without recompilation.
      + User extension without modification of source code. 
 
-Examples: 
+Examples of embedded scripting languages usage and use-cases: 
 
      * TCL - Tool Command Language => Used by many EDA - Electronic
        Design Automation Sofware in electronic engineering.
@@ -62,14 +62,45 @@ Examples:
 
      * AutoLisp [proprietary] => Lisp-like language used in Autocad.
 
+     * SQL (Structured Query Language) => Many databases are
+       implemented in C or C++ uses SQL as scripting language and
+       domain specific language (DSL) for querying and storing
+       data. Example: SQLite, Postgres SQL, ...
+
      * Emacs Lisp => Emacs core, including the LISP
        engine/interpreter, is written in C and other parts are
        written in Emacs Lisp. This lisp dialect allows extending Emacs
        at with custom extensions (plugins) and also modifying the
-       application behavior at runtime. 
+       application behavior at runtime.
 
      * VBA - Visual Basic for Application [proprietary] => Used in
        Microsft Office Suite, specially in Microsft Excel.
+
+
+Considerations for choosing embedded scripting languages: 
+
+  + Small footprint and small overhead
+
+  + C++ API bindings 
+
+  + Garbage collector implementation 
+
+  + Permissive license for static linking or option of dual license
+    for static linking. 
+
+  + Heavy duty computations with significant overhead should be
+    performed on the C++-side, specially loops.
+
+  + JIT - Just-In-Time compiler => can increase the performance by
+    translating bytecodes into machine code.
+    + Example: Lua JIT, Javascript V8 engine used by Chrome browser. 
+
+  + Features for running untrusted scripts or configuration: 
+
+    * Ability for restricting capabilities such as creating process,
+      accessing the file system and so on.
+
+    * Non-turing complete => better for configuration 
 
 ** Squirrel Scripting Language 
 *** Overview 
@@ -539,7 +570,8 @@ code embedding duktape JavaScript engine.
       * Easy to use and lots of examples. 
     + Drawbacks:
       * Lack of namespaces which enhances API discoverability
-      * Lack of C++ wrappers to some Duktape C-types 
+      * Lack of C++ wrappers to some Duktape C-types
+      * Lack of a CMakeLists.txt at the top directory. 
 
 File: CMakeLists.txt 
 
@@ -774,8 +806,8 @@ File: duktape-embed.cpp
 Build: 
 
 #+BEGIN_SRC sh 
- $ cmake -H. -B_build -DCMAKE_BUILD_TYPE=Debug
- $ cmake --build _build --target 
+  $ cmake -H. -B_build -DCMAKE_BUILD_TYPE=Debug
+  $ cmake --build _build --target 
 #+END_SRC
 
 Program output: 
@@ -812,5 +844,189 @@ Program output:
    =>> [C++-LOG] -  <my_js_function> =>> n = 20
     [*] res = 500
 
+
+#+END_SRC
+*** Example project with Duktape-CC binding library 
+
+  + Duktape-CC binding library: https://github.com/stfwi/duktape-cc/
+    + Benefits 
+      + Namespace 
+      + RAII for duktape C-API
+      + Javascript common known APIs such as console.log()
+    + Disadvantage:
+      + No possible to bind lambda function. 
+      + No possible to bind C++ classes or objects
+      + No CMakeLists.txt at top directory, which makes the library
+        usage easier, but the following cmake scripts solves this
+        problem.
+
+
+File: CMakeLists.txt 
+
+#+BEGIN_SRC cmake 
+  cmake_minimum_required(VERSION 3.0)
+  project(duktape-cc-trial)
+
+  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+
+  include(duktape.cmake)
+
+  #----- Main Target Definition ----------------------------#
+         add_executable( duktape-script duktape-script.cpp)
+  target_link_libraries( duktape-script duktape-cc )
+#+END_SRC
+
+File: duktape.cmake 
+
+#+BEGIN_SRC cmake 
+   include(FetchContent)
+
+   # Note: the 'add_subriectory' line was commented becuyase 
+   #       library that will be downloaded does not have 
+   #       a CMakeListst.txt file at the root directory. 
+   macro(Download_Library_Git  NAME TAG REPOSITORY_URL)
+       FetchContent_Declare(
+           ${NAME}
+           GIT_REPOSITORY  ${REPOSITORY_URL}
+           GIT_TAG         ${TAG}
+       )
+       FetchContent_GetProperties(${NAME})
+       if(NOT cpputest_POPULATED)
+           FetchContent_Populate(${NAME})
+           message("${NAME}_SOURCE_DIR} = ${${NAME}_SOURCE_DIR}")        
+
+           # => Disable following line: the library does not have a CMakeLists.txt
+           #    at the root directory.
+           # add_subdirectory(${${NAME}_SOURCE_DIR} ${${NAME}_BINARY_DIR})
+       endif()
+   endmacro()
+
+
+   # ====>> Duktape JavaScript Engine Configuration <<===========#
+
+   Download_Library_Git( duktape-cc 
+                         51fed200b0c3353a60fa560aa8a13a480f0ec0c7
+                         https://github.com/stfwi/duktape-cc/
+                       )
+
+   file(GLOB_RECURSE duktape_sources "${duktape-cc_SOURCE_DIR}/duktape/*.c")
+   file(GLOB_RECURSE duktape_headers1 "${duktape-cc_SOURCE_DIR}/duktape/*.hh")
+   file(GLOB_RECURSE duktape_headers2 "${duktape-cc_SOURCE_DIR}/duktape/*.h")
+
+                  add_library( duktape-cc ${duktape_sources} ${duktape_headers1} ${duktape_headers2} )
+   target_include_directories( duktape-cc PUBLIC ${duktape-cc_SOURCE_DIR} )
+
+#+END_SRC
+
+File: duktape-script.cpp 
+
+#+BEGIN_SRC cpp 
+   #include <iostream> 
+   #include <string> 
+   #include <vector> 
+   #include <fstream>
+
+   #include <duktape/duktape.hh>
+   #include <duktape/mod/mod.stdio.hh>
+
+   int main()
+   {
+       std::puts(" [TRACE] Program started Ok. ");
+
+       // Create Duktape Engine object (Virtual Machine)
+       auto ctx = duktape::engine{};
+
+       // Load all functions from stdio module 
+       // ==> Note: It is necessary for console.log() work 
+       duktape::mod::stdio::define_in(ctx);   
+
+
+       std::puts("\n [EXPERIMENT 1] ======= Evaluate string as code ========");
+
+       ctx.eval<void>(R"( 
+           console.log(" [INFO] Hello world Javascript Engine ");
+
+           var i = 0;
+           while(i < 5) {
+               console.log(" [TRACE] <ducktape>  i = " + i);
+               i++;
+           }
+       )");
+
+       std::puts("\n [EXPERIMENT 2] == Read/write values to the engine the engine =");
+
+       // Write or pass values to the engine. 
+       ctx.define("app.version", "0.251");
+       ctx.define("user.points", 1000);
+       ctx.define("array1", std::vector<double>{ 4.51, 9.25, -25.154, 205.2 });
+       ctx.define("array2", std::vector<std::string>{ "C++", "ADA-Spark", "Rust", "Dlang", "OCaml" });
+
+       std::string script_file = "/tmp/myscript.js";
+
+       const char* script_code = R"(
+           console.log("  => app.version = " + app.version );
+           console.log("  => user.points = " + user.points );
+           console.log("  => array1 = " + array1);
+           console.log("  => array2 = " + array2);
+
+           myconfig_path = "/Users/data/osx/config";
+           user_credits = 1020; 
+           vector = [100.25, 90.251, -120.5150];
+       )";
+
+       // Write script code to file     
+       auto fs = std::ofstream(script_file);
+       // Flush forces writing to the IO
+       fs << script_code << std::flush;          
+       // Execute script from file 
+       ctx.include(script_file);
+
+       std::cout << " ---- Read configuration from file " << std::endl; 
+
+       // Throws exception: duktape::detail::basic_script_error<void>
+       auto myconfig_path = ctx.eval<std::string>("myconfig_path");
+       auto credits       = ctx.eval<int>("user_credits");
+       auto vec           = ctx.eval<std::vector<double>>("vector");
+       std::cout << "\n\n[*] my_config_path = " << myconfig_path << "\n";
+       std::cout << "[*]   user_credits = " << credits << "\n";
+       std::cout << "[*] vec[0] = " << vec[0] << " ; vec[1] = " << vec[1] << "\n";    
+
+       return 0;
+   }
+#+END_SRC
+
+Build: 
+
+#+BEGIN_SRC sh 
+  $ cmake -H. -B_build -DCMAKE_BUILD_TYPE=Debug
+  $ cmake --build _build --target 
+#+END_SRC
+
+Program output: 
+
+#+BEGIN_SRC sh 
+   $ _build/duktape-script 
+   [TRACE] Program started Ok. 
+
+   [EXPERIMENT 1] ======= Evaluate string as code ========
+
+   [EXPERIMENT 2] == Read/write values to the engine the engine =
+   [INFO] Hello world Javascript Engine 
+   [TRACE] <ducktape>  i = 0
+   [TRACE] <ducktape>  i = 1
+   [TRACE] <ducktape>  i = 2
+   [TRACE] <ducktape>  i = 3
+   [TRACE] <ducktape>  i = 4
+    => app.version = 0.251
+    => user.points = 1000
+    => array1 = 4.51,9.25,-25.154,205.2
+    => array2 = C++,ADA-Spark,Rust,Dlang,OCaml
+   ---- Read configuration from file 
+
+
+  [*] my_config_path = /Users/data/osx/config
+  [*]   user_credits = 1020
+  [*] vec[0] = 100.25 ; vec[1] = 90.251
 
 #+END_SRC
