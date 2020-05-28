@@ -119,7 +119,7 @@ File: icon.rs  - Resource script
   $ g++ resource.cpp icon.res -o app-gcc.exe -std=c++14        
 #+END_SRC
 
-** Embed Resource with xxd tool (Byte-array)
+** Embedding Resource with xxd tool (Byte-array)
 
 Example: The U-nix tool xxd can generate C-code for embedding
 resources in native applications. Example: embed a text file
@@ -159,7 +159,193 @@ application:
  $ g++ main.o file1.o file2.o program_asset.o -o program.exe 
 #+END_SRC
 
-** Embed Resources with CMake Resource Compiler (CMakeRC)
+** Embedding Resources with incbin library 
+
+  + INCBIN is a singl-file which allows embedding files in executables
+    with the compiler native inline assembler.
+
+  + Repository:
+    + https://github.com/graphitemaster/incbin/
+
+  + Note: the following CMakeLists.txt automatically downloads the
+    single-file header only libary _incbin.h_ to the directory
+    ${CMAKE_BINARY_DIR}/include 
+
+File: CMakeLists.txt 
+
+#+BEGIN_SRC cmake 
+   cmake_minimum_required(VERSION 3.0)
+   project(duktape-cc-trial)
+
+   set(CMAKE_CXX_STANDARD 17)
+   set(CMAKE_VERBOSE_MAKEFILE ON)
+
+   #--------------------------------#
+
+   macro(Download_Single_Headerlib FILE URL)
+     file(DOWNLOAD ${URL} ${CMAKE_BINARY_DIR}/include/${FILE})
+     IF(NOT Download_Single_Headerlib_flag)
+       include_directories(${CMAKE_BINARY_DIR}/include)
+       set(Download_Single_Headerlib_flag TRUE)
+     ENDIF()
+   endmacro()
+
+
+   Download_Single_Headerlib(
+     incbin.h
+     "https://raw.githubusercontent.com/graphitemaster/incbin/8cefe46d5380bf5ae4b4d87832d811f6692aae44/incbin.h"
+     )
+   include_directories(${CMAKE_CURRENT_LIST_DIR})
+
+   #--------- Main Target -------------#
+
+   add_executable(main app.cpp)
+#+END_SRC
+
+File: app.cpp 
+
+#+BEGIN_SRC cpp 
+   #include <iostream>
+   #include <string>
+
+   #define INCBIN_STYLE INCBIN_STYLE_SNAKE
+   #define INCBIN_PREFIX g_
+   #include <incbin.h>
+
+   /* Usage: INCBIN(<<LABLE>>, <<FILE>>)
+    *
+    * Symbols defined by INCBIN 
+    * ------------------------------------------ 
+    *  const unsigned char        g_asset_data[]  // g_<<LABLE>>_data 
+    *  const unsigned char* const g_asset_end;    // g_<<LABEL>>_end 
+    *  const unsinged int         g_asset_size;   // g_<<LABEL>>_size 
+    */
+   INCBIN(asset, "data.txt");
+
+   #define MEMORY_STREAM(label) \
+     memstream( (char*) ((g_ ## label ## _data)),				\
+                (char*) ((g_ ##label ## _data) + (g_ ## label ##_size)))
+
+   /// Credits: https://stackoverflow.com/a/13059195
+   /// https://stackoverflow.com/questions/13059091/
+   struct membuf: std::streambuf {
+     membuf(char const* base, size_t size) {
+       char* p(const_cast<char*>(base));
+       this->setg(p, p, p + size);
+     }
+     virtual ~membuf() = default;
+   };
+
+   /// Credits: https://stackoverflow.com/a/13059195
+   /// https://stackoverflow.com/questions/13059091/
+   struct memstream: virtual membuf, std::istream {
+
+     memstream(char const* base, char* const end)
+       : membuf(base, reinterpret_cast<uintptr_t>(end) - reinterpret_cast<uintptr_t>(base) )
+       , std::istream(static_cast<std::streambuf*>(this)) { }
+
+     memstream(char const* base, size_t size)
+       : membuf(base, size)
+       , std::istream(static_cast<std::streambuf*>(this)) { }
+   };
+
+   // Read all lines from some input stream
+   // and print on stdout.
+   void print_lines(std::istream& is)
+   {
+     std::string line;
+     int  n = 0;
+     while(std::getline(is, line) && n < 25)
+       std::cout << " line[" << n++ << "] = " << line << std::endl;
+   }
+
+   int main()
+   {
+
+     std::puts("\n [EXPERIMENT 1] =>> Read directly from symbols ---");  
+     std::string text = std::string(g_asset_data, g_asset_data + g_asset_size);
+     std::cout << " Content of the asset file is " << std::endl;
+     std::cout << " => " << text << std::endl;
+
+     std::puts("\n [EXPERIMENT 2] =>> Read from memory stream -------");
+     auto is = MEMORY_STREAM(asset);
+     print_lines(is);
+
+     return 0;
+   }
+
+#+END_SRC
+
+File: data.txt 
+  + => File that will be embedded into the executable. (Text of Marcus
+    Tulius Cicero - 53 BC in latim)
+
+#+BEGIN_SRC txt 
+  "At vero eos et accusamus et iusto odio dignissimos ducimus qui
+  blanditiis praesentium voluptatum deleniti atque corrupti quos dolores
+  et quas molestias excepturi sint occaecati cupiditate non provident,
+  similique sunt in culpa qui officia deserunt mollitia animi, id est
+  laborum et dolorum fuga. Et harum quidem rerum facilis est et expedita
+  distinctio. Nam libero tempore, cum soluta nobis est eligendi optio
+  cumque nihil impedit quo minus id quod maxime placeat facere possimus,
+  omnis voluptas assumenda est, omnis dolor repellendus. Temporibus
+  autem quibusdam et aut officiis debitis aut rerum necessitatibus saepe
+  eveniet ut et voluptates repudiandae sint et molestiae non
+  recusandae. Itaque earum rerum hic tenetur a sapiente delectus, ut aut
+  reiciendis voluptatibus maiores alias consequatur aut perferendis
+  doloribus asperiores repellat."
+#+END_SRC
+
+Build: 
+
+#+BEGIN_SRC sh 
+   $ cmake -H. -B_build -G Ninja -DCMAKE_BUILD_TYPE=Debug
+   $ cmake --build _build --target 
+#+END_SRC
+
+Run: 
+
+#+BEGIN_SRC sh 
+    $ cp _build/main /tmp/main.bin  && cd /tmp 
+
+    $ ./main.bin 
+
+    [EXPERIMENT 1] =>> Read directly from symbols ---
+    Content of the asset file is 
+    => "At vero eos et accusamus et iusto odio dignissimos ducimus qui
+   blanditiis praesentium voluptatum deleniti atque corrupti quos dolores
+   ... ...    ... ...    ... ...    ... ...    ... ...    ... ... 
+   ... ...    ... ...    ... ...    ... ...    ... ...    ... ... 
+   reiciendis voluptatibus maiores alias consequatur aut perferendis
+   doloribus asperiores repellat."
+
+
+
+    [EXPERIMENT 2] =>> Read from memory stream -------
+    line[0] = "At vero eos et accusamus et iusto odio dignissimos ducimus qui
+    line[1] = blanditiis praesentium voluptatum deleniti atque corrupti quos dolores
+    ... ... ...     ... ... ...     ... ... ...     ... ... ...     ... ... ... 
+    ... ... ...     ... ... ...     ... ... ...     ... ... ...     ... ... ... 
+    line[12] = doloribus asperiores repellat."
+    line[13] =    
+#+END_SRC
+
+Verify the strings in the binary with command (strings):
+
+#+BEGIN_SRC sh 
+    $ file main.bin
+    main.bin: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked, interpreter 
+    /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=368cd9a3d42f21e3ce76d43bb927a7fdc3c41e38, 
+    for GNU/Linux 3.2.0, with debug_info, not stripped
+
+   $ strings main.bin | grep accusamus
+   "At vero eos et accusamus et iusto odio dignissimos ducimus qui
+
+   $ strings main.bin | grep libero
+   distinctio. Nam libero tempore, cum soluta nobis est eligendi optio
+#+END_SRC
+
+** Embedding Resources with CMake Resource Compiler (CMakeRC)
 
 A resource compiler is an application that appends  text and
 binary files to the executable object code without needing to store
