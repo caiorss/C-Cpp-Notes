@@ -4758,7 +4758,6 @@ Check installation:
     <INSERT TEXT HERE ....>
 #+END_SRC
 
-
 *** Set common file extension for all executables
 
 Unlike Windows, native executables files on Unix-like operating
@@ -4792,6 +4791,98 @@ File: CMakeLists.txt
   add_executable(app1  main1.cpp)
   add_executable(app2  main1.cpp src1.cpp src2.cpp src3.cpp)
 #+END_SRC
+*** Glob files from a directory or sub-directories
+
+Globing allows adding files of a given cmake target without specifying
+all of them explicitly. Although, it is not a good practice, it can be
+useful for migrating projects using other building systems to CMake. 
+
+Example: sample project that used GNU autotools or Makefiles. 
+
+  + ./path/to/project <DIRECTORY>
+    * CMakeLists.txt
+
+    * main/   <DIR> =>> Executable Target: main -> ./main (Unix) or  main.exe (Windows)
+      + main.cpp
+      + class1.cpp
+      + class1.hpp
+      + class2.cpp
+      + class2.hpp 
+
+    * mylib  <DIR>  =>> Shared Library Target:  mylib1 libmylib1.so (Unix), libmylib1.dylib (OSX) or mylib1.dll (Windows)
+      + class1A.cpp
+      + class1A.hpp
+      + class2A.cpp
+      + class2A.hpp
+      + .... ... ..
+      + ./directory/ <DIR> 
+        + file1A.cpp
+        + file1A.hpp
+        + file1A.cpp
+        + file1A.hpp
+        + ... ... ... 
+
+File: CMakeLists.txt 
+
+#+BEGIN_SRC cmake 
+  cmake_minimum_required(VERSION 3.0)
+  project(cmake-glob)
+
+  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+
+    #----------------------------------------------#
+    #    mylib  => Library target                  #
+    #----------------------------------------------#
+
+  # Assign all *.cpp files paths in the directory ./mylib 
+  # to the variable 'mylib_sources'. It allso includes the 
+  # subdirectories of ./mylib. 
+  file(GLOB_RECURSE mylib_sources "mylib/*.cpp")
+  file(GLOB_RECURSE mylib_headers "mylib/*.hpp")
+
+  add_library(mylib SHARED ${lib_sources} ${lib_headers} )
+  target_include_directories(mylib PUBLIC ./lib)
+
+    #----------------------------------------------#
+    #     main  => Executable target               #
+    #----------------------------------------------#
+
+  # --> Assign the path of all *.cpp files in the directory 
+  #  ./main to the variable 'main_sources'
+  #  note: it does not include subdirectories. 
+  file(GLOB main_sources "main/*.cpp")
+  file(GLOB main_headers "main/*.hpp")
+
+         add_executable( main ${main_sources} ${main_headers})
+  target_link_libraries( main mylib glut gl ... )
+#+END_SRC
+
+ *Highlights* 
+
+  + The following lines sets the variable _main_sources_ to the
+    following list of strings containing the file names:
+    main/main.cpp, main/class1.cpp, main/class2.cpp and so on.
+
+  + _GLOB_ scans all files in a directory with a given pattern, but does
+    not scan in sub-directories. 
+
+#+BEGIN_SRC cmake 
+  file(GLOB main_sources "main/*.cpp")
+#+END_SRC
+
+  + The next lien sets the variable _mylib_headers_ to mylib a list of
+    strings contains the file names: mylib/class1A.cpp
+    mylib/class2A.cpp ... mylib/directory/file1A.cpp,
+    mylib/directory/file2A.cpp and so on.
+
+  + _GLOB_RECURSE_ scans all files in a directory and subdirectories
+    with a given pattern. 
+
+#+BEGIN_SRC cmake 
+  file(GLOB_RECURSE mylib_sources "mylib/*.cpp") 
+#+END_SRC
+
 *** Copy some target binaries to a directory
 
 This piece of code copies the target binaries (compiled code) to a
