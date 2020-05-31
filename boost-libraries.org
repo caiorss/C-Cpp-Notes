@@ -5760,7 +5760,8 @@ Output:
     world
   ]
 #+END_SRC
-** CLI11 Command Liner Parser Library 
+** Command Line Parsing 
+*** CLI11 Library 
 
 
 CLI11 is a small and lightweight header-only library for command line
@@ -5902,6 +5903,156 @@ Sample program output:
    serving directory = /home/user/pages
 #+END_SRC
 
+*** Clipp library 
+
+Single-file header-only library for parsing command line arguments
+(command line option parsing). It supports: positional values
+(required arguments); optional values; manpage generation and so on. 
+
+  + Repository: https://github.com/muellan/clipp
+
+ *Sample Project* 
+
+File: CMakeLists.txt 
+
+#+BEGIN_SRC cmake 
+  cmake_minimum_required(VERSION 3.0)
+  project(clipp-test)
+
+  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+
+  #============= Functions and macros ===========================#
+  
+  macro(Download_Single_Headerlib FILE URL)
+      file(DOWNLOAD ${URL} ${CMAKE_BINARY_DIR}/include/${FILE})
+      IF(NOT Download_Single_Headerlib_flag)
+         include_directories(${CMAKE_BINARY_DIR}/include)
+         set(Download_Single_Headerlib_flag TRUE)
+      ENDIF()
+  endmacro()
+
+  Download_Single_Headerlib(
+      clipp.h
+      https://raw.githubusercontent.com/muellan/clipp/v1.2.3/include/clipp.h
+      )
+
+  #============ Targets settings ==================================#
+  
+  add_executable( application application.cpp )
+#+END_SRC
+
+File: application.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream> 
+  #include <string> 
+
+  #include <clipp.h>
+
+  struct ServerOptions
+  {        
+          // --------- Required values -------------------//
+          int         port;
+          std::string host; 
+
+          // -------- Optional values -------------------//
+          int         loglevel                = 1; 
+          std::string name                    = "untitled";
+          bool        require_authentication  = false;    
+          bool        verbose                 = false;         
+  };
+
+  int main(int argc, char* argv []) 
+  {
+          ServerOptions opts; 
+
+          auto cli = (
+                  // --- Positional values ===>> Required --------------//
+                    clipp::value("host name", opts.host)
+                  , clipp::value("server port", opts.port)
+                 
+                  // --- Optional values ------------------------//
+                  , clipp::option("-v", "--verbose")
+                          .set(opts.verbose)
+                          .doc("Enable versbosity")
+                  , clipp::option("-a", "--require-auth")
+                          .set(opts.require_authentication)
+                          .doc("Require authentication")                
+                  , clipp::option("--loglevel") & clipp::value("set server's log level", opts.loglevel)
+                  , clipp::option("-n", "--name") & clipp::value("server name", opts.name)
+                  );
+
+          if( !clipp::parse(argc, argv, cli) ) {
+                  std::cout << clipp::make_man_page(cli, argv[0] );
+                  return EXIT_SUCCESS;
+          }
+
+          std::cout << std::boolalpha; 
+
+          std::cout << " Running server " 
+                    << " \n         port = " << opts.port 
+                    << " \n         host = " << opts.host 
+                    << " \n      verbose = " << opts.verbose
+                    << " \n require_auth = " << opts.require_authentication
+                    << " \n         name = " << opts.name
+                    << " \n   log level  = " << opts.loglevel
+                    << "\n";
+    
+          return EXIT_SUCCESS;
+  }
+#+END_SRC
+
+ *Running* 
+
+Building: 
+
+#+BEGIN_SRC sh 
+  $ cmake -H. -B_build -DCMAKE_BUILD_TYPE=Debug 
+  $ cmake --build _build --target 
+#+END_SRC
+
+Running [1]:  
+
+#+BEGIN_SRC text 
+   $ ./application 
+  SYNOPSIS
+          ./application <host name> <server port> [-v] [-a] [--loglevel <set server's log level>] [-n
+                        <server name>]
+
+  OPTIONS
+          -v, --verbose
+                      Enable versbosity
+
+          -a, --require-auth
+                      Require authentication
+#+END_SRC
+
+Running [2]: 
+
+#+BEGIN_SRC text 
+   $ ./application 127.0.0.1 8080 
+   Running server  
+           port = 8080 
+           host = 127.0.0.1 
+        verbose = false 
+   require_auth = false 
+           name = untitled 
+     log level  = 1
+#+END_SRC
+
+Running [3]: 
+
+#+BEGIN_SRC text 
+   $ ./application 127.0.0.1 8080 --verbose --name "lisp server"
+   Running server  
+           port = 8080 
+           host = 127.0.0.1 
+        verbose = true 
+   require_auth = false 
+           name = lisp server 
+     log level  = 1
+#+END_SRC
 ** Serialization 
 *** Cereal - Serialization library 
 
@@ -7276,7 +7427,6 @@ Easy to use single-file header-only library for parsing and writing
      => element = 1000
 
  #+END_SRC
-
 
 *** cpptoml configuration parser 
 
