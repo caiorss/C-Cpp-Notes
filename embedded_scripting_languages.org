@@ -1891,3 +1891,312 @@ Program output:
   [*] vec[0] = 100.25 ; vec[1] = 90.251
 
 #+END_SRC
+** Python Engine via Pybind11 
+
+Documentation: 
+
+  + [[https://pybind11.readthedocs.io/en/stable/advanced/embedding.html][Pybind11 Embedding]]
+
+Advantages: 
+  + High popularity
+  + Lost of libraries
+  + Easy usage 
+
+Drawbacks: 
+  + Hard to static link
+  + Not ligthweight and designed to be embedded as Lua.
+  + It is not possible to run multiple instances of the Python
+    interpreter.
+  + It is not possible to sandbox the interpreter and restrict
+    accessing files or process manipulation APIs.
+  + Requires pre-installation of Python development headers. But, it
+    can be mitigated by using Anaconda or miniconda Python distributions.
+
+Known Cases: 
+  + GDB - GNU Debugger 
+  + IDA Debugger
+  + Sublime Text Editor 
+
+ *Sample Project* 
+
+GIST containing the sources: 
+  + https://gist.github.com/d7fda02034757374a0b0114e54c7daff
+
+File: CMakeLists.txt 
+
+#+BEGIN_SRC cmake 
+   cmake_minimum_required(VERSION 3.9)
+   project(embed-python-scripting)
+
+   #========== Global Configurations =============#
+   #----------------------------------------------#
+
+   set(CMAKE_CXX_STANDARD 17)     
+   set(CMAKE_VERBOSE_MAKEFILE ON)
+   set(CMAKE_CXX_EXTENSIONS OFF)
+
+   # ------------ Download CPM CMake Script ----------------#
+
+   ## Automatically donwload and use module CPM.cmake
+   file(DOWNLOAD https://raw.githubusercontent.com/TheLartians/CPM.cmake/v0.26.2/cmake/CPM.cmake
+                    "${CMAKE_BINARY_DIR}/CPM.cmake")
+   include("${CMAKE_BINARY_DIR}/CPM.cmake")
+
+   #----------- Add dependencies --------------------------#
+
+   find_package(PythonLibs REQUIRED)
+
+   CPMAddPackage(
+       NAME pybind11 
+       URL  https://github.com/pybind/pybind11/archive/v2.5.zip    
+       DOWNLOAD_ONLY true  
+   )
+
+   # add_subdirectory( {pybind11_SOURCE_DIR} )
+   include_directories( ${pybind11_SOURCE_DIR}/include
+                        ${PYTHON_INCLUDE_PATH} )
+
+   message( [TRACE] "  pybind11_SOURCE_DIR = ${pybind11_SOURCE_DIR} ")
+
+   # configure_file(script.py ${CMAKE_BINARY_DIR} COPYONLY )
+
+   #----------- Set targets -------------------------------#
+
+   add_executable(app1 app1.cpp)
+   target_link_libraries( app1 ${PYTHON_LIBRARIES} )
+
+   add_custom_command(
+           TARGET app1 POST_BUILD
+           COMMAND ${CMAKE_COMMAND} -E copy
+                   ${CMAKE_SOURCE_DIR}/script.py 
+                   ${CMAKE_CURRENT_BINARY_DIR}/script.py)
+
+#+END_SRC
+
+File: app.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string> 
+  #include <sstream>
+  #include <fstream>
+  #include <cassert>
+  #include <vector> 
+
+  #include <pybind11/embed.h>
+
+  namespace py = pybind11;
+
+  // Requires: <string>, <stream>, <sstream>
+  std::string readFile(std::string const& file)
+  {
+      auto is = std::ifstream(file);
+      if( !is.good() ){
+          throw std::runtime_error("Error: stream has errors.");
+      }
+      std::stringstream ss;
+      ss << is.rdbuf();
+      return ss.str();
+  }
+
+
+  int main(int argc, char** argv)
+  {
+      extern std::string pycode;
+
+      auto guard = py::scoped_interpreter{};
+
+      // ------ EXPERIMENT 1 ------------------------------------// 
+      std::puts(" [EXPERIMENT 1] ===== Execute Python code ======================\n");
+
+      auto code = readFile("./script.py");
+
+      // std::cout << " code = " << code << "\n";
+
+      auto g = py::globals();
+
+      // Define global variables for the interpreter global scope 
+      g["game_assets"] = "/Users/myuser/game_assets";
+      g["speed"]       = 20.151;
+      g["z_value"]     = 100;    
+
+      // Evaluate Python code
+      try {        
+          py::exec( code, g );
+
+      } catch(pybind11::error_already_set const& ex) {
+          std::cerr << " [PYBIND11 ERROR] " << ex.what() << std::endl;
+          return EXIT_FAILURE;
+      }
+
+      // ------ EXPERIMENT 2 ------------------------------------// 
+      std::puts("\n [EXPERIMENT 2] == Read user defined configuration variables ===\n");
+
+      auto v_x    = g["x"].cast<double>();
+      auto v_path = g["path"].cast<std::string>();
+
+      std::cout << " [*]    v_x = " << v_x << std::endl;
+      std::cout << " [*] v_path = " << v_path << std::endl;
+
+      return EXIT_SUCCESS;
+  }
+
+  // ----- Internal Python Embedded Module ---------------------------// 
+
+
+  const char* version()
+  {
+      return "SampleModule Version 3.451-ZETA";
+  }
+
+  // Sample "function-object class"
+  class LinearFunctor
+  {
+  public:
+      double A = 0, B = 0;
+
+      LinearFunctor();
+      LinearFunctor(double a, double b): A(a), B(b){ }
+
+      double GetA() const   { return A; }
+      void   SetA(double a) { A = a; }
+      double GetB() const   { return B; }
+      void   SetB(double b) { B = b; }
+
+      void show() const
+      {
+          std::cout << " LinearFunction: y(x) = A * x + B" << std::endl;
+          std::cout << " => A = " << this->A << " ; B = " << this->B << std::endl;
+      }
+      std::string toString() const
+      {
+          std::stringstream ss;
+          ss << " LinearFunction: y(x) = A * x + B" << std::endl;
+          ss << " => A = " << this->A << " ; B = " << this->B << std::endl;
+          return ss.str();
+      }
+      // Function-call operator
+      double operator()(double x)
+      {
+          return A * x + B;
+      }
+  };
+
+  // ---- Internal Module -----------------------// 
+
+  PYBIND11_EMBEDDED_MODULE(SampleModule, m) {
+      // optional module docstring
+      m.doc() = "Sample Python built with C++ CeePlusPlus ";
+      m.def("version", &version, "Show Library Version");
+
+      m.def("cppLambda"
+            ,[](double x, double y){ return 3.0 * x + y;}
+            ,"A C++ lambda object or functor"
+            //,py::arg("x"), py::args("y") = 15
+      );
+
+      // Register LinearFunction
+      py::class_<LinearFunctor>(m, "LinearFunctor")
+              .def(py::init<double, double>())             // Register overloaded consructor
+              .def("GetA", &LinearFunctor::GetA)            // Reister method GetA()
+              .def("GetB", &LinearFunctor::GetB)            // Register method GetB()
+              .def("SetA", &LinearFunctor::SetA)            // Reister method GetA()
+              .def("SetB", &LinearFunctor::SetB)            // Register method GetB()
+              .def("show", &LinearFunctor::show)            // Register method show
+              .def("call", &LinearFunctor::operator())      // Register function-call operator with name 'call'
+              .def("__call__", &LinearFunctor::operator ()) // Register fun-call operator
+              .def("__repr__", &LinearFunctor::toString)    // Register strin representation
+              .def_readwrite("A", &LinearFunctor::A)        // Register field A
+              .def_readwrite("B", &LinearFunctor::B);       // Register field B
+
+  } /** --- End of PYBIND11_MODULE registration --- */
+
+#+END_SRC
+
+File: script.py 
+
+#+BEGIN_SRC python 
+   print("   => game_assets = ", game_assets)
+   print("   =>       speed = ", speed)
+   print("   =>     z_value = ", z_value)
+
+   x: float = 10.0 * 20.51 / 200
+
+   path = "C:\\\\Users\\dummy\\Documents\\data"
+
+   print(" [PYTHON] The value of x = ", x)
+
+   for i in range(5):
+       print("   [PYTHON] i = ", i)
+
+   # It is not possible to restrict the interpreter!
+   import os 
+   print(" [*] Current path = ", os.getcwd() )
+
+   print("\n ------------------------------------------")
+   print("\n =>>> Test Python Internal Module (C++) <<=\n")
+
+   import SampleModule as m 
+   from SampleModule import LinearFunctor 
+
+   print(f"    ->   Module Information = [{m.__doc__}] ")
+   print( "    ->       Module Version = ", m.version())
+   print( "    -> m.cppLambda(100, 25) = ", m.cppLambda(100, 25) )
+
+   functor = LinearFunctor(8.0, -10.0)
+   print(f"\n C++ Functor -> ${functor} ")
+
+   print(" functor(5.0) = ", functor(5.0))
+   print(" functor(8.0) = ", functor(8.0))
+
+#+END_SRC
+
+Build and running: 
+
+#+BEGIN_SRC sh 
+  $ cd /tmp 
+  $ git clone https://gist.github.com/d7fda02034757374a0b0114e54c7daff python-embed-script 
+  $ cd python-embed-script
+
+  $ cmake -H. -B_build -DCMAKE_BUILD_TYPE=Debug
+  $ cmake --build _build --target 
+#+END_SRC
+
+Program output: 
+
+#+BEGIN_SRC sh 
+  $ _build/app1 
+
+   [EXPERIMENT 1] ===== Execute Python code ======================
+
+     => game_assets =  /Users/myuser/game_assets
+     =>       speed =  20.151
+     =>     z_value =  100
+   [PYTHON] The value of x =  1.0255
+     [PYTHON] i =  0
+     [PYTHON] i =  1
+     [PYTHON] i =  2
+     [PYTHON] i =  3
+     [PYTHON] i =  4
+   [*] Current path =  /home/mxpkf8/temp-projects/python-embed-script
+
+   ------------------------------------------
+
+   =>>> Test Python Internal Module (C++) <<=
+
+      ->   Module Information = [Sample Python built with C++ CeePlusPlus ] 
+      ->       Module Version =  SampleModule Version 3.451-ZETA
+      -> m.cppLambda(100, 25) =  325.0
+
+   C++ Functor -> $ LinearFunction: y(x) = A * x + B
+   => A = 8 ; B = -10
+
+   functor(5.0) =  30.0
+   functor(8.0) =  54.0
+
+   [EXPERIMENT 2] == Read user defined configuration variables ===
+
+   [*]    v_x = 1.0255
+   [*] v_path = C:\\Users\dummy\Documents\data
+
+#+END_SRC
