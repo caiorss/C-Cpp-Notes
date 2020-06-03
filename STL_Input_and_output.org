@@ -2213,6 +2213,134 @@ Relevant Member function of class std::istream for binary file:
 
    * *Inside ELF Symbol Table*
      + <https://blogs.oracle.com/solaris/inside-elf-symbol-tables-v2>
+** Reading whole input stream to string 
+
+Note: It is advisable to not use the function istreamToString with
+large files >= 1GB, otherwise it can cost 1GB of RAM. Large files
+should be processed chunk-by-chunk in order to not consume an
+unnecessary amount of memory.
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+  #include <sstream> 
+  #include <fstream> 
+
+  /** @brief Read whole input stream to a string and returns it 
+    ,* Requires headers: <iostream> and <sstream>
+    ,*/
+  std::string istreamToString(std::istream& is){
+      if(is.bad()){ 
+          throw std::runtime_error("Error: stream has errors.");
+      }
+      std::stringstream ss;
+      ss << is.rdbuf();
+      return ss.str();
+  }
+#+END_SRC
+
+Read std::cin stream - console (stdin) 
+
+#+BEGIN_SRC cpp 
+  // Use types a text and types CTRL + D when he is done sending EOF character 
+  >> auto text = istreamToString(std::cin); 
+   A stdin input stream works like a "console file".      
+   In UNIX everything has a file interface, works with a file API, everything is a file.
+   Type CTRL + D to send EOF and close this stream.
+
+  >> std::cout << "text = " << text2 << std::endl;
+  text =  A stdin input stream works like a "console file".
+   In UNIX everything has a file interface, works with a file API, everything is a file.
+   Type CTRL + D to send EOF and close this stream.
+#+END_SRC
+
+Read file input stream: 
+
+#+BEGIN_SRC cpp 
+  >> auto ifs = std::ifstream("/proc/sys/kernel/osrelease")
+  (std::basic_ifstream<char, std::char_traits<char> > &) @0x7f3edbc0a688
+
+  >> auto os_release = istreamToString(ifs)
+  (std::basic_string<char, std::char_traits<char>, std::allocator<char> > &) "4.20.16-100.fc28.x86_64
+  "
+
+  >> std::cout << " =>> Linux-OS Release = " << os_release << std::endl;
+   =>> Linux-OS Release = 4.20.16-100.fc28.x86_64
+#+END_SRC
+
+Read stringstream - memory stream. 
+
+#+BEGIN_SRC cpp 
+  >> std::stringstream ms;
+  >> ms << " UNIX - Linux OS2 Mainframes AIX VxWorks QNX ";
+  >> ms << "\n network TCP IP UDP SOCKET packets";
+  >> ms << " \n binary bits octets speed 3G 4G 5G business flow currency";
+  >> ms << " \n technology price technology technology technology";
+  >> ms << std::flush;
+
+  // Type of txt => std::string 
+  >> auto txt = istreamToString(ms);
+
+  >> std::cout << "text = \n" << txt ;
+  text = 
+   UNIX - Linux OS2 Mainframes AIX VxWorks QNX 
+   network TCP IP UDP SOCKET packets 
+   binary bits octets speed 3G 4G 5G business flow currency 
+#+END_SRC
+** Reading whole file to string 
+
+The following function read a given text file content to a string.
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string> 
+  #include <sstream>
+  #include <fstream>
+
+  // Requires: <string>, <stream>, <sstream>
+  std::string readFile(std::string const& file) {
+      std::ifstream is(file);
+      if( !is.good() ){
+          throw std::runtime_error("Error: stream has errors.");
+      }
+      std::stringstream ss;
+      ss << is.rdbuf();
+      return ss.str();
+  } 
+#+END_SRC
+
+Testing in ROOT repl: 
+
+#+BEGIN_SRC cpp 
+   root [11] std::string content = readFile("/etc/filesystems")
+   (std::string &) "xfs
+   ext4
+   ext3
+   ext2
+   nodev proc
+   nodev devpts
+   iso9660
+   vfat
+   hfs
+   hfsplus
+   *
+   "
+
+  root [13] std::cout << " Content of file /etc/filesystems = \n\n" << content <<  Content of file /etc/filesystems = 
+
+  xfs
+  ext4
+  ext3
+  ext2
+  nodev proc
+  nodev devpts
+  iso9660
+  vfat
+  hfs
+  hfsplus
+  *
+#+END_SRC
+
 ** IO - Insertion << and extraction >> operators
 *** Operators insertion insertion for std::vector<T> 
 
@@ -2441,7 +2569,6 @@ Output:
    Enter product: 461 "Cappucino coffee" 25.60        
     prod =  461 "Cappucino coffee" 25.6 ;  price = 25.6
 #+END_SRC
-
 ** Custom IO manipulators 
 
  *Example: 1* 
@@ -2658,80 +2785,6 @@ Restore buffer:
   >> std::cerr << "pi = " << M_PI << " exp(3.5) " << std::exp(3.5) << "\n";
   pi = 3.14159 exp(3.5) 33.1155  
 
-#+END_SRC
-** Read whole input stream to string 
-
-Note: It is advisable to not use the function istreamToString with
-large files >= 1GB, otherwise it can cost 1GB of RAM. Large files
-should be processed chunk-by-chunk in order to not consume an
-unnecessary amount of memory.
-
-#+BEGIN_SRC cpp 
-  #include <iostream>
-  #include <string>
-  #include <sstream> 
-  #include <fstream> 
-
-  /** @brief Read whole input stream to a string and returns it 
-    ,* Requires headers: <iostream> and <sstream>
-    ,*/
-  std::string istreamToString(std::istream& is){
-      if(is.bad()){ 
-          throw std::runtime_error("Error: stream has errors.");
-      }
-      std::stringstream ss;
-      ss << is.rdbuf();
-      return ss.str();
-  }
-#+END_SRC
-
-Read std::cin stream - console (stdin) 
-
-#+BEGIN_SRC cpp 
-  // Use types a text and types CTRL + D when he is done sending EOF character 
-  >> auto text = istreamToString(std::cin); 
-   A stdin input stream works like a "console file".      
-   In UNIX everything has a file interface, works with a file API, everything is a file.
-   Type CTRL + D to send EOF and close this stream.
-
-  >> std::cout << "text = " << text2 << std::endl;
-  text =  A stdin input stream works like a "console file".
-   In UNIX everything has a file interface, works with a file API, everything is a file.
-   Type CTRL + D to send EOF and close this stream.
-#+END_SRC
-
-Read file input stream: 
-
-#+BEGIN_SRC cpp 
-  >> auto ifs = std::ifstream("/proc/sys/kernel/osrelease")
-  (std::basic_ifstream<char, std::char_traits<char> > &) @0x7f3edbc0a688
-
-  >> auto os_release = istreamToString(ifs)
-  (std::basic_string<char, std::char_traits<char>, std::allocator<char> > &) "4.20.16-100.fc28.x86_64
-  "
-
-  >> std::cout << " =>> Linux-OS Release = " << os_release << std::endl;
-   =>> Linux-OS Release = 4.20.16-100.fc28.x86_64
-#+END_SRC
-
-Read stringstream - memory stream. 
-
-#+BEGIN_SRC cpp 
-  >> std::stringstream ms;
-  >> ms << " UNIX - Linux OS2 Mainframes AIX VxWorks QNX ";
-  >> ms << "\n network TCP IP UDP SOCKET packets";
-  >> ms << " \n binary bits octets speed 3G 4G 5G business flow currency";
-  >> ms << " \n technology price technology technology technology";
-  >> ms << std::flush;
-
-  // Type of txt => std::string 
-  >> auto txt = istreamToString(ms);
-
-  >> std::cout << "text = \n" << txt ;
-  text = 
-   UNIX - Linux OS2 Mainframes AIX VxWorks QNX 
-   network TCP IP UDP SOCKET packets 
-   binary bits octets speed 3G 4G 5G business flow currency 
 #+END_SRC
 
 ** Saving and restoring IO flags 
