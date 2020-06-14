@@ -5732,6 +5732,251 @@ Output:
  n = 10
 #+END_SRC
 
+*** Generic lambdas C++14
+**** Overview  
+
+C++14 introduced _generic-lambdas_ language feature which allows
+defining lambda with _auto_ keyword which behaves like templated
+functions. 
+
+Papers: 
+
+  * N3559 / *Proposal for Generic (Polymorphic) Lambda Expressions*
+    + <http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2013/n3559.pdf>
+
+  * N3649 / *Generic (Polymorphic) Lambda Expressions (Revision 3)*
+    * <http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2013/n3649.html>
+
+  * *C++ lambda expressions and closures*
+    * https://core.ac.uk/download/pdf/82307163.pdf
+    * https://eel.is/c++draft/expr.prim.lambda.closure
+
+Generic lambda expression named 'print_lambda' with generic parameter a.
+
+#+BEGIN_SRC cpp 
+     auto print_lambda = [](const auto& a){ std::cout << " Value of a = " << a << '\n'; };
+
+     // Or equivalent: 
+     auto print_lambda = [](auto const& a){ std::cout << " Value of a = " << a << '\n'; };
+#+END_SRC
+
+The previous lamba is an anonymous Functor (function-object) created
+by the compiler with a templated parameter in the function-call
+operator.
+
+#+BEGIN_SRC cpp 
+  // Anonymous functor 
+  class __Anonymous_generic_lambda
+  {
+  public: 
+     template<typename T>
+     void operator(const T& a)
+     {  
+         std::cout << " Value of a = " << a << '\n';
+     }
+  };
+#+END_SRC
+**** Example 1 - Basic Generic Lambdas
+
+File: cpp-generic-lambda.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <vector>
+  #include <string>
+  #include <algorithm>
+
+  template<typename iterable, typename Callable>
+  void custom_algorithm(iterable const& seq, Callable func)
+  {
+      for(auto const& x: seq) func(x);
+  }
+
+  int main(int argc, char** argv)
+  {
+      auto print_lambda = [](auto a){ std::cout << " Value of a = " << a << '\n'; };
+
+      std::puts(" ---------- Apply to single argument ---------------");
+      print_lambda(10);
+      print_lambda('x');
+      print_lambda("<generic-lambda-on-the-rocks!>");
+
+      std::puts("\n ---- Apply to integer vector / st::for_each ------------");
+      std::vector<int> xs{10, 2, 5, 9};
+      std::for_each(xs.begin(), xs.end(), print_lambda);
+
+      std::puts("\n -- [1] Apply to string vector / std::for_each ------------");
+      std::vector<std::string> words = {"C++",  "ADA", "RUST", "DLang", "Dart" };
+      std::for_each(words.begin(), words.end(), print_lambda);
+
+      std::puts("\n -- [2] Apply to string vector / std::for_each ------------");
+
+      int i = 0;
+      // Capturing lambda defined at call-site.
+      std::for_each(words.begin(), words.end(),
+                    [&i](auto const& x){
+                          std::cout << " x[" << i++ << "] = " << x << '\n';
+                    });
+
+      std::puts("\n - Generic lambda with custom algorithm ----------------");
+      custom_algorithm(xs, print_lambda);
+
+     return 0;
+  }
+#+END_SRC
+
+Building: 
+
+#+BEGIN_SRC sh 
+  $ g++  cpp-generic-lambda.cpp -o app1.bin -std=c++1z -Wall -ggdb
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC sh 
+  $ ./app1.bin 
+   ---------- Apply to single argument ---------------
+   Value of a = 10
+   Value of a = x
+   Value of a = <generic-lambda-on-the-rocks!>
+
+   ---- Apply to integer vector / st::for_each ------------
+   Value of a = 10
+   Value of a = 2
+   Value of a = 5
+   Value of a = 9
+
+   -- [1] Apply to string vector / std::for_each ------------
+   Value of a = C++
+   Value of a = ADA
+   Value of a = RUST
+   Value of a = DLang
+   Value of a = Dart
+
+   -- [2] Apply to string vector / std::for_each ------------
+   x[0] = C++
+   x[1] = ADA
+   x[2] = RUST
+   x[3] = DLang
+   x[4] = Dart
+
+   - Generic lambda with custom algorithm ----------------
+   Value of a = 10
+   Value of a = 2
+   Value of a = 5
+   Value of a = 9
+
+#+END_SRC
+**** Example 2 - Generic lambdas and templates 
+
+Generic lambdas work in a similar way to templated functions or
+classes. A lambda generic expression can be applied to any type
+satisfying its type requirements (concepts). In the following code,
+the generic lambda _mygen_lambda1_ which is similar to the functor
+_functor1_, can be applied to any class or type with members _get_param_
+and _get_name_ regardless of its class hierarchy. It works in a similar
+way to *duck typing* of dynamic languages such as Python, Ruby,
+JavaScript and so on. The difference for dynamic typed languages is
+that, if the type does not satisfy the requirements of the generic
+lambda, a compile-time error will happen.
+
+File: generic-lambda2.cpp 
+
+#+BEGIN_SRC cpp 
+   #include <iostream>
+   #include <vector>
+   #include <string>
+   #include <algorithm>
+
+   struct Circle
+   {
+       int rad = 0;
+
+       std::string get_name(){ return "circle"; }
+
+       void set_parameter(int rad)
+       {
+           std::printf("[INFO] Circle parameter set to %d \n", rad);
+           this->rad = rad;
+       }
+       int get_param() const {return rad; }
+   };
+
+   class Gearbox
+   {
+       int x = 10;
+    public:
+       std::string get_name(){ return "gearbox"; }
+
+       void set_parameter(int x)
+       {
+           std::printf("[INFO] Gearbox parameter set to %d \n", x);
+           this->x = x;
+       }
+
+       int get_param() const {return x; }
+
+       void dummy_non_common_method() { }
+   };
+
+   // The generic lambda mygen_lambda1 is similar to this
+   // templated functor.
+   struct functor1
+   {
+       template<typename T>
+       void operator()(T& obj, int k)
+       {
+           std::cout << " Object name = " << obj.get_name() << "\n";
+           obj.set_parameter(k);
+           std::cout << " Parameter set to " << k << "\n";
+       }
+   };
+
+
+   int main(int argc, char** argv)
+   {
+       auto mygen_lambda1 = [](auto& obj, int k){
+           std::cout << " Object name = " << obj.get_name() << "\n";
+           obj.set_parameter(k);
+           std::cout << " Parameter set to " << k << "\n";
+       };
+
+       std::puts("\n --- Apply lambda on Circle object ");
+       Circle c1;
+       mygen_lambda1(c1, 5);
+
+       std::puts("\n --- Apply lambda on Gearbox object ");
+       Gearbox g1;
+       mygen_lambda1(g1, 9);
+
+       std::puts("\n --- Apply functor on Gearbox object ");
+       functor1 fun1;
+       fun1(g1, 9);
+
+           return 0;
+   }
+
+#+END_SRC
+
+Program output: 
+
+#+BEGIN_SRC sh 
+   --- Apply lambda on Circle object 
+   Object name = circle
+  [INFO] Circle parameter set to 5 
+   Parameter set to 5
+
+   --- Apply lambda on Gearbox object 
+   Object name = gearbox
+  [INFO] Gearbox parameter set to 9 
+   Parameter set to 9
+
+   --- Apply functor on Gearbox object 
+   Object name = gearbox
+  [INFO] Gearbox parameter set to 9 
+   Parameter set to 9
+
+#+END_SRC
 *** Self-executable lambda for complex initialization 
 
 Self-executable lambdas functions can also be used for performing
