@@ -70,9 +70,9 @@ int main(){
 	DWORD const infoboxOptions  = MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND;
 	// Text in UTF8 => Note => Windows API doesn't work with UTF8
 	// or multi-byte characters as the API treats the chars as they were ANSI.
-	char narrowText []  = "Some chinese text não inglês  读写汉字 - 学中文";
+	char narrowText []  = "한국어 (Korean) / 读写汉字 - 学中文 (Chinese)";
 	// Unicode text in UTF16 
-	wchar_t wideText []  = L"Some chinese text não inglês 读写汉字 - 学中文";
+	wchar_t wideText []  = L"한국어 (Korean) /  读写汉字 - 学中文 (Chinese)";
 	MessageBoxA( 0, narrowText, "ANSI (narrow) text:", infoboxOptions );    
     MessageBoxW( 0, wideText, L"Unicode (wide) text:", infoboxOptions );
 	
