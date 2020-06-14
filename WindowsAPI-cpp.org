@@ -773,7 +773,6 @@ Signature of Wide unicode functions:
 *** Example - ANSI X Unicode and Windows API 
 
  + Source Code: [[file:src/windows/winapi-enconding1.cpp][file:src/windows/winapi-enconding1.cpp]]
- + Gist: [[https://gist.github.com/caiorss/c26e018b1e6838664bd949775fcdf551][winapi-enconding1.cpp]]
 
 Compiling with GCC: 
 
@@ -969,20 +968,20 @@ Directories created:
     DWORD const infoboxOptions  = MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND;
     // Text in UTF8 => Note => Windows API doesn't work with UTF8
     // or multi-byte characters as the API treats the chars as they were ANSI.
-    char narrowText []  = "Some chinese text não inglês  读写汉字 - 学中文";
+    char narrowText []  = "한국어 (Korean) / 读写汉字 - 学中文 (Chinese)";
     // Unicode text in UTF16 
-    wchar_t wideText []  = L"Some chinese text não inglês 读写汉字 - 学中文";
+    wchar_t wideText []  = L"한국어 (Korean) /  读写汉字 - 学中文 (Chinese)";
     MessageBoxA( 0, narrowText, "ANSI (narrow) text:", infoboxOptions );    
     MessageBoxW( 0, wideText, L"Unicode (wide) text:", infoboxOptions );
 #+END_SRC
- 
+
 Output of [[https://docs.microsoft.com/en-us/windows/desktop/api/winuser/nf-winuser-messageboxa][MessageBoxA]] (failure, it cannot deal with unicode UTF-8 chars):
 
  [[file:images/messagebox-ansi1.png][file:images/messagebox-ansi1.png]]
 
 Output of [[https://docs.microsoft.com/en-us/windows/desktop/api/winuser/nf-winuser-messageboxw][MessageBoxW]] (success):
 
- [[file:images/messabox-unicode1.png][file:images/messabox-unicode1.png]]
+ [[file:images/messagebox-unicode1.png][file:images/messagebox-unicode1.png]]
 
 *** Example - Using Windows API with UTF8
 
@@ -1198,6 +1197,10 @@ Compiling with Mingw/GCC:
 #+CAPTION: Output with UTF8 enalbed => Terminal in unicode UTF8 mode 
 [[file:images/windows-console-unicode-utf8.png][file:images/windows-console-unicode-utf8.png]]
 
+Note: The Japanese characters (Kanji and Hiragrama) are not shown
+because the current terminal lacks Japanese font. But other terminals
+such as cmder.exe or Windows terminal shows those characters.
+
 See: 
 
  + WINAPI - [[https://docs.microsoft.com/en-us/windows/console/setconsoleoutputcp][SetConsoleOutputCP function - Windows Console | Microsoft Docs]]
@@ -1346,8 +1349,7 @@ Parts:
            << "References   = " << ProcessEntry.cntUsage       << "\n"
            << "Thread Count = " << ProcessEntry.cntThreads     << "\n"  
            << "-----------------------------------------------\n";
-      }
-    while( Process32Next( hProcessSnapShot, &ProcessEntry ));
+    } while( Process32Next( hProcessSnapShot, &ProcessEntry ));
     // Close handle releasing resource.
     CloseHandle( hProcessSnapShot );
     return 1;
@@ -1624,6 +1626,266 @@ Print all DLLs used by the process:
         }	
    }
 #+END_SRC
+** CODE - Show files and directories attributes       :cmake:build:demo:code:
+
+Gist: 
+ + https://gist.github.com/bad57134dd6e95e394a04b8b727a825f
+
+File: attrib.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <windows.h>
+  #include <string>
+
+  #define disp(expr) std::cerr << std::boolalpha << __FILE__ << ":" << __LINE__ << ":" \
+                                                           << " ; " << #expr << " = " << (expr) << std::endl
+
+  void showFileAttributes(std::string path)
+  {
+       DWORD attr = GetFileAttributesA(path.c_str());
+       disp(attr);
+       bool isInvalid = attr == INVALID_FILE_ATTRIBUTES;
+       bool exists = !isInvalid;
+       bool isDirectory = exists && static_cast<bool>(attr & FILE_ATTRIBUTE_DIRECTORY);
+       bool isFile = exists && !static_cast<bool>(attr & FILE_ATTRIBUTE_DIRECTORY);
+       std::cout << "File attributes for path = " << path << std::endl;
+       std::cout << std::boolalpha
+                 << "Is invalid file attribute = " << isInvalid << std::endl
+                 << "File exists               = " << exists << std::endl
+                 << "Is directory              = " << isDirectory << std::endl
+                 << "Is file                   = " << isFile << std::endl;
+       std::cout << "--------------------------------" << std::endl
+                 << std::endl;
+  }
+
+  bool fileExists(std::string path)
+  {
+     DWORD attr = GetFileAttributesA(path.c_str());
+     return !(attr == INVALID_FILE_ATTRIBUTES) && !(attr & FILE_ATTRIBUTE_DIRECTORY);
+  }
+
+  bool dirExists(std::string path)
+  {
+      DWORD attr = GetFileAttributesA(path.c_str());
+      return !(attr == INVALID_FILE_ATTRIBUTES) && (attr & FILE_ATTRIBUTE_DIRECTORY);
+  }
+
+  // Get Path to current program / Application 
+  std::string pathToThisProgram()
+  {
+      std::string result(MAX_PATH, 0);
+      int n = GetModuleFileNameA(NULL, &result[0], MAX_PATH);
+      result.resize(n);
+      return result;
+  }
+
+  std::string getEnvironment(std::string varname)
+  {
+      static int size = 32767;
+      std::string result(size, 0);
+      DWORD n = GetEnvironmentVariableA(varname.c_str(), &result[0], size);
+      result.resize(n);
+      return result;
+  }
+
+  int main()
+  {
+      std::cout << "Path to this program = "
+                << pathToThisProgram() << std::endl;
+      std::cout << "Evironment variable => %USERPROFILE% = "
+                << getEnvironment("USERPROFILE") << std::endl;
+      std::cout << "Evironment variable => %SYSTEMROOT% = "
+                << getEnvironment("SYSTEMROOT") << std::endl;
+      std::cout << "Evironment variable => %WRONGVAR% = "
+                << getEnvironment("WRONGVAR") << std::endl;
+
+      std::string thisprog = pathToThisProgram();
+      std::string dest = getEnvironment("USERPROFILE") + "\\Desktop\\app.exe";
+      // Copy file to Desktop
+      if (fileExists(dest))
+      {
+          std::cout << " ==> File " << dest << " exists - removing it ... " << std::endl;
+          DeleteFileA(dest.c_str());
+      }
+      bool result = CopyFileA(thisprog.c_str(), dest.c_str(), TRUE);
+      std::cout << "Copy successful? = " << std::boolalpha << result << std::endl;
+
+      //Delete this executable
+      bool result2 = DeleteFileA(thisprog.c_str());
+      std::cout << "Delete successful? = " << std::boolalpha << result2 << std::endl;
+
+      std::cout << "-------------------------------" << std::endl;
+
+      showFileAttributes("C:\\Windows\\System32");
+      showFileAttributes("C:/Windows/System32");
+      showFileAttributes("C:\\Windows\\System32\\cmd.exe");
+      showFileAttributes("C:\\Windows\\System32DONOT_EXISTS");
+
+      disp(fileExists("C:\\Windows\\System32"));
+      disp(fileExists("C:/Windows/System32"));
+      // Windows file system is case insensitive!
+      disp(fileExists("C:\\Windows\\System32\\cmd.exe"));
+      disp(fileExists("C:\\Windows\\System32\\CMD.EXE"));
+      disp(fileExists("C:\\Windows\\System32\\kernel32.dll"));
+      disp(fileExists("C:\\Windows\\System32DONOT_EXISTS"));
+
+      std::cout << std::endl;
+
+      disp(dirExists("C:\\Windows\\System32"));
+      disp(dirExists("C:/Windows/System32"));
+      disp(dirExists("C:\\Windows\\System32\\cmd.exe"));
+      disp(dirExists("C:\\Windows\\System32\\CMD.EXE"));
+      disp(dirExists("C:\\Windows\\System32\\kernel32.dll"));
+      disp(dirExists("C:\\Windows\\System32DONOT_EXISTS"));
+      disp(dirExists("C:\\$Recycle.bin"));
+
+      return 0;
+  }
+#+END_SRC
+
+File: CMakeLists.txt 
+
+#+BEGIN_SRC cmake 
+   cmake_minimum_required(VERSION 3.9)
+   project(WindowsExploration)
+
+   #========== Global Configurations =============#
+   #----------------------------------------------#
+   set(CMAKE_CXX_STANDARD 17)     
+   set(CMAKE_VERBOSE_MAKEFILE ON)
+
+   #========== Targets Configurations ============#
+   add_executable(attrib attrib.cpp)
+#+END_SRC
+
+Download sources: 
+
+#+BEGIN_SRC sh 
+  $ git clone https://gist.github.com/bad57134dd6e95e394a04b8b727a825f attrib
+  $ cd attrib
+ 
+  $ ls
+  CMakeLists.txt  Makefile  attrib.cpp  build_msvc.bat
+#+END_SRC
+
+Building manually with MINGW (GCC ported to Windows): 
+
+#+BEGIN_SRC sh 
+  $ g++ attrib.cpp -o attrib.exe -std=c++1z -ggdb -Wall -Wextra
+  $ g++ attrib.cpp -o attrib.scr -std=c++1z -ggdb -Wall -Wextra
+
+  $ file attrib.exe
+  attrib.exe: PE32+ executable (console) x86-64, for MS Windows
+#+END_SRC
+
+Building manually with MSVC-2019 (cl.exe) via developer command prompt
+at start menu. 
+
+#+BEGIN_SRC sh 
+  $ cl.exe attrib.cpp /out:attrib.exe /ZI /std:c++latest
+#+END_SRC
+
+Building via CMake and Visual Studio Code Vscode: 
+
+#+BEGIN_SRC sh 
+  # Open the directory with source files in Vscode, Select the toolchain (called KIT)
+  # ,then build the application. 
+  $ cd attrib 
+  $ vscode . 
+#+END_SRC
+
+Building with CMake and "Visual" Studio Compiler (MSVC-15) from command
+line: 
+
+#+BEGIN_SRC sh 
+  $ cmake -H. -B_build -DCMAKE_BUILD_TYPE=Debug -G "Visual Studio 14 2015 Win64"
+  $ cmake --build _build --target
+
+  # Command file comes from GIT installation that provides some Linux/UNIX tools
+  # for Windows. 
+  $ file _build/Debug/atrib.exe
+  _build/Debug/atrib.exe: PE32+ executable (console) x86-64, for MS Windows
+#+END_SRC
+
+Building with CMake and MSVC 2019 (Only works if this compiler is
+already installed.)
+
+#+BEGIN_SRC sh 
+  $ cmake -B_build -H. -DCMAKE_BUILD_TYPE=Debug
+  $ cmake --build _build --target
+#+END_SRC
+
+Building with CMake and Mingw: 
+
+#+BEGIN_SRC sh 
+  $ cmake -H. -B_build_mingw -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE
+  $ cmake --build _build_mingw --target
+
+  $ dir _build_mingw/
+  CMakeCache.txt  CMakeFiles  Makefile  cmake_install.cmake  compile_commands.json
+#+END_SRC
+
+Program output: 
+
+#+BEGIN_SRC sh 
+   $ _build\Debug\attrib.exe
+
+   Path to this program = Z:\windows-experiments\build\attrib.exe
+   Evironment variable => %USERPROFILE% = C:\Users\myuser 
+   Evironment variable => %SYSTEMROOT% = C:\Windows
+   Evironment variable => %WRONGVAR% =
+    ==> File C:\Users\myuser\Desktop\app.exe exists - removing it ...
+   Copy successful? = true
+   Delete successful? = false
+   -------------------------------
+   ..\application1.cpp:11: ; attr = 16
+   File attributes for path = C:\Windows\System32
+   Is invalid file attribute = false
+   File exists               = true
+   Is directory              = true
+   Is file                   = false
+   --------------------------------
+
+   ..\application1.cpp:11: ; attr = 16
+   File attributes for path = C:/Windows/System32
+   Is invalid file attribute = false
+   File exists               = true
+   Is directory              = true
+   Is file                   = false
+   --------------------------------
+
+   ..\application1.cpp:11: ; attr = 32
+   File attributes for path = C:\Windows\System32\cmd.exe
+   Is invalid file attribute = false
+   File exists               = true
+   Is directory              = false
+   Is file                   = true
+   --------------------------------
+
+   ..\application1.cpp:11: ; attr = 4294967295
+   File attributes for path = C:\Windows\System32DONOT_EXISTS
+   Is invalid file attribute = true
+   File exists               = false
+   Is directory              = false
+   Is file                   = false
+   --------------------------------
+
+   ..\application1.cpp:90: ; fileExists("C:\\Windows\\System32") = false
+   ..\application1.cpp:91: ; fileExists("C:/Windows/System32") = false
+   ..\application1.cpp:93: ; fileExists("C:\\Windows\\System32\\cmd.exe") = true
+   ..\application1.cpp:94: ; fileExists("C:\\Windows\\System32\\CMD.EXE") = true
+   ..\application1.cpp:95: ; fileExists("C:\\Windows\\System32\\kernel32.dll") = true
+   ..\application1.cpp:96: ; fileExists("C:\\Windows\\System32DONOT_EXISTS") = false
+
+   ..\application1.cpp:100: ; dirExists("C:\\Windows\\System32") = true
+   ..\application1.cpp:101: ; dirExists("C:/Windows/System32") = true
+   ..\application1.cpp:102: ; dirExists("C:\\Windows\\System32\\cmd.exe") = false
+   ..\application1.cpp:103: ; dirExists("C:\\Windows\\System32\\CMD.EXE") = false
+   ..\application1.cpp:104: ; dirExists("C:\\Windows\\System32\\kernel32.dll") = false
+   ..\application1.cpp:105: ; dirExists("C:\\Windows\\System32DONOT_EXISTS") = false
+   ..\application1.cpp:106: ; dirExists("C:\\$Recycle.bin") = true
+#+END_SRC
 ** CODE - List directory files 
 
 Program for listing directories, similar to U*nix's ls or Windows' dir
@@ -1793,6 +2055,7 @@ WinAPIs used:
  + [[https://docs.microsoft.com/en-us/windows/desktop/api/fileapi/nf-fileapi-findnextfilew][FindNextFileW]]
  + [[https://msdn.microsoft.com/en-us/library/windows/desktop/ms679360(v=vs.85).aspx][GetLastError]]
  + [[https://docs.microsoft.com/en-us/windows/desktop/api/winbase/nf-winbase-formatmessage][FormatMessage]]
+
 ** CODE - Enumerate Logical Drivers 
 
 This code enumerates all logical drivers in the current Windows
