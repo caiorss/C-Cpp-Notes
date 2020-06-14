@@ -699,6 +699,227 @@ Output:
     [ERROR] Failure = GSL: Precondition failure at ... .../_deps/gsl-src/include/gsl/span: 499
 #+END_SRC
 
+** mapbox variant 
+
+Mapbox variant is a C++14,C++11 header-only library which provides
+variant type which are discriminant union containers (sum types), also
+called as algebraic data types in functional programming languages. 
+
+Repository: 
+
+ + https://github.com/mapbox/variant/ 
+
+Benefits: 
+
+  + Supports C++11 and C++14 compilers 
+
+  + Header only, however with fast compile-time.
+
+  + Similar to Boost.Variant (unlike std::variant which is
+    stack-allocated), but it is more convenient to use than
+    Boost.Variant as the only way to get it is downloading and
+    installing the whole Boost library.
+
+  + Unlike, std::variant from C++17, which are stack allocated, mapbox
+    variant can deal with non-complete recursive types as it is
+    heap-allocated. In other words it can deal with recursive types
+    without explicitly using std::unique_ptr, std::shared_ptr and so
+    on.
+
+Use cases: 
+ 
+  + Traverse recursive data structures
+
+  + Evaluate ASTs - Abstract Syntax Trees. 
+
+  + Emulate algebraic data types from functional programming languages.
+
+  + Implementation of compilers, interpreters and parsers.
+
+ *Sample Code* 
+
+GIST: 
+  + https://gist.github.com/b153a0748519330dec0d153d2c608eb9
+
+File: CMakeLists.txt 
+
+#+BEGIN_SRC sh 
+  cmake_minimum_required(VERSION 3.9)
+  project(recursive-variant)
+
+  #========== Global Configurations =============#
+  #----------------------------------------------#
+
+  set(CMAKE_CXX_STANDARD 17)     
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+  set(CMAKE_CXX_EXTENSIONS OFF)
+
+  # ------------ Download CPM CMake Script ----------------#
+
+  ## Automatically donwload and use module CPM.cmake
+  file(DOWNLOAD https://raw.githubusercontent.com/TheLartians/CPM.cmake/v0.26.2/cmake/CPM.cmake
+                   "${CMAKE_BINARY_DIR}/CPM.cmake")
+  include("${CMAKE_BINARY_DIR}/CPM.cmake")
+
+  #----------- Add dependencies --------------------------#
+
+  CPMAddPackage(
+      NAME  mapbox-variant 
+      URL   https://github.com/mapbox/variant/archive/v1.1.6.zip
+      DOWNLOAD_ONLY YES
+  )
+
+  include_directories( ${mapbox-variant_SOURCE_DIR}/include )
+  message([TRACE] " mapbox source = ${mapbox-variant_SOURCE_DIR} ")
+
+  #----------- Set targets -------------------------------#
+
+  add_executable(app1 app1.cpp)
+  target_link_libraries(app1)
+
+#+END_SRC
+
+File: app1.cpp 
+
+#+BEGIN_SRC cpp 
+    #include <iostream>
+    #include <string> 
+    #include <sstream>
+    #include <cassert>
+
+    #include <mapbox/variant.hpp>
+
+    namespace m = mapbox::util;
+
+    // Forward declarations
+    struct Add;
+    struct Mul;
+
+    using expr = m::variant<int, m::recursive_wrapper<Add>, m::recursive_wrapper<Mul>>;
+
+    struct Add
+    {
+        expr lhs;
+        expr rhs;
+        Add(expr lhs, expr rhs): lhs(lhs), rhs(rhs){ }
+    };
+
+    struct Mul
+    {
+        expr lhs;
+        expr rhs;
+        Mul(expr lhs, expr rhs): lhs(lhs), rhs(rhs){ }
+    };
+
+    struct EvalVisitor
+    {
+        int operator()(int x)
+        {
+            return x;
+        }
+        int operator()(Add const& v)
+        {
+            return m::apply_visitor(*this, v.lhs)
+                    + m::apply_visitor(*this, v.rhs);
+        }
+
+        int operator()(Mul const& v)
+        {
+            return m::apply_visitor(*this, v.lhs)
+                    * m::apply_visitor(*this, v.rhs);
+        }
+
+    };
+
+
+    struct StringVisitor
+    {
+        std::string format_expr(expr node)
+        {
+            if(node.is<int>())
+                return std::to_string( node.get<int>() );
+            else
+                return std::string() + " (" + m::apply_visitor(*this, node) + ") ";
+        }
+
+        std::string operator()(int x)
+        {
+            return std::to_string(x);
+        }
+        std::string operator()(Add const& v)
+        {
+            return this->format_expr(v.rhs) + " + " + this->format_expr(v.lhs);
+        }
+
+        std::string operator()(Mul const& v)
+        {
+            return this->format_expr(v.rhs) + " * " + this->format_expr(v.lhs);
+        }
+
+    };
+
+
+
+
+    int main(int argc, char** argv)
+    {
+        std::cout << " [INFO] Running Ok " << std::endl;
+        std::cout << std::boolalpha;
+
+        // Abstract syntax tree
+        expr ast;
+
+        // Create visitor object
+        auto eval = EvalVisitor{};
+        auto disp = StringVisitor{};
+
+        ast = 10;
+        std::cout << " =>>  is_num? = " << ast.is<int>() << "\n";
+        std::cout << " =>>    value = " << ast.get<int>() << "\n";
+        std::cout << " =>>   Expr 0 = " << m::apply_visitor(disp, ast) << "\n";
+        std::cout << " =>> Result 0 = " << m::apply_visitor(eval, ast) << '\n';
+
+        ast = Mul(5, Add(3, 4));
+        std::cout << "\n";
+        std::cout << " =>>  is_num? = " << ast.is<int>() << "\n";
+        std::cout << " =>>  is_add? = " << ast.is<Mul>() << "\n";
+        std::cout << " =>>   Expr 1 = " << m::apply_visitor(disp, ast) << "\n";
+        std::cout << " =>> Result 1 = " << m::apply_visitor(eval, ast) << '\n';
+
+        // (10 + 4) * (5 * (3 + 8)) = 770
+        ast        = Mul(Add(10, 4), Mul(5, Add(3, 8)));
+        std::cout << "\n";
+        std::cout << " =>>  is_mul? = " << ast.is<Mul>() << "\n";
+        std::cout << " =>>   Expr 2 = " << m::apply_visitor(disp, ast) << "\n";
+        int result = m::apply_visitor(eval, ast);
+        assert(result == 770);
+        std::cout << " =>> Result 2 = " << result  << '\n';
+
+
+        return 0;
+    }
+
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC sh 
+   [INFO] Running Ok 
+   =>>  is_num? = true
+   =>>    value = 10
+   =>>   Expr 0 = 10
+   =>> Result 0 = 10
+
+   =>>  is_num? = false
+   =>>  is_add? = true
+   =>>   Expr 1 =  (4 + 3)  * 5
+   =>> Result 1 = 35
+
+   =>>  is_mul? = true
+   =>>   Expr 2 =  ( (8 + 3)  * 5)  *  (4 + 10) 
+   =>> Result 2 = 770
+#+END_SRC
+
 ** Range v3 (C++20)
 
 Ranges v3 is a header-only generic library that will be included in
