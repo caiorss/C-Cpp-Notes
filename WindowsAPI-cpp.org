@@ -163,6 +163,8 @@ Native executables, shared libraries and project files.
 |--------------------------+---------------+----------------------------------------------------------------------------|
 | *Native Code*              |               |                                                                            |
 | .exe                     | PE32 or PE64  | Windows Executable                                                         |
+| .scr                     | PE32 or PE64  | Windows Executable, screen saver animation                                 |
+|                          |               |                                                                            |
 | .dll                     | PE32 or PE64  | Dynamic Linked Library - It can be Native PE32, PE64 or .NET/CLR DLL       |
 | .xll                     | PE32 or PE64  | Excel native Addin (extensio or plugin). It is a dll with .xll extension.  |
 | .pyd                     | PE32 or PE64  | Python native module on Windows - DLL with .pyd extension instead of .dll. |
@@ -4472,6 +4474,712 @@ Explorer Options window.
 
   $ dll-runner.exe C:\\Windows\system32\shell32.dll Options_RunDLL "0"
 #+END_SRC
+
+** Read metadata from Windows PE Portable Executable files 
+
+PE (Portable Executable), which main variants are PE-32 and PE-64, is
+the binary file format used by Windows executable (.exe files),
+shared libraries (.dll files); device drivers (.sys files) and also
+Windows kernel.
+
+More infor about PE32 files: 
+
+   + [[https://blog.malwarebytes.com/threat-analysis/2014/05/five-pe-analysis-tools-worth-looking-at/][Five PE Analysis Tools Worth Looking At]]
+
+   + http://www.pelib.com/resources/luevel.txt
+
+   + https://wiki.osdev.org/PE
+
+   + [[https://docs.microsoft.com/en-us/windows/win32/debug/pe-format][PE Format - Microsft Docs]]
+
+   + [[https://en.wikibooks.org/wiki/X86_Disassembly/Windows_Executable_Files][Wikibooks - x86 Disassembly/Windows Executable Files]]
+
+   + [[https://en.wikipedia.org/wiki/Portable_Executable][Portable Executable]]
+
+   + [[http://www.csn.ul.ie/~caolan/publink/winresdump/winresdump/doc/pefile2.html][The Portable Executable File Format from Top to Bottom]]
+
+   + [[http://www.sunshine2k.de/reversing/tuts/tut_pe.htm][PE File Format Offsets - by Sunshine]]
+
+   + [[https://www.aldeid.com/wiki/PE-Portable-executable][PE-Portable-executable  - aldeid]]
+
+   + [[https://blog.kowalczyk.info/articles/pefileformat.html][Portable Executable File Format - blog kowalczyk]]
+
+   + [[https://codereview.stackexchange.com/questions/106037/pulling-pe32-header-info][Question - Pulling PE32 header info]]
+
+   + [[https://webserver2.tecgraf.puc-rio.br/~ismael/Cursos/YC++/apostilas/win32_xcoff_pe/tyne-example/Tiny%2520PE.htm][Tiny PE - Creating the smallest possible PE executable]]
+
+   + [[http://www.cse.tkk.fi/fi/opinnot/T-110.6220/2010_Spring_Malware_Analysis_and_Antivirus_Tchnologies/luennot-files/Erdelyi-Reverse_engineering_2.pdf][Reverse Engineering III: PE Format]]
+
+   + [[https://tech-zealots.com/malware-analysis/pe-portable-executable-structure-malware-analysis-part-2/][Undestanding PE Structure - Part 2]]
+
+   + https://formats.kaitai.io/uefi_te/index.html
+
+  *Project Files* 
+
+GIST: 
+ +  https://gist.github.com/f5edeaa4d929f5acf258d71caf6915cd
+
+File: CMakeLists.txt 
+
+#+BEGIN_SRC cmake 
+  cmake_minimum_required(VERSION 3.9)
+  project(pe-metadata)
+
+  #========== Global Configurations =============#
+  #----------------------------------------------#
+  set(CMAKE_CXX_STANDARD 17)     
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+
+  add_executable(pe-info pe-info.cpp pe_data.hpp)
+#+END_SRC
+
+File: pe_data.hpp
+
+#+BEGIN_SRC cpp 
+  #ifndef _PE_DATA_ 
+  #define _PE_DATA_ 
+
+  //#include <windows.h>
+  //#include <winnt.h>
+  constexpr size_t IMAGE_SIZEOF_SHORT_NAME = 8;
+  constexpr size_t IMAGE_NUMBEROF_DIRECTORY_ENTRIES = 16;
+
+  // using LONG      = long;
+  using LONG      = std::int32_t;
+  using WORD      = std::uint16_t;  // unsigned short;
+  using DWORD     = std::uint32_t;  // unsigned long; 
+  using BYTE      = std::uint8_t;   //unsigned char;
+  using ULONGLONG = std::uint64_t;  // unsigned long long 
+
+  // Source: <winttt.h>  => Original: typedef struct _IMAGE_DOS_HEADER
+  struct IMAGE_DOS_HEADER {            
+      WORD   e_magic;                     
+      WORD   e_cblp;                   
+      WORD   e_cp;                     
+      WORD   e_crlc;                   
+      WORD   e_cparhdr;                
+      WORD   e_minalloc;               
+      WORD   e_maxalloc;               
+      WORD   e_ss;                     
+      WORD   e_sp;                     
+      WORD   e_csum;                   
+      WORD   e_ip;                     
+      WORD   e_cs;                     
+      WORD   e_lfarlc;                 
+      WORD   e_ovno;                   
+      WORD   e_res[4];                 
+      WORD   e_oemid;                  
+      WORD   e_oeminfo;                
+      WORD   e_res2[10];               
+      //  Offset to the PE header from the beginning of the file. 
+      LONG   e_lfanew;                    
+    };
+
+   struct PE_HEADER
+   {
+      DWORD Signature; 
+      WORD  Machine;
+      WORD  NumberOfSections;
+      DWORD TimeDateStamp;
+      DWORD PointerToSymbolTable;
+      DWORD NumberOfSymbols;
+      WORD  SizeOfOptionalHeader;
+      WORD  Characteristics;
+   };
+
+  struct PE_IMAGE_DATA_DIRECTORY {
+      DWORD   VirtualAddress;
+      DWORD   Size;
+  };
+
+  struct PE_OPTIONAL_HEADER64 {
+      WORD        Magic;
+      BYTE        MajorLinkerVersion;
+      BYTE        MinorLinkerVersion;
+      DWORD       SizeOfCode;
+      DWORD       SizeOfInitializedData;
+      DWORD       SizeOfUninitializedData;
+      DWORD       AddressOfEntryPoint;
+      DWORD       BaseOfCode;
+      ULONGLONG   ImageBase;
+      DWORD       SectionAlignment;
+      DWORD       FileAlignment;
+      WORD        MajorOperatingSystemVersion;
+      WORD        MinorOperatingSystemVersion;
+      WORD        MajorImageVersion;
+      WORD        MinorImageVersion;
+      WORD        MajorSubsystemVersion;
+      WORD        MinorSubsystemVersion;
+      DWORD       Win32VersionValue;
+      DWORD       SizeOfImage;
+      DWORD       SizeOfHeaders;
+      DWORD       CheckSum;
+      WORD        Subsystem;
+      WORD        DllCharacteristics;
+      ULONGLONG   SizeOfStackReserve;
+      ULONGLONG   SizeOfStackCommit;
+      ULONGLONG   SizeOfHeapReserve;
+      ULONGLONG   SizeOfHeapCommit;
+      DWORD       LoaderFlags;
+      DWORD       NumberOfRvaAndSizes;    
+      PE_IMAGE_DATA_DIRECTORY DataDirectory[IMAGE_NUMBEROF_DIRECTORY_ENTRIES];
+  };
+
+  // source: winnt.h header 
+  struct PE_SECTION_HEADER {
+      BYTE    Name[IMAGE_SIZEOF_SHORT_NAME];
+      union {
+              DWORD   PhysicalAddress;
+              DWORD   VirtualSize;
+      } Misc;    
+      DWORD   VirtualAddress;
+      DWORD   SizeOfRawData;
+      DWORD   PointerToRawData;
+      DWORD   PointerToRelocations;
+      DWORD   PointerToLinenumbers;
+      WORD    NumberOfRelocations;
+      WORD    NumberOfLinenumbers;
+      DWORD   Characteristics;
+  };
+
+
+  #endif 
+#+END_SRC
+
+File: pe-info.cp
+
+#+BEGIN_SRC cpp 
+   #include <iostream>
+   #include <string>
+   #include <cstdint>
+   #include <fstream>
+   #include <cassert> 
+   #include <optional> // C++17 
+   #include <algorithm>
+
+   #include "pe_data.hpp"
+
+   /**  Read binary data from a input stream at a given offset.
+    * 
+    * @param tref    Reference to type that will be read from input stream 
+    * @param ifs     Input stream 
+    * @param offset  Offset from the beggining of the input stream or file.
+    */
+   template<typename T>
+   void read_at( T& tref
+               , std::istream& ifs
+               , std::optional<size_t> offset = {})
+   {
+       if(offset) ifs.seekg(offset.value());
+       ifs.read(reinterpret_cast<char*>(&tref), sizeof (T));
+   }
+
+   int main(int argc, char** argv)
+   {
+       if(argc < 2)
+       {
+           std::cout << "Usage: $ pe-info <FILE> " << "\n";
+           return EXIT_FAILURE;
+       }
+
+       auto file_path = std::string{ argv[1] } ;  
+
+       std::cout << " File: " << file_path << "\n";
+
+       auto ifs = std::ifstream (file_path, std::ios::in | std::ios::binary );    
+       assert( ifs.good() );
+
+       IMAGE_DOS_HEADER dos_header; 
+       // Position cursor at beggining of file 
+       read_at(dos_header, ifs, 0x00 );
+       assert( dos_header.e_magic == 0x5A4D ); 
+       // Offset of PE-Header from the beggining of the file 
+       auto e_lfanew = dos_header.e_lfanew;      
+
+       char magic[3] = { 
+         dos_header.e_magic & 0xFF          // Fist byte
+       , (dos_header.e_magic >> 8)  & 0xff  // Second byte 
+       , 0x00                               // Null character 
+       };
+
+       std::printf("\n ------ DOS HEADER ---------------\n");
+       std::printf(" [DOS_HEADER] MAGIC NUMBER = 0x%X (hex) \n", dos_header.e_magic);
+       std::printf(" [DOS_HEADER] MAGIC NUMBER = %s   (str) \n", magic);
+       std::printf(" [DOS_HEADER]     e_lfanew = 0x%X \n", e_lfanew);
+
+       //--------------------------------------------------//
+       //   PE HEADER                                      // 
+       //--------------------------------------------------//
+       PE_HEADER pe_header;    
+       read_at(pe_header, ifs, dos_header.e_lfanew);
+
+       //The signature should always have this value (0x4550)
+       assert( pe_header.Signature == 0x4550 );
+
+       std::printf("\n -------- PE - Header ----------------------\n\n");
+       std::printf(" Note: if machine is 0x8664 => the processor is AMD-Intel x86-64 \n");
+       std::printf("\n");
+       std::printf("          Signature = 0x%X \n", pe_header.Signature);
+       std::printf("            Machine = 0x%X \n", pe_header.Machine);
+       std::printf(" Number of sections = %d \n",   pe_header.NumberOfSections);
+
+       //--------------------------------------------------//
+       //   PE OPTIONAL HEADER                             // 
+       //--------------------------------------------------//
+       PE_OPTIONAL_HEADER64 pe_opt;
+       read_at(pe_opt, ifs);
+
+       std::string subsystem = [&pe_opt]() {
+           if(pe_opt.Subsystem == 1)  return "No subsystem required (device drivers)";      
+           if(pe_opt.Subsystem == 2)  return "gui / graphical";
+           if(pe_opt.Subsystem == 3)  return "console";      
+           if(pe_opt.Subsystem == 9)  return "Windows CE system";        
+           if(pe_opt.Subsystem == 10) return "EFI - Extensible Firmware Interfgace";                
+           if(pe_opt.Subsystem == 16) return "Windows Boot";                
+
+           return "Unknown";
+       }();
+
+       std::printf("\n -------- PE Optional Header ----------------------\n\n");
+       std::printf("                           Magic = 0x%X \n", pe_opt.Magic);
+       std::printf("                       Subsystem = 0x%X \n", pe_opt.Subsystem);
+       std::printf("                       Subsystem = %s   \n", subsystem.c_str());
+       std::printf("           Address of Entrypoint = 0x%X \n", pe_opt.AddressOfEntryPoint);
+       std::printf("              Major link version = 0x%X \n", pe_opt.MajorLinkerVersion);
+       std::printf("                    Size of code = 0x%X \n", pe_opt.SizeOfCode);
+       std::printf("  Major Operating System Version = 0x%X \n", pe_opt.MajorOperatingSystemVersion);
+       std::printf("  Minor Operating System Version = 0x%X \n", pe_opt.MinorOperatingSystemVersion);
+
+       //--------------------------------------------------//
+       //   DATA SECTIONS                                  // 
+       //--------------------------------------------------//
+       std::printf("\n -------- PE Sections ---------------\n\n");
+       PE_SECTION_HEADER sec;
+
+       for(int i = 0; i < pe_header.NumberOfSections; i++)
+       {
+           read_at(sec, ifs);        
+           std::printf(" [%d] section name = %s \n", i, sec.Name);
+           std::printf("     => Virtual Address = 0x%X \n", sec.VirtualAddress);
+           std::printf("     =>     Raw Address = 0x%X \n", sec.PointerToRawData);
+           std::printf("\n");
+       }       
+
+       return 0;
+   }
+#+END_SRC
+
+ *Building*
+
+  + This proof-of-concept application is cross-platform and does not
+    depend on the Windows API, therefore, it can also be built on
+    Linux or any Unix-like operating system. 
+
+Build on Windows 
+
+#+BEGIN_SRC sh 
+  $ git clone f5edeaa4d929f5acf258d71caf6915cd
+
+File: CMakeLists.txt 
+
+#+BEGIN_SRC cmake 
+  cmake_minimum_required(VERSION 3.9)
+  project(pe-metadata)
+
+  #========== Global Configurations =============#
+  #----------------------------------------------#
+  set(CMAKE_CXX_STANDARD 17)     
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+
+  add_executable(pe-info pe-info.cpp pe_data.hpp)
+#+END_SRC
+
+File: pe_data.hpp
+
+#+BEGIN_SRC cpp 
+  #ifndef _PE_DATA_ 
+  #define _PE_DATA_ 
+
+  //#include <windows.h>
+  //#include <winnt.h>
+  constexpr size_t IMAGE_SIZEOF_SHORT_NAME = 8;
+  constexpr size_t IMAGE_NUMBEROF_DIRECTORY_ENTRIES = 16;
+
+  // using LONG      = long;
+  using LONG      = std::int32_t;
+  using WORD      = std::uint16_t;  // unsigned short;
+  using DWORD     = std::uint32_t;  // unsigned long; 
+  using BYTE      = std::uint8_t;   //unsigned char;
+  using ULONGLONG = std::uint64_t;  // unsigned long long 
+
+  // Source: <winttt.h>  => Original: typedef struct _IMAGE_DOS_HEADER
+  struct IMAGE_DOS_HEADER {            
+      WORD   e_magic;                     
+      WORD   e_cblp;                   
+      WORD   e_cp;                     
+      WORD   e_crlc;                   
+      WORD   e_cparhdr;                
+      WORD   e_minalloc;               
+      WORD   e_maxalloc;               
+      WORD   e_ss;                     
+      WORD   e_sp;                     
+      WORD   e_csum;                   
+      WORD   e_ip;                     
+      WORD   e_cs;                     
+      WORD   e_lfarlc;                 
+      WORD   e_ovno;                   
+      WORD   e_res[4];                 
+      WORD   e_oemid;                  
+      WORD   e_oeminfo;                
+      WORD   e_res2[10];               
+      //  Offset to the PE header from the beginning of the file. 
+      LONG   e_lfanew;                    
+    };
+
+   struct PE_HEADER
+   {
+      DWORD Signature; 
+      WORD  Machine;
+      WORD  NumberOfSections;
+      DWORD TimeDateStamp;
+      DWORD PointerToSymbolTable;
+      DWORD NumberOfSymbols;
+      WORD  SizeOfOptionalHeader;
+      WORD  Characteristics;
+   };
+
+  struct PE_IMAGE_DATA_DIRECTORY {
+      DWORD   VirtualAddress;
+      DWORD   Size;
+  };
+
+  struct PE_OPTIONAL_HEADER64 {
+      WORD        Magic;
+      BYTE        MajorLinkerVersion;
+      BYTE        MinorLinkerVersion;
+      DWORD       SizeOfCode;
+      DWORD       SizeOfInitializedData;
+      DWORD       SizeOfUninitializedData;
+      DWORD       AddressOfEntryPoint;
+      DWORD       BaseOfCode;
+      ULONGLONG   ImageBase;
+      DWORD       SectionAlignment;
+      DWORD       FileAlignment;
+      WORD        MajorOperatingSystemVersion;
+      WORD        MinorOperatingSystemVersion;
+      WORD        MajorImageVersion;
+      WORD        MinorImageVersion;
+      WORD        MajorSubsystemVersion;
+      WORD        MinorSubsystemVersion;
+      DWORD       Win32VersionValue;
+      DWORD       SizeOfImage;
+      DWORD       SizeOfHeaders;
+      DWORD       CheckSum;
+      WORD        Subsystem;
+      WORD        DllCharacteristics;
+      ULONGLONG   SizeOfStackReserve;
+      ULONGLONG   SizeOfStackCommit;
+      ULONGLONG   SizeOfHeapReserve;
+      ULONGLONG   SizeOfHeapCommit;
+      DWORD       LoaderFlags;
+      DWORD       NumberOfRvaAndSizes;    
+      PE_IMAGE_DATA_DIRECTORY DataDirectory[IMAGE_NUMBEROF_DIRECTORY_ENTRIES];
+  };
+
+  // source: winnt.h header 
+  struct PE_SECTION_HEADER {
+      BYTE    Name[IMAGE_SIZEOF_SHORT_NAME];
+      union {
+              DWORD   PhysicalAddress;
+              DWORD   VirtualSize;
+      } Misc;    
+      DWORD   VirtualAddress;
+      DWORD   SizeOfRawData;
+      DWORD   PointerToRawData;
+      DWORD   PointerToRelocations;
+      DWORD   PointerToLinenumbers;
+      WORD    NumberOfRelocations;
+      WORD    NumberOfLinenumbers;
+      DWORD   Characteristics;
+  };
+
+
+  #endif 
+#+END_SRC
+
+File: pe-info.cp
+
+#+BEGIN_SRC cpp 
+   #include <iostream>
+   #include <string>
+   #include <cstdint>
+   #include <fstream>
+   #include <cassert> 
+   #include <optional> // C++17 
+   #include <algorithm>
+
+   #include "pe_data.hpp"
+
+   /**  Read binary data from a input stream at a given offset.
+    * 
+    * @param tref    Reference to type that will be read from input stream 
+    * @param ifs     Input stream 
+    * @param offset  Offset from the beggining of the input stream or file.
+    */
+   template<typename T>
+   void read_at( T& tref
+               , std::istream& ifs
+               , std::optional<size_t> offset = {})
+   {
+       if(offset) ifs.seekg(offset.value());
+       ifs.read(reinterpret_cast<char*>(&tref), sizeof (T));
+   }
+
+   int main(int argc, char** argv)
+   {
+       if(argc < 2)
+       {
+           std::cout << "Usage: $ pe-info <FILE> " << "\n";
+           return EXIT_FAILURE;
+       }
+
+       auto file_path = std::string{ argv[1] } ;  
+
+       std::cout << " File: " << file_path << "\n";
+
+       auto ifs = std::ifstream (file_path, std::ios::in | std::ios::binary );    
+       assert( ifs.good() );
+
+       IMAGE_DOS_HEADER dos_header; 
+       // Position cursor at beggining of file 
+       read_at(dos_header, ifs, 0x00 );
+       assert( dos_header.e_magic == 0x5A4D ); 
+       // Offset of PE-Header from the beggining of the file 
+       auto e_lfanew = dos_header.e_lfanew;      
+
+       char magic[3] = { 
+         dos_header.e_magic & 0xFF          // Fist byte
+       , (dos_header.e_magic >> 8)  & 0xff  // Second byte 
+       , 0x00                               // Null character 
+       };
+
+       std::printf("\n ------ DOS HEADER ---------------\n");
+       std::printf(" [DOS_HEADER] MAGIC NUMBER = 0x%X (hex) \n", dos_header.e_magic);
+       std::printf(" [DOS_HEADER] MAGIC NUMBER = %s   (str) \n", magic);
+       std::printf(" [DOS_HEADER]     e_lfanew = 0x%X \n", e_lfanew);
+
+       //--------------------------------------------------//
+       //   PE HEADER                                      // 
+       //--------------------------------------------------//
+       PE_HEADER pe_header;    
+       read_at(pe_header, ifs, dos_header.e_lfanew);
+
+       //The signature should always have this value (0x4550)
+       assert( pe_header.Signature == 0x4550 );
+
+       std::printf("\n -------- PE - Header ----------------------\n\n");
+       std::printf(" Note: if machine is 0x8664 => the processor is AMD-Intel x86-64 \n");
+       std::printf("\n");
+       std::printf("          Signature = 0x%X \n", pe_header.Signature);
+       std::printf("            Machine = 0x%X \n", pe_header.Machine);
+       std::printf(" Number of sections = %d \n",   pe_header.NumberOfSections);
+
+       //--------------------------------------------------//
+       //   PE OPTIONAL HEADER                             // 
+       //--------------------------------------------------//
+       PE_OPTIONAL_HEADER64 pe_opt;
+       read_at(pe_opt, ifs);
+
+       std::string subsystem = [&pe_opt]() {
+           if(pe_opt.Subsystem == 1)  return "No subsystem required (device drivers)";      
+           if(pe_opt.Subsystem == 2)  return "gui / graphical";
+           if(pe_opt.Subsystem == 3)  return "console";      
+           if(pe_opt.Subsystem == 9)  return "Windows CE system";        
+           if(pe_opt.Subsystem == 10) return "EFI - Extensible Firmware Interfgace";                
+           if(pe_opt.Subsystem == 16) return "Windows Boot";                
+
+           return "Unknown";
+       }();
+
+       std::printf("\n -------- PE Optional Header ----------------------\n\n");
+       std::printf("                           Magic = 0x%X \n", pe_opt.Magic);
+       std::printf("                       Subsystem = 0x%X \n", pe_opt.Subsystem);
+       std::printf("                       Subsystem = %s   \n", subsystem.c_str());
+       std::printf("           Address of Entrypoint = 0x%X \n", pe_opt.AddressOfEntryPoint);
+       std::printf("              Major link version = 0x%X \n", pe_opt.MajorLinkerVersion);
+       std::printf("                    Size of code = 0x%X \n", pe_opt.SizeOfCode);
+       std::printf("  Major Operating System Version = 0x%X \n", pe_opt.MajorOperatingSystemVersion);
+       std::printf("  Minor Operating System Version = 0x%X \n", pe_opt.MinorOperatingSystemVersion);
+
+       //--------------------------------------------------//
+       //   DATA SECTIONS                                  // 
+       //--------------------------------------------------//
+       std::printf("\n -------- PE Sections ---------------\n\n");
+       PE_SECTION_HEADER sec;
+
+       for(int i = 0; i < pe_header.NumberOfSections; i++)
+       {
+           read_at(sec, ifs);        
+           std::printf(" [%d] section name = %s \n", i, sec.Name);
+           std::printf("     => Virtual Address = 0x%X \n", sec.VirtualAddress);
+           std::printf("     =>     Raw Address = 0x%X \n", sec.PointerToRawData);
+           std::printf("\n");
+       }       
+
+       return 0;
+   }
+#+END_SRC
+
+ *Building*
+
+  + This proof-of-concept application is cross-platform and does not
+    depend on the Windows API, therefore, it can also be built on
+    Linux or any Unix-like operating system. 
+
+Build on Windows 
+
+#+BEGIN_SRC sh 
+  $ git clone https://gist.github.com/f5edeaa4d929f5acf258d71caf6915cd pe-info && cd pe-info 
+  $ cmake -H. -B_build -G "Visual Studio 16 2019" -DCMAKE_BUILD_TYPE=Debug
+  $ cmake --build _build --target
+#+END_SRC
+
+Build on Linux 
+
+#+BEGIN_SRC sh 
+  $ git clone https://gist.github.com/f5edeaa4d929f5acf258d71caf6915cd pe-info && cd pe-info 
+  $ cmake -H. -B_build_linux -DCMAKE_BUILD_TYPE=Debug 
+  $ cmake --build _build_linux --target 
+#+END_SRC
+
+ *Running* 
+
+Note: the following results can be checked with the application [[http://www.ntcore.com/exsuite.php][CFF Explorer]] 
+which allows viewing PE32 files in intuitive and lightweight GUI. 
+
+Inspect: ipconfig.exe 
+
+#+BEGIN_SRC sh 
+  $ pe-info.exe C:\Windows\System32\ipconfig.exe
+
+   File: C:\Windows\System32\ipconfig.exe
+
+   ------ DOS HEADER ---------------
+   [DOS_HEADER] MAGIC NUMBER = 0x5A4D (hex)
+   [DOS_HEADER] MAGIC NUMBER = MZ   (str)
+   [DOS_HEADER]     e_lfanew = 0xE8
+
+   -------- PE - Header ----------------------
+
+   Note: if machine is 0x8664 => the processor is AMD-Intel x86-64
+
+            Signature = 0x4550
+              Machine = 0x8664
+   Number of sections = 6
+
+   -------- PE Optional Header ----------------------
+
+                             Magic = 0x20B
+                         Subsystem = 0x3
+                         Subsystem = console
+             Address of Entrypoint = 0x4EB0
+                Major link version = 0xE
+                      Size of code = 0x4800
+    Major Operating System Version = 0xA
+    Minor Operating System Version = 0x0
+
+   -------- PE Sections ---------------
+
+   [0] section name = .text
+       => Virtual Address = 0x1000
+       =>     Raw Address = 0x400
+
+   [1] section name = .rdata
+       => Virtual Address = 0x6000
+       =>     Raw Address = 0x4C00
+
+   [2] section name = .data
+       => Virtual Address = 0x9000
+       =>     Raw Address = 0x7600
+
+   [3] section name = .pdata
+       => Virtual Address = 0xA000
+       =>     Raw Address = 0x7800
+
+   [4] section name = .rsrc
+       => Virtual Address = 0xB000
+       =>     Raw Address = 0x7C00
+
+   [5] section name = .reloc
+       => Virtual Address = 0xC000
+       =>     Raw Address = 0x8600
+
+#+END_SRC
+
+Inspect: notepad.exe 
+
+#+BEGIN_SRC sh 
+   $ pe-info.exe C:\Windows\System32\notepad.exe
+
+   File: C:\Windows\System32\notepad.exe
+
+   ------ DOS HEADER ---------------
+   [DOS_HEADER] MAGIC NUMBER = 0x5A4D (hex)
+   [DOS_HEADER] MAGIC NUMBER = MZ   (str)
+   [DOS_HEADER]     e_lfanew = 0xF8
+
+   -------- PE - Header ----------------------
+
+   Note: if machine is 0x8664 => the processor is AMD-Intel x86-64
+
+            Signature = 0x4550
+              Machine = 0x8664
+   Number of sections = 7
+
+   -------- PE Optional Header ----------------------
+
+                             Magic = 0x20B
+                         Subsystem = 0x2
+                         Subsystem = gui / graphical
+             Address of Entrypoint = 0x20110
+                Major link version = 0xE
+                      Size of code = 0x20600
+    Major Operating System Version = 0xA
+    Minor Operating System Version = 0x0
+
+   -------- PE Sections ---------------
+
+   [0] section name = .text
+       => Virtual Address = 0x1000
+       =>     Raw Address = 0x400
+
+   [1] section name = .rdata
+       => Virtual Address = 0x22000
+       =>     Raw Address = 0x20A00
+
+   [2] section name = .data
+       => Virtual Address = 0x2B000
+       =>     Raw Address = 0x29600
+
+   [3] section name = .pdata
+       => Virtual Address = 0x2E000
+       =>     Raw Address = 0x2A200
+
+   [4] section name = .didat
+       => Virtual Address = 0x2F000
+       =>     Raw Address = 0x2B200
+
+   [5] section name = .rsrc
+       => Virtual Address = 0x30000
+       =>     Raw Address = 0x2B400
+
+   [6] section name = .reloc
+       => Virtual Address = 0x31000
+       =>     Raw Address = 0x2C000
+#+END_SRC
+
+
+
 
 ** Install Development Tools and Compilers 
 *** C++ Compilers 
