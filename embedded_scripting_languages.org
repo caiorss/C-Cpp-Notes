@@ -747,7 +747,11 @@ Sol2 library documentation:
  
   + https://sol2.readthedocs.io/en/latest/
 
-  *Files* 
+
+  *Sample Project* 
+
+GIST: 
+  + https://gist.github.com/17a37d905d3d71c0ae66661a189481b5
 
 File: CMakeLists.txt 
 
@@ -826,6 +830,7 @@ File: lua-lib.cmake
 
    FetchContent_MakeAvailable( sol2 )
    include_directories( ${sol2_SOURCE_DIR}/include )
+
 #+END_SRC
 
 File: embed-lua-sol.cpp 
@@ -1019,10 +1024,295 @@ File: embed-lua-sol.cpp
   }
 #+END_SRC
 
-Building: 
+Building => Debug build: 
 
 #+BEGIN_SRC sh 
-   $ cmake -H. -B_build -DCMAKE_BUILD_TYPE=Debug
+   $ git clone https://gist.github.com/17a37d905d3d71c0ae66661a189481b5
+
+File: CMakeLists.txt 
+
+#+BEGIN_SRC cmake 
+  cmake_minimum_required(VERSION 3.0)
+  project(duktape-cc-trial)
+
+  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+
+  include(lua-lib.cmake)
+
+  #-----  Target Definitions ----------------------------#
+
+         add_executable( embed-lua-sol embed-lua-sol.cpp)
+  target_link_libraries( embed-lua-sol lua::lualib )
+
+  # Lua REPL executable built from static library liblua.a (Linux)
+  # Note: the main() function is in the file main.c in the lua sources directory
+         add_executable( lua-repl $<TARGET_OBJECTS:lua::lualib> )
+  target_link_libraries( lua-repl m pthread )
+#+END_SRC
+
+File: lua-lib.cmake 
+
+  + CMake Script for downloading sol2 binding library and lua library
+    sources. 
+
+#+BEGIN_SRC cmake 
+   include(FetchContent)
+
+   # Note: the 'add_subriectory' line was commented becuyase 
+   #       library that will be downloaded does not have 
+   #       a CMakeListst.txt file at the root directory. 
+   macro(Download_Library_Git  NAME TAG REPOSITORY_URL)
+       FetchContent_Declare(
+           ${NAME}
+           GIT_REPOSITORY  ${REPOSITORY_URL}
+           GIT_TAG         ${TAG}
+       )
+       FetchContent_GetProperties(${NAME})
+       if(NOT cpputest_POPULATED)
+           FetchContent_Populate(${NAME})
+           message("${NAME}_SOURCE_DIR} = ${${NAME}_SOURCE_DIR}")        
+
+           # => Disable following line: the library does not have a CMakeLists.txt
+           #    at the root directory.
+           # add_subdirectory(${${NAME}_SOURCE_DIR} ${${NAME}_BINARY_DIR})
+       endif()
+   endmacro()
+
+
+   # ====>> Download Lua library <<==========================#
+
+   Download_Library_Git( lua                       
+                         v5.3.5
+                         https://github.com/lua/lua
+                       )
+
+   file(GLOB_RECURSE lua_sources "${lua_SOURCE_DIR}/*.c")
+   file(GLOB_RECURSE lua_headers" ${lua_SOURCE_DIR}/*.h")
+
+   message( [TRACE] " lua_SOURCE_DIR = ${lua_SOURCE_DIR} ")
+
+                  add_library( lua STATIC ${lua_sources} ${lua_headers} )
+   target_include_directories( lua PUBLIC ${lua_SOURCE_DIR} )
+
+   add_library( lua::lualib  ALIAS lua)
+
+   # ====>> Download Sol C++ binding library <<====================#
+
+   FetchContent_Declare( sol2 
+                         GIT_REPOSITORY  https://github.com/ThePhD/sol2
+                         GIT_TAG         v3.2.0
+                       )
+
+   FetchContent_MakeAvailable( sol2 )
+   include_directories( ${sol2_SOURCE_DIR}/include )
+
+#+END_SRC
+
+File: embed-lua-sol.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string> 
+  #include <vector> 
+  #include <algorithm>
+
+  #include <sol/sol.hpp>
+
+
+  class Counter {
+  private: 
+      std::string m_name;
+      int         m_counter;
+
+  public: 
+
+      // Ctor [1] => Default ctor 
+      Counter(): Counter("untitled", 0) { }
+
+      // Ctor [2]
+      Counter(std::string name, int counter)
+        : m_name{std::move(name)}, m_counter{counter}
+      { 
+          std::cout << " [TRACE] Counter created with =>  { " 
+                    <<   " name = " << m_name 
+                    << " ; counter = " << m_counter 
+                    << " } \n";
+      }
+
+      int getCounter() const { return m_counter; }
+      void setCounter(int n) {       
+        m_counter = n; 
+        std::cout << " [TRACE] I was set to value " << n << std::endl;
+      }
+
+      void increment() {       
+        m_counter++; 
+        std::cout << " [TRACE] increment event =>> counter = {  " 
+                  << m_name << " ; " << m_counter 
+                  << " } " << std::endl;
+      }    
+  };
+
+  double add_fun(double a, double b)
+  {
+      std::cout << " [TRACE] addfun() => a = " << a 
+                << " ; b = " << b << std::endl;
+      return a + b;             
+  }
+
+  void sol_eval(sol::state& ctx, std::string code)
+  {
+      try {
+          ctx.script( std::move(code) );        
+      } catch ( sol::error const& ex) {
+          std::cerr << " [SOL ERROR] " << ex.what() << "\n";
+      }
+  }
+
+
+  int main()
+  {
+      // Create an instance of lua Engine (aka virtual Machine)
+      sol::state ctx{};
+
+      // Load basic libraries (such as print)
+      ctx.open_libraries(sol::lib::base, sol::lib::coroutine, sol::lib::string, sol::lib::io);    
+
+      // Register function pointer 
+      ctx.set_function("add_fun", &add_fun);
+
+      // Register lambda object 
+      ctx.set_function("make_vector", [](int n ) -> std::vector<int> {
+          auto vec = std::vector<int>(n);
+          for(int i = 0; i < n; i++ ) vec[i]= i * 3;
+          return vec;
+      });
+
+      // Set variables in the Lua engine 
+      ctx["points"]    = 2000;
+      ctx.set("character", "<Marcus Tulius Cicero>");
+
+      /* ===========>>> E X P E  R I M E N T / 1  <<=========*/
+      std::puts("\n [EXPERIMENT 1] ==>> Evaluating string as code ");
+      {
+          // ===>>> Eval code as string <<=== 
+          // Throws exception sol::error 
+          ctx.script(R"(
+              print(" [LUA] Hello world lua "); 
+
+              x = add_fun(10, 20);
+              print("\n  [LUA] result =  " .. x);
+
+              v = make_vector(5);
+              print("\n  [LUA] Printing a vector ");
+
+              for i = 1, 5 do 
+                  print("   -> v[" .. i .. " ] = " .. v[i] );
+              end 
+
+              print("  [LUA] VAR points    = " .. points );
+              print("  [LUA] VAR character = " .. character );
+          )");
+
+      }
+
+      /* ===========>>> E X P E  R I M E N T / 2  <<=========*/
+      std::puts("\n\n [EXPERIMENT 2] ==>> Reading configuration ");
+      {
+          ctx.script(R"(
+              -- Simulation of user configuration from script     
+              asset_path   = "C:\\\\Users\\myuser\\data\\files\\";
+              user_credits = 2000;
+              width        = 200.561;        
+          )");
+
+          auto asset_path = ctx.get<std::string>("asset_path");
+          int user_credits = ctx["user_credits"];
+
+          std::cout << "  [*] => asset_path = " << asset_path << "\n";
+          std::cout << "  [*] => user_credits = " << user_credits << "\n";
+
+      }
+
+      /* ===========>>> E X P E  R I M E N T / 3  <<=========*/
+      std::puts("\n\n [EXPERIMENT 3] ==>> Register C++ classes ");
+
+      struct StatefulFunctor {
+          int state = 0;
+          StatefulFunctor(int state): state(state){ }
+          int operator()(){ 
+
+              std::cout << "  *=>> [StatefulFunctor] My new state is = " 
+                        << this->state << "\n";
+              return state++; 
+          }
+      };
+
+      auto stateful = StatefulFunctor(10);
+      ctx.set_function("stateful", stateful);
+
+      ctx.script(R"(
+          stateful();
+          stateful();
+          stateful();
+      )");
+
+
+      ctx.new_usertype<Counter>(
+          // Class name 
+           "Counter"          
+
+          //  --- Register methods  ------ //
+          ,"getCounter", &Counter::getCounter
+          ,"setCounter", &Counter::setCounter
+          ,"increment",  &Counter::increment
+
+          // --- Register properties  ---- //
+          , "value",     sol::property( &Counter::getCounter
+                                      , &Counter::setCounter)
+      );
+
+
+      sol_eval(ctx, R"(
+          print("\n ----->>> Calling C++ classes from Lua <----- ");
+
+          -- Create new instance (object) of C++ class Counter 
+          counter = Counter.new();
+          counter:increment();
+          counter:increment(); 
+          counter:increment();
+
+          x = counter:getCounter(); 
+          print("  [*] value of counter is equal to = " .. x);
+
+          counter.value = 2000;
+          print(" [*] Counter value is equal to = " .. counter.value );
+      )");
+
+      Counter* ptr = ctx.get<Counter*>("counter");
+
+      std::cout << " [FROM C++] counter value = " 
+                << ptr->getCounter() 
+                << "\n";
+
+      return 0;
+  }
+#+END_SRC
+
+Building => Debug build: 
+
+#+BEGIN_SRC sh 
+   $ git clone https://gist.github.com/17a37d905d3d71c0ae66661a189481b5 lua-sol && cd lua-sol 
+   $ cmake --config Debug -H. -B_build 
+   $ cmake --build _build --target 
+#+END_SRC
+
+Building => Release build: 
+
+#+BEGIN_SRC sh 
+   $ git clone https://gist.github.com/17a37d905d3d71c0ae66661a189481b5 lua-sol && cd lua-sol 
+   $ cmake --config Release -H. -B_build 
    $ cmake --build _build --target 
 #+END_SRC
 
