@@ -68,7 +68,11 @@ Headers:
 
 
 
-** Low level IO code 
+** [CODE] Low level IO - open(), read(), write() syscall functions
+
+This code demonstrates the usage of the open(), read(), write(),
+close() low-level IO library-calls for file descriptors which
+encapsulates system-calls with the same name. 
 
 GIST: 
  + https://gist.github.com/05fbba6475cca1dbdd50bbb2bd5ac8ae
@@ -273,4 +277,176 @@ Running:
    =>    errno(int) = 21
    =>    errno(str) = <UNKNOWN>
    => errno message = Is a directory 
+#+END_SRC
+
+ + Run 4 - read stdin file descriptor _STDIN_FILENO_
+
+#+BEGIN_SRC 
+   $ >> ./unix-low-level-io.bin file -stdin
+   [INFO] Program started. 
+   [INFO] ?? File is regular file = FALSE 
+   [INFO] ?? File is directory file = FALSE 
+
+
+  Hello world
+  Hello world
+   Unix-linux file descriptors - Low level IO
+   Unix-linux file descriptors - Low level IO
+
+  # User types Ctrl+D to close STDIN 
+#+END_SRC
+
+** [CODE] Low level IO - creat() 
+
+Creates a file using Unix-low level IO function creat() which
+encapsulates the creat() system-call.
+
+File: unix-creat.cpp 
+
+#+BEGIN_SRC cpp 
+   #include <iostream>
+   #include <string> 
+
+   #include <unistd.h>
+   #include <sys/types.h>
+   #include <sys/stat.h>
+   #include <fcntl.h>
+   #include <cstring>
+
+   void print_errno_details(int err);
+
+   int main(int argc, char** argv)
+   {
+       // File is created with read, write permissions for owner 
+       // ,groups and others
+       mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
+
+       int fd = creat("/tmp/my-sample-file.txt", mode);
+       if(fd  == -1){
+           print_errno_details(errno);
+           return EXIT_FAILURE;
+       }
+
+       constexpr size_t BUFFER_SIZE = 500;
+       char buffer[BUFFER_SIZE];
+
+       // Fill the whole buffer with '\0' null char characters
+       memset(buffer, '\0', BUFFER_SIZE);
+
+       // strcpy => Copy string literal to buffer. 
+       strcpy(buffer, " [LINE 0] Write this message to buffer\n");
+       fprintf(stdout, " Buffer size (non blank chars) = %zu \n", strlen(buffer));
+       // Write strlen(buffer) bytes to file descriptor 
+       write(fd, buffer, strlen(buffer));
+
+       strcpy(buffer, " [LINE 1] Unix, BSD, OSX, LINUX, AIX, POSIX\n");
+       fprintf(stdout, " Buffer size (non blank chars) = %zu \n", strlen(buffer));
+       fprintf(stdout, " Buffer content = '%s' \n", buffer);
+       // Write strlen(buffer) bytes to file descriptor 
+       write(fd, buffer, strlen(buffer));
+
+       strcpy(buffer, " [LINE 2] FreeRTOS Linux RTAI Real-time RTMES QNX\n");
+       write(fd, buffer, strlen(buffer));
+
+       close(fd);
+       return EXIT_SUCCESS;
+   }
+
+   // Ruires: #include <string>
+   void print_errno_details(int err)
+   {
+           std::fprintf(stderr , "\n   =>    errno(int) = %d" 
+                                 "\n   => errno message = %s \n"
+                               , err, strerror(err));
+           std::fflush(stderr);
+   }
+#+END_SRC
+
+Building: 
+
+#+BEGIN_SRC sh 
+  $ g++ unix-creat.cpp -o unix-creat.bin -std=c++1z -Wall -Wextra -g 
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC sh 
+  $ >> ./unix-creat.bin 
+  Buffer size (non blank chars) = 39 
+  Buffer size (non blank chars) = 44 
+  Buffer content = ' [LINE 1] Unix, BSD, OSX, LINUX, AIX, POSIX
+ '
+#+END_SRC
+
+Content of generated file: 
+
+#+BEGIN_SRC sh 
+  $ >> cat /tmp/my-sample-file.txt 
+  [LINE 0] Write this message to buffer
+  [LINE 1] Unix, BSD, OSX, LINUX, AIX, POSIX
+  [LINE 2] FreeRTOS Linux RTAI Real-time RTMES QNX
+#+END_SRC
+
+Trace library-calls with _ltrace_ application: 
+ 
+  +  $ ltrace ./unix-creat.bin
+
+#+BEGIN_SRC sh 
+  $ >> ltrace ./unix-creat.bin
+
+  _ZNSt8ios_base4InitC1Ev(0x4040a9, 0xffff, 0x7ffcfe326598, 224) = 0
+  __cxa_atexit(0x4010e0, 0x4040a9, 0x402008, 6)                  = 0
+  creat(0x402010, 420, 0x7ffcfe326598, 256)                      = 3
+  memset(0x7ffcfe326280, '\0', 500)                              = 0x7ffcfe326280
+  strlen(" [LINE 0] Write this message to "...)                  = 39
+  fprintf(0x7f95f2612500, " Buffer size (non blank chars) ="..., 39 Buffer size (non blank chars) = 39 
+  ) = 37
+  strlen(" [LINE 0] Write this message to "...)                  = 39
+  write(3, " [LINE 0] Write this message to "..., 39)            = 39
+  strlen(" [LINE 1] Unix, BSD, OSX, LINUX,"...)                  = 44
+  fprintf(0x7f95f2612500, " Buffer size (non blank chars) ="..., 44 Buffer size (non blank chars) = 44 
+  ) = 37
+  fprintf(0x7f95f2612500, " Buffer content = '%s' \n", " [LINE 1] Unix, BSD, OSX, LINUX,"... Buffer content = ' [LINE 1] Unix, BSD, OSX, LINUX, AIX, POSIX
+  ' 
+  ) = 66
+  strlen(" [LINE 1] Unix, BSD, OSX, LINUX,"...)                  = 44
+  write(3, " [LINE 1] Unix, BSD, OSX, LINUX,"..., 44)            = 44
+  strlen(" [LINE 2] FreeRTOS Linux RTAI Re"...)                  = 50
+  write(3, " [LINE 2] FreeRTOS Linux RTAI Re"..., 50)            = 50
+  close(3)                                                       = 0
+  _ZNSt8ios_base4InitD1Ev(0x4040a9, 0, 0x4010e0, 1)              = 0x7f95f2965e40
+  +++ exited (status 0) +++
+
+#+END_SRC
+
+Trace system-calls with _strace_ application: 
+
+  +  $ strace ./unix-creat.bin
+
+#+BEGIN_SRC sh 
+  $ strace ./unix-creat.bin 
+
+  execve("./unix-creat.bin", ["./unix-creat.bin"], 0x7fff489b8e40 /* 83 vars */) = 0
+  brk(NULL)                               = 0x57c000
+  arch_prctl(0x3001 /* ARCH_??? */, 0x7fff751bd910) = -1 EINVAL (Invalid argument)
+  access("/etc/ld.so.preload", R_OK)      = -1 ENOENT (No such file or directory)
+   ... ... ... ... ... ... ... ... ... ... ... ... ... ...
+   ... ... ... ... ... ... ... ... ... ... ... ... ... ...
+
+  mprotect(0x7fed4e032000, 4096, PROT_READ) = 0
+  munmap(0x7fed4dfe4000, 136250)          = 0
+  brk(NULL)                               = 0x57c000
+  brk(0x59d000)                           = 0x59d000
+  creat("/tmp/my-sample-file.txt", 0644)  = 3
+  fstat(1, {st_mode=S_IFCHR|0620, st_rdev=makedev(0x88, 0xc), ...}) = 0
+  write(1, " Buffer size (non blank chars) ="..., 37) = 37
+  write(3, " [LINE 0] Write this message to "..., 39) = 39
+  write(1, " Buffer size (non blank chars) ="..., 37) = 37
+  write(1, " Buffer content = ' [LINE 1] Uni"..., 63) = 63
+  write(1, "' \n", 3)                     = 3
+  write(3, " [LINE 1] Unix, BSD, OSX, LINUX,"..., 44) = 44
+  write(3, " [LINE 2] FreeRTOS Linux RTAI Re"..., 50) = 50
+  close(3)                                = 0
+  exit_group(0)                           = ?
+  +++ exited with 0 +++
 #+END_SRC
