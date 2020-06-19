@@ -1,0 +1,276 @@
+#+INCLUDE: theme/style.org 
+#+TITLE: Linux and Unix system programming 
+#+DESCRIPTION: Linux, unix and posix system programming 
+#+STARTUP: content 
+
+
+* Linux and Unix system programming 
+** Low level IO functions 
+
+C-Library functions which encapsulates file-related systems calls.
+
+Headers: 
+
+#+BEGIN_SRC cpp 
+    #include <sys/types.h>
+    #include <sys/stat.h>
+    #include <fcntl.h>
+    #include <unistd.h>
+#+END_SRC
+
+  *Special File Descriptors* 
+
+  + STDOUT_FILENO => File descritor for stdout (process standard output)
+  + STDERR_FILENO => File descritor for stderr (process standard error output)
+  + STDIN_FILENO => File descritor for stdin (process standard input)
+
+  *Functions* 
+
+  + close() => Close a file descriptor.
+    + Doc: $ man 2 close 
+
+#+BEGIN_SRC cpp 
+  int close(int fd);
+#+END_SRC
+
+ + open() => Encapsulates open system call => Returns a file descritor
+   number. When fails, it returns (-1) setting the global variable
+   _errno_.
+   + Doc: $ man 2 open 
+
+#+BEGIN_SRC cpp 
+   int open(const char *pathname, int flags);
+#+END_SRC
+
+  + creat() => Create file
+    + Doc: $ man 2 creat 
+
+#+BEGIN_SRC cpp 
+   int creat(const char *pathname, mode_t mode)
+#+END_SRC
+
+
+  + read() => Read bytes from a file descriptor into a buffer, returning the
+    number of bytes read. If there is an error, the functions returns
+    (-1) setting the global variable _errno_.
+    + Doc: $ man 2 read 
+
+#+BEGIN_SRC cpp 
+  ssize_t read(int fd, void *buf, size_t count);
+#+END_SRC
+
+  + write() => Write N bytes from a buffer to a file descriptor.
+    + Doc: $ man 2 write 
+
+#+BEGIN_SRC cpp 
+  ssize_t write(int fd, const void *buf, size_t count);
+#+END_SRC
+
+
+
+** Low level IO code 
+
+GIST: 
+ + https://gist.github.com/05fbba6475cca1dbdd50bbb2bd5ac8ae
+
+File: unix-low-level-io.cpp 
+
+#+BEGIN_SRC cpp 
+   #include <iostream>
+
+   #include <unistd.h>
+   #include <sys/types.h>
+   #include <sys/stat.h>
+   #include <fcntl.h>
+
+   #include <cstring> // Import: char* strerror(in errnum);
+
+   const char* 
+   errno_to_cstring(int err)
+   {
+       // No such file or directory 
+       if(err == ENOENT) return "ENOENT";
+       // Operation not permitted 
+       if(err == EPERM)  return "EPERM";
+       // Onput/Output error 
+       if(err == EIO)    return "EIO";
+
+       if(err == EAGAIN) return "EAGAIN";
+       if(err == EPERM)  return "EPERM";
+       if(err == EPIPE)  return "EPIPE";
+
+       return "<UNKNOWN>";
+   }	
+
+
+   /** Check whether file descriptor is regular file */
+   bool fd_is_regular_file(int fd)
+   {		
+        struct stat fd_info; 
+        // int fstat(int fd, struct stat *statbuf);
+        int r = fstat(fd, &fd_info);
+        return S_ISREG(fd_info.st_mode);
+   }
+
+   bool fd_is_directory(int fd)
+   {
+       struct stat fd_info; 
+       // int fstat(int fd, struct stat *statbuf);
+       int r = fstat(fd, &fd_info);
+       return S_ISDIR(fd_info.st_mode);	
+   }
+
+   void print_errno_details(int err)
+   {
+       std::fprintf(stderr , "\n   =>    errno(int) = %d" 
+                             "\n   =>    errno(str) = %s"
+                             "\n   => errno message = %s \n"
+                             , err, errno_to_cstring(err), strerror(err));
+        std::fflush(stderr);
+   }
+
+   int main(int argc, char** argv)
+   {
+       std::puts(" [INFO] Program started. ");
+
+       if(argc < 3){
+               std::fprintf(stderr, " Usage:                             \n");
+               std::fprintf(stderr, "  => To read a file:                \n");
+               std::fprintf(stderr, "    $ %s file <FILE>                \n", argv[0]);
+               std::fprintf(stderr, "  => To read stdin (console input): \n");
+               std::fprintf(stderr, "    $ %s file -stdin                \n", argv[0]);
+               return 0;
+       }
+
+       // Compare two c-strings return 0 (zero) when they are equal.
+       // int strcmp(const char *s1, const char *s2)
+       if( strcmp(argv[1], "file") != 0 )
+       {
+               std::fprintf(stderr, " [ERROR] Expected command file. \n");
+               return EXIT_FAILURE;
+       }
+
+       // Variable for holding a file descriptor 
+       int fd; 
+
+       // The library-call open() attempts to open a file  and returns a "file-descriptor" 
+       // (integer number ) when the operation is successful. The library-call 
+       // returns (-1) when the operation fails. 
+       // Note: It encapsulates the 'open' system call. 
+       // 	
+       if( strcmp(argv[2], "-stdin") == 0)
+               fd = STDIN_FILENO; 
+       else 
+               fd = open(argv[2], O_RDONLY);
+
+       if(fd == -1){
+               // Get error flag 'errno' to get more details about current error.
+               int err = errno;
+               std::fprintf(stderr ," [ERROR] Failed to open file. ");
+               print_errno_details(err);
+               return EXIT_FAILURE;
+       }
+
+       std::fprintf(stdout, " [INFO] ?? File is regular file = %s \n"
+                                 , fd_is_regular_file(fd) ? "TRUE" : "FALSE"  );
+       std::fprintf(stdout, " [INFO] ?? File is directory file = %s \n"
+                                 , fd_is_directory(fd) ? "TRUE" : "FALSE"  );				  
+       // Flush file => Force changes to be immeditely written.
+       std::fflush(stdout);
+
+       // Buffer maximum size in bytes 
+       constexpr size_t BUFFER_MAX_SIZE = 200; 	
+       char buffer[BUFFER_MAX_SIZE];
+
+       // Stream BUFFER_MAX_SIZE bytes from file descriptor 
+       // to STDOUT_FILENO (file descriptor).
+       //---------------------------------------------------
+       ssize_t ret; 
+       do {
+               ret = read(fd, buffer, BUFFER_MAX_SIZE);		
+               if(ret == -1) {
+                       int err = errno; 
+                       std::fprintf(stderr, " [ERROR] An error has happened => ");
+                       print_errno_details(err);
+                       close(fd);
+                       return EXIT_FAILURE;
+               }		
+               ::write(STDOUT_FILENO, buffer, ret);
+       } while( ret != 0);
+
+       // Always close the file descriptor.
+       close(fd);
+
+       return 0;
+   }
+#+END_SRC
+
+Building: 
+
+#+BEGIN_SRC sh 
+  $ g++ unix-low-level-io.cpp -o unix-low-level-io.bin -std=c++1z -Wall -Wextra
+#+END_SRC
+
+Running:
+
+  + Run 1
+
+#+BEGIN_SRC sh 
+ $ >> ./unix-low-level-io.bin 
+ [INFO] Program started. 
+ Usage:                             
+  => To read a file:                
+    $ ./unix-low-level-io.bin file <FILE>                
+  => To read stdin (console input): 
+    $ ./unix-low-level-io.bin file -stdin                
+#+END_SRC
+
+ + Run 2: 
+
+#+BEGIN_SRC sh 
+   $ >> ./unix-low-level-io.bin file /proc/filesystems 
+   [INFO] Program started. 
+   [INFO] ?? File is regular file = TRUE 
+   [INFO] ?? File is directory file = FALSE 
+  nodev	sysfs
+  nodev	tmpfs
+  nodev	bdev
+  nodev	proc
+  nodev	cgroup
+  nodev	cgroup2
+  ... ... ... 
+
+  $ >> ./unix-low-level-io.bin file /etc/resolv.conf 
+   [INFO] Program started. 
+   [INFO] ?? File is regular file = TRUE 
+   [INFO] ?? File is directory file = FALSE 
+  # Generated by NetworkManager
+  nameserver 194.165.12.10
+#+END_SRC
+
+ + Run 3: (Error)
+
+#+BEGIN_SRC sh 
+ $ >> ./unix-low-level-io.bin file /etc/resosad
+ [INFO] Program started. 
+ [ERROR] Failed to open file. 
+   =>    errno(int) = 2
+   =>    errno(str) = ENOENT
+   => errno message = No such file or directory 
+
+ $ >> ./unix-low-level-io.bin file /etc/shadow
+ [INFO] Program started. 
+ [ERROR] Failed to open file. 
+   =>    errno(int) = 13
+   =>    errno(str) = <UNKNOWN>
+   => errno message = Permission denied 
+
+ $ >> ./unix-low-level-io.bin file /
+ [INFO] Program started. 
+ [INFO] ?? File is regular file = FALSE 
+ [INFO] ?? File is directory file = TRUE 
+ [ERROR] An error has happened => 
+   =>    errno(int) = 21
+   =>    errno(str) = <UNKNOWN>
+   => errno message = Is a directory 
+#+END_SRC
