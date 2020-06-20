@@ -956,3 +956,252 @@ Verify exported symbols by gtk3 shared library:
 #+END_SRC
 
 
+** Launching processes with exec and fork system wrappers 
+
+This code demonstrates the usage of exec and fork system-calls wrapper
+functions, namely, execvp() and fork() functions. 
+
+ *Relevant functions signature* 
+
+Fork
+  + Linux Manpage: "fork() creates a new process by duplicating the
+    calling process.  The new process is referred to as the child
+    process.  The calling process is referred to as the parent
+    process."
+  + Note: The function 'fork' is not the system call fork, but a
+    C wrapper around this sytem call provided by the C runtime
+    library. (GLIBC - GNU C library in the machine where this was tested.)
+
+#+BEGIN_SRC cpp 
+  pid_t fork(void);
+#+END_SRC
+
+Execvp (wraps exec system call)
+  + The exec system calls is always called when a new process is
+    launched/created. It replaces the process image of the current
+    process with a new one from the launched executable.
+  + Note: In addition to native executables, on Unix-like operating
+    systems, an executable can also be any scripting file starting
+    with shebang as first line such as "#!/usr/bin/env sh"
+
+#+BEGIN_SRC cpp 
+   int execvp(const char *file, char *const argv[]);
+#+END_SRC
+
+Waitpid => Waits for a state of change of a process.
+  + It can be used for waiting for process termination. 
+ 
+#+BEGIN_SRC cpp 
+   pid_t waitpid(pid_t pid, int *wstatus, int options);
+#+END_SRC
+
+ *Documentation* 
+
+  + [[https://man7.org/linux/man-pages/man2/fork.2.html][fork() Linux Manpage]]
+
+  + [[https://www.freebsd.org/cgi/man.cgi?query=execvp][Execvp() => FreeBSD Manpage]]
+
+ *Further Reading*
+
+  + [[https://en.wikipedia.org/wiki/Fork_(system_call)][Fork (system call) - Wikipedia]]
+
+  + [[http://people.cs.pitt.edu/~aus/cs449/ts-lecture14.pdf][Fork() System Calland ProcessesCS449 Spring 2016]]
+
+  + [[https://www.cs.columbia.edu/~junfeng/11sp-w4118/lectures/unix.pdf][Chapter 0 - Operating system interfaces {PDF}]]
+
+ *Sample Code* 
+
+GIST: 
+ + https://gist.github.com/133e91ba3732718cb228310173368674
+
+File: unix-process.cpp 
+
+#+BEGIN_SRC cpp 
+   // ------ File: unix-process.cpp -----------------------------------------------------------//
+   // Description: Shows hows to launch processes on Unix with Exec and Fork syscall wrappers.
+   //-------------------------------------------------------------------------------------------//
+
+   #include <iostream>
+   #include <vector>
+
+   // ----- Unix/Linux headers -----// 
+   #include <unistd.h>
+   #include <sys/types.h>
+   #include <sys/stat.h>
+   #include <fcntl.h>
+   #include <sys/wait.h>
+
+   #include <cstring> // Import: char* strerror(in errnum);
+
+   // -------------- Declarations --------------------------//
+
+   void print_errno_details(int err);
+   void execvp_test();
+   void execvp_cpp(std::string app, std::vector<std::string> args);
+
+   // Launch a new process without terminate this process. 
+   // It combines fork + exec system-calls. 
+   void fork_exec(std::string app, std::vector<std::string> args);
+
+   // -------------  MAIN() ------------------------------//
+
+   int main(int argc, char** argv)
+   {
+        std::puts(" [INFO] Program started. ");
+
+        if(argc < 2){
+           std::printf(" Usage:  ./unix-process <OPTION>");
+           return EXIT_SUCCESS;
+        }
+
+        std::string opt = argv[1];
+
+        if(opt == "0")
+        {
+           execvp_test();
+        }
+        // Test execvp 
+        if(opt == "1")
+        {
+            execvp_cpp("thunar", { "/etc" } );
+            return EXIT_SUCCESS;
+        }
+        // Fork-exec 
+        if(opt == "2")
+        {
+            fork_exec("konsole", { "-e", "tmux", "a"} );
+        }	
+
+        std::puts(" [TRACE] Finish execution. ");
+        return 0;
+   }
+
+   // ------------- Definitions ------------------------//
+
+   void print_errno_details(int err)
+   {
+           std::fprintf(stderr ,"\n   =>    errno(int) = %d" 
+                                "\n   => errno message = %s \n"
+                               , err, strerror(err));
+           std::fflush(stderr);
+   }
+
+
+   // Test exec system-call wrapper function (execvp)
+   void execvp_test()
+   {    
+           const char* app    = "thunar";
+
+           const char* args[] = {  app     // Process name, can be anything 
+                                  , "/etc"  // Arguments passed to the process 
+                                  , nullptr // Always terminate the argument array with null pointer 
+                                 };
+
+           // Encapsulates execv system call. 
+           // int execvp(const char *file, char *const argv[]);
+           if( execvp(app, (char *const *) args) == -1)
+           {
+                 std::fprintf(stderr, " Error: unable to launch process");
+                 print_errno_details(errno);
+                 throw std::runtime_error("Error: failed to launch process");
+           }
+
+   }
+
+   // C++ wrapper for the exevp() library-call 
+   // It replaces the current process image with a new one 
+   // from other executable. 
+   void execvp_cpp(  std::string app
+                   , std::vector<std::string> args)
+   {
+        std::vector<const char*> pargs;
+        pargs.reserve(args.size() + 1);
+        pargs.push_back(app.c_str());
+        for(auto const& a: args){ pargs.push_back(a.c_str()); }
+        pargs.push_back(nullptr);
+
+        // Signature: int execvp(const char *file, char *const argv[]);
+
+        // execvp(app.c_str(), execvp(app.c_str(), (char* const *) pargs.data() )
+        int status = execvp(app.c_str(), (char* const*) pargs.data() );
+        if( status == -1)
+        {
+             std::fprintf(stderr, " Error: unable to launch process");
+             print_errno_details(errno);
+             throw std::runtime_error("Error: failed to launch process");
+        }
+   }
+
+   void fork_exec(std::string app, std::vector<std::string> args)
+   {
+        std::printf(" [TRACE] <BEFORE FORK> PID of parent process = %d \n", getpid());
+
+        // PID of child process (copy of this process)
+        pid_t pid = fork();
+
+        if(pid == -1)
+        {
+            std::fprintf(stderr, "Error: unable to launch process");
+            print_errno_details(errno);
+            throw std::runtime_error("Error: unable to launch process");
+        }
+        if(pid == 0){
+             std::printf(" [TRACE] Running on child process => PID_CHILD = %d \n", getpid());	
+
+             // Close file descriptors, in order to disconnect the process from the terminal.
+             // This procedure allows the process to be launched as a daemon (aka service).
+             close(STDOUT_FILENO);
+             close(STDERR_FILENO);
+             close(STDIN_FILENO );
+
+             // Execvp system call, replace the image of this process with a new one
+             // from an executable. 
+             execvp_cpp(app, args);		
+             return;
+        }
+
+        std::printf(" [TRACE] <AFTER FORK> PID of parent process = %d \n", getpid());
+
+        // pid_t waitpid(pid_t pid, int *wstatus, int options);
+        int status;
+
+        std::printf(" [TRACE] Waiting for child process to finish. ");
+
+        // Wait for child process termination.
+        // From header: #include <sys/wait.h>
+        if(waitpid(pid, &status, 0) == -1)
+        {
+            print_errno_details(errno);
+            throw std::runtime_error("Error: cannot wait for child process");
+        }
+
+        std::printf(" [TRACE] Child process has been terminated Ok.");
+       // -------- Parent process ----------------//
+   }
+#+END_SRC
+
+Building: 
+
+#+BEGIN_SRC sh 
+   $ >> g++ unix-process.cpp -o unix-process.bin -std=c++1z -Wall -Wextra -g
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC sh 
+   ~/t/unix-explore
+   $ >> ./unix-process.bin 0
+   [INFO] Program started. 
+
+   ~/t/unix-explore
+   $ >> ./unix-process.bin 1
+   [INFO] Program started. 
+
+   ~/t/unix-explore
+   $ >> ./unix-process.bin 2
+   [INFO] Program started. 
+   [TRACE] <BEFORE FORK> PID of parent process = 774929 
+   [TRACE] <AFTER FORK> PID of parent process = 774929 
+   [TRACE] Running on child process => PID_CHILD = 774930 
+   [TRACE] Waiting for child process to finish.  [TRACE] Child process has been terminated Ok. [TRACE] Finish execution. 
+#+END_SRC
