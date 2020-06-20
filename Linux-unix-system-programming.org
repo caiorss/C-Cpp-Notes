@@ -1205,3 +1205,109 @@ Running:
    [TRACE] Running on child process => PID_CHILD = 774930 
    [TRACE] Waiting for child process to finish.  [TRACE] Child process has been terminated Ok. [TRACE] Finish execution. 
 #+END_SRC
+** Read/List directory contents 
+
+Functions used: 
+
+#+BEGIN_SRC cpp 
+   DIR *opendir(const char *name);
+
+   int readdir(   unsigned int fd
+                , struct old_linux_dirent* dirp,
+                , unsigned int count);
+#+END_SRC
+
+File: unix-readdir.cpp 
+
+#+BEGIN_SRC cpp 
+   #include <iostream>
+
+   // #include <string>
+   #include <sys/types.h>
+   #include <dirent.h>  // Get function opendir
+   #include <errno.h>
+
+   #include <sys/types.h>
+   #include <sys/stat.h>
+   #include <unistd.h>
+
+
+   template<typename Callback>
+   void iterate_directory(const std::string& path, Callback&& callback)
+   {
+       DIR *dir;
+       struct dirent *dp;
+
+       dir = opendir(path.c_str()) ;
+
+       // To determine the cause of error - It is necessary to check the error code.
+       if (dir == nullptr) throw std::runtime_error("Error: Cannot read directory");
+
+       while ((dp = readdir(dir)) != nullptr) 
+       {
+          if(path == "/")
+               callback(dp->d_name);
+          else 
+               callback(path + "/" + dp->d_name);		
+       };
+       closedir(dir);
+   }
+
+   int main(int argc, char** argv)
+   {
+        std::cout << " List directory contents " << std::endl;
+
+        if(argc < 2)
+        {
+            std::cout << "Usage: ./unix-readdir <DIRECTORY>" << "\n";
+            return EXIT_SUCCESS;
+        }
+
+        int idx = 0;
+        iterate_directory(argv[1], [&idx](auto const& path)
+        {
+            std::cout << "  [" << idx++  << "] path => " << path << "\n";
+        });
+        return EXIT_SUCCESS;
+   }
+
+#+END_SRC
+
+Building: 
+
+#+BEGIN_SRC sh 
+  $ g++ unix-readdir.cpp -o unix-readdir.bin -std=c++1z -g -Wall -Wextra 
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC sh 
+  $ >> ./unix-readdir.bin /
+   List directory contents 
+    [0] path => srv
+    [1] path => sys
+    [2] path => ..
+    [3] path => opt
+    [4] path => .
+    [5] path => run
+    [6] path => media
+    ... ... ... 
+    [18] path => lib
+    [19] path => usr
+    [20] path => boot
+    [21] path => mnt
+    [22] path => sbin
+  ... .. .... ... ... 
+
+   $ >> ./unix-readdir.bin /boot 
+   List directory contents 
+    [0] path => /boot/..
+    [1] path => /boot/.
+    [2] path => /boot/initramfs-5.6.12-300.fc32.x86_64.img
+    [3] path => /boot/grub2
+    [4] path => /boot/vmlinuz-0-rescue-a1ac43b933e24659bba5edf2b9cec1e1
+    [5] path => /boot/memtest86+-5.01
+    [6] path => /boot/initramfs-5.6.6-300.fc32.x86_64.img
+     ... ... ...     ... ... ...     ... ... ...     ... ... ...     
+#+END_SRC
+
