@@ -68,7 +68,7 @@ Headers:
 
 
 
-** [CODE] Low level IO - open(), read(), write() syscall functions
+** Low level IO - open(), read(), write() syscall functions
 
 This code demonstrates the usage of the open(), read(), write(),
 close() low-level IO library-calls for file descriptors which
@@ -296,7 +296,7 @@ Running:
   # User types Ctrl+D to close STDIN 
 #+END_SRC
 
-** [CODE] Low level IO - creat() 
+** Low level IO - creat() 
 
 Creates a file using Unix-low level IO function creat() which
 encapsulates the creat() system-call.
@@ -450,3 +450,509 @@ Trace system-calls with _strace_ application:
   exit_group(0)                           = ?
   +++ exited with 0 +++
 #+END_SRC
+** Information about current process 
+
+File: current-process.cpp 
+
+#+BEGIN_SRC cpp 
+   #include <iostream> 
+   #include <string> 
+   #include <cstring> 
+
+   #include <unistd.h>
+   #include <sys/types.h>
+   #include <sys/stat.h>
+   #include <fcntl.h>
+   #include <limits.h> // PATH_MAX constant (macro)
+
+   auto get_cwd() -> std::string;
+   auto set_cwd(const std::string& path) -> void;
+   auto read_symlink(std::string const& path) -> std::string;
+
+   int main(int argc, char** argv)
+   {
+       // Unique process ID (identifier) number 
+       fprintf(stdout, "   => Process PID = %d \n", ::getpid());
+
+       // PID for parent process
+       fprintf(stdout, "   => Process PID = %d \n", ::getppid());
+
+       // Current directory 
+       fprintf(stdout, "   => Current directory = %s \n", get_cwd().c_str());
+
+       fprintf(stdout, "\n Change the curren directory to /etc \n");
+       set_cwd("/etc");
+       fprintf(stdout, "   => Current directory = %s \n", get_cwd().c_str());
+
+       // Note: It only works on Linux. The directory /proc/self is a pseudo-directory 
+       //       whith pseudo-files containing information about the current process. 
+       // 
+       // the file /proc/self/exe is a symbolic link to the current executable.
+       std::string exe_file = read_symlink("/proc/self/exe");
+       fprintf(stdout, "  => Absolute Path of current executable = %s \n", exe_file.c_str());
+
+       // Current directory 
+       std::string exe_dir = read_symlink("/proc/self/cwd");
+       fprintf(stdout, "  => Current directory of this executable = %s \n", exe_dir.c_str());
+
+       fprintf(stdout, " [INFO] Finish Ok. \n");
+       return 0;
+   }
+
+   // ----------- Functions Implementations ------------// 
+   // 
+
+   /** Get current working directory of current process */
+   auto get_cwd() -> std::string 
+   {
+       char* buffer = ::getcwd(nullptr, 0);
+       auto cwd = std::string(buffer);
+       // Note buffer was allocated with malloc 
+       free(buffer);
+       return cwd;
+   }
+
+   /** Set current working directory for current process. */
+   auto set_cwd(const std::string& path) -> void 
+   {
+        int status = ::chdir(path.c_str());
+        if(status < 0)
+            throw std::runtime_error("Failed to change directory.");
+   }
+
+   /** Read value of symbolic link 
+    *  
+    * Requires: <limits.h>, <sys/types.h>, <sys/stats.h>
+    */
+   auto read_symlink(std::string const& path) -> std::string 
+   {
+       // Create a buffer with size PATH_MAX + 1 filled with 0 ('\0'), null characters
+       std::string buffer(PATH_MAX, 0);
+       // ssize_t readlink(const char *pathname, char *buf, size_t bufsiz);
+       ssize_t nread = ::readlink(path.c_str(), &buffer[0], PATH_MAX);
+       if(nread == -1){
+           fprintf(stderr, " Error: %s \n", strerror(errno));
+           throw std::runtime_error("Error: unable to read symlink. Check 'errno' variable");
+       }
+       buffer.resize(nread);
+       return buffer;
+   }
+#+END_SRC
+
+Building: 
+
+#+BEGIN_SRC sh 
+   $ >> g++ current-process.cpp -o current-process.elf -Wall -Wextra -ggdb
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC sh 
+  $ >> ./current-process.elf 
+    => Process PID = 719155 
+    => Process PID = 678179 
+    => Current directory = /home/mxpkf8/temp-projects/unix-explore 
+
+  Change the curren directory to /etc 
+    => Current directory = /etc 
+   => Absolute Path of current executable = /home/mxpkf8/temp-projects/unix-explore/current-process.elf 
+   => Current directory of this executable = /etc 
+  [INFO] Finish Ok.
+#+END_SRC
+
+** Dynamic Loading Shared Libraries 
+*** Overview 
+
+ The dlopen API provide access to the _dynamic linker_ services allowing
+the current process to load and unload shared objects or shared
+libraries in its address space (virtual memory).
+
+This API for loading shared libraries is not only available on Linux,
+it also can be found in FreeBSD, NetBSD, MacOSX, Android and so on.
+
+Use cases: 
+
+  + Load new code at-runtime
+
+  + Load third-party code a runtime
+
+  + Plugin systems, extensions or addons.
+
+  + Load native code extensions in languages with interpreters written
+    in C, such as Python, Ruby, Lua and so on. Note: Python native
+    extensions are shared libraries. 
+
+Documentation: 
+
+  + http://gnu.wiki/man3/dlopen.3.php
+
+  + [[https://man7.org/linux/man-pages/man3/dlopen.3.html][Dlopen API - Linux Manpages]]
+
+  + [[https://www.freebsd.org/cgi/man.cgi?query=dlopen&apropos=0&sektion=0&manpath=SuSE+Linux%252Fi386+7.3&format=html][Free BSD - dlopen API documentation]]
+
+  + [[https://docs.oracle.com/cd/E19048-01/chorus5/806-7014/6jftsjfdq/index.html][Dlopen - Oracle Documentation]]
+
+  + [[http://www.qnx.com/developers/docs/6.5.0SP1.update/com.qnx.doc.neutrino_lib_ref/d/dlopen.html][Dlopen - QNX documentation]]
+
+  + [[https://dwheeler.com/program-library/Program-Library-HOWTO/x172.html][Dynamically Loaded (DL) Libraries]]
+
+
+Further Reading: 
+
+  + [[https://cseweb.ucsd.edu/~gbournou/CSE131/the_inside_story_on_shared_libraries_and_dynamic_loading.pdf][Inside the history on shared libraries and dynamic loading]]
+
+  + [[https://hackaday.com/2018/07/12/its-all-in-the-libs-building-a-plugin-system-using-dynamic-loading/][It 's all in the libs - Building a Plugin system using Dynamic Loading]]
+
+  + [[http://docencia.ac.upc.edu/FIB/USO/Bibliografia/unix-c-libraries.html][Building And Using Static And Shared "C" Libraries]]
+
+  + [[https://www.informit.com/articles/article.aspx?p=22435][More Shared Libraries-Dynamic Loading and Unloading]]
+
+  + https://grugq.github.io/docs/subversiveld.pdf
+
+  + [[https://github.com/mgood7123/universal-dynamic-loader][universal-dynamic-loader]] for Linux - "min-dl: minimal dynamic linker implementation"
+
+
+Headers and libraries: 
+
+  + Header:  #include <dlfcn.h>
+  + Linking: (-ldl) flag 
+
+ _Function dlopen()_:
+
+  + Doc: $ man dlopen 
+  + Loads a shared library and returns a _handle_ or _opaque pointer_
+    casted as void pointer. The term _opaque_ means that the
+    implementation is hidden and the pointer is only meant to be
+    passed around to other functions.
+  + Note: When this function fails, it returns null pointer.
+
+#+BEGIN_SRC cpp 
+      void* dlopen(const char* filename, int flags);
+#+END_SRC
+
+ _Function dlsym()_:
+
+  + Doc: $ man dlsym
+  + Obtains address of a shared library symbol from _handle_ (from
+    dlopen). 
+  + Params:
+    + handle => Shared library handle obtained from _dlopen_
+    + symbol  => Name of symbol to be loaded.
+  + Return:
+    + Address of symbol casted as void*. It can be a function-pointer
+      or a pointer to global variable. If the symbol is not found, the
+      function returns a null pointer. 
+
+#+BEGIN_SRC cpp 
+    void* dlsym(void* handle, const char* symbol);
+#+END_SRC
+
+ _Function dlvsym()_:
+
+  + Doc: $ man dlvsym
+    + Loads a specific version of a symbol. 
+
+#+BEGIN_SRC cpp 
+    void* dlvsym(void *handle, char *symbol, char *version);
+#+END_SRC
+
+ _Function dlclose()_: 
+
+  + Doc: $ man dlclose()
+
+#+BEGIN_SRC cpp 
+  int dlclose(void *handle);
+#+END_SRC
+
+ _Function dlerror()_ 
+   + Obtaines error messages from dlopen API.
+   + Doc: $ man dlerror()
+
+#+BEGIN_SRC cpp 
+  char* dlerror(void);
+#+END_SRC
+
+ *Simplified type signatures with a C++-friendly notation*
+
+#+BEGIN_SRC cpp 
+   // Opaque pointer for shared library (shared object) handle 
+   using HND = void* ; 
+   // Opaque pointer for shared library symbol 
+   using SYM = void* ; 
+
+   HND  dlopen( const char* filename, int flags);
+   SYM   dlsym( HND handle, const char* symbol);
+   SYM  dlvsym( HND handle, char *symbol, char *version);
+   int dlclose( HND handle );
+#+END_SRC
+
+ *Usage example* 
+
+#+BEGIN_SRC cpp 
+   #include <dlfcn.h>
+
+   // Opaque pointer for shared library (shared object) handle 
+   using HND = void* ; 
+   // Opaque pointer for shared library symbol 
+   using SYM = void* ; 
+
+   void load_library()
+   {
+       // Load shared library 
+       HND hnd = dlopen("/path/to/shared-library.so", RTLD_LAZY | RTLD_GLOBAL); 
+       if(hnd == nullptr)
+       {
+          std::cerr << "  [ERROR] " << dlerror() << "\n";
+          throw std::runtime_error("Error: unable to load shared library"); 
+       }
+
+       // Load symbol 
+       SYM hsym = dlsym(hnd, "name_of_function"); 
+
+       // if(!hsym)
+       if(hsym == nullptr)
+       {
+          throw std::runtime_error("Error: symbol not found"); 
+       }
+
+       // Function signature type alias 
+       //  => The function to be loaded can only have C-linkage. 
+       using name_of_function_t = void (*) (int param0, double param1, const char* param3);
+       
+       //  Function pointer. 
+       auto name_of_function_ptr = reinterpret_cast<name_of_function_t>(hsym); 
+    
+       // Call loaded function 
+       name_of_function_ptr(100, 2.51, "string");
+
+       // Unload shared library 
+       dlclose(hsym);
+   }
+#+END_SRC
+
+
+ 
+*** GK3 GUI with dynamic linking 
+
+The following sample code is a GTk3 or GTK2 GUI graphical user
+interface application with GTK functions loaded from a GTK shared
+library, without any compile-time linking. The advantage of this
+approach is the greater portability across different versions of GTk
+and the ability to switch between GT3 and GT2.
+
+GIST: 
+  + https://gist.github.com/d81dd9c422dc93ad4104b5e79259afdf
+
+File: CMakeLists.txt 
+
+#+BEGIN_SRC cmake 
+   cmake_minimum_required(VERSION 3.9)
+   project(gtk-sample)
+
+   #========== Global Configurations =============#
+   #----------------------------------------------#
+
+   set(CMAKE_CXX_STANDARD 17)     
+   set(CMAKE_VERBOSE_MAKEFILE ON)
+
+          add_executable( gtk-dlopen gtk-dlopen.cpp)
+   target_link_libraries( gtk-dlopen dl )   
+#+END_SRC
+
+File: gtk-dlopen.cpp 
+
+#+BEGIN_SRC cpp 
+    #include <iostream>
+    #include <cstring> 
+    #include <cassert> 
+
+    // Uses: dlopen(), dlclose(), ... 
+    #include <dlfcn.h>
+
+    // ---- Copied from GTK headers ------// 
+    typedef char            gchar;
+    typedef short           gshort;
+    typedef long            glong;
+    typedef int             gint;
+    typedef gint            gboolean;
+    typedef unsigned char   guchar;
+    typedef unsigned short  gushort;
+    typedef unsigned long   gulong;
+    typedef unsigned int    guint;
+    typedef float           gfloat;
+    typedef double          gdouble;
+    typedef void*           gpointer;
+    typedef const void*     gconstpointer;
+
+    enum class GtkWindowType
+    {
+        GTK_WINDOW_TOPLEVEL,
+        GTK_WINDOW_POPUP
+    };
+
+    enum class GConnectFlags
+    {
+      G_CONNECT_AFTER	= 1 << 0,
+      G_CONNECT_SWAPPED	= 1 << 1
+    };
+
+    template<typename TFun>
+    TFun load_symbol(void* hnd, std::string symbol)
+    {
+        void* hSym = dlsym(hnd, symbol.c_str());
+        if(hSym == nullptr)
+        {
+            std::string msg = std::string(" [Error] symbol not found: ") + symbol;
+            throw std::runtime_error(msg);
+        }    
+        return reinterpret_cast<TFun>(hSym);
+    }
+
+    // Opaque type (aka incomplete type)
+    struct GClosure;
+
+    // -------- Function Pointers type aliases -------------------//
+    using GCallback      = void  (*) (void);
+    using GClosureNotify = void  (*) (gpointer data, GClosure* closure);
+    using g_signal_connect_data_t =  gulong	(*) (   gpointer instance
+                                                      , const gchar*    detailed_signal
+                                                      , GCallback       c_handler
+                                                      , gpointer        data
+                                                      , GClosureNotify  destroy_data
+                                                      , GConnectFlags	connect_flags
+                                                  );
+
+    int main(int argc, char** argv)
+    {    
+        std::string shared_lib =  [&]() -> std::string 
+        {
+            if(argc < 2) return "/lib64/libgtk-3.so.0";
+            return argv[1];
+        }();
+
+        std::cout << " [INFO] Loading shared library: " << shared_lib << "\n";
+
+        //  void *dlopen(const char *filename, int flags);
+
+        // Handle to shared library 
+        void* hnd = dlopen(shared_lib.c_str(), RTLD_NOW | RTLD_GLOBAL);
+        if(hnd == nullptr){ fprintf(stderr, "%s\n", dlerror());  }
+        assert( hnd != nullptr );
+
+        void* hSym = nullptr; 
+
+        // --------- Load gtk_init_check function pointer ------- // 
+        hSym = dlsym(hnd, "gtk_init_check");
+        assert(hSym != nullptr);
+        using gtk_init_check_t = gboolean (*) (int* argc, char*** argv);
+        auto gtk_init_check = reinterpret_cast<gtk_init_check_t>(hSym);   
+
+        // ------- Load remaining function pointers (symbols) --------// 
+        //-----------------------------------------------------------//
+
+        // opaque pointer 
+        struct GtkWidget;
+
+        using gkt_window_new_t = GtkWidget* (*) (int);
+        auto gtk_window_new  = load_symbol<gkt_window_new_t>(hnd, "gtk_window_new");    
+        auto gtk_widget_show = load_symbol<void (*) (GtkWidget*)>(hnd, "gtk_widget_show");
+        auto gtk_main        = load_symbol<void (*) ()>(hnd, "gtk_main");
+
+        using gtk_window_set_title_t = void (*) (GtkWidget* window, const gchar* title);
+        auto gtk_window_set_title = load_symbol<gtk_window_set_title_t>(hnd, "gtk_window_set_title");
+
+        using gtk_widget_set_size_t = void (*) (GtkWidget*, gint, gint);
+        auto gtk_widget_set_size = load_symbol<gtk_widget_set_size_t>(hnd, "gtk_widget_set_size_request");
+
+        auto gtk_main_quit = load_symbol<void (*) ()>(hnd, "gtk_main_quit");
+
+        auto gtk_signal_connect_data 
+              = load_symbol<g_signal_connect_data_t>(hnd, "g_signal_connect_data");
+
+        /** ------- Build Window GUI - Graphical User Interface ----------**/
+
+        // Call function pointer 
+        gtk_init_check(&argc, &argv);
+
+        GtkWidget* window = gtk_window_new( (int) GtkWindowType::GTK_WINDOW_TOPLEVEL);
+        gtk_widget_set_size(window, 400, 500);
+        gtk_window_set_title(window, "My GTK Window");
+        gtk_widget_show(window);    
+
+        gtk_signal_connect_data(  window         // Widget 
+                                , "destroy"      // Event name 
+                                , gtk_main_quit  // Callback                             
+                                , nullptr        // Pointer to data (closure )
+                                , nullptr 
+                                , (GConnectFlags) 0 // GConnect flags 
+                                );
+
+        std::cout << " [INFO] Window running. OK! " << "\n";
+        gtk_main();
+
+        // Always close shared library handler.
+        dlclose(hnd);
+
+        std::cout << " [INFO] Shutdown gracefully. Ok. \n" ;
+        return EXIT_SUCCESS;
+    }
+#+END_SRC
+
+Building: 
+
+#+BEGIN_SRC sh 
+  $ git clone https://gist.github.com/d81dd9c422dc93ad4104b5e79259afdf && cd gist 
+  $ g++ gtk-dlopen.cpp -o gtk-dlopen.bin -std=c++1z -ldl -ggdb -Wall -Wextra   
+#+END_SRC
+
+Checking the dependencies of gtk-dlopen.bin 
+
+#+BEGIN_SRC sh 
+   $ >> ldd gtk-dlopen.bin 
+          linux-vdso.so.1 (0x00007ffd23fc4000)
+          libdl.so.2 => /lib64/libdl.so.2 (0x00007f6a78428000)
+          libstdc++.so.6 => /lib64/libstdc++.so.6 (0x00007f6a78238000)
+          libm.so.6 => /lib64/libm.so.6 (0x00007f6a780f2000)
+          libgcc_s.so.1 => /lib64/libgcc_s.so.1 (0x00007f6a780d7000)
+          libc.so.6 => /lib64/libc.so.6 (0x00007f6a77f0d000)
+          /lib64/ld-linux-x86-64.so.2 (0x00007f6a78453000)
+#+END_SRC
+
+Running: (load GTK shared library /lib64/libgtk-3.so.0)
+
+#+BEGIN_SRC sh 
+ $ >> ./gtk-dlopen.bin 
+ [INFO] Loading shared library: /lib64/libgtk-3.so.0
+ [INFO] Window running. OK! 
+ [INFO] Shutdown gracefully. Ok. 
+#+END_SRC
+
+Running: (load GK2 shared library )
+
+#+BEGIN_SRC sh 
+   $ >> ./gtk-dlopen.bin /usr/lib64/libgtk-x11-2.0.so 
+   [INFO] Loading shared library: /usr/lib64/libgtk-x11-2.0.so
+   [INFO] Window running. OK! 
+   [INFO] Shutdown gracefully. Ok. 
+#+END_SRC
+
+Verify exported symbols by gtk3 shared library: 
+
+#+BEGIN_SRC sh 
+    $ >> nm -D /lib64/libgtk-3.so.0 | grep init
+           ... ... ... ... ..
+           ... ... ... ... ..
+           U g_async_initable_new_async
+           U g_async_initable_new_finish
+           U g_datalist_init
+           U g_hash_table_iter_init
+           U g_initable_get_type
+           U g_initable_new
+           U g_initially_unowned_get_type
+           U g_mutex_init
+           U g_once_init_enter
+          ... ... ... ... ..
+          ... ... ... ... ..
+#+END_SRC
+
+
