@@ -1311,3 +1311,349 @@ Running:
      ... ... ...     ... ... ...     ... ... ...     ... ... ...     
 #+END_SRC
 
+** Creating Portable Binaries for Linux / GLIBC hell 
+
+ *The Problem* 
+
+One of the greatest challenges of Linux desktop is building and
+deploying portable applications and native executable which work on
+any Linux distribution. Even if an application totally statically
+linked against all dependencies or it is bundled with all its shared
+libraries dependencies via LD_LIBRARY_PATH environment variable or
+RPATH, the program may still fail to run in other Linux distribution
+due to the GLIBC (GNU C library runtime) dependency. A GLIBC is _forward_
+_compatible_, but not _backward compatible_, the GLIBC runtime failure is
+more likely to happen if the application was built on a Linux
+distribution using a newer version of GLIBC, but the program is
+deployed in a distribution using an older version of GLIBC.
+
+  + Side Note: Applications built with GO (Golang) programming
+    language are less likely to be affected by the GLIBC-issue as
+    often, the compiler does not link against the GLIBC.
+
+GIST Containing all files used in this experiment: 
+
+  + https://gist.github.com/0557cd0fa1d5370723b015e443a7c036
+
+ *GLIBC - Problem Illustration with a Sample Project* 
+
+File: Makefile
+
+#+BEGIN_SRC make 
+  build:
+          cmake --config Debug -H. -B_build2
+          cmake --build _build2 --target 
+#+END_SRC
+
+File: CMakeLists.txt 
+
+#+BEGIN_SRC cmake 
+  cmake_minimum_required(VERSION 3.9)
+  project(Simple_Cmake_Project)
+
+  set(CMAKE_CXX_STANDARD 17)     
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+
+  #========== Targets Configurations ============#
+          add_executable( filesys filesys.cpp )
+  target_link_libraries( filesys stdc++fs)
+#+END_SRC
+
+File: filesys.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+  #include <iterator>
+  #include <iomanip>
+  #include <filesystem>
+
+  namespace fs = std::filesystem;
+
+  template<typename Range, typename Function>
+  auto dotimes(size_t n, Range&& iterable, Function fun)
+  {
+      size_t i = 0;
+      auto it = fs::begin(iterable);
+      auto end = fs::end(iterable);
+      while(i < n && it != end ){
+              fun(it);
+              ++it;
+              i++;
+      }
+  }
+
+  int main(){
+
+       std::cout << std::boolalpha;
+       std::cout << "\n ===== Listing directory /etc =====" << std::endl;
+       // Show first 10 files of directory /etc 
+       dotimes(10, fs::directory_iterator("/etc"),
+               [](auto p){
+                    auto path = p->path();
+                    std::cout << std::left
+                              << std::setw(0) << path.filename().string()
+                              << " " << std::setw(35)
+                              << std::right << std::setw(40) << path
+                              << std::endl;				
+               });		
+       return EXIT_SUCCESS;
+  }
+#+END_SRC
+
+ *Steps for reproducing the problem* 
+
+STEP 1: Get current machine infomation. 
+
+  + GLIBC Version is: 2.34-2.fc32
+
+#+BEGIN_SRC sh 
+  # Current machine 
+  $ cat /etc/fedora-release 
+  Fedora release 32 (Thirty Two)
+
+  # Current GLIBC Version 
+  $ ld --version
+  GNU ld version 2.34-2.fc32
+  ... ... ... ... 
+#+END_SRC
+
+STEP 2: Build the application. 
+
+#+BEGIN_SRC sh 
+  $ git clone https://gist.github.com/0557cd0fa1d5370723b015e443a7c036
+
+ *GLIBC - Problem Illustration with a Sample Project* 
+
+File: Makefile
+
+#+BEGIN_SRC make 
+  build:
+          cmake --config Debug -H. -B_build2
+          cmake --build _build2 --target 
+#+END_SRC
+
+File: CMakeLists.txt 
+
+#+BEGIN_SRC cmake 
+  cmake_minimum_required(VERSION 3.9)
+  project(Simple_Cmake_Project)
+
+  set(CMAKE_CXX_STANDARD 17)     
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+
+  #========== Targets Configurations ============#
+          add_executable( filesys filesys.cpp )
+  target_link_libraries( filesys stdc++fs)
+#+END_SRC
+
+File: filesys.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+  #include <iterator>
+  #include <iomanip>
+  #include <filesystem>
+
+  namespace fs = std::filesystem;
+
+  template<typename Range, typename Function>
+  auto dotimes(size_t n, Range&& iterable, Function fun)
+  {
+      size_t i = 0;
+      auto it = fs::begin(iterable);
+      auto end = fs::end(iterable);
+      while(i < n && it != end ){
+              fun(it);
+              ++it;
+              i++;
+      }
+  }
+
+  int main(){
+
+       std::cout << std::boolalpha;
+       std::cout << "\n ===== Listing directory /etc =====" << std::endl;
+       // Show first 10 files of directory /etc 
+       dotimes(10, fs::directory_iterator("/etc"),
+               [](auto p){
+                    auto path = p->path();
+                    std::cout << std::left
+                              << std::setw(0) << path.filename().string()
+                              << " " << std::setw(35)
+                              << std::right << std::setw(40) << path
+                              << std::endl;				
+               });		
+       return EXIT_SUCCESS;
+  }
+#+END_SRC
+
+ *Steps for reproducing the problem* 
+
+STEP 1: Get current machine infomation. 
+
+  + GLIBC Version is: 2.34-2.fc32
+
+#+BEGIN_SRC sh 
+  # Current machine 
+  $ cat /etc/fedora-release 
+  Fedora release 32 (Thirty Two)
+
+  # Current GLIBC Version 
+  $ ld --version
+  GNU ld version 2.34-2.fc32
+  ... ... ... ... 
+#+END_SRC
+
+STEP 2: Build the application. 
+
+#+BEGIN_SRC sh 
+  $ git clone https://gist.github.com/0557cd0fa1d5370723b015e443a7c036 gist && cd gist 
+  $ cmake --config Debug -H. -B_build1
+  $ cmake --build _build1 --target 
+
+  $ file _build1/filesys 
+  _build1/filesys: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked, 
+  interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=d1a3628f794c66bcfb29303cfa4a528910f4e3e2
+  , for GNU/Linux 3.2.0, not stripped
+#+END_SRC
+
+STEP 3: Run in the current machine (newer version of GLIBC)
+
+#+BEGIN_SRC sh 
+  $ _build1/filesys 
+
+   ===== Listing directory /etc =====
+  chrony.conf                       "/etc/chrony.conf"
+  xl2tpd                            "/etc/xl2tpd"
+  group                             "/etc/group"
+  profile.d                         "/etc/profile.d"
+  kde4rc                            "/etc/kde4rc"
+  resolv.conf.8LUAL0                "/etc/resolv.conf.8LUAL0"
+  geoclue                           "/etc/geoclue"
+  bash_completion.d                 "/etc/bash_completion.d"
+  cups                              "/etc/cups"
+  mime.types                        "/etc/mime.types"
+#+END_SRC
+
+STEP 4: Attempt to run the binary in a distribution using an older
+version of GLIBC. The distribution used was a QEMU-KVM virtual
+machine running MX-Linux 19.2, distribution based on Debian, with
+GLIBC version .
+
+#+BEGIN_SRC sh 
+  #---------- Failure ------------------------------------#
+   $ _build1/filesys 
+   _build1/filesys: /lib/x86_64-linux-gnu/libstdc++.so.6: version 
+    `GLIBCXX_3.4.26' not found (required by _build1/filesys)
+
+   #----------- Machine Info (MX Linux 19.2) -------------#
+   # Kernel version 
+   $ uname -r
+   4.19.0-9-amd64
+
+   # Distro name 
+   $ cat /etc/issue 
+   Welcome to MX 19.2 (patito feo) 64-bit! Powered by Debian.
+   ... ... ... ... ............ .... ... ... .. 
+
+   $ ld --version
+   GNU ld (GNU Binutils for Debian) 2.31.1
+   ... ... ... ... ... ... ... ... ... ... ... ... 
+#+END_SRC
+
+ *Solution* 
+
+As GLIBC is _forward compatible_, but not _backward compatible_. The
+solution for this issue is to build the application on a _system_ with
+the oldest possible version of GLIBC. System in this context, means: a
+Linux virtual machine; a Chroot environment; or Docker image with an
+older version of GLIBC. Other alternative is to replace GLIBC with
+_MUSL_ CRT (C Runtime library), but the drawback is that MUSL does not
+support dynamic loading (_dlopen_, _dlsym_ APIs). 
+
+The solution adopted for solving this issue was to use a Docker image
+based on [[https://github.com/phusion/holy-build-box][holy-build-box]], which is a Docker image based on Centos 6
+Linux distribution containing a modern version of GCC compiler, CMake
+and an older version of GLIBC.
+
+See: 
+  + https://github.com/phusion/holy-build-box
+
+ _File: Dockerfile_ (Available at [[https://gist.github.com/0557cd0fa1d5370723b015e443a7c036][gist url]])
+
+#+BEGIN_SRC sh 
+  # $ docker run -it --rm -v $PWD:/work -w /work phusion/holy-build-box-64:latest bash 
+  FROM phusion/holy-build-box-64:latest
+
+  ENTRYPOINT [ "/hbb_exe/activate-exec", "bash"  ]
+#+END_SRC
+
+Build docker image: 
+
+#+BEGIN_SRC sh 
+   # Run at the directory where is Dockerfile 
+   $ docker build -f Dockerfile -t linux-build . 
+#+END_SRC
+
+Enter in the docker image shell: 
+
+#+BEGIN_SRC sh 
+   $ docker run --rm -it -v $PWD:/cwd -w /cwd linux-build 
+   Holy build box activated
+   Prefix: /hbb_exe
+   CFLAGS/CXXFLAGS: -g -O2 -fvisibility=hidden -I/hbb_exe/include 
+   LDFLAGS: -L/hbb_exe/lib -static-libstdc++
+   STATICLIB_CFLAGS: -g -O2 -fvisibility=hidden -I/hbb_exe/include 
+   SHLIB_CFLAGS: -g -O2 -fvisibility=hidden -I/hbb_exe/include 
+   SHLIB_LDFLAGS: -L/hbb_exe/lib -static-libstdc++
+
+   [root@88c9630a2008 cwd]# ls
+   _build1  CMakeLists.txt   Dockerfile   filesys.cpp   Makefile
+#+END_SRC
+
+Build the application: 
+
+#+BEGIN_SRC sh 
+  [root@88c9630a2008 cwd]# make 
+  cmake --config Debug -H. -B_build2
+  -- Configuring done
+  -- Generating done
+  -- Build files have been written to: /cwd/_build2
+  cmake --build _build2 --target 
+  gmake[1]: Entering directory '/cwd/_build2'
+  /hbb/bin/cmake -S/cwd -B/cwd/_build2 --check-build-system CMakeFiles/Makefile.cmake 0
+  ... ... ... ... ... ... ... ... ... 
+  ... ... ... ... ... ... ... ... ... ... ... ... 
+
+  [root@88c9630a2008 cwd]# ls _build2
+  CMakeCache.txt  CMakeFiles  cmake_install.cmake  filesys  Makefile
+#+END_SRC
+
+Run the application _build2/filesys in MX-Linux: 
+
+#+BEGIN_SRC sh 
+   # Built on Fedora 32 with newer version of GLIBC 
+   $ _build1/filesys
+   _build1/filesys: /lib/x86_64-linux-gnu/libstdc++.so.6: 
+   version `GLIBCXX_3.4.26' not found (required by _build1/filesys)
+
+
+   # Built on Centos6 docker with older version of GLIBC 
+   #--------------------------------------
+   $ _build2/filesys
+
+    ===== Listing directory /etc =====
+   .java                             "/etc/.java"
+   .pwd.lock                         "/etc/.pwd.lock"
+   ImageMagick-6                     "/etc/ImageMagick-6"
+   NetworkManager                    "/etc/NetworkManager"
+   UPower                            "/etc/UPower"
+   X11                               "/etc/X11"
+   acpi                              "/etc/acpi"
+   adduser.conf                      "/etc/adduser.conf"
+   adjtime                           "/etc/adjtime"
+   alsa                              "/etc/alsa"
+#+END_SRC
+
