@@ -1312,8 +1312,7 @@ Running:
 #+END_SRC
 
 ** Creating Portable Binaries for Linux / GLIBC hell 
-
- *The Problem* 
+**** Overview 
 
 One of the greatest challenges of Linux desktop is building and
 deploying portable applications and native executable which work on
@@ -1331,11 +1330,13 @@ deployed in a distribution using an older version of GLIBC.
     language are less likely to be affected by the GLIBC-issue as
     often, the compiler does not link against the GLIBC.
 
+**** The GLIBC Problem 
+
+ *GLIBC - Problem Illustration with a Sample Project* 
+
 GIST Containing all files used in this experiment: 
 
   + https://gist.github.com/0557cd0fa1d5370723b015e443a7c036
-
- *GLIBC - Problem Illustration with a Sample Project* 
 
 File: Makefile
 
@@ -1474,8 +1475,7 @@ GLIBC version .
    GNU ld (GNU Binutils for Debian) 2.31.1
    ... ... ... ... ... ... ... ... ... ... ... ... 
 #+END_SRC
-
- *Solution* 
+**** Solution 1 - via linking against older GLIBC 
 
 As GLIBC is _forward compatible_, but not _backward compatible_. The
 solution for this issue is to build the application on a _system_ with
@@ -1568,4 +1568,87 @@ Run the application _build2/filesys in MX-Linux:
    adjtime                           "/etc/adjtime"
    alsa                              "/etc/alsa"
 #+END_SRC
+**** Solution 2 - via linking against MUSL 
+
+Other alternative to avoid the GLIBC dependency problem is to build
+the application statically linking against [[https://www.musl-libc.org/][MUSL - LibC]] which is an CRT
+(C runtime library), initially developed for embedded systems, but that has
+become an alternative to GLIBC. The easiest way to build statically
+linking against MUSL is to use an Alpine docker image: 
+
+ + Note: CRT - is a central component of Unix-like operating
+   systems. It encapsulates system-calls and other operating system
+   services for user-space applications. 
+
+See: 
+  * [[https://en.wikipedia.org/wiki/Musl][Musl - Wikipedia]]
+  * [[https://wiki.debian.org/musl][Musl - Debian]]
+  * [[https://www.arangodb.com/2018/04/static-binaries-c-plus-plus-application/][Static Binaries for a C++ Application - ArangoDB]]
+  * [[https://doc.rust-lang.org/edition-guide/rust-2018/platform-and-target-support/musl-support-for-fully-static-binaries.html][MUSL support for fully static binaries - Rust Docs]]
+  * [[http://www.etalabs.net/compare_libcs.html][Comparison of C/POSIX standard library implementations for Linux]]
+  * [[https://elinux.org/images/8/8b/Room_For_Cooperation-_Bionic_and_musl.pdf][Elinux/Linaro - Bionic and musl - room for cooperation?]]
+
+File: MuslBuilder.docker ([[https://gist.github.com/0557cd0fa1d5370723b015e443a7c036][Available at gist]])
+
+#+BEGIN_SRC docker 
+  FROM alpine:latest
+  RUN apk add musl cmake make g++
+#+END_SRC
+
+ *Building:* 
+
+Buildilg the docker containing MUSL and development tools:
+
+#+BEGIN_SRC sh 
+   $ git clone https://gist.github.com/0557cd0fa1d5370723b015e443a7c036 && cd gist 
+   $ docker build -f MuslBuilder.docker -t musl-builder . 
+#+END_SRC
+
+Running a container of this docker image: 
+
+#+BEGIN_SRC sh 
+   $ docker run -it --rm -v $(pwd):/cwd -w /cwd -e UID=$(id -u) -e GID=$(id -g) musl-builder 
+   /cwd $ cmake --config Debug -H. -B_build-musl -DCMAKE_EXE_LINKER_FLAGS="-static -Os"
+   /cwd # cmake --build _build-musl --target 
+#+END_SRC
+
+Exiting from the container and check the executable:
+
+#+BEGIN_SRC sh 
+  $ du -h _build-musl/filesys 
+  8.7M	_build-musl/filesys
+  8.7M	total
+
+  $ file _build-musl/filesys 
+  _build-musl/filesys: ELF 64-bit LSB shared object, x86-64, version 1 (SYSV)
+  , statically linked, with debug_info, not stripped
+
+  # Check dependencies 
+  $ ldd _build-musl/filesys 
+          statically linked
+#+END_SRC
+
+Attempt to run from MX-Linux 19.2 (Older GLIBC)
+
+#+BEGIN_SRC sh 
+   $ _build-musl/filesys 
+
+    ===== Listing directory /etc =====
+   .java                             "/etc/.java"
+   .pwd.lock                         "/etc/.pwd.lock"
+   ImageMagick-6                     "/etc/ImageMagick-6"
+   NetworkManager                    "/etc/NetworkManager"
+   UPower                            "/etc/UPower"
+   X11                               "/etc/X11"
+   acpi                              "/etc/acpi"
+   adduser.conf                      "/etc/adduser.conf"
+   adjtime                           "/etc/adjtime"
+   alsa                              "/etc/alsa"
+#+END_SRC
+
+
+
+
+
+
 
