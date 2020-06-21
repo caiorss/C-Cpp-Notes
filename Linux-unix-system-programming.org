@@ -1421,94 +1421,6 @@ STEP 1: Get current machine infomation.
 STEP 2: Build the application. 
 
 #+BEGIN_SRC sh 
-  $ git clone https://gist.github.com/0557cd0fa1d5370723b015e443a7c036
-
- *GLIBC - Problem Illustration with a Sample Project* 
-
-File: Makefile
-
-#+BEGIN_SRC make 
-  build:
-          cmake --config Debug -H. -B_build2
-          cmake --build _build2 --target 
-#+END_SRC
-
-File: CMakeLists.txt 
-
-#+BEGIN_SRC cmake 
-  cmake_minimum_required(VERSION 3.9)
-  project(Simple_Cmake_Project)
-
-  set(CMAKE_CXX_STANDARD 17)     
-  set(CMAKE_VERBOSE_MAKEFILE ON)
-
-  #========== Targets Configurations ============#
-          add_executable( filesys filesys.cpp )
-  target_link_libraries( filesys stdc++fs)
-#+END_SRC
-
-File: filesys.cpp 
-
-#+BEGIN_SRC cpp 
-  #include <iostream>
-  #include <string>
-  #include <iterator>
-  #include <iomanip>
-  #include <filesystem>
-
-  namespace fs = std::filesystem;
-
-  template<typename Range, typename Function>
-  auto dotimes(size_t n, Range&& iterable, Function fun)
-  {
-      size_t i = 0;
-      auto it = fs::begin(iterable);
-      auto end = fs::end(iterable);
-      while(i < n && it != end ){
-              fun(it);
-              ++it;
-              i++;
-      }
-  }
-
-  int main(){
-
-       std::cout << std::boolalpha;
-       std::cout << "\n ===== Listing directory /etc =====" << std::endl;
-       // Show first 10 files of directory /etc 
-       dotimes(10, fs::directory_iterator("/etc"),
-               [](auto p){
-                    auto path = p->path();
-                    std::cout << std::left
-                              << std::setw(0) << path.filename().string()
-                              << " " << std::setw(35)
-                              << std::right << std::setw(40) << path
-                              << std::endl;				
-               });		
-       return EXIT_SUCCESS;
-  }
-#+END_SRC
-
- *Steps for reproducing the problem* 
-
-STEP 1: Get current machine infomation. 
-
-  + GLIBC Version is: 2.34-2.fc32
-
-#+BEGIN_SRC sh 
-  # Current machine 
-  $ cat /etc/fedora-release 
-  Fedora release 32 (Thirty Two)
-
-  # Current GLIBC Version 
-  $ ld --version
-  GNU ld version 2.34-2.fc32
-  ... ... ... ... 
-#+END_SRC
-
-STEP 2: Build the application. 
-
-#+BEGIN_SRC sh 
   $ git clone https://gist.github.com/0557cd0fa1d5370723b015e443a7c036 gist && cd gist 
   $ cmake --config Debug -H. -B_build1
   $ cmake --build _build1 --target 
@@ -1634,13 +1546,13 @@ Build the application:
 Run the application _build2/filesys in MX-Linux: 
 
 #+BEGIN_SRC sh 
-   # Built on Fedora 32 with newer version of GLIBC 
+   # Built on Fedora 32 with newer version of GLIBC [FAILURE]
    $ _build1/filesys
    _build1/filesys: /lib/x86_64-linux-gnu/libstdc++.so.6: 
-   version `GLIBCXX_3.4.26' not found (required by _build1/filesys)
+   version 'GLIBCXX_3.4.26' not found (required by _build1/filesys)
 
 
-   # Built on Centos6 docker with older version of GLIBC 
+   # Built on Centos6 docker with older version of GLIBC [OK, WORKS]
    #--------------------------------------
    $ _build2/filesys
 
