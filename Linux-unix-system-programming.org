@@ -1814,7 +1814,7 @@ MMAP - File Memory Mapping for other programming languages
    + https://docs.julialang.org/en/v1/stdlib/Mmap/ - Julia Language library for mmap (memory-mapped files)
 
    + [[https://engineering.indeedblog.com/blog/2015/02/memory-mapping-with-util-mmap/][Memory Mapping with util-mmap]] - mmap for Java.
-*** Example - mmap for reading Windows PE32 executables 
+*** Example (C++ Version) - mmap for reading Windows PE32 executables 
 
 This code uses mmap API (memory mapped files) for reading metadata
 from PE (Portable Executable) - Windows native executable files or
@@ -2006,4 +2006,178 @@ Running:
              Signature = 0x4550 
                Machine = 0x8664 
     Number of sections = 7 
+#+END_SRC
+*** Example (C Version) - mmap for reading Windows PE32 executables 
+
+GIST: 
+  + https://gist.github.com/166265f6dc85c8d9cc2dc00253caae78
+
+File: unix-mmap.c 
+
+#+BEGIN_SRC cpp 
+    #include <stdio.h>
+    #include <stdlib.h>
+    #include <stdint.h> 
+    #include <assert.h>
+
+    // --- Unix/Posix headers ---------//
+    #include <unistd.h>
+    #include <sys/mman.h>
+    #include <sys/stat.h>
+    #include <fcntl.h>
+
+    #define IMAGE_SIZEOF_SHORT_NAME            8
+    #define IMAGE_NUMBEROF_DIRECTORY_ENTRIES  16
+
+    typedef int32_t  LONG;
+    typedef uint16_t WORD;
+    typedef uint32_t DWORD;
+    typedef uint8_t  BYTE;
+    typedef uint64_t ULONGLONG;;
+
+    // Source: <winttt.h>  => Original: typedef struct _IMAGE_DOS_HEADER
+    typedef struct {            
+        WORD   e_magic;                     
+        WORD   e_cblp;                   
+        WORD   e_cp;                     
+        WORD   e_crlc;                   
+        WORD   e_cparhdr;                
+        WORD   e_minalloc;               
+        WORD   e_maxalloc;               
+        WORD   e_ss;                     
+        WORD   e_sp;                     
+        WORD   e_csum;                   
+        WORD   e_ip;                     
+        WORD   e_cs;                     
+        WORD   e_lfarlc;                 
+        WORD   e_ovno;                   
+        WORD   e_res[4];                 
+        WORD   e_oemid;                  
+        WORD   e_oeminfo;                
+        WORD   e_res2[10];               
+        //  Offset to the PE header from the beginning of the file. 
+        LONG   e_lfanew;                    
+      } IMAGE_DOS_HEADER;
+
+     typedef struct {
+        DWORD Signature; 
+        WORD  Machine;
+        WORD  NumberOfSections;
+        DWORD TimeDateStamp;
+        DWORD PointerToSymbolTable;
+        DWORD NumberOfSymbols;
+        WORD  SizeOfOptionalHeader;
+        WORD  Characteristics;
+     } PE_HEADER;
+
+
+    ssize_t get_file_size(int fd)
+    {
+        struct stat file_stat; 
+        if( fstat(fd, &file_stat) == -1 )
+            return -1;
+        return file_stat.st_size;
+    }
+
+    int main(int argc, char** argv)
+    {   
+        // ----------- Validate arguments ----------------------------//
+        if(argc < 2)
+        {
+            fprintf(stderr, "Usage: /unix-mmap <FILE> \n");
+            return EXIT_FAILURE;
+        }
+
+        // ----------- Get file descriptor ----------------------------//
+
+        // Get read-only file descriptor of file 
+        int fd = open(argv[1], O_RDONLY);
+        if(fd == -1){
+            fprintf(stderr, " Error: unable to open file. check ERRNO variable \n");
+            return EXIT_FAILURE;
+        }
+
+        ssize_t size = get_file_size(fd);
+        if(size == -1){
+            fprintf(stderr, " Error: unable to get file size \n");
+            return EXIT_FAILURE;
+        }
+
+        // ----------- Map file in to process' virtual memory ---------------------------//
+
+        void* fmap = mmap(    NULL     /* Often set to zero, aka nullpointer           */
+                            , size        /* Size of file mapping in bytes                */
+                            , PROT_READ   /* Open in read-only mode                       */
+                            , MAP_PRIVATE /* Only this process can access this memory-map */
+                            , fd          /* File descriptor of file to be memory mapped  */
+                            , 0x00        /* Offset from the beggining of the file        */
+                         );
+
+        if( fmap == MAP_FAILED)
+        {
+            fprintf(stderr, " Error: memory mapped failed. check ERRNO \n");
+            return EXIT_FAILURE;
+        }
+
+        // --------- Process file -----------------------------------------// 
+
+        unsigned char* bmap = (unsigned char*) fmap; 
+
+        // char file_signature [2] = { bmap[0], bmap[1], bmap[2], bmap[3], 0x00 };
+        printf(" File signature = %c %c 0x%X 0x%X \n", bmap[0], bmap[1], bmap[2], bmap[3]);
+
+        IMAGE_DOS_HEADER* dos_header = (IMAGE_DOS_HEADER*) fmap;
+        PE_HEADER*        pe_header  = fmap + dos_header->e_lfanew;
+
+        assert( pe_header->Signature == 0x4550 );
+
+        printf("\n ========= [DOS HEADER] =================\n");
+        printf("   MAGIC NUMBER = 0x%X (hex) \n", dos_header->e_magic);
+        printf("   MAGIC NUMBER = %c %c  (str) \n", dos_header->e_magic & 0xFF, (dos_header->e_magic >> 8) & 0xFF);
+        printf("       e_lfanew = 0x%X \n",      dos_header->e_lfanew);
+
+        printf("\n ======== [PE - Header] ================\n");
+        printf(" Note: if machine is 0x8664 => the processor is AMD-Intel x86-64 \n");
+        printf("\n");
+        printf("          Signature = 0x%X \n", pe_header->Signature);
+        printf("            Machine = 0x%X \n", pe_header->Machine);
+        printf(" Number of sections = %d \n",   pe_header->NumberOfSections);
+
+        // ---------- Release Resource ------------------------------------// 
+
+        // Unmap memory segment 
+        munmap(fmap, size);
+        // Release file-descriptor resource
+        close(fd);
+
+        return 0;
+    } // --- End of main() ----// 
+
+
+#+END_SRC
+
+Build: 
+
+#+BEGIN_SRC sh 
+  $ gcc unix-mmap.c -o unix-mmap-c.bin -Wall -Wextra -g
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC sh 
+   $ ./unix-mmap-c.bin notepad.exe 
+    File signature = M Z 0x90 0x0 
+
+    ========= [DOS HEADER] =================
+      MAGIC NUMBER = 0x5A4D (hex) 
+      MAGIC NUMBER = M Z  (str) 
+          e_lfanew = 0xF8 
+
+    ======== [PE - Header] ================
+    Note: if machine is 0x8664 => the processor is AMD-Intel x86-64 
+
+             Signature = 0x4550 
+               Machine = 0x8664 
+    Number of sections = 7 
+  
 #+END_SRC
