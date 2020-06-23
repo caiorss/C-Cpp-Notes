@@ -1847,7 +1847,7 @@ MMAP - File Memory Mapping for other programming languages
    + https://docs.julialang.org/en/v1/stdlib/Mmap/ - Julia Language library for mmap (memory-mapped files)
 
    + [[https://engineering.indeedblog.com/blog/2015/02/memory-mapping-with-util-mmap/][Memory Mapping with util-mmap]] - mmap for Java.
-*** Example (C Version) - mmap for reading Windows PE32 executables 
+*** Example (C) - mmap for reading Windows PE32 files 
 
 This code uses mmap API (memory mapped files) for reading metadata
 from PE (Portable Executable) - Windows native executable files or
@@ -2025,7 +2025,7 @@ Running:
     Number of sections = 7 
   
 #+END_SRC
-*** Example (C++ Version) - mmap for reading Windows PE32 executables 
+*** Example (C++) - mmap for reading Windows PE32 files 
 
 GIST: 
   + https://gist.github.com/166265f6dc85c8d9cc2dc00253caae78
@@ -2200,6 +2200,216 @@ Running:
 
 
    $ ./unix-mmap.bin notepad.exe 
+    File signature = M Z 0x90 0x0 
+
+    ========= [DOS HEADER] =================
+      MAGIC NUMBER = 0x5A4D (hex) 
+      MAGIC NUMBER = M Z  (str) 
+          e_lfanew = 0xF8 
+
+    ======== [PE - Header] ================
+    Note: if machine is 0x8664 => the processor is AMD-Intel x86-64 
+
+             Signature = 0x4550 
+               Machine = 0x8664 
+    Number of sections = 7 
+#+END_SRC
+*** Example (C++) - mmap for reading Windows PE32 with class 
+
+This code uses a class FileMapping for encapsulating Unix
+memory-mapped files which simplifies the usage of the mmap feature and
+makes the code cleaner and safer. 
+
+GIST: 
+  + https://gist.github.com/166265f6dc85c8d9cc2dc00253caae78
+
+File: unix-mmap-class.cpp 
+
+#+BEGIN_SRC cpp 
+   #include <iostream>
+   #include <string> 
+   #include <fstream> 
+   #include <cstdint> 
+   #include <cassert>
+
+   // --- Unix/Posix headers ---------//
+   #include <unistd.h>
+   #include <sys/mman.h>
+   #include <sys/stat.h>
+   #include <fcntl.h>
+
+   constexpr size_t IMAGE_SIZEOF_SHORT_NAME = 8;
+   constexpr size_t IMAGE_NUMBEROF_DIRECTORY_ENTRIES = 16;
+
+   // using LONG      = long;
+   using LONG      = std::int32_t;
+   using WORD      = std::uint16_t;  // unsigned short;
+   using DWORD     = std::uint32_t;  // unsigned long; 
+   using BYTE      = std::uint8_t;   //unsigned char;
+   using ULONGLONG = std::uint64_t;  // unsigned long long 
+
+   // Source: <winttt.h>  => Original: typedef struct _IMAGE_DOS_HEADER
+   struct IMAGE_DOS_HEADER {            
+       WORD   e_magic;                     
+       WORD   e_cblp;                   
+       WORD   e_cp;                     
+       WORD   e_crlc;                   
+       WORD   e_cparhdr;                
+       WORD   e_minalloc;               
+       WORD   e_maxalloc;               
+       WORD   e_ss;                     
+       WORD   e_sp;                     
+       WORD   e_csum;                   
+       WORD   e_ip;                     
+       WORD   e_cs;                     
+       WORD   e_lfarlc;                 
+       WORD   e_ovno;                   
+       WORD   e_res[4];                 
+       WORD   e_oemid;                  
+       WORD   e_oeminfo;                
+       WORD   e_res2[10];               
+       //  Offset to the PE header from the beginning of the file. 
+       LONG   e_lfanew;                    
+     };
+
+    struct PE_HEADER
+    {
+       DWORD Signature; 
+       WORD  Machine;
+       WORD  NumberOfSections;
+       DWORD TimeDateStamp;
+       DWORD PointerToSymbolTable;
+       DWORD NumberOfSymbols;
+       WORD  SizeOfOptionalHeader;
+       WORD  Characteristics;
+    };
+
+   /** Class for encapsulating memory mapped files*/
+   class FileMapping
+   {
+       int   m_fd      = -1; 
+       void* m_addr    = nullptr; 
+       ssize_t m_size  = -1;
+
+       ssize_t get_file_size(int fd)
+       {
+           struct stat file_stat; 
+           if( fstat(fd, &file_stat) == -1 )
+               throw std::runtime_error("Error: unable to get file size");
+           return file_stat.st_size;
+       }
+
+   public: 
+       // Disable copy constructor 
+       FileMapping(FileMapping const&) = delete;
+       // Disable copy assignment operator 
+       FileMapping& operator=(FileMapping const&) = delete;    
+
+       /** 
+        * @param file_path - File to be memory-mapped to current process. 
+        */
+       FileMapping(std::string file_path)
+       {
+           // Get read-only file descriptor of file 
+           m_fd = open(file_path.c_str(), O_RDONLY);        
+           if(m_fd == -1){
+               throw std::runtime_error("Unable to open file");
+           }      
+
+           m_size = get_file_size(m_fd);
+           if(m_size == -1)
+               throw std::runtime_error("Unable to get file size");
+
+
+           m_addr = ::mmap( nullptr     
+                           , m_size       
+                           , PROT_READ   
+                           , MAP_PRIVATE 
+                           , m_fd        
+                           , 0x00        
+                       );
+           if( m_addr == MAP_FAILED)
+           {
+               throw std::runtime_error("Error: failed to map file to memory");
+           }
+
+       }
+
+       ~FileMapping()
+       {
+           // Unmap memory segment 
+           munmap(m_addr, m_size);
+           // Release file-descriptor resource
+           close(m_fd);
+
+           m_fd = -1;
+           m_addr = nullptr;
+           m_size = -1;
+       }
+
+       /** @brief Returns pointer file mapping address. */
+       void* addr() const { return m_addr; }  
+
+       /** @brief  Get casted pointer to an offset of the file mapping address. */
+       template<typename T>
+       T addr_rel(std::ptrdiff_t offset) const { 
+           return reinterpret_cast<T>( reinterpret_cast<uintptr_t>(m_addr) + offset);  
+       }
+
+   }; // --- End of class FileMapping ---- //
+
+
+   int main(int argc, char** argv)
+   {   
+       // ----------- Validate arguments ----------------------------//
+       if(argc < 2)
+       {
+           std::fprintf(stderr, "Usage: /unix-mmap <FILE> \n");
+           return EXIT_FAILURE;
+       }
+
+       FileMapping fmap(argv[1]);
+
+       // --------- Process file -----------------------------------------// 
+
+       const auto bmap = fmap.addr_rel<unsigned char*>(0x00);
+
+       // char file_signature [2] = { bmap[0], bmap[1], bmap[2], bmap[3], 0x00 };
+       std::printf(" File signature = %c %c 0x%X 0x%X \n", bmap[0], bmap[1], bmap[2], bmap[3]);
+
+       IMAGE_DOS_HEADER* dos_header = fmap.addr_rel<IMAGE_DOS_HEADER*>(0x00);
+       PE_HEADER*        pe_header  = fmap.addr_rel<PE_HEADER*>( dos_header->e_lfanew);
+
+       assert( pe_header->Signature == 0x4550 );
+
+       std::printf("\n ========= [DOS HEADER] =================\n");
+       std::printf("   MAGIC NUMBER = 0x%X (hex) \n", dos_header->e_magic);
+       std::printf("   MAGIC NUMBER = %c %c  (str) \n", dos_header->e_magic & 0xFF, (dos_header->e_magic >> 8) & 0xFF);
+       std::printf("       e_lfanew = 0x%X \n",      dos_header->e_lfanew);
+
+       std::printf("\n ======== [PE - Header] ================\n");
+       std::printf(" Note: if machine is 0x8664 => the processor is AMD-Intel x86-64 \n");
+       std::printf("\n");
+       std::printf("          Signature = 0x%X \n", pe_header->Signature);
+       std::printf("            Machine = 0x%X \n", pe_header->Machine);
+       std::printf(" Number of sections = %d \n",   pe_header->NumberOfSections);
+
+       return 0;
+   } // --- End of main() ----// 
+
+
+#+END_SRC
+
+Building: 
+
+#+BEGIN_SRC sh 
+  $ g++ unix-mmap-class.cpp -o unix-mmap-class.bin -std=c++1z -g -Wall -Wextra
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC sh 
+   $ ./unix-mmap-class.bin notepad.exe 
     File signature = M Z 0x90 0x0 
 
     ========= [DOS HEADER] =================
