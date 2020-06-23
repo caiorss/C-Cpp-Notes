@@ -1648,3 +1648,362 @@ Running:
 
 
 
+** Memory Mapped Files 
+*** Overview 
+
+File mapping is an operating system mechanism which maps a disk file
+to a process virtual memory. This operating system feature allows
+accessing the file as it was in the process memory. 
+
+Benefits: 
+
+  + Transparent access to file, allows accessing the file as it was an
+    ordinary memory. (the file is accessible by pointer)
+
+  + Good for processing large files which does not fit in the machine
+    RAM memory.
+
+Use-cases: 
+  
+  + Read large files
+
+  + IPC - Inter-Process Communication 
+
+  + Process complicated binary files
+
+  + Modify complex binary files. The file can be modified by just
+    changing a memory, in other words, modifying the contents of a
+    memory address. 
+
+  + Implement JIT - Just-In-Time compiler and execute assembly code at runtime.
+
+The _mmap API_ is available in most Unix-like operating systems: 
+
+  + Linux
+  + BSD-family: MacOSX, FreeBDS, NetBSD, OpenBSD
+  + Solaris 
+  + QNX, AIX
+
+  *Mmap API functions*
+
+File descriptors: 
+
+#+BEGIN_SRC cpp 
+    #include <unistd.h>
+    #include <sys/types.h>
+    #include <sys/stat.h>
+    #include <fcntl.h>
+
+    // Returns file descriptor of a disk-file 
+    int open(const char *pathname, int flags);
+
+    // Close file descriptor (release resource)
+    int close(int fd);
+#+END_SRC
+
+Mmap: 
+
+  + Doc: $ man mmap
+  + Linux Manpage Description: "mmap() creates a new mapping in the
+    virtual address space of the calling process.  The starting
+    address for the new mapping is specified in addr.  The length
+    argument speci‐ fies the length of the mapping (which must be
+    greater than 0)"
+
+  + Argument: _prot_ (Memory Protection)
+    + PROT_READ  => Pages may be written (most used)
+    + PROT_WRITE => Pages may be written (allows changing the file by writing to the mapped memory)
+    + PROT_NONE  => Pages may not be accessed
+    + PROT_EXEC  => Pages may be executed => Allows executing machine
+      code (assembly) at runtime. Use case: JIT - Just-In-Time
+      compiler
+
+  + Argument: _flags_
+    + MAP_SHARED  => Multiple processes can share the same _file_
+                  _mapping_. This flag is used for IPC - Inter Process
+                  Communication. 
+    + MAP_PRIVATE => Only the current process can access the file mapping.
+
+#+BEGIN_SRC cpp 
+   #include <sys/mman.h>
+
+   void* mmap(  void*   addr    // (often nullptr) Address that the file will be mapped 
+              , size_t  length  // Length of file mapping (often the file size)
+              , int     prot    // Flags for memory protection 
+              , int     flags   // Flags for process access conttrol (private | shared)
+              , int     fd      // File descriptor to be mapped into virtual memory
+              , off_t   offset  // (often zero) Offset from the beginning of the file 
+             );
+#+END_SRC
+
+munmap:
+
+  + Doc: $ man munmap
+  + Linux Manpage doc: "The munmap() system call deletes the mappings
+    for the specified address range, and causes further references to
+    addresses within the range to generate invalid memory ref‐
+    erences.  The region is also automatically unmapped when the
+    process is terminated.  On the other hand, closing the file
+    descriptor does not unmap the region."
+
+  + Param _addr_: Address of memory mapping (value returned by mmap)
+
+  + Param _length:_ length of file mapping, often it is the file size.
+
+#+BEGIN_SRC cpp 
+    // For mmap and munmap 
+    #include <sys/mman.h>     
+
+    int munmap( void *addr, size_t length);
+#+END_SRC
+
+Hyperlinks to manpage documentation of related-functions: 
+
+  + [[https://linux.die.net/man/2/mmap][mmap]] (Linux manpage)
+
+  + [[https://linux.die.net/man/2/remap_file_pages][remap_file_pages]]
+
+  + [[https://linux.die.net/man/2/mremap][mremap]] (Linux manpage)
+
+  + [[https://linux.die.net/man/2/msync][msync]]
+
+
+ *References and further reading* 
+
+General: 
+
+   + [[https://en.wikipedia.org/wiki/Mmap][mmap - Wikipedia]]
+
+   + [[https://developer.apple.com/library/archive/documentation/FileManagement/Conceptual/FileSystemAdvancedPT/MappingFilesIntoMemory/MappingFilesIntoMemory.html][Apple - Mapping Files Into Memory]]
+
+   + [[https://upsilon.cc/~zack/teaching/1415/progsyst/cours-05-mmap.pdf][Programmation SystèmeCours 5 — Memory Mapping]] ([[http://web.archive.org/web/20200622232258/https://upsilon.cc/~zack/teaching/1415/progsyst/cours-05-mmap.pdf][Web Archive]])
+
+   + [[https://unix.stackexchange.com/questions/474926/how-does-memory-mapping-a-file-have-significant-performance-increases-over-the-s/475014][How does memory mapping a file have significant performance increases over the standard I/O system calls?]]
+
+   + [[https://courses.engr.illinois.edu/cs241/sp2014/lecture/27-IPC.pdf][Interprocess Communication: Memory mapped files and pipes]]
+
+   + [[http://web.cs.ucla.edu/honors/UPLOADS/kousha/thesis.pdf][Linux Memory Mapped System Call Performance]]
+
+   + [[https://w3.cs.jmu.edu/kirkpams/OpenCSF/Books/csf/html/MMap.html][Shared Memory with Memory-Mapped Files]]
+
+   + [[https://www.sublimetext.com/blog/articles/use-mmap-with-care][Use mmap With Care - Sublime HQ]]
+
+   + [[http://www.idryman.org/blog/2017/06/28/opic-a-memory-allocator-for-fast-serialization/][Writing a Memory Allocator for Fast Serialization]]
+
+   + [[http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2006/n2044.html][Paper: Memory Mapped Files And Shared Memory For C++]]
+
+   + [[https://indico.cern.ch/event/658060/contributions/2898569/attachments/1622526/2582399/pivarski-serialization.pdf][Overview of Serialization Technologies]] - CERN
+
+   + [[https://www.usenix.org/sites/default/files/conference/protected-files/hotstorage17_slides_choi.pdf][Efficient Memory Mapped File I/O for In-Memory File Systems]]
+
+   + [[https://engineering.mongodb.com/post/getting-storage-engines-ready-for-fast-storage-devices][Getting storage engines ready for fast storage devices]]
+
+   + [[http://blogs.networkingfutures.co.uk/post/2015/12/28/Windows-Services-Implementing-Non-Persisted-Memory-Mapped-Files-Exposing-IPC-Style-Communications.aspx][Introduction to Memory Mapped Files]] (.NET Specific)
+
+
+MMAP - File Memory Mapping for other programming languages
+
+   + https://docs.rs/flatdata/0.5.0/flatdata/ (Rust library for mmap)
+
+   + [[https://www.red-gate.com/simple-talk/dotnet/net-development/sharing-caring-using-memory-mapped-files-net/][Sharing is Caring: Using Memory Mapped Files in .NET]]
+
+   + [[https://coders-corner.net/2013/03/22/inter-process-communication-with-memory-mapped-files-part-01-transfer-a-data-structure-and-an-object/][Inter-Process Communication with Memory-Mapped Files, Part 01]]
+
+   + [[https://github.com/jampp/sharedbuffers/][Python SharedBuffer - library for mmap]]
+
+   + https://docs.julialang.org/en/v1/stdlib/Mmap/ - Julia Language library for mmap (memory-mapped files)
+
+   + [[https://engineering.indeedblog.com/blog/2015/02/memory-mapping-with-util-mmap/][Memory Mapping with util-mmap]] - mmap for Java.
+*** Example - mmap for reading Windows PE32 executables 
+
+This code uses mmap API (memory mapped files) for reading metadata
+from PE (Portable Executable) - Windows native executable files or
+windows object-code. 
+
+GIST: 
+  + https://gist.github.com/166265f6dc85c8d9cc2dc00253caae78
+
+File: unix-mmap.cpp 
+
+#+BEGIN_SRC cpp 
+   #include <iostream>
+   #include <string> 
+   #include <fstream> 
+   #include <cstdint> 
+   #include <cassert>
+
+   // --- Unix/Posix headers ---------//
+   #include <unistd.h>
+   #include <sys/mman.h>
+   #include <sys/stat.h>
+   #include <fcntl.h>
+
+   constexpr size_t IMAGE_SIZEOF_SHORT_NAME = 8;
+   constexpr size_t IMAGE_NUMBEROF_DIRECTORY_ENTRIES = 16;
+
+   // using LONG      = long;
+   using LONG      = std::int32_t;
+   using WORD      = std::uint16_t;  // unsigned short;
+   using DWORD     = std::uint32_t;  // unsigned long; 
+   using BYTE      = std::uint8_t;   //unsigned char;
+   using ULONGLONG = std::uint64_t;  // unsigned long long 
+
+   // Source: <winttt.h>  => Original: typedef struct _IMAGE_DOS_HEADER
+   struct IMAGE_DOS_HEADER {            
+       WORD   e_magic;                     
+       WORD   e_cblp;                   
+       WORD   e_cp;                     
+       WORD   e_crlc;                   
+       WORD   e_cparhdr;                
+       WORD   e_minalloc;               
+       WORD   e_maxalloc;               
+       WORD   e_ss;                     
+       WORD   e_sp;                     
+       WORD   e_csum;                   
+       WORD   e_ip;                     
+       WORD   e_cs;                     
+       WORD   e_lfarlc;                 
+       WORD   e_ovno;                   
+       WORD   e_res[4];                 
+       WORD   e_oemid;                  
+       WORD   e_oeminfo;                
+       WORD   e_res2[10];               
+       //  Offset to the PE header from the beginning of the file. 
+       LONG   e_lfanew;                    
+     };
+
+    struct PE_HEADER
+    {
+       DWORD Signature; 
+       WORD  Machine;
+       WORD  NumberOfSections;
+       DWORD TimeDateStamp;
+       DWORD PointerToSymbolTable;
+       DWORD NumberOfSymbols;
+       WORD  SizeOfOptionalHeader;
+       WORD  Characteristics;
+    };
+
+
+   ssize_t get_file_size(int fd)
+   {
+       struct stat file_stat; 
+       if( fstat(fd, &file_stat) == -1 )
+           throw std::runtime_error("Error: unable to get file size");
+       return file_stat.st_size;
+   }
+
+   int main(int argc, char** argv)
+   {   
+       // ----------- Validate arguments ----------------------------//
+       if(argc < 2)
+       {
+           std::fprintf(stderr, "Usage: /unix-mmap <FILE> \n");
+           return EXIT_FAILURE;
+       }
+
+       // ----------- Get file descriptor ----------------------------//
+
+       // Get read-only file descriptor of file 
+       int fd = open(argv[1], O_RDONLY);
+       if(fd == -1){
+           std::fprintf(stderr, " Error: unable to open file. check ERRNO variable \n");
+           return EXIT_FAILURE;
+       }
+
+       ssize_t size = get_file_size(fd);
+
+       // ----------- Map file in to process' virtual memory ---------------------------//
+
+       void* fmap = mmap(    nullptr     /* Often set to zero, aka nullpointer           */
+                           , size        /* Size of file mapping in bytes                */
+                           , PROT_READ   /* Open in read-only mode                       */
+                           , MAP_PRIVATE /* Only this process can access this memory-map */
+                           , fd          /* File descriptor of file to be memory mapped  */
+                           , 0x00        /* Offset from the beggining of the file        */
+                        );
+
+       if( fmap == MAP_FAILED)
+       {
+           std::fprintf(stderr, " Error: memory mapped failed. check ERRNO \n");
+           return EXIT_FAILURE;
+       }
+
+       // --------- Process file -----------------------------------------// 
+
+       const auto bmap = reinterpret_cast<unsigned char*>(fmap); 
+
+       // char file_signature [2] = { bmap[0], bmap[1], bmap[2], bmap[3], 0x00 };
+       std::printf(" File signature = %c %c 0x%X 0x%X \n", bmap[0], bmap[1], bmap[2], bmap[3]);
+
+       IMAGE_DOS_HEADER* dos_header = reinterpret_cast<IMAGE_DOS_HEADER*>(fmap);
+       PE_HEADER*        pe_header  = reinterpret_cast<PE_HEADER*>( (uintptr_t) fmap + dos_header->e_lfanew);
+
+       assert( pe_header->Signature == 0x4550 );
+
+       std::printf("\n ========= [DOS HEADER] =================\n");
+       std::printf("   MAGIC NUMBER = 0x%X (hex) \n", dos_header->e_magic);
+       std::printf("   MAGIC NUMBER = %c %c  (str) \n", dos_header->e_magic & 0xFF, (dos_header->e_magic >> 8) & 0xFF);
+       std::printf("       e_lfanew = 0x%X \n",      dos_header->e_lfanew);
+
+       std::printf("\n ======== [PE - Header] ================\n");
+       std::printf(" Note: if machine is 0x8664 => the processor is AMD-Intel x86-64 \n");
+       std::printf("\n");
+       std::printf("          Signature = 0x%X \n", pe_header->Signature);
+       std::printf("            Machine = 0x%X \n", pe_header->Machine);
+       std::printf(" Number of sections = %d \n",   pe_header->NumberOfSections);
+
+
+       // ---------- Release Resource ------------------------------------// 
+
+       // Unmap memory segment 
+       munmap(fmap, size);
+       // Release file-descriptor resource
+       close(fd);
+
+       return 0;
+   } // --- End of main() ----// 
+
+
+#+END_SRC
+
+Building: 
+
+#+BEGIN_SRC sh 
+  $ clang++ unix-mmap.cpp -o unix-mmap.bin -std=c++1z -Wall -Wextra -g
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC sh 
+   $ ./unix-mmap.bin ipconfig.exe 
+    File signature = M Z 0x90 0x0 
+
+    ========= [DOS HEADER] =================
+      MAGIC NUMBER = 0x5A4D (hex) 
+      MAGIC NUMBER = M Z  (str) 
+          e_lfanew = 0xE8 
+
+    ======== [PE - Header] ================
+    Note: if machine is 0x8664 => the processor is AMD-Intel x86-64 
+
+             Signature = 0x4550 
+               Machine = 0x8664 
+    Number of sections = 6 
+
+
+   $ ./unix-mmap.bin notepad.exe 
+    File signature = M Z 0x90 0x0 
+
+    ========= [DOS HEADER] =================
+      MAGIC NUMBER = 0x5A4D (hex) 
+      MAGIC NUMBER = M Z  (str) 
+          e_lfanew = 0xF8 
+
+    ======== [PE - Header] ================
+    Note: if machine is 0x8664 => the processor is AMD-Intel x86-64 
+
+             Signature = 0x4550 
+               Machine = 0x8664 
+    Number of sections = 7 
+#+END_SRC
