@@ -307,7 +307,9 @@ Header: [[https://en.cppreference.com/w/cpp/header/memory][<memory>]]
      allocation and deallocation through function calls to the
      IUnknown member functions: QueryInterface, AddRef, and Release." 
 
-** Pointer arithmetic and array index
+** Memory access and Pointer arithmetic
+
+ *Pointer Arithmetic* 
 
 + [[https://en.cppreference.com/w/cpp/types/size_t][std::size_t]] - Integer which represents the size of a given type in
   bytes. Use cases: type size, number of items in a
@@ -325,6 +327,107 @@ Header: [[https://en.cppreference.com/w/cpp/header/memory][<memory>]]
 + [[https://en.cppreference.com/w/cpp/types/ptrdiff_t][std::ptrdiff_t]] (Header: [[https://en.cppreference.com/w/cpp/header/cstdint][<cstdint>]]) - Type-safe integer for pointer
   arithmetic, pointer offset and array index in a platform-indepedent
   way.
+
+ *Memory Access* 
+
+
+|-------------------------------+-------------------------------------------------------------------------------------+---|
+| Feature                       | Note                                                                                |   |
+|-------------------------------+-------------------------------------------------------------------------------------+---|
+| *Pointer*                       |                                                                                     |   |
+|-------------------------------+-------------------------------------------------------------------------------------+---|
+| void*                         | void pointers are used for untyped memory access (generic memory)                   |   |
+| T* (struct T;)                | opaque pointer or pointer to incomplete type (similar to void*, but more type-safe) |   |
+| std::byte      (C++17 - Only) | byte-addressable memory / byte view of the memory [better, more explicit]           |   |
+| std::uint8_t*  (unsigned)     | byte-addressable memory / byte view of the memory [better, more explicit]           |   |
+| std::int8_t*   (signed)       | byte-addressable memory                                                             |   |
+| char*          (signed)       | byte-addressable memory                                                             |   |
+| unsigned char* (unsigned)     | byte-addressable memory                                                             |   |
+|                               |                                                                                     |   |
+|-------------------------------+-------------------------------------------------------------------------------------+---|
+| *Object Size and Array index*   |                                                                                     |   |
+|-------------------------------+-------------------------------------------------------------------------------------+---|
+| std::size_t   (unsigned)      | size  of object in bytes; number of elements or array index.                        |   |
+| std::ssize_t  (signed)        | similar to size_t, but this type is signed.                                         |   |
+|                               |                                                                                     |   |
+|-------------------------------+-------------------------------------------------------------------------------------+---|
+| *Pointer Arithmetic*            |                                                                                     |   |
+|-------------------------------+-------------------------------------------------------------------------------------+---|
+| std::uintptr_t  (unsigned)    | unsigned type that can store the address held by a pointer.                         |   |
+| std::intptr_t   (signed)      | signed type that can store address held by a pointer.                               |   |
+| std::ptrdiff_t  (unsigned)    | pointer offset and pointer difference.                                              |   |
+|                               |                                                                                     |   |
+|-------------------------------+-------------------------------------------------------------------------------------+---|
+
+Reminder example for std::size_t 
+
+#+BEGIN_SRC cpp 
+   double dataset [5] = { 20.51, 100.51, -2.51, 90.25, 10.0};
+
+   for(size_t i = 0; i < 5; i ++){ do_something( dataset[i] ) };
+#+END_SRC
+
+Reminder example for std::uintptr_t and ptrdiff_t / Example 1 
+
+#+BEGIN_SRC cpp  
+   int x = 100; 
+   int ptr* = &x;
+
+   // [C-style cast] => The variable p stores address (numerical value)
+   // pointed by the pointer variable ptr. 
+   std::uintptr_t p = (std::uintptr_t) ptr; 
+  
+   // [C++-style cast]
+   std::uintptr_t p = reinterpret_cast<std::uintptr_t>(ptr); 
+   std::uintptr_t p = reinterpret_cast<std::uintptr_t>(&x); 
+#+END_SRC
+
+Reminder example for std::uintptr_t and ptrdiff_t / Example 2 
+  + Note: Unlike in C, in C++, it is possible to perform arithmetic on
+    void* pointers. The only safe way to perform this kind of
+    operation is to cast void* to _std::uintptr_t_, peform the
+    arithmetic operating and then cast to the 
+
+#+BEGIN_SRC cpp     
+   // ***********************************************************//
+   // ---------- Use-Case Memory Mapped File --------------------// 
+
+    // Calls mmap() on Unix-like systems
+    MemoryMappedFile fmap("/path/to/file");
+
+    // Get void* pointer which points to the file mapping. 
+    void* mmap_addr = fmap.get(): 
+   
+    // Number of bytes from the beginning of the file until the 
+    // PE-header 
+    constexpr ptrdiff_t PE_header_offset = 0xF8; 
+
+    // ERROR!! Possible in C, but not possible in C++. [DO NOT COMPILE!!]
+    PE_HEADER* hdr = mmap_addr + PE_header_offset;
+
+    // C-style cast (not advisable) [AVOID]
+    PE_HEADER* hdr = (PE_HEADER*) ((std::uintptr_t) mmap_addr + PE_header_offset);
+
+    // C++-style cast [better]
+    PE_HEADER* hdr = reinterpret_cast<PE_HEADER*>( reinterpret_cast<std::uintptr_t>(mmap_addr) + PE_header_offset);
+#+END_SRC
+
+Reminder example for std::uintptr_t and ptrdiff_t / Example 3 
+
+#+BEGIN_SRC cpp 
+   // *****************************************************************//
+   // --- Use-Case for Embedded Systems / MMIO - Memory Mapped IO -----// 
+
+   // MMIO - Memory-Mapped IO address of ADC - Analog-To-Digial Converter
+   constexpr uintptr_t ADDRESS_OF_ADC = 0xFF8ABCDE; 
+
+   // C-style cast [AVOID] 
+   auto mmio_adc = (volatile const std::uint32_t*) ADDRESS_OF_ADC;
+
+   // C++-style cast
+   auto mmio_adc = reinterpret_cast<volatile const std::uint32_t*>(ADDRESS_OF_ADC_;  
+#+END_SRC
+
 
 *Fixed Size Integers* 
 
