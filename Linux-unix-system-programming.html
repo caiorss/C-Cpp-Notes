@@ -3,7 +3,7 @@
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
-<!-- 2020-06-21 Sun 20:55 -->
+<!-- 2020-06-26 Fri 14:07 -->
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Linux and Unix system programming</title>
@@ -239,26 +239,35 @@ for the JavaScript code in this tag.
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents">
 <ul>
-<li><a href="#orge3f8381">1. Linux and Unix system programming</a>
+<li><a href="#orgfd01ec4">1. Linux and Unix system programming</a>
 <ul>
-<li><a href="#orgb6c554e">1.1. Low level IO functions</a></li>
-<li><a href="#org2ec6179">1.2. Low level IO - open(), read(), write() syscall functions</a></li>
-<li><a href="#org154f636">1.3. Low level IO - creat()</a></li>
-<li><a href="#orgb5fc50b">1.4. Information about current process</a></li>
-<li><a href="#org5fde227">1.5. Dynamic Loading Shared Libraries</a>
+<li><a href="#orga702a1e">1.1. Creating Portable Binaries for Linux / GLIBC hell</a>
 <ul>
-<li><a href="#orge5c3fa0">1.5.1. Overview</a></li>
-<li><a href="#org22cbd8f">1.5.2. GK3 GUI with dynamic linking</a></li>
+<li><a href="#org660175f">1.1.1. Overview</a></li>
+<li><a href="#org5f729c1">1.1.2. The GLIBC Problem</a></li>
+<li><a href="#org3507ac9">1.1.3. Solution 1 - via linking against older GLIBC</a></li>
+<li><a href="#org9d10f5f">1.1.4. Solution 2 - via linking against MUSL libC</a></li>
 </ul>
 </li>
-<li><a href="#org130d45c">1.6. Launching processes with exec and fork system wrappers</a></li>
-<li><a href="#org5dfb769">1.7. Read/List directory contents</a></li>
-<li><a href="#orgf16fadd">1.8. Creating Portable Binaries for Linux / GLIBC hell</a>
+<li><a href="#org073492b">1.2. Low level IO functions overview</a></li>
+<li><a href="#orgb986d8a">1.3. Low level IO - open(), read(), write() syscall functions</a></li>
+<li><a href="#org984d439">1.4. Low level IO - creat()</a></li>
+<li><a href="#org530f3a9">1.5. Information about current process</a></li>
+<li><a href="#org949fbb4">1.6. Dynamic Loading Shared Libraries / dlopen() API</a>
 <ul>
-<li><a href="#org5ec61d2">1.8.1. Overview</a></li>
-<li><a href="#org6f73c02">1.8.2. The GLIBC Problem</a></li>
-<li><a href="#org0513074">1.8.3. Solution 1 - via linking against older GLIBC</a></li>
-<li><a href="#orge33624a">1.8.4. Solution 2 - via linking against MUSL</a></li>
+<li><a href="#org131e9a2">1.6.1. Overview</a></li>
+<li><a href="#org59828ad">1.6.2. GTK3/GTK2 GUI using dynamic loading - low level</a></li>
+<li><a href="#org183ab11">1.6.3. GTK3/GTK2 GUI using dynamic loading - high level C++ wrapper</a></li>
+</ul>
+</li>
+<li><a href="#org755de76">1.7. Launching processes with exec and fork system wrappers</a></li>
+<li><a href="#org4980c55">1.8. Reading/Listings directory contents</a></li>
+<li><a href="#orgc3fc707">1.9. Memory Mapped Files - mmap</a>
+<ul>
+<li><a href="#org8a087b6">1.9.1. Overview</a></li>
+<li><a href="#org842a0c9">1.9.2. Example (C) - mmap for reading Windows PE32 files</a></li>
+<li><a href="#orgda2822c">1.9.3. Example (C++) - mmap for reading Windows PE32 files</a></li>
+<li><a href="#org98d61b2">1.9.4. Example (C++) - mmap for reading Windows PE32 with class</a></li>
 </ul>
 </li>
 </ul>
@@ -268,13 +277,528 @@ for the JavaScript code in this tag.
 </div>
 
 
-<div id="outline-container-orge3f8381" class="outline-2">
-<h2 id="orge3f8381"><span class="section-number-2">1</span> Linux and Unix system programming</h2>
+<div id="outline-container-orgfd01ec4" class="outline-2">
+<h2 id="orgfd01ec4"><span class="section-number-2">1</span> Linux and Unix system programming</h2>
 <div class="outline-text-2" id="text-1">
 </div>
-<div id="outline-container-orgb6c554e" class="outline-3">
-<h3 id="orgb6c554e"><span class="section-number-3">1.1</span> Low level IO functions</h3>
+<div id="outline-container-orga702a1e" class="outline-3">
+<h3 id="orga702a1e"><span class="section-number-3">1.1</span> Creating Portable Binaries for Linux / GLIBC hell</h3>
 <div class="outline-text-3" id="text-1-1">
+</div>
+<div id="outline-container-org660175f" class="outline-4">
+<h4 id="org660175f"><span class="section-number-4">1.1.1</span> Overview</h4>
+<div class="outline-text-4" id="text-1-1-1">
+<p>
+One of the greatest challenges of Linux desktop is building and
+deploying portable applications and native executable which work on
+any Linux distribution. Even if an application totally statically
+linked against all dependencies or it is bundled with all its shared
+libraries dependencies via LD_LIBRARY_PATH environment variable or
+RPATH, the program may still fail to run in other Linux distribution
+due to the GLIBC (GNU C library runtime) dependency. A GLIBC is <span class="underline">forward</span>
+<span class="underline">compatible</span>, but not <span class="underline">backward compatible</span>, the GLIBC runtime failure is
+more likely to happen if the application was built on a Linux
+distribution using a newer version of GLIBC, but the program is
+deployed in a distribution using an older version of GLIBC.
+</p>
+
+<ul class="org-ul">
+<li>Side Note 1:
+<ul class="org-ul">
+<li>Applications built with GO (Golang) programming
+language are less likely to be affected by the GLIBC-issue, as GO
+compiler often does not link against the GLIBC and builds
+statically linked binaries which can be deployed everywhere.</li>
+</ul></li>
+
+<li>Side Note 2:
+<ul class="org-ul">
+<li>The GLIBC issue do not only affect C++, all programming
+languages which generates native Linux executables, for
+instance, D-lang, Rust, OCaml, Haskell are also affected
+by the GLIBC compability problem.</li>
+</ul></li>
+
+<li>Side Note 3:
+<ul class="org-ul">
+<li>Even <a href="https://appimage.org/">AppImage</a>, which is a solution for distributing binaries on
+Linux is affected by the GLIBC-problem. As a result, the
+AppImage documentation recommends building AppImage on Linux
+distributions with older versions of GlibC.</li>
+</ul></li>
+</ul>
+
+<p>
+Possible Solutions: 
+</p>
+
+<ol class="org-ol">
+<li>Link against an older version of GLIBC
+<ul class="org-ul">
+<li>Build the application in a system with the oldest possible version
+of GLIBC. <span class="underline">System</span> in this context means: a linux virtual machine; a
+chroot environment or a docker image with an older version of
+GLIBC.</li>
+</ul></li>
+
+<li>Link against MUSL (CRT - C Runtime Library)
+<ul class="org-ul">
+<li>The MUSL library, is an alternative to GLIBC, which was
+designed for embedded systems and static linking, allows
+building statically linked binaries that does not suffer from
+the GLIBC compatibility problems. The drawback of this
+procedure is that dynamic loading with <span class="underline">dlopen</span> API (dlopen,
+dlclose, dlsym functions) is still not supported.</li>
+</ul></li>
+
+<li>Deploy via Docker
+<ul class="org-ul">
+<li>Deploy the application via docker image. While this solution is
+acceptable for compilers, building environments, servers and
+command line applications, Docker is not suitable for games or
+Desktop GUI (Graphical User Interface) applications intended
+to be used by non-technical users.</li>
+<li>Advantage:
+<ul class="org-ul">
+<li>Pack application, dependencies and configuration.</li>
+<li>The deployment environment can be reproduced everywhere.</li>
+</ul></li>
+</ul></li>
+
+<li>Distribute as source and recompile from source on every
+deployment machine.</li>
+
+<li>Distribute the application via Linux distribution repositories
+<ul class="org-ul">
+<li>Distribute the application via official Linux distribution
+repositories by creating distribution-specific packages for
+every supported distribution. It means creating (.deb) Debian packages for
+Debian-based distributions; (.rpm) packages for Fedora and
+Centos; (.apk) alpine packages for Alpine.</li>
+</ul></li>
+</ol>
+</div>
+</div>
+
+<div id="outline-container-org5f729c1" class="outline-4">
+<h4 id="org5f729c1"><span class="section-number-4">1.1.2</span> The GLIBC Problem</h4>
+<div class="outline-text-4" id="text-1-1-2">
+<p>
+<b>GLIBC - Problem Illustration with a Sample Project</b> 
+</p>
+
+<p>
+GIST Containing all files used in this experiment: 
+</p>
+
+<ul class="org-ul">
+<li><a href="https://gist.github.com/0557cd0fa1d5370723b015e443a7c036">https://gist.github.com/0557cd0fa1d5370723b015e443a7c036</a></li>
+</ul>
+
+<p>
+File: Makefile
+</p>
+
+<div class="org-src-container">
+<pre class="src src-make">build:
+        cmake --config Debug -H. -B_build2
+        cmake --build _build2 --target 
+</pre>
+</div>
+
+<p>
+File: CMakeLists.txt 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cmake"><span class="org-function-name">cmake_minimum_required</span>(VERSION 3.9)
+<span class="org-function-name">project</span>(Simple_Cmake_Project)
+
+<span class="org-function-name">set</span>(CMAKE_CXX_STANDARD 17)     
+<span class="org-function-name">set</span>(CMAKE_VERBOSE_MAKEFILE ON)
+
+<span class="org-comment">#========== Targets Configurations ============#</span>
+        <span class="org-function-name">add_executable</span>( filesys filesys.cpp )
+<span class="org-function-name">target_link_libraries</span>( filesys stdc++fs)
+</pre>
+</div>
+
+<p>
+File: filesys.cpp 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">iostream</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">string</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">iterator</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">iomanip</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">filesystem</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+
+<span class="org-keyword">namespace</span> <span class="org-constant">fs</span> = <span class="org-constant">std</span>::filesystem;
+
+<span class="org-keyword">template</span><span class="org-rainbow-delimiters-depth-1">&lt;</span><span class="org-keyword">typename</span> <span class="org-type">Range</span>, <span class="org-keyword">typename</span> <span class="org-type">Function</span><span class="org-rainbow-delimiters-depth-1">&gt;</span>
+<span class="org-keyword">auto</span> <span class="org-function-name">dotimes</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">size_t</span> <span class="org-variable-name">n</span>, <span class="org-type">Range</span>&amp;&amp; <span class="org-variable-name">iterable</span>, <span class="org-type">Function</span> <span class="org-variable-name">fun</span><span class="org-rainbow-delimiters-depth-1">)</span>
+<span class="org-rainbow-delimiters-depth-1">{</span>
+    <span class="org-type">size_t</span> <span class="org-variable-name">i</span> = 0;
+    <span class="org-keyword">auto</span> <span class="org-variable-name">it</span> = <span class="org-constant">fs</span>::begin<span class="org-rainbow-delimiters-depth-2">(</span>iterable<span class="org-rainbow-delimiters-depth-2">)</span>;
+    <span class="org-keyword">auto</span> <span class="org-variable-name">end</span> = <span class="org-constant">fs</span>::end<span class="org-rainbow-delimiters-depth-2">(</span>iterable<span class="org-rainbow-delimiters-depth-2">)</span>;
+    <span class="org-keyword">while</span><span class="org-rainbow-delimiters-depth-2">(</span>i &lt; n &amp;&amp; it != end <span class="org-rainbow-delimiters-depth-2">){</span>
+            fun<span class="org-rainbow-delimiters-depth-3">(</span>it<span class="org-rainbow-delimiters-depth-3">)</span>;
+            ++it;
+            i++;
+    <span class="org-rainbow-delimiters-depth-2">}</span>
+<span class="org-rainbow-delimiters-depth-1">}</span>
+
+<span class="org-type">int</span> <span class="org-function-name">main</span><span class="org-rainbow-delimiters-depth-1">(){</span>
+
+     <span class="org-constant">std</span>::cout &lt;&lt; <span class="org-constant">std</span>::boolalpha;
+     <span class="org-constant">std</span>::cout &lt;&lt; <span class="org-string">"\n ===== Listing directory /etc ====="</span> &lt;&lt; <span class="org-constant">std</span>::endl;
+     <span class="org-comment-delimiter">// </span><span class="org-comment">Show first 10 files of directory /etc </span>
+     dotimes<span class="org-rainbow-delimiters-depth-2">(</span>10, <span class="org-constant">fs</span>::directory_iterator<span class="org-rainbow-delimiters-depth-3">(</span><span class="org-string">"/etc"</span><span class="org-rainbow-delimiters-depth-3">)</span>,
+             <span class="org-rainbow-delimiters-depth-3">[](</span><span class="org-keyword">auto</span> <span class="org-variable-name">p</span><span class="org-rainbow-delimiters-depth-3">){</span>
+                  <span class="org-keyword">auto</span> <span class="org-variable-name">path</span> = p-&gt;path<span class="org-rainbow-delimiters-depth-4">()</span>;
+                  <span class="org-constant">std</span>::cout &lt;&lt; <span class="org-constant">std</span>::left
+                            &lt;&lt; <span class="org-constant">std</span>::setw<span class="org-rainbow-delimiters-depth-4">(</span>0<span class="org-rainbow-delimiters-depth-4">)</span> &lt;&lt; path.filename<span class="org-rainbow-delimiters-depth-4">()</span>.string<span class="org-rainbow-delimiters-depth-4">()</span>
+                            &lt;&lt; <span class="org-string">" "</span> &lt;&lt; <span class="org-constant">std</span>::setw<span class="org-rainbow-delimiters-depth-4">(</span>35<span class="org-rainbow-delimiters-depth-4">)</span>
+                            &lt;&lt; <span class="org-constant">std</span>::right &lt;&lt; <span class="org-constant">std</span>::setw<span class="org-rainbow-delimiters-depth-4">(</span>40<span class="org-rainbow-delimiters-depth-4">)</span> &lt;&lt; path
+                            &lt;&lt; <span class="org-constant">std</span>::endl;               
+             <span class="org-rainbow-delimiters-depth-3">}</span><span class="org-rainbow-delimiters-depth-2">)</span>;        
+     <span class="org-keyword">return</span> EXIT_SUCCESS;
+<span class="org-rainbow-delimiters-depth-1">}</span>
+</pre>
+</div>
+
+<p>
+<b>Steps for reproducing the problem</b> 
+</p>
+
+<p>
+STEP 1: Get current machine infomation. 
+</p>
+
+<ul class="org-ul">
+<li>GLIBC Version is: 2.34-2.fc32</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">Current machine </span>
+$ cat /etc/fedora-release 
+Fedora release 32 (Thirty Two)
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">Current GLIBC Version </span>
+$ ld --version
+GNU ld version 2.34-2.fc32
+... ... ... ... 
+</pre>
+</div>
+
+<p>
+STEP 2: Build the application. 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">$ git clone https://gist.github.com/0557cd0fa1d5370723b015e443a7c036 gist &amp;&amp; <span class="org-builtin">cd</span> gist 
+$ cmake --config Debug -H. -B_build1
+$ cmake --build _build1 --target 
+
+$ file _build1/filesys 
+<span class="org-function-name">_build1/filesys</span>: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked, 
+interpreter /lib64/ld-linux-x86-64.so.2, <span class="org-variable-name">BuildID</span>[sha1]=d1a3628f794c66bcfb29303cfa4a528910f4e3e2
+, for GNU/Linux 3.2.0, not stripped
+</pre>
+</div>
+
+<p>
+STEP 3: Run in the current machine (newer version of GLIBC)
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">$ _build1/filesys 
+
+ ===== Listing directory /etc =====
+chrony.conf                       <span class="org-string">"/etc/chrony.conf"</span>
+xl2tpd                            <span class="org-string">"/etc/xl2tpd"</span>
+group                             <span class="org-string">"/etc/group"</span>
+profile.d                         <span class="org-string">"/etc/profile.d"</span>
+kde4rc                            <span class="org-string">"/etc/kde4rc"</span>
+resolv.conf.8LUAL0                <span class="org-string">"/etc/resolv.conf.8LUAL0"</span>
+geoclue                           <span class="org-string">"/etc/geoclue"</span>
+bash_completion.d                 <span class="org-string">"/etc/bash_completion.d"</span>
+cups                              <span class="org-string">"/etc/cups"</span>
+mime.types                        <span class="org-string">"/etc/mime.types"</span>
+</pre>
+</div>
+
+<p>
+STEP 4: Attempt to run the binary in a distribution using an older
+version of GLIBC. The distribution used was a QEMU-KVM virtual
+machine running MX-Linux 19.2, distribution based on Debian, with
+GLIBC version .
+</p>
+
+<p>
+GLIBC Failure on MX-Linux Virtual Machine: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">---------- Failure!! GLIC Incompa ------------------------------------#</span>
+ $ _build1/filesys 
+ _build1/filesys: /lib/x86_64-linux-gnu/libstdc++.so.6: version 
+  <span class="org-string">'GLIBCXX_3.4.26'</span> not found (required by _build1/filesys)
+</pre>
+</div>
+
+<p>
+Virtual Machine Information: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">----------- Machine Info (MX Linux 19.2) -------------#</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">Kernel version </span>
+$ uname -r
+4.19.0-9-amd64
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">Distro name </span>
+$ cat /etc/issue 
+Welcome to MX 19.2 (patito feo) 64-bit! Powered by Debian.
+... ... ... ... ............ .... ... ... .. 
+
+$ ld --version
+GNU ld (GNU Binutils for Debian) 2.31.1
+... ... ... ... ... ... ... ... ... ... ... ... 
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org3507ac9" class="outline-4">
+<h4 id="org3507ac9"><span class="section-number-4">1.1.3</span> Solution 1 - via linking against older GLIBC</h4>
+<div class="outline-text-4" id="text-1-1-3">
+<p>
+As GLIBC is <span class="underline">forward compatible</span>, but not <span class="underline">backward compatible</span>. The
+solution for this issue is to build the application on a <span class="underline">system</span> with
+the oldest possible version of GLIBC. System in this context, means: a
+Linux virtual machine; a Chroot environment; or Docker image with an
+older version of GLIBC. Other alternative is to replace GLIBC with
+<span class="underline">MUSL</span> CRT (C Runtime library), but the drawback is that MUSL does not
+support dynamic loading (_dlopen_, <span class="underline">dlsym</span> APIs). 
+</p>
+
+<p>
+The solution adopted for solving this issue was to use a Docker image
+based on <a href="https://github.com/phusion/holy-build-box">holy-build-box</a>, which is a Docker image based on Centos 6
+Linux distribution containing a modern version of GCC compiler, CMake
+and an older version of GLIBC.
+</p>
+
+<p>
+See: 
+</p>
+<ul class="org-ul">
+<li><a href="https://github.com/phusion/holy-build-box">https://github.com/phusion/holy-build-box</a></li>
+</ul>
+
+<p>
+<span class="underline">File: Dockerfile</span> (Available at <a href="https://gist.github.com/0557cd0fa1d5370723b015e443a7c036">gist url</a>)
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">$ docker run -it --rm -v $PWD:/work -w /work phusion/holy-build-box-64:latest bash </span>
+FROM phusion/holy-build-box-64:latest
+
+ENTRYPOINT [ <span class="org-string">"/hbb_exe/activate-exec"</span>, <span class="org-string">"bash"</span>  ]
+</pre>
+</div>
+
+<p>
+Build docker image: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">Run at the directory where is Dockerfile </span>
+$ docker build -f Dockerfile -t linux-build . 
+</pre>
+</div>
+
+<p>
+Enter in the docker image shell: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">$ docker run --rm -it -v $<span class="org-variable-name">PWD</span>:/cwd -w /cwd linux-build 
+Holy build box activated
+<span class="org-function-name">Prefix</span>: /hbb_exe
+<span class="org-function-name">CFLAGS/CXXFLAGS</span>: -g -O2 -fvisibility=hidden -I/hbb_exe/include 
+<span class="org-function-name">LDFLAGS</span>: -L/hbb_exe/lib -static-libstdc++
+<span class="org-function-name">STATICLIB_CFLAGS</span>: -g -O2 -fvisibility=hidden -I/hbb_exe/include 
+<span class="org-function-name">SHLIB_CFLAGS</span>: -g -O2 -fvisibility=hidden -I/hbb_exe/include 
+<span class="org-function-name">SHLIB_LDFLAGS</span>: -L/hbb_exe/lib -static-libstdc++
+
+[root@88c9630a2008 cwd]# ls
+_build1  CMakeLists.txt   Dockerfile   filesys.cpp   Makefile
+</pre>
+</div>
+
+<p>
+Building the application: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[root@88c9630a2008 cwd]# make 
+cmake --config Debug -H. -B_build2
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /cwd/_build2
+cmake --build _build2 --target 
+<span class="org-function-name">gmake</span>[<span class="org-compilation-line-number">1</span>]: Entering directory <span class="org-string">'/cwd/_build2'</span>
+/hbb/bin/cmake -S/cwd -B/cwd/_build2 --check-build-system CMakeFiles/Makefile.cmake 0
+... ... ... ... ... ... ... ... ... 
+... ... ... ... ... ... ... ... ... ... ... ... 
+
+[root@88c9630a2008 cwd]# ls _build2
+CMakeCache.txt  CMakeFiles  cmake_install.cmake  filesys  Makefile
+</pre>
+</div>
+
+<p>
+Running the application _build2/filesys in MX-Linux: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">Built on Fedora 32 with newer version of GLIBC [FAILURE]</span>
+$ _build1/filesys
+<span class="org-function-name">_build1/filesys</span>: /lib/x86_64-linux-gnu/libstdc++.so.6: 
+version <span class="org-string">'GLIBCXX_3.4.26'</span> not found (required by _build1/filesys)
+
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">Built on Centos6 docker with older version of GLIBC [OK, WORKS]</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">--------------------------------------</span>
+$ _build2/filesys
+
+ ===== Listing directory /etc =====
+.java                             <span class="org-string">"/etc/.java"</span>
+.pwd.lock                         <span class="org-string">"/etc/.pwd.lock"</span>
+ImageMagick-6                     <span class="org-string">"/etc/ImageMagick-6"</span>
+NetworkManager                    <span class="org-string">"/etc/NetworkManager"</span>
+UPower                            <span class="org-string">"/etc/UPower"</span>
+X11                               <span class="org-string">"/etc/X11"</span>
+acpi                              <span class="org-string">"/etc/acpi"</span>
+adduser.conf                      <span class="org-string">"/etc/adduser.conf"</span>
+adjtime                           <span class="org-string">"/etc/adjtime"</span>
+alsa                              <span class="org-string">"/etc/alsa"</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-org9d10f5f" class="outline-4">
+<h4 id="org9d10f5f"><span class="section-number-4">1.1.4</span> Solution 2 - via linking against MUSL libC</h4>
+<div class="outline-text-4" id="text-1-1-4">
+<p>
+Other alternative to avoid the GLIBC dependency problem is to build
+the application statically linking against <a href="https://www.musl-libc.org/">MUSL - LibC</a> which is an CRT
+(C runtime library), initially developed for embedded systems, but that has
+become an alternative to GLIBC. The easiest way to build statically
+linking against MUSL is to use an Alpine docker image: 
+</p>
+
+<ul class="org-ul">
+<li>Note: CRT - is a central component of Unix-like operating
+systems. It encapsulates system-calls and other operating system
+services for user-space applications.</li>
+</ul>
+
+<p>
+See: 
+</p>
+<ul class="org-ul">
+<li><a href="https://en.wikipedia.org/wiki/Musl">Musl - Wikipedia</a></li>
+<li><a href="https://wiki.debian.org/musl">Musl - Debian</a></li>
+<li><a href="https://www.arangodb.com/2018/04/static-binaries-c-plus-plus-application/">Static Binaries for a C++ Application - ArangoDB</a></li>
+<li><a href="https://doc.rust-lang.org/edition-guide/rust-2018/platform-and-target-support/musl-support-for-fully-static-binaries.html">MUSL support for fully static binaries - Rust Docs</a></li>
+<li><a href="http://www.etalabs.net/compare_libcs.html">Comparison of C/POSIX standard library implementations for Linux</a></li>
+<li><a href="https://elinux.org/images/8/8b/Room_For_Cooperation-_Bionic_and_musl.pdf">Elinux/Linaro - Bionic and musl - room for cooperation?</a></li>
+</ul>
+
+<p>
+File: MuslBuilder.docker (<a href="https://gist.github.com/0557cd0fa1d5370723b015e443a7c036">Available at gist</a>)
+</p>
+
+<div class="org-src-container">
+<pre class="src src-docker">FROM alpine:latest
+RUN apk add musl cmake make g++
+</pre>
+</div>
+
+<p>
+<b>Building:</b> 
+</p>
+
+<p>
+Buildilg the docker containing MUSL and development tools:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">$ git clone https://gist.github.com/0557cd0fa1d5370723b015e443a7c036 &amp;&amp; <span class="org-builtin">cd</span> gist 
+$ docker build -f MuslBuilder.docker -t musl-builder . 
+</pre>
+</div>
+
+<p>
+Running a container of this docker image: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">$ docker run -it --rm -v $(<span class="org-sh-quoted-exec">pwd</span>):/cwd -w /cwd -e <span class="org-variable-name">UID</span>=$(<span class="org-sh-quoted-exec">id</span> -u) -e <span class="org-variable-name">GID</span>=$(<span class="org-sh-quoted-exec">id</span> -g) musl-builder 
+/cwd $ cmake --config Debug -H. -B_build-musl -DCMAKE_EXE_LINKER_FLAGS=<span class="org-string">"-static -Os"</span>
+/cwd <span class="org-comment-delimiter"># </span><span class="org-comment">cmake --build _build-musl --target </span>
+</pre>
+</div>
+
+<p>
+Exiting from the container and check the executable:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">$ du -h _build-musl/filesys 
+8.7M    _build-musl/filesys
+8.7M    total
+
+$ file _build-musl/filesys 
+<span class="org-function-name">_build-musl/filesys</span>: ELF 64-bit LSB shared object, x86-64, version 1 (SYSV)
+, statically linked, with debug_info, not stripped
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">Check dependencies </span>
+$ ldd _build-musl/filesys 
+        statically linked
+</pre>
+</div>
+
+<p>
+Attempt to run from MX-Linux 19.2 (Older GLIBC)
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">$ _build-musl/filesys 
+
+ ===== Listing directory /etc =====
+.java                             <span class="org-string">"/etc/.java"</span>
+.pwd.lock                         <span class="org-string">"/etc/.pwd.lock"</span>
+ImageMagick-6                     <span class="org-string">"/etc/ImageMagick-6"</span>
+NetworkManager                    <span class="org-string">"/etc/NetworkManager"</span>
+UPower                            <span class="org-string">"/etc/UPower"</span>
+X11                               <span class="org-string">"/etc/X11"</span>
+acpi                              <span class="org-string">"/etc/acpi"</span>
+adduser.conf                      <span class="org-string">"/etc/adduser.conf"</span>
+adjtime                           <span class="org-string">"/etc/adjtime"</span>
+alsa                              <span class="org-string">"/etc/alsa"</span>
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-org073492b" class="outline-3">
+<h3 id="org073492b"><span class="section-number-3">1.2</span> Low level IO functions overview</h3>
+<div class="outline-text-3" id="text-1-2">
 <p>
 C-Library functions which encapsulates file-related systems calls.
 </p>
@@ -372,11 +896,9 @@ number of bytes read. If there is an error, the functions returns
 </div>
 </div>
 
-
-
-<div id="outline-container-org2ec6179" class="outline-3">
-<h3 id="org2ec6179"><span class="section-number-3">1.2</span> Low level IO - open(), read(), write() syscall functions</h3>
-<div class="outline-text-3" id="text-1-2">
+<div id="outline-container-orgb986d8a" class="outline-3">
+<h3 id="orgb986d8a"><span class="section-number-3">1.3</span> Low level IO - open(), read(), write() syscall functions</h3>
+<div class="outline-text-3" id="text-1-3">
 <p>
 This code demonstrates the usage of the open(), read(), write(),
 close() low-level IO library-calls for file descriptors which
@@ -630,9 +1152,9 @@ Hello world
 </div>
 </div>
 
-<div id="outline-container-org154f636" class="outline-3">
-<h3 id="org154f636"><span class="section-number-3">1.3</span> Low level IO - creat()</h3>
-<div class="outline-text-3" id="text-1-3">
+<div id="outline-container-org984d439" class="outline-3">
+<h3 id="org984d439"><span class="section-number-3">1.4</span> Low level IO - creat()</h3>
+<div class="outline-text-3" id="text-1-4">
 <p>
 Creates a file using Unix-low level IO function creat() which
 encapsulates the creat() system-call.
@@ -811,9 +1333,9 @@ Trace system-calls with <span class="underline">strace</span> application:
 </div>
 </div>
 </div>
-<div id="outline-container-orgb5fc50b" class="outline-3">
-<h3 id="orgb5fc50b"><span class="section-number-3">1.4</span> Information about current process</h3>
-<div class="outline-text-3" id="text-1-4">
+<div id="outline-container-org530f3a9" class="outline-3">
+<h3 id="org530f3a9"><span class="section-number-3">1.5</span> Information about current process</h3>
+<div class="outline-text-3" id="text-1-5">
 <p>
 File: current-process.cpp 
 </p>
@@ -933,15 +1455,15 @@ Change the curren directory to /etc
 </div>
 </div>
 
-<div id="outline-container-org5fde227" class="outline-3">
-<h3 id="org5fde227"><span class="section-number-3">1.5</span> Dynamic Loading Shared Libraries</h3>
-<div class="outline-text-3" id="text-1-5">
+<div id="outline-container-org949fbb4" class="outline-3">
+<h3 id="org949fbb4"><span class="section-number-3">1.6</span> Dynamic Loading Shared Libraries / dlopen() API</h3>
+<div class="outline-text-3" id="text-1-6">
 </div>
-<div id="outline-container-orge5c3fa0" class="outline-4">
-<h4 id="orge5c3fa0"><span class="section-number-4">1.5.1</span> Overview</h4>
-<div class="outline-text-4" id="text-1-5-1">
+<div id="outline-container-org131e9a2" class="outline-4">
+<h4 id="org131e9a2"><span class="section-number-4">1.6.1</span> Overview</h4>
+<div class="outline-text-4" id="text-1-6-1">
 <p>
- The dlopen API provide access to the <span class="underline">dynamic linker</span> services allowing
+The dlopen API provide access to the <span class="underline">dynamic linker</span> services allowing
 the current process to load and unload shared objects or shared
 libraries in its address space (virtual memory).
 </p>
@@ -965,6 +1487,20 @@ Use cases:
 <li>Load native code extensions in languages with interpreters written
 in C, such as Python, Ruby, Lua and so on. Note: Python native
 extensions are shared libraries.</li>
+</ul>
+
+<p>
+The Dlopen() API is available on most Unix-like operating systems,
+such as: 
+</p>
+
+<ul class="org-ul">
+<li>Linux</li>
+<li>MacOSX</li>
+<li>FreeBDS</li>
+<li>NetBSD</li>
+<li>OpenBSD</li>
+<li>QNX</li>
 </ul>
 
 <p>
@@ -1148,14 +1684,16 @@ function returns a null pointer.</li>
        <span class="org-keyword">throw</span> <span class="org-constant">std</span>::runtime_error<span class="org-rainbow-delimiters-depth-3">(</span><span class="org-string">"Error: symbol not found"</span><span class="org-rainbow-delimiters-depth-3">)</span>; 
     <span class="org-rainbow-delimiters-depth-2">}</span>
 
-    <span class="org-comment-delimiter">// </span><span class="org-comment">Function signature type alias </span>
-    <span class="org-comment-delimiter">//  </span><span class="org-comment">=&gt; The function to be loaded can only have C-linkage. </span>
+    <span class="org-comment-delimiter">// </span><span class="org-comment">Type alias for function pointer in modern C++ </span>
+    <span class="org-comment-delimiter">//  </span><span class="org-comment">=&gt; Note: The function to be loaded can only have C-linkage. </span>
     <span class="org-keyword">using</span> <span class="org-type">name_of_function_t</span> = <span class="org-type">void</span> <span class="org-rainbow-delimiters-depth-2">(</span>*<span class="org-rainbow-delimiters-depth-2">)</span> <span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">int</span> <span class="org-variable-name">param0</span>, <span class="org-type">double</span> <span class="org-variable-name">param1</span>, <span class="org-keyword">const</span> <span class="org-type">char</span>* <span class="org-variable-name">param3</span><span class="org-rainbow-delimiters-depth-2">)</span>;
 
-    <span class="org-comment-delimiter">//  </span><span class="org-comment">Function pointer. </span>
+    <span class="org-comment-delimiter">// </span><span class="org-comment">Type alias for function pointer in old C++ (C++98)</span>
+    <span class="org-keyword">typedef</span> <span class="org-type">void</span> <span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">name_of_function_t</span>*<span class="org-rainbow-delimiters-depth-2">)</span> <span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">int</span> <span class="org-variable-name">param0</span>, <span class="org-type">double</span> <span class="org-variable-name">param1</span>, <span class="org-keyword">const</span> <span class="org-type">char</span>* <span class="org-variable-name">param3</span><span class="org-rainbow-delimiters-depth-2">)</span>;       
+
     <span class="org-keyword">auto</span> <span class="org-variable-name">name_of_function_ptr</span> = <span class="org-keyword">reinterpret_cast</span><span class="org-rainbow-delimiters-depth-2">&lt;</span><span class="org-type">name_of_function_t</span><span class="org-rainbow-delimiters-depth-2">&gt;(</span>hsym<span class="org-rainbow-delimiters-depth-2">)</span>; 
 
-    <span class="org-comment-delimiter">// </span><span class="org-comment">Call loaded function </span>
+    <span class="org-comment-delimiter">// </span><span class="org-comment">Call loaded function (Function pointer)</span>
     name_of_function_ptr<span class="org-rainbow-delimiters-depth-2">(</span>100, 2.51, <span class="org-string">"string"</span><span class="org-rainbow-delimiters-depth-2">)</span>;
 
     <span class="org-comment-delimiter">// </span><span class="org-comment">Unload shared library </span>
@@ -1166,11 +1704,9 @@ function returns a null pointer.</li>
 </div>
 </div>
 
-
-
-<div id="outline-container-org22cbd8f" class="outline-4">
-<h4 id="org22cbd8f"><span class="section-number-4">1.5.2</span> GK3 GUI with dynamic linking</h4>
-<div class="outline-text-4" id="text-1-5-2">
+<div id="outline-container-org59828ad" class="outline-4">
+<h4 id="org59828ad"><span class="section-number-4">1.6.2</span> GTK3/GTK2 GUI using dynamic loading - low level</h4>
+<div class="outline-text-4" id="text-1-6-2">
 <p>
 The following sample code is a GTk3 or GTK2 GUI graphical user
 interface application with GTK functions loaded from a GTK shared
@@ -1263,18 +1799,18 @@ File: gtk-dlopen.cpp
 <span class="org-keyword">using</span> <span class="org-type">GCallback</span>      = <span class="org-type">void</span>  <span class="org-rainbow-delimiters-depth-1">(</span>*<span class="org-rainbow-delimiters-depth-1">)</span> <span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">void</span><span class="org-rainbow-delimiters-depth-1">)</span>;
 <span class="org-keyword">using</span> <span class="org-type">GClosureNotify</span> = <span class="org-type">void</span>  <span class="org-rainbow-delimiters-depth-1">(</span>*<span class="org-rainbow-delimiters-depth-1">)</span> <span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">gpointer</span> <span class="org-variable-name">data</span>, <span class="org-type">GClosure</span>* <span class="org-variable-name">closure</span><span class="org-rainbow-delimiters-depth-1">)</span>;
 <span class="org-keyword">using</span> <span class="org-type">g_signal_connect_data_t</span> =  gulong <span class="org-rainbow-delimiters-depth-1">(</span>*<span class="org-rainbow-delimiters-depth-1">)</span> <span class="org-rainbow-delimiters-depth-1">(</span>   <span class="org-type">gpointer</span> <span class="org-variable-name">instance</span>
-                                                  , <span class="org-keyword">const</span> <span class="org-type">gchar</span>*    <span class="org-variable-name">detailed_signal</span>
-                                                  , <span class="org-type">GCallback</span>       <span class="org-variable-name">c_handler</span>
-                                                  , <span class="org-type">gpointer</span>        <span class="org-variable-name">data</span>
-                                                  , <span class="org-type">GClosureNotify</span>  <span class="org-variable-name">destroy_data</span>
-                                                  , <span class="org-type">GConnectFlags</span>   <span class="org-variable-name">connect_flags</span>
-                                              <span class="org-rainbow-delimiters-depth-1">)</span>;
+                                              , <span class="org-keyword">const</span> <span class="org-type">gchar</span>*    <span class="org-variable-name">detailed_signal</span>
+                                              , <span class="org-type">GCallback</span>       <span class="org-variable-name">c_handler</span>
+                                              , <span class="org-type">gpointer</span>        <span class="org-variable-name">data</span>
+                                              , <span class="org-type">GClosureNotify</span>  <span class="org-variable-name">destroy_data</span>
+                                              , <span class="org-type">GConnectFlags</span>   <span class="org-variable-name">connect_flags</span>
+                                          <span class="org-rainbow-delimiters-depth-1">)</span>;
 
 <span class="org-type">int</span> <span class="org-function-name">main</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">int</span> <span class="org-variable-name">argc</span>, <span class="org-type">char</span>** <span class="org-variable-name">argv</span><span class="org-rainbow-delimiters-depth-1">)</span>
 <span class="org-rainbow-delimiters-depth-1">{</span>    
     <span class="org-constant">std</span>::<span class="org-type">string</span> <span class="org-variable-name">shared_lib</span> =  <span class="org-rainbow-delimiters-depth-2">[</span>&amp;<span class="org-rainbow-delimiters-depth-2">]()</span> -&gt; <span class="org-constant">std</span>::string 
     <span class="org-rainbow-delimiters-depth-2">{</span>
-        <span class="org-keyword">if</span><span class="org-rainbow-delimiters-depth-3">(</span>argc &lt; 2<span class="org-rainbow-delimiters-depth-3">)</span> <span class="org-keyword">return</span> <span class="org-string">"/lib64/libgtk-3.so.0"</span>;
+        <span class="org-keyword">if</span><span class="org-rainbow-delimiters-depth-3">(</span>argc &lt; 2<span class="org-rainbow-delimiters-depth-3">)</span> <span class="org-keyword">return</span> <span class="org-string">"libgtk-3.so.0"</span>;
         <span class="org-keyword">return</span> argv<span class="org-rainbow-delimiters-depth-3">[</span>1<span class="org-rainbow-delimiters-depth-3">]</span>;
     <span class="org-rainbow-delimiters-depth-2">}()</span>;
 
@@ -1420,12 +1956,410 @@ Verify exported symbols by gtk3 shared library:
 </div>
 </div>
 </div>
+
+<div id="outline-container-org183ab11" class="outline-4">
+<h4 id="org183ab11"><span class="section-number-4">1.6.3</span> GTK3/GTK2 GUI using dynamic loading - high level C++ wrapper</h4>
+<div class="outline-text-4" id="text-1-6-3">
+<p>
+This proof-of-concept code contains a high-level wrapper class
+SharedLibrary for abstracting away the dlopen() API. This class is
+used for loading GTK3 or GTk2 shared library at runtime and then
+showing modal notifications dialogs. The advantage of the dynamic
+loading approach is the flexibility, portability and easier deployment
+as the binary does not depends on any particular GTK shared library
+version.
+</p>
+
+<p>
+Note: 
+</p>
+
+<ul class="org-ul">
+<li>The code of the class SharedLibrary can be reused on any other
+unix-like operating system with dlopen() API, such as FreeBDS,
+NetBSD, MacOSX and so on.</li>
+
+<li>The Windows API for dynamic loading is LoadLibrary(),
+GetProcAddress().</li>
+</ul>
+
+<p>
+GIST: 
+</p>
+<ul class="org-ul">
+<li><a href="https://gist.github.com/6bbb3b9491d4fad01d3875a559b7365b">https://gist.github.com/6bbb3b9491d4fad01d3875a559b7365b</a></li>
+</ul>
+
+<p>
+<b>Project Files</b> 
+</p>
+
+<p>
+File: CMakeLists.txt 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cmake"><span class="org-function-name">cmake_minimum_required</span>(VERSION 3.9)
+<span class="org-function-name">project</span>(gtk-dynamic-load-dialog)
+
+<span class="org-function-name">set</span>(CMAKE_CXX_STANDARD 17)     
+<span class="org-function-name">set</span>(CMAKE_VERBOSE_MAKEFILE ON)
+
+<span class="org-comment"># ---- TARGETS Configuration ---------------#</span>
+       <span class="org-function-name">add_executable</span>( gtk-dialog gtk-dialog.cpp gtk_types.hpp)
+<span class="org-function-name">target_link_libraries</span>( gtk-dialog dl ) 
+</pre>
 </div>
 
+<p>
+File: gtk-dialog.cpp 
+</p>
 
-<div id="outline-container-org130d45c" class="outline-3">
-<h3 id="org130d45c"><span class="section-number-3">1.6</span> Launching processes with exec and fork system wrappers</h3>
-<div class="outline-text-3" id="text-1-6">
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">iostream</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">string</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span> 
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">cstring</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span> 
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">cassert</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span> 
+
+<span class="org-comment-delimiter">// </span><span class="org-comment">Uses: dlopen(), dlclose(), ... </span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">dlfcn.h</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+
+<span class="org-preprocessor">#include</span> <span class="org-string">"gtk_types.hpp"</span>
+
+<span class="org-comment-delimiter">/** </span><span class="org-comment">Requires header: &lt;dlfcn.h&gt; and linking flag (-ldl) */</span>
+<span class="org-keyword">class</span> <span class="org-type">SharedLibrary</span>
+<span class="org-rainbow-delimiters-depth-1">{</span>
+<span class="org-function-name">public</span>:
+    <span class="org-keyword">using</span> <span class="org-type">HND</span>  = <span class="org-type">void</span>*; 
+    <span class="org-keyword">using</span> <span class="org-type">HSYM</span> = <span class="org-type">void</span>*;
+<span class="org-function-name">private</span>:
+    <span class="org-type">HND</span>         <span class="org-variable-name">m_hnd</span>  = <span class="org-constant">nullptr</span>; 
+    <span class="org-constant">std</span>::<span class="org-type">string</span> <span class="org-variable-name">m_lib</span> = <span class="org-string">""</span> ; 
+    <span class="org-type">int</span>         <span class="org-variable-name">m_flags</span> = 0;
+<span class="org-function-name">public</span>:
+    <span class="org-function-name">SharedLibrary</span><span class="org-rainbow-delimiters-depth-2">(){}</span>    
+    ~<span class="org-function-name">SharedLibrary</span><span class="org-rainbow-delimiters-depth-2">(){</span> <span class="org-keyword">this</span>-&gt;unload<span class="org-rainbow-delimiters-depth-3">()</span>; <span class="org-rainbow-delimiters-depth-2">}</span>
+
+    <span class="org-comment-delimiter">// </span><span class="org-comment">Constructor delegation </span>
+    <span class="org-function-name">SharedLibrary</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-constant">std</span>::<span class="org-type">string</span> <span class="org-variable-name">library</span><span class="org-rainbow-delimiters-depth-2">)</span>
+        : SharedLibrary<span class="org-rainbow-delimiters-depth-2">(</span>library, RTLD_NOW | RTLD_GLOBAL<span class="org-rainbow-delimiters-depth-2">)</span>
+    <span class="org-rainbow-delimiters-depth-2">{</span>  <span class="org-rainbow-delimiters-depth-2">}</span>
+
+    <span class="org-function-name">SharedLibrary</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-constant">std</span>::<span class="org-type">string</span> <span class="org-variable-name">library</span>, <span class="org-type">int</span> <span class="org-variable-name">flags</span><span class="org-rainbow-delimiters-depth-2">)</span>
+    <span class="org-rainbow-delimiters-depth-2">{</span>
+        <span class="org-keyword">this</span>-&gt;load<span class="org-rainbow-delimiters-depth-3">(</span>library, flags<span class="org-rainbow-delimiters-depth-3">)</span>;
+    <span class="org-rainbow-delimiters-depth-2">}</span>
+
+    <span class="org-comment-delimiter">// </span><span class="org-comment">Disable copy constructor and copy-assignment operator </span>
+    <span class="org-function-name">SharedLibrary</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">SharedLibrary</span> <span class="org-keyword">const</span> &amp;<span class="org-rainbow-delimiters-depth-2">)</span> = <span class="org-keyword">delete</span>;
+    <span class="org-type">SharedLibrary</span>&amp; <span class="org-keyword">operator</span><span class="org-function-name">=</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">SharedLibrary</span> <span class="org-keyword">const</span> &amp;<span class="org-rainbow-delimiters-depth-2">)</span> = <span class="org-keyword">delete</span>;
+
+    <span class="org-comment-delimiter">// </span><span class="org-comment">Move constructor </span>
+    <span class="org-function-name">SharedLibrary</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">SharedLibrary</span>&amp;&amp; <span class="org-variable-name">rhs</span><span class="org-rainbow-delimiters-depth-2">)</span> 
+    <span class="org-rainbow-delimiters-depth-2">{</span>
+        <span class="org-constant">std</span>::swap<span class="org-rainbow-delimiters-depth-3">(</span>m_hnd, rhs.m_hnd<span class="org-rainbow-delimiters-depth-3">)</span>;
+        <span class="org-constant">std</span>::swap<span class="org-rainbow-delimiters-depth-3">(</span>m_lib, rhs.m_lib<span class="org-rainbow-delimiters-depth-3">)</span>;
+        <span class="org-constant">std</span>::swap<span class="org-rainbow-delimiters-depth-3">(</span>m_flags, rhs.m_flags<span class="org-rainbow-delimiters-depth-3">)</span>;
+    <span class="org-rainbow-delimiters-depth-2">}</span>
+
+    <span class="org-comment-delimiter">// </span><span class="org-comment">Move assignment operator </span>
+    <span class="org-type">SharedLibrary</span>&amp; <span class="org-keyword">operator</span><span class="org-function-name">=</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">SharedLibrary</span>&amp;&amp; <span class="org-variable-name">rhs</span><span class="org-rainbow-delimiters-depth-2">)</span> 
+    <span class="org-rainbow-delimiters-depth-2">{</span>
+        <span class="org-keyword">this</span>-&gt;unload<span class="org-rainbow-delimiters-depth-3">()</span>;
+        <span class="org-constant">std</span>::swap<span class="org-rainbow-delimiters-depth-3">(</span>m_hnd, rhs.m_hnd<span class="org-rainbow-delimiters-depth-3">)</span>;
+        <span class="org-constant">std</span>::swap<span class="org-rainbow-delimiters-depth-3">(</span>m_lib, rhs.m_lib<span class="org-rainbow-delimiters-depth-3">)</span>;
+        <span class="org-constant">std</span>::swap<span class="org-rainbow-delimiters-depth-3">(</span>m_flags, rhs.m_flags<span class="org-rainbow-delimiters-depth-3">)</span>;
+        <span class="org-keyword">return</span> *<span class="org-keyword">this</span>;
+    <span class="org-rainbow-delimiters-depth-2">}</span>
+
+    <span class="org-type">HND</span>         <span class="org-function-name">handler</span><span class="org-rainbow-delimiters-depth-2">()</span>   <span class="org-keyword">const</span> <span class="org-rainbow-delimiters-depth-2">{</span> <span class="org-keyword">return</span> m_hnd; <span class="org-rainbow-delimiters-depth-2">}</span>    
+    <span class="org-type">bool</span>        <span class="org-function-name">is_loaded</span><span class="org-rainbow-delimiters-depth-2">()</span> <span class="org-keyword">const</span> <span class="org-rainbow-delimiters-depth-2">{</span> <span class="org-keyword">return</span> m_hnd != <span class="org-constant">nullptr</span>; <span class="org-rainbow-delimiters-depth-2">}</span>    
+    <span class="org-constant">std</span>::<span class="org-type">string</span> <span class="org-function-name">library</span><span class="org-rainbow-delimiters-depth-2">()</span>   <span class="org-keyword">const</span> <span class="org-rainbow-delimiters-depth-2">{</span> <span class="org-keyword">return</span> m_lib; <span class="org-rainbow-delimiters-depth-2">}</span>
+
+    <span class="org-comment-delimiter">/** </span><span class="org-comment">Retrieve symbol from shared library */</span>
+    <span class="org-type">HSYM</span> <span class="org-function-name">symbol_ptr</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-constant">std</span>::<span class="org-type">string</span> <span class="org-variable-name">name</span><span class="org-rainbow-delimiters-depth-2">)</span> <span class="org-keyword">const</span> 
+    <span class="org-rainbow-delimiters-depth-2">{</span>
+        <span class="org-keyword">return</span> ::dlsym<span class="org-rainbow-delimiters-depth-3">(</span>m_hnd, name.c_str<span class="org-rainbow-delimiters-depth-4">()</span><span class="org-rainbow-delimiters-depth-3">)</span>;
+    <span class="org-rainbow-delimiters-depth-2">}</span>
+
+    <span class="org-comment-delimiter">/** </span><span class="org-comment">@brief Get symbol from shared library</span>
+<span class="org-comment">     * Note: The caller is resposible for checking if the symbol is (null) nullptr.</span>
+<span class="org-comment">     */</span>
+    <span class="org-keyword">template</span><span class="org-rainbow-delimiters-depth-2">&lt;</span><span class="org-keyword">typename</span> <span class="org-type">TFun</span><span class="org-rainbow-delimiters-depth-2">&gt;</span>
+    <span class="org-type">TFun</span> <span class="org-function-name">symbol</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-constant">std</span>::<span class="org-type">string</span> <span class="org-variable-name">name</span><span class="org-rainbow-delimiters-depth-2">)</span> <span class="org-keyword">const</span> 
+    <span class="org-rainbow-delimiters-depth-2">{</span>
+        <span class="org-type">HSYM</span> <span class="org-variable-name">sym</span> = ::dlsym<span class="org-rainbow-delimiters-depth-3">(</span>m_hnd, name.c_str<span class="org-rainbow-delimiters-depth-4">()</span><span class="org-rainbow-delimiters-depth-3">)</span>;
+        <span class="org-keyword">return</span> <span class="org-keyword">reinterpret_cast</span><span class="org-rainbow-delimiters-depth-3">&lt;</span><span class="org-type">TFun</span><span class="org-rainbow-delimiters-depth-3">&gt;(</span>sym<span class="org-rainbow-delimiters-depth-3">)</span>;
+    <span class="org-rainbow-delimiters-depth-2">}</span>
+
+    <span class="org-comment-delimiter">/** </span><span class="org-comment">@brief Attempts to load symbol and throws exception, if symbol is not found. */</span>
+    <span class="org-keyword">template</span><span class="org-rainbow-delimiters-depth-2">&lt;</span><span class="org-keyword">typename</span> <span class="org-type">TFun</span><span class="org-rainbow-delimiters-depth-2">&gt;</span>
+    <span class="org-type">TFun</span> <span class="org-function-name">symbol_or_fail</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-constant">std</span>::<span class="org-type">string</span> <span class="org-variable-name">name</span><span class="org-rainbow-delimiters-depth-2">)</span> <span class="org-keyword">const</span> 
+    <span class="org-rainbow-delimiters-depth-2">{</span>
+        <span class="org-type">HSYM</span> <span class="org-variable-name">sym</span> = ::dlsym<span class="org-rainbow-delimiters-depth-3">(</span>m_hnd, name.c_str<span class="org-rainbow-delimiters-depth-4">()</span><span class="org-rainbow-delimiters-depth-3">)</span>;
+
+        <span class="org-keyword">if</span><span class="org-rainbow-delimiters-depth-3">(</span><span class="org-negation-char">!</span>sym<span class="org-rainbow-delimiters-depth-3">){</span> 
+            <span class="org-constant">std</span>::<span class="org-type">string</span> <span class="org-variable-name">msg</span> = <span class="org-string">" [ERROR] Dlopen / dlsym() =&gt; unable find symbol"</span>;
+            msg = msg + <span class="org-string">" &lt;"</span> + name + <span class="org-string">"&gt;"</span>;
+            <span class="org-keyword">throw</span> <span class="org-constant">std</span>::runtime_error<span class="org-rainbow-delimiters-depth-4">(</span>msg<span class="org-rainbow-delimiters-depth-4">)</span>; 
+        <span class="org-rainbow-delimiters-depth-3">}</span>
+        <span class="org-keyword">return</span> <span class="org-keyword">reinterpret_cast</span><span class="org-rainbow-delimiters-depth-3">&lt;</span><span class="org-type">TFun</span><span class="org-rainbow-delimiters-depth-3">&gt;(</span>sym<span class="org-rainbow-delimiters-depth-3">)</span>;
+    <span class="org-rainbow-delimiters-depth-2">}</span>
+
+    <span class="org-type">void</span> <span class="org-function-name">load</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-constant">std</span>::<span class="org-type">string</span> <span class="org-variable-name">library</span>, <span class="org-type">int</span> <span class="org-variable-name">flags</span><span class="org-rainbow-delimiters-depth-2">)</span>
+    <span class="org-rainbow-delimiters-depth-2">{</span>
+        <span class="org-keyword">if</span><span class="org-rainbow-delimiters-depth-3">(</span><span class="org-negation-char">!</span><span class="org-keyword">this</span>-&gt;is_loaded<span class="org-rainbow-delimiters-depth-4">()</span><span class="org-rainbow-delimiters-depth-3">)</span> <span class="org-rainbow-delimiters-depth-3">{</span> <span class="org-keyword">this</span>-&gt;unload<span class="org-rainbow-delimiters-depth-4">()</span>; <span class="org-rainbow-delimiters-depth-3">}</span>
+        m_lib   = library;
+        m_flags = flags;
+        m_hnd = dlopen<span class="org-rainbow-delimiters-depth-3">(</span>library.c_str<span class="org-rainbow-delimiters-depth-4">()</span>, RTLD_NOW | RTLD_GLOBAL<span class="org-rainbow-delimiters-depth-3">)</span>;        
+        <span class="org-keyword">if</span><span class="org-rainbow-delimiters-depth-3">(</span>m_hnd == <span class="org-constant">nullptr</span><span class="org-rainbow-delimiters-depth-3">){</span> 
+            <span class="org-constant">std</span>::<span class="org-type">string</span> <span class="org-variable-name">msg</span> = <span class="org-string">" [ERROR] DlopenError: "</span>;
+            msg = msg + dlerror<span class="org-rainbow-delimiters-depth-4">()</span>;
+            <span class="org-keyword">throw</span> <span class="org-constant">std</span>::runtime_error<span class="org-rainbow-delimiters-depth-4">(</span>msg<span class="org-rainbow-delimiters-depth-4">)</span>;
+        <span class="org-rainbow-delimiters-depth-3">}</span>
+    <span class="org-rainbow-delimiters-depth-2">}</span>    
+
+    <span class="org-type">void</span> <span class="org-function-name">reload</span><span class="org-rainbow-delimiters-depth-2">()</span> 
+    <span class="org-rainbow-delimiters-depth-2">{</span>
+        <span class="org-keyword">this</span>-&gt;unload<span class="org-rainbow-delimiters-depth-3">()</span>;
+        <span class="org-keyword">this</span>-&gt;load<span class="org-rainbow-delimiters-depth-3">(</span>m_lib, m_flags<span class="org-rainbow-delimiters-depth-3">)</span>;
+    <span class="org-rainbow-delimiters-depth-2">}</span>
+
+    <span class="org-type">void</span> <span class="org-function-name">unload</span><span class="org-rainbow-delimiters-depth-2">()</span> 
+    <span class="org-rainbow-delimiters-depth-2">{</span>
+        <span class="org-keyword">if</span><span class="org-rainbow-delimiters-depth-3">(</span><span class="org-negation-char">!</span><span class="org-keyword">this</span>-&gt;is_loaded<span class="org-rainbow-delimiters-depth-4">()</span><span class="org-rainbow-delimiters-depth-3">)</span> <span class="org-rainbow-delimiters-depth-3">{</span> <span class="org-keyword">return</span>; <span class="org-rainbow-delimiters-depth-3">}</span>
+        ::dlclose<span class="org-rainbow-delimiters-depth-3">(</span>m_hnd<span class="org-rainbow-delimiters-depth-3">)</span>;        
+        m_hnd = <span class="org-constant">nullptr</span>;
+    <span class="org-rainbow-delimiters-depth-2">}</span>
+
+<span class="org-rainbow-delimiters-depth-1">}</span>; <span class="org-comment-delimiter">// </span><span class="org-comment">--- End of class SharedLibrary() ---- //</span>
+
+<span class="org-keyword">using</span> <span class="org-keyword">namespace</span> <span class="org-constant">GtkPP</span>::<span class="org-constant">fpointer</span>;
+<span class="org-keyword">using</span> <span class="org-keyword">namespace</span> <span class="org-constant">GtkPP</span>::<span class="org-constant">enums</span>;
+
+<span class="org-keyword">struct</span> <span class="org-type">GtkLib</span>
+<span class="org-rainbow-delimiters-depth-1">{</span>
+    <span class="org-type">SharedLibrary</span> <span class="org-variable-name">slib</span>;
+
+    <span class="org-function-name">GtkLib</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-constant">std</span>::<span class="org-type">string</span> <span class="org-variable-name">library</span><span class="org-rainbow-delimiters-depth-2">)</span>
+        : slib<span class="org-rainbow-delimiters-depth-2">(</span> <span class="org-constant">std</span>::move<span class="org-rainbow-delimiters-depth-3">(</span>SharedLibrary<span class="org-rainbow-delimiters-depth-4">(</span>library<span class="org-rainbow-delimiters-depth-4">)</span><span class="org-rainbow-delimiters-depth-3">)</span> <span class="org-rainbow-delimiters-depth-2">)</span>
+    <span class="org-rainbow-delimiters-depth-2">{</span> 
+        gtk_init_check         = slib.symbol_or_fail<span class="org-rainbow-delimiters-depth-3">&lt;</span><span class="org-type">gtk_init_check_t</span><span class="org-rainbow-delimiters-depth-3">&gt;(</span><span class="org-string">"gtk_init_check"</span><span class="org-rainbow-delimiters-depth-3">)</span>;       
+        gtk_main_quit          = slib.symbol_or_fail<span class="org-rainbow-delimiters-depth-3">&lt;</span><span class="org-type">gtk_main_quit_t</span><span class="org-rainbow-delimiters-depth-3">&gt;(</span><span class="org-string">"gtk_main_quit"</span><span class="org-rainbow-delimiters-depth-3">)</span>;
+        <span class="org-comment-delimiter">// </span><span class="org-comment">gtk_main               = slib.symbol_or_fail&lt;void (*) ()&gt;("gtk_main");</span>
+        gtk_message_dialog_new = slib.symbol_or_fail<span class="org-rainbow-delimiters-depth-3">&lt;</span><span class="org-type">gtk_message_dialog_new_t</span><span class="org-rainbow-delimiters-depth-3">&gt;(</span><span class="org-string">"gtk_message_dialog_new"</span><span class="org-rainbow-delimiters-depth-3">)</span>;
+        gtk_widget_destroy     = slib.symbol_or_fail<span class="org-rainbow-delimiters-depth-3">&lt;</span><span class="org-type">gtk_widget_destroy_t</span><span class="org-rainbow-delimiters-depth-3">&gt;(</span><span class="org-string">"gtk_widget_destroy"</span><span class="org-rainbow-delimiters-depth-3">)</span>;
+        gtk_dialog_run         = slib.symbol_or_fail<span class="org-rainbow-delimiters-depth-3">&lt;</span><span class="org-type">gtk_dialog_run_t</span><span class="org-rainbow-delimiters-depth-3">&gt;(</span><span class="org-string">"gtk_dialog_run"</span><span class="org-rainbow-delimiters-depth-3">)</span>;
+        gtk_window_set_title   = slib.symbol<span class="org-rainbow-delimiters-depth-3">&lt;</span><span class="org-type">gtk_window_set_title_t</span><span class="org-rainbow-delimiters-depth-3">&gt;(</span><span class="org-string">"gtk_window_set_title"</span><span class="org-rainbow-delimiters-depth-3">)</span>;
+
+    <span class="org-rainbow-delimiters-depth-2">}</span>
+
+    <span class="org-type">gtk_init_check_t</span>         <span class="org-variable-name">gtk_init_check</span>; 
+    <span class="org-type">gtk_main_quit_t</span>          <span class="org-variable-name">gtk_main_quit</span>; 
+    <span class="org-comment-delimiter">// </span><span class="org-comment">gtk_main_t               gtk_main;</span>
+    <span class="org-type">gtk_message_dialog_new_t</span> <span class="org-variable-name">gtk_message_dialog_new</span>;
+    <span class="org-type">gtk_widget_destroy_t</span>     <span class="org-variable-name">gtk_widget_destroy</span>;
+    <span class="org-type">gtk_dialog_run_t</span>         <span class="org-variable-name">gtk_dialog_run</span>;
+    <span class="org-type">gtk_window_set_title_t</span>   <span class="org-variable-name">gtk_window_set_title</span>;
+
+    <span class="org-comment-delimiter">// </span><span class="org-comment">Message box notification </span>
+    <span class="org-type">void</span> <span class="org-function-name">msgbox</span><span class="org-rainbow-delimiters-depth-2">(</span>  <span class="org-constant">std</span>::<span class="org-type">string</span> <span class="org-variable-name">title</span>
+                , <span class="org-constant">std</span>::<span class="org-type">string</span> <span class="org-variable-name">text</span> 
+                , <span class="org-type">GtkMessageType</span> <span class="org-variable-name">mtype</span> = <span class="org-constant">GtkMessageType</span>::GTK_MESSAGE_INFO 
+                <span class="org-rainbow-delimiters-depth-2">)</span> 
+    <span class="org-rainbow-delimiters-depth-2">{</span>
+       <span class="org-type">GtkWidget</span>* <span class="org-variable-name">dialog</span> = <span class="org-keyword">this</span>-&gt;gtk_message_dialog_new<span class="org-rainbow-delimiters-depth-3">(</span>  <span class="org-constant">nullptr</span> 
+                                                , <span class="org-rainbow-delimiters-depth-4">(</span><span class="org-type">int</span><span class="org-rainbow-delimiters-depth-4">)</span> <span class="org-constant">GtkDialogFlags</span>::GTK_DIALOG_MODAL
+                                                , <span class="org-rainbow-delimiters-depth-4">(</span><span class="org-type">int</span><span class="org-rainbow-delimiters-depth-4">)</span> mtype 
+                                                , <span class="org-rainbow-delimiters-depth-4">(</span><span class="org-type">int</span><span class="org-rainbow-delimiters-depth-4">)</span> <span class="org-constant">GtkButtonsType</span>::GTK_BUTTONS_OK
+                                                , text.c_str<span class="org-rainbow-delimiters-depth-4">()</span>
+                                                <span class="org-rainbow-delimiters-depth-3">)</span>;                                            
+        assert<span class="org-rainbow-delimiters-depth-3">(</span> dialog != <span class="org-constant">nullptr</span> <span class="org-rainbow-delimiters-depth-3">)</span>;    
+        <span class="org-keyword">this</span>-&gt;gtk_window_set_title<span class="org-rainbow-delimiters-depth-3">(</span>dialog, title.c_str<span class="org-rainbow-delimiters-depth-4">()</span><span class="org-rainbow-delimiters-depth-3">)</span>;
+        <span class="org-keyword">this</span>-&gt;gtk_dialog_run<span class="org-rainbow-delimiters-depth-3">(</span>dialog<span class="org-rainbow-delimiters-depth-3">)</span>;
+        <span class="org-constant">std</span>::cout &lt;&lt; <span class="org-string">" [INFO] Dialog destroyed OK "</span> &lt;&lt; <span class="org-string">"\n"</span>;
+        <span class="org-keyword">this</span>-&gt;gtk_widget_destroy<span class="org-rainbow-delimiters-depth-3">(</span>dialog<span class="org-rainbow-delimiters-depth-3">)</span>;   
+    <span class="org-rainbow-delimiters-depth-2">}</span>
+<span class="org-rainbow-delimiters-depth-1">}</span>;
+
+
+<span class="org-type">int</span> <span class="org-function-name">main</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">int</span> <span class="org-variable-name">argc</span>, <span class="org-type">char</span>** <span class="org-variable-name">argv</span><span class="org-rainbow-delimiters-depth-1">)</span>
+<span class="org-rainbow-delimiters-depth-1">{</span>        
+    <span class="org-comment-delimiter">// </span><span class="org-comment">User can select his own GTK shared library, if it is not </span>
+    <span class="org-comment-delimiter">// </span><span class="org-comment">found. He can also select GTK2 shared library. </span>
+    <span class="org-keyword">auto</span> <span class="org-variable-name">shared_lib</span> =  <span class="org-rainbow-delimiters-depth-2">[</span>&amp;<span class="org-rainbow-delimiters-depth-2">]()</span> -&gt; <span class="org-constant">std</span>::string 
+    <span class="org-rainbow-delimiters-depth-2">{</span>
+        <span class="org-keyword">if</span><span class="org-rainbow-delimiters-depth-3">(</span>argc &lt; 2<span class="org-rainbow-delimiters-depth-3">)</span> <span class="org-keyword">return</span> <span class="org-string">"libgtk-3.so.0"</span>;
+        <span class="org-keyword">return</span> argv<span class="org-rainbow-delimiters-depth-3">[</span>1<span class="org-rainbow-delimiters-depth-3">]</span>;
+    <span class="org-rainbow-delimiters-depth-2">}()</span>;
+
+    <span class="org-constant">std</span>::cout &lt;&lt; <span class="org-string">" [INFO] Loading shared library: "</span> &lt;&lt; shared_lib &lt;&lt; <span class="org-string">"\n"</span>;   
+    <span class="org-keyword">auto</span> <span class="org-variable-name">gtk</span> = GtkLib<span class="org-rainbow-delimiters-depth-2">{</span>shared_lib<span class="org-rainbow-delimiters-depth-2">}</span>;   
+
+    <span class="org-comment-delimiter">// </span><span class="org-comment">Alwas start the library before calling any GTK function </span>
+    gtk.gtk_init_check<span class="org-rainbow-delimiters-depth-2">(</span>&amp;argc, &amp;argv<span class="org-rainbow-delimiters-depth-2">)</span>;    
+
+    gtk.msgbox<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">"User notification"</span>, <span class="org-string">"Download completed. Ok."</span>,     <span class="org-constant">GtkMessageType</span>::GTK_MESSAGE_INFO <span class="org-rainbow-delimiters-depth-2">)</span>;    
+    gtk.msgbox<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">"Runtime error"</span>,     <span class="org-string">"KERNEL PANIC!! Reboot NOW!!"</span>, <span class="org-constant">GtkMessageType</span>::GTK_MESSAGE_ERROR <span class="org-rainbow-delimiters-depth-2">)</span>;        
+
+    <span class="org-constant">std</span>::cout &lt;&lt; <span class="org-string">" [INFO] Shutdown gracefully. Ok. \n"</span> ;
+    <span class="org-keyword">return</span> EXIT_SUCCESS;
+<span class="org-rainbow-delimiters-depth-1">}</span>
+</pre>
+</div>
+
+<p>
+File: gtk_types.hpp 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-comment-delimiter">// </span><span class="org-comment">------ C++ Wrappers for dynamically loading GTK ----- //</span>
+<span class="org-preprocessor">#if</span><span class="org-negation-char"><span class="org-preprocessor">n</span></span><span class="org-preprocessor">def</span> _GTK_TYPES_HPP
+<span class="org-preprocessor">#define</span> <span class="org-variable-name">_GTK_TYPES_HPP</span>
+
+<span class="org-keyword">namespace</span> <span class="org-constant">GtkPP</span> 
+<span class="org-rainbow-delimiters-depth-1">{</span>
+    <span class="org-keyword">namespace</span> <span class="org-constant">base</span> <span class="org-rainbow-delimiters-depth-2">{</span>
+        <span class="org-keyword">using</span> <span class="org-type">gchar</span>    = <span class="org-type">char</span>;
+        <span class="org-keyword">using</span> <span class="org-type">gshort</span>   = <span class="org-type">short</span>;
+        <span class="org-keyword">using</span> <span class="org-type">glong</span>    = <span class="org-type">long</span>;
+        <span class="org-keyword">using</span> <span class="org-type">gint</span>     = <span class="org-type">int</span>;
+        <span class="org-keyword">using</span> <span class="org-type">gboolean</span> = gint;
+        <span class="org-keyword">using</span> <span class="org-type">guchar</span>   = <span class="org-type">unsigned</span> <span class="org-type">short</span>;
+        <span class="org-keyword">using</span> <span class="org-type">gulong</span>   = <span class="org-type">unsigned</span> <span class="org-type">long</span>;
+        <span class="org-keyword">using</span> <span class="org-type">guint</span>    = <span class="org-type">unsigned</span> <span class="org-type">int</span>;
+        <span class="org-keyword">using</span> <span class="org-type">gfloat</span>   = <span class="org-type">float</span>;
+        <span class="org-keyword">using</span> <span class="org-type">gdouble</span>  = <span class="org-type">double</span>;
+        <span class="org-keyword">using</span> <span class="org-type">gpointer</span> = <span class="org-type">void</span>*;          
+        <span class="org-keyword">using</span> <span class="org-type">gconstpointer</span> = <span class="org-keyword">const</span> <span class="org-type">void</span>*;
+
+    <span class="org-rainbow-delimiters-depth-2">}</span>;
+    <span class="org-comment-delimiter">// </span><span class="org-comment">------- Opaque Types / incomplete types ---------//</span>
+    <span class="org-keyword">namespace</span> <span class="org-constant">widget</span> <span class="org-rainbow-delimiters-depth-2">{</span>        
+        <span class="org-keyword">struct</span> <span class="org-type">GtkWidget</span>;
+        <span class="org-keyword">struct</span> <span class="org-type">GClosure</span>;
+        <span class="org-keyword">struct</span> <span class="org-type">GtkWidget</span>;
+        <span class="org-keyword">struct</span> <span class="org-type">GtkWindow</span>;
+        <span class="org-keyword">struct</span> <span class="org-type">GtkDialog</span>;
+    <span class="org-rainbow-delimiters-depth-2">}</span>;
+
+    <span class="org-keyword">namespace</span> <span class="org-constant">enums</span> <span class="org-rainbow-delimiters-depth-2">{</span>
+        <span class="org-keyword">enum</span> <span class="org-keyword">class</span> <span class="org-type">GtkWindowType</span>
+        <span class="org-rainbow-delimiters-depth-3">{</span>
+            <span class="org-variable-name">GTK_WINDOW_TOPLEVEL</span>,
+            <span class="org-variable-name">GTK_WINDOW_POPUP</span>
+        <span class="org-rainbow-delimiters-depth-3">}</span>;
+
+        <span class="org-keyword">enum</span> <span class="org-keyword">class</span> <span class="org-type">GConnectFlags</span>
+        <span class="org-rainbow-delimiters-depth-3">{</span>
+        <span class="org-variable-name">G_CONNECT_AFTER</span> = 1 &lt;&lt; 0,
+        <span class="org-variable-name">G_CONNECT_SWAPPED</span>   = 1 &lt;&lt; 1
+        <span class="org-rainbow-delimiters-depth-3">}</span>;
+
+        <span class="org-keyword">enum</span> <span class="org-keyword">class</span> <span class="org-type">GtkMessageType</span>
+        <span class="org-rainbow-delimiters-depth-3">{</span>
+        <span class="org-variable-name">GTK_MESSAGE_INFO</span>,
+        <span class="org-variable-name">GTK_MESSAGE_WARNING</span>,
+        <span class="org-variable-name">GTK_MESSAGE_QUESTION</span>,
+        <span class="org-variable-name">GTK_MESSAGE_ERROR</span>,
+        <span class="org-variable-name">GTK_MESSAGE_OTHER</span>
+        <span class="org-rainbow-delimiters-depth-3">}</span>;
+
+        <span class="org-keyword">enum</span> <span class="org-keyword">class</span> <span class="org-type">GtkButtonsType</span>
+        <span class="org-rainbow-delimiters-depth-3">{</span>
+        <span class="org-variable-name">GTK_BUTTONS_NONE</span>,
+        <span class="org-variable-name">GTK_BUTTONS_OK</span>,
+        <span class="org-variable-name">GTK_BUTTONS_CLOSE</span>,
+        <span class="org-variable-name">GTK_BUTTONS_CANCEL</span>,
+        <span class="org-variable-name">GTK_BUTTONS_YES_NO</span>,
+        <span class="org-variable-name">GTK_BUTTONS_OK_CANCEL</span>
+        <span class="org-rainbow-delimiters-depth-3">}</span>;
+
+        <span class="org-keyword">enum</span> <span class="org-keyword">class</span> <span class="org-type">GtkDialogFlags</span>
+        <span class="org-rainbow-delimiters-depth-3">{</span>
+        <span class="org-variable-name">GTK_DIALOG_MODAL</span>               = 1 &lt;&lt; 0,
+        <span class="org-variable-name">GTK_DIALOG_DESTROY_WITH_PARENT</span> = 1 &lt;&lt; 1,
+        <span class="org-variable-name">GTK_DIALOG_USE_HEADER_BAR</span>      = 1 &lt;&lt; 2
+        <span class="org-rainbow-delimiters-depth-3">}</span>;
+    <span class="org-rainbow-delimiters-depth-2">}</span>;
+
+    <span class="org-comment-delimiter">/** </span><span class="org-comment">@brief Function pointers type aliases  */</span>
+    <span class="org-keyword">namespace</span> <span class="org-constant">fpointer</span> 
+    <span class="org-rainbow-delimiters-depth-2">{</span>
+        <span class="org-keyword">using</span> <span class="org-keyword">namespace</span> <span class="org-constant">base</span>;
+        <span class="org-keyword">using</span> <span class="org-keyword">namespace</span> <span class="org-constant">widget</span>;
+        <span class="org-keyword">using</span> <span class="org-constant">enums</span>::<span class="org-type">GConnectFlags</span>;
+
+        <span class="org-keyword">using</span> <span class="org-type">GtkDialogFlags_t</span> = <span class="org-type">int</span>; 
+        <span class="org-keyword">using</span> <span class="org-type">GtkMessageType_t</span> = <span class="org-type">int</span>; 
+        <span class="org-keyword">using</span> <span class="org-type">GtkButtonsType_t</span> = <span class="org-type">int</span>;
+
+        <span class="org-keyword">using</span> <span class="org-type">gtk_init_check_t</span> = gboolean <span class="org-rainbow-delimiters-depth-3">(</span>*<span class="org-rainbow-delimiters-depth-3">)</span> <span class="org-rainbow-delimiters-depth-3">(</span><span class="org-type">int</span>* <span class="org-variable-name">argc</span>, <span class="org-type">char</span>*** <span class="org-variable-name">argv</span><span class="org-rainbow-delimiters-depth-3">)</span>;
+        <span class="org-keyword">using</span> <span class="org-type">gtk_dialog_run_t</span>       = gint <span class="org-rainbow-delimiters-depth-3">(</span>*<span class="org-rainbow-delimiters-depth-3">)</span> <span class="org-rainbow-delimiters-depth-3">(</span><span class="org-type">void</span>* <span class="org-variable-name">dialog</span><span class="org-rainbow-delimiters-depth-3">)</span>;
+        <span class="org-keyword">using</span> <span class="org-type">gtk_widget_destroy_t</span>   = <span class="org-type">void</span> <span class="org-rainbow-delimiters-depth-3">(</span>*<span class="org-rainbow-delimiters-depth-3">)</span> <span class="org-rainbow-delimiters-depth-3">(</span><span class="org-type">GtkWidget</span>* <span class="org-variable-name">widget</span><span class="org-rainbow-delimiters-depth-3">)</span>;
+        <span class="org-keyword">using</span> <span class="org-type">gtk_window_set_title_t</span> = <span class="org-type">void</span> <span class="org-rainbow-delimiters-depth-3">(</span>*<span class="org-rainbow-delimiters-depth-3">)</span> <span class="org-rainbow-delimiters-depth-3">(</span><span class="org-type">GtkWidget</span>* <span class="org-variable-name">window</span>, <span class="org-keyword">const</span> <span class="org-type">gchar</span>* <span class="org-variable-name">title</span><span class="org-rainbow-delimiters-depth-3">)</span>;
+        <span class="org-keyword">using</span> <span class="org-type">gtk_main_quit_t</span>        = <span class="org-type">void</span> <span class="org-rainbow-delimiters-depth-3">(</span>*<span class="org-rainbow-delimiters-depth-3">)</span> <span class="org-rainbow-delimiters-depth-3">()</span>;
+
+        <span class="org-keyword">using</span> <span class="org-type">gtk_window_set_title_t</span> = <span class="org-type">void</span> <span class="org-rainbow-delimiters-depth-3">(</span>*<span class="org-rainbow-delimiters-depth-3">)</span> <span class="org-rainbow-delimiters-depth-3">(</span><span class="org-type">GtkWidget</span>* <span class="org-variable-name">window</span>, <span class="org-keyword">const</span> <span class="org-type">gchar</span>* <span class="org-variable-name">title</span><span class="org-rainbow-delimiters-depth-3">)</span>;
+
+
+        <span class="org-keyword">using</span> <span class="org-type">GCallback</span>      = <span class="org-type">void</span>  <span class="org-rainbow-delimiters-depth-3">(</span>*<span class="org-rainbow-delimiters-depth-3">)</span> <span class="org-rainbow-delimiters-depth-3">(</span><span class="org-type">void</span><span class="org-rainbow-delimiters-depth-3">)</span>;
+        <span class="org-keyword">using</span> <span class="org-type">GClosureNotify</span> = <span class="org-type">void</span>  <span class="org-rainbow-delimiters-depth-3">(</span>*<span class="org-rainbow-delimiters-depth-3">)</span> <span class="org-rainbow-delimiters-depth-3">(</span><span class="org-type">gpointer</span> <span class="org-variable-name">data</span>, <span class="org-type">GClosure</span>* <span class="org-variable-name">closure</span><span class="org-rainbow-delimiters-depth-3">)</span>;
+        <span class="org-keyword">using</span> <span class="org-type">g_signal_connect_data_t</span> =  gulong <span class="org-rainbow-delimiters-depth-3">(</span>*<span class="org-rainbow-delimiters-depth-3">)</span> <span class="org-rainbow-delimiters-depth-3">(</span> <span class="org-type">gpointer</span>        <span class="org-variable-name">instance</span>
+                                                    , <span class="org-keyword">const</span> <span class="org-type">gchar</span>*    <span class="org-variable-name">detailed_signal</span>
+                                                    , <span class="org-type">GCallback</span>       <span class="org-variable-name">c_handler</span>
+                                                    , <span class="org-type">gpointer</span>          <span class="org-variable-name">data</span>
+                                                    , <span class="org-type">GClosureNotify</span>  <span class="org-variable-name">destroy_data</span>
+                                                    , <span class="org-type">GConnectFlags</span> <span class="org-variable-name">connect_flags</span>
+                                                    <span class="org-rainbow-delimiters-depth-3">)</span>;
+
+
+        <span class="org-keyword">using</span> <span class="org-type">gtk_message_dialog_new_t</span> = GtkWidget* <span class="org-rainbow-delimiters-depth-3">(</span>*<span class="org-rainbow-delimiters-depth-3">)</span> <span class="org-rainbow-delimiters-depth-3">(</span> <span class="org-type">GtkWindow</span>       *<span class="org-variable-name">parent</span>,
+                                                          <span class="org-type">GtkDialogFlags_t</span>  <span class="org-variable-name">flags</span>,
+                                                          <span class="org-type">GtkMessageType_t</span>  <span class="org-variable-name">type</span>,
+                                                          <span class="org-type">GtkButtonsType_t</span>  <span class="org-variable-name">buttons</span>,
+                                                          <span class="org-keyword">const</span> <span class="org-type">gchar</span>*    <span class="org-variable-name">message_format</span>
+                                                        <span class="org-rainbow-delimiters-depth-3">)</span>;
+
+
+    <span class="org-rainbow-delimiters-depth-2">}</span>;
+
+<span class="org-rainbow-delimiters-depth-1">}</span>;
+
+<span class="org-preprocessor">#endif</span> 
+</pre>
+</div>
+
+<p>
+Building and running: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">Download </span>
+$ &gt;&gt; git clone https://gist.github.com/6bbb3b9491d4fad01d3875a559b7365b gtk-dialog &amp;&amp; <span class="org-builtin">cd</span> gtk-dialog 
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">Configure </span>
+$ &gt;&gt; cmake --config Debug -H. -B_build
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">Build </span>
+$ &gt;&gt; cmake --build _build --target 
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">Run </span>
+$ &gt;&gt; _build/gtk-dialog 
+[INFO] Loading shared library: libgtk-3.so.0
+[INFO] Dialog destroyed OK 
+[INFO] Dialog destroyed OK 
+[INFO] Shutdown gracefully. Ok. 
+
+</pre>
+</div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org755de76" class="outline-3">
+<h3 id="org755de76"><span class="section-number-3">1.7</span> Launching processes with exec and fork system wrappers</h3>
+<div class="outline-text-3" id="text-1-7">
 <p>
 This code demonstrates the usage of exec and fork system-calls wrapper
 functions, namely, execvp() and fork() functions. 
@@ -1717,9 +2651,21 @@ $ &gt;&gt; ./unix-process.bin 2
 </div>
 </div>
 </div>
-<div id="outline-container-org5dfb769" class="outline-3">
-<h3 id="org5dfb769"><span class="section-number-3">1.7</span> Read/List directory contents</h3>
-<div class="outline-text-3" id="text-1-7">
+<div id="outline-container-org4980c55" class="outline-3">
+<h3 id="org4980c55"><span class="section-number-3">1.8</span> Reading/Listings directory contents</h3>
+<div class="outline-text-3" id="text-1-8">
+<p>
+API Documentations: 
+</p>
+
+<ul class="org-ul">
+<li><a href="https://man7.org/linux/man-pages/man3/opendir.3.html">Linux Manpage - opendir()</a></li>
+
+<li><a href="https://www.freebsd.org/cgi/man.cgi?query=opendir&amp;sektion=3">FreeBSD manpage - opendir()</a></li>
+
+<li><a href="https://www.man7.org/linux/man-pages/man3/readdir.3.html">Linux manpage - readdir()</a></li>
+</ul>
+
 <p>
 Functions used: 
 </p>
@@ -1838,434 +2784,852 @@ Running:
 </div>
 </div>
 
-<div id="outline-container-orgf16fadd" class="outline-3">
-<h3 id="orgf16fadd"><span class="section-number-3">1.8</span> Creating Portable Binaries for Linux / GLIBC hell</h3>
-<div class="outline-text-3" id="text-1-8">
+
+
+<div id="outline-container-orgc3fc707" class="outline-3">
+<h3 id="orgc3fc707"><span class="section-number-3">1.9</span> Memory Mapped Files - mmap</h3>
+<div class="outline-text-3" id="text-1-9">
 </div>
-<div id="outline-container-org5ec61d2" class="outline-4">
-<h4 id="org5ec61d2"><span class="section-number-4">1.8.1</span> Overview</h4>
-<div class="outline-text-4" id="text-1-8-1">
+<div id="outline-container-org8a087b6" class="outline-4">
+<h4 id="org8a087b6"><span class="section-number-4">1.9.1</span> Overview</h4>
+<div class="outline-text-4" id="text-1-9-1">
 <p>
-One of the greatest challenges of Linux desktop is building and
-deploying portable applications and native executable which work on
-any Linux distribution. Even if an application totally statically
-linked against all dependencies or it is bundled with all its shared
-libraries dependencies via LD_LIBRARY_PATH environment variable or
-RPATH, the program may still fail to run in other Linux distribution
-due to the GLIBC (GNU C library runtime) dependency. A GLIBC is <span class="underline">forward</span>
-<span class="underline">compatible</span>, but not <span class="underline">backward compatible</span>, the GLIBC runtime failure is
-more likely to happen if the application was built on a Linux
-distribution using a newer version of GLIBC, but the program is
-deployed in a distribution using an older version of GLIBC.
+File mapping is an operating system mechanism which maps a disk file
+to a process virtual memory. This operating system feature allows
+accessing the file as it was in the process memory. 
+</p>
+
+<p>
+Benefits: 
 </p>
 
 <ul class="org-ul">
-<li>Side Note: Applications built with GO (Golang) programming
-language are less likely to be affected by the GLIBC-issue as
-often, the compiler does not link against the GLIBC.</li>
+<li>Transparent access to file, allows accessing the file as it was an
+ordinary memory. (the file is accessible by pointer)</li>
+
+<li>Good for processing large files which does not fit in the machine
+RAM memory.</li>
 </ul>
-</div>
-</div>
-
-<div id="outline-container-org6f73c02" class="outline-4">
-<h4 id="org6f73c02"><span class="section-number-4">1.8.2</span> The GLIBC Problem</h4>
-<div class="outline-text-4" id="text-1-8-2">
-<p>
-<b>GLIBC - Problem Illustration with a Sample Project</b> 
-</p>
 
 <p>
-GIST Containing all files used in this experiment: 
+Use-cases: 
 </p>
 
 <ul class="org-ul">
-<li><a href="https://gist.github.com/0557cd0fa1d5370723b015e443a7c036">https://gist.github.com/0557cd0fa1d5370723b015e443a7c036</a></li>
+<li>Read large files</li>
+
+<li>IPC - Inter-Process Communication</li>
+
+<li>Process complicated binary files</li>
+
+<li>Modify complex binary files. The file can be modified by just
+changing a memory, in other words, modifying the contents of a
+memory address.</li>
+
+<li>Implement JIT - Just-In-Time compiler and execute assembly code at runtime.</li>
 </ul>
 
 <p>
-File: Makefile
+The <span class="underline">mmap API</span> is available in most Unix-like operating systems: 
+</p>
+
+<ul class="org-ul">
+<li>Linux</li>
+<li>BSD-family: MacOSX, FreeBDS, NetBSD, OpenBSD</li>
+<li>Solaris</li>
+<li>QNX, AIX</li>
+</ul>
+
+<p>
+<b>Mmap API functions</b>
+</p>
+
+<p>
+File descriptors: 
 </p>
 
 <div class="org-src-container">
-<pre class="src src-make">build:
-        cmake --config Debug -H. -B_build2
-        cmake --build _build2 --target 
+<pre class="src src-cpp"><span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">unistd.h</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">sys/types.h</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">sys/stat.h</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">fcntl.h</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+
+<span class="org-comment-delimiter">// </span><span class="org-comment">Returns file descriptor of a disk-file </span>
+<span class="org-type">int</span> <span class="org-function-name">open</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-keyword">const</span> <span class="org-type">char</span> *<span class="org-variable-name">pathname</span>, <span class="org-type">int</span> <span class="org-variable-name">flags</span><span class="org-rainbow-delimiters-depth-1">)</span>;
+
+<span class="org-comment-delimiter">// </span><span class="org-comment">Close file descriptor (release resource)</span>
+<span class="org-type">int</span> <span class="org-function-name">close</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">int</span> <span class="org-variable-name">fd</span><span class="org-rainbow-delimiters-depth-1">)</span>;
 </pre>
 </div>
 
 <p>
-File: CMakeLists.txt 
+Mmap: 
 </p>
 
+<ul class="org-ul">
+<li>Doc: $ man mmap</li>
+<li>Linux Manpage Description: "mmap() creates a new mapping in the
+virtual address space of the calling process.  The starting
+address for the new mapping is specified in addr.  The length
+argument speci‐ fies the length of the mapping (which must be
+greater than 0)"</li>
+
+<li>Argument: <span class="underline">prot</span> (Memory Protection)
+<ul class="org-ul">
+<li>PROT_READ  =&gt; Pages may be written (most used)</li>
+<li>PROT_WRITE =&gt; Pages may be written (allows changing the file by writing to the mapped memory)</li>
+<li>PROT_NONE  =&gt; Pages may not be accessed</li>
+<li>PROT_EXEC  =&gt; Pages may be executed =&gt; Allows executing machine
+code (assembly) at runtime. Use case: JIT - Just-In-Time
+compiler</li>
+</ul></li>
+
+<li>Argument: <span class="underline">flags</span>
+<ul class="org-ul">
+<li>MAP_SHARED  =&gt; Multiple processes can share the same <span class="underline">file</span>
+<span class="underline">mapping</span>. This flag is used for IPC - Inter Process
+Communication.</li>
+<li>MAP_PRIVATE =&gt; Only the current process can access the file mapping.</li>
+</ul></li>
+</ul>
+
 <div class="org-src-container">
-<pre class="src src-cmake"><span class="org-function-name">cmake_minimum_required</span>(VERSION 3.9)
-<span class="org-function-name">project</span>(Simple_Cmake_Project)
+<pre class="src src-cpp"><span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">sys/mman.h</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
 
-<span class="org-function-name">set</span>(CMAKE_CXX_STANDARD 17)     
-<span class="org-function-name">set</span>(CMAKE_VERBOSE_MAKEFILE ON)
-
-<span class="org-comment">#========== Targets Configurations ============#</span>
-        <span class="org-function-name">add_executable</span>( filesys filesys.cpp )
-<span class="org-function-name">target_link_libraries</span>( filesys stdc++fs)
+<span class="org-type">void</span>* <span class="org-function-name">mmap</span><span class="org-rainbow-delimiters-depth-1">(</span>  <span class="org-type">void</span>*   <span class="org-variable-name">addr</span>    <span class="org-comment-delimiter">// </span><span class="org-comment">(often nullptr) Address that the file will be mapped </span>
+           , <span class="org-type">size_t</span>  <span class="org-variable-name">length</span>  <span class="org-comment-delimiter">// </span><span class="org-comment">Length of file mapping (often the file size)</span>
+           , <span class="org-type">int</span>     <span class="org-variable-name">prot</span>    <span class="org-comment-delimiter">// </span><span class="org-comment">Flags for memory protection </span>
+           , <span class="org-type">int</span>     <span class="org-variable-name">flags</span>   <span class="org-comment-delimiter">// </span><span class="org-comment">Flags for process access conttrol (private | shared)</span>
+           , <span class="org-type">int</span>     <span class="org-variable-name">fd</span>      <span class="org-comment-delimiter">// </span><span class="org-comment">File descriptor to be mapped into virtual memory</span>
+           , <span class="org-type">off_t</span>   <span class="org-variable-name">offset</span>  <span class="org-comment-delimiter">// </span><span class="org-comment">(often zero) Offset from the beginning of the file </span>
+          <span class="org-rainbow-delimiters-depth-1">)</span>;
 </pre>
 </div>
 
 <p>
-File: filesys.cpp 
+munmap:
+</p>
+
+<ul class="org-ul">
+<li>Doc: $ man munmap</li>
+<li>Linux Manpage doc: "The munmap() system call deletes the mappings
+for the specified address range, and causes further references to
+addresses within the range to generate invalid memory ref‐
+erences.  The region is also automatically unmapped when the
+process is terminated.  On the other hand, closing the file
+descriptor does not unmap the region."</li>
+
+<li>Param <span class="underline">addr</span>: Address of memory mapping (value returned by mmap)</li>
+
+<li>Param <span class="underline">length:</span> length of file mapping, often it is the file size.</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-comment-delimiter">// </span><span class="org-comment">For mmap and munmap </span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">sys/mman.h</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>     
+
+<span class="org-type">int</span> <span class="org-function-name">munmap</span><span class="org-rainbow-delimiters-depth-1">(</span> <span class="org-type">void</span> *<span class="org-variable-name">addr</span>, <span class="org-type">size_t</span> <span class="org-variable-name">length</span><span class="org-rainbow-delimiters-depth-1">)</span>;
+</pre>
+</div>
+
+<p>
+Hyperlinks to manpage documentation of related-functions: 
+</p>
+
+<ul class="org-ul">
+<li><a href="https://linux.die.net/man/2/mmap">mmap</a> (Linux manpage)</li>
+
+<li><a href="https://linux.die.net/man/2/remap_file_pages">remap_file_pages</a></li>
+
+<li><a href="https://linux.die.net/man/2/mremap">mremap</a> (Linux manpage)</li>
+
+<li><a href="https://linux.die.net/man/2/msync">msync</a></li>
+</ul>
+
+
+<p>
+<b>References and further reading</b> 
+</p>
+
+<p>
+General: 
+</p>
+
+<ul class="org-ul">
+<li><a href="https://en.wikipedia.org/wiki/Mmap">mmap - Wikipedia</a></li>
+
+<li><a href="https://developer.apple.com/library/archive/documentation/FileManagement/Conceptual/FileSystemAdvancedPT/MappingFilesIntoMemory/MappingFilesIntoMemory.html">Apple - Mapping Files Into Memory</a></li>
+
+<li><a href="https://upsilon.cc/~zack/teaching/1415/progsyst/cours-05-mmap.pdf">Programmation SystèmeCours 5 — Memory Mapping</a> (<a href="http://web.archive.org/web/20200622232258/https://upsilon.cc/~zack/teaching/1415/progsyst/cours-05-mmap.pdf">Web Archive</a>)</li>
+
+<li><a href="https://unix.stackexchange.com/questions/474926/how-does-memory-mapping-a-file-have-significant-performance-increases-over-the-s/475014">How does memory mapping a file have significant performance increases over the standard I/O system calls?</a></li>
+
+<li><a href="https://courses.engr.illinois.edu/cs241/sp2014/lecture/27-IPC.pdf">Interprocess Communication: Memory mapped files and pipes</a></li>
+
+<li><a href="http://web.cs.ucla.edu/honors/UPLOADS/kousha/thesis.pdf">Linux Memory Mapped System Call Performance</a></li>
+
+<li><a href="https://w3.cs.jmu.edu/kirkpams/OpenCSF/Books/csf/html/MMap.html">Shared Memory with Memory-Mapped Files</a></li>
+
+<li><a href="https://www.sublimetext.com/blog/articles/use-mmap-with-care">Use mmap With Care - Sublime HQ</a></li>
+
+<li><a href="http://www.idryman.org/blog/2017/06/28/opic-a-memory-allocator-for-fast-serialization/">Writing a Memory Allocator for Fast Serialization</a></li>
+
+<li><a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2006/n2044.html">Paper: Memory Mapped Files And Shared Memory For C++</a></li>
+
+<li><a href="https://indico.cern.ch/event/658060/contributions/2898569/attachments/1622526/2582399/pivarski-serialization.pdf">Overview of Serialization Technologies</a> - CERN</li>
+
+<li><a href="https://www.usenix.org/sites/default/files/conference/protected-files/hotstorage17_slides_choi.pdf">Efficient Memory Mapped File I/O for In-Memory File Systems</a></li>
+
+<li><a href="https://engineering.mongodb.com/post/getting-storage-engines-ready-for-fast-storage-devices">Getting storage engines ready for fast storage devices</a></li>
+
+<li><a href="http://blogs.networkingfutures.co.uk/post/2015/12/28/Windows-Services-Implementing-Non-Persisted-Memory-Mapped-Files-Exposing-IPC-Style-Communications.aspx">Introduction to Memory Mapped Files</a> (.NET Specific)</li>
+</ul>
+
+
+<p>
+MMAP - File Memory Mapping for other programming languages
+</p>
+
+<ul class="org-ul">
+<li><a href="https://docs.rs/flatdata/0.5.0/flatdata/">https://docs.rs/flatdata/0.5.0/flatdata/</a> (Rust library for mmap)</li>
+
+<li><a href="https://www.red-gate.com/simple-talk/dotnet/net-development/sharing-caring-using-memory-mapped-files-net/">Sharing is Caring: Using Memory Mapped Files in .NET</a></li>
+
+<li><a href="https://coders-corner.net/2013/03/22/inter-process-communication-with-memory-mapped-files-part-01-transfer-a-data-structure-and-an-object/">Inter-Process Communication with Memory-Mapped Files, Part 01</a></li>
+
+<li><a href="https://github.com/jampp/sharedbuffers/">Python SharedBuffer - library for mmap</a></li>
+
+<li><a href="https://docs.julialang.org/en/v1/stdlib/Mmap/">https://docs.julialang.org/en/v1/stdlib/Mmap/</a> - Julia Language library for mmap (memory-mapped files)</li>
+
+<li><a href="https://engineering.indeedblog.com/blog/2015/02/memory-mapping-with-util-mmap/">Memory Mapping with util-mmap</a> - mmap for Java.</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-org842a0c9" class="outline-4">
+<h4 id="org842a0c9"><span class="section-number-4">1.9.2</span> Example (C) - mmap for reading Windows PE32 files</h4>
+<div class="outline-text-4" id="text-1-9-2">
+<p>
+This code uses mmap API (memory mapped files) for reading metadata
+from PE (Portable Executable) - Windows native executable files or
+windows object-code. 
+</p>
+
+<p>
+GIST: 
+</p>
+<ul class="org-ul">
+<li><a href="https://gist.github.com/166265f6dc85c8d9cc2dc00253caae78">https://gist.github.com/166265f6dc85c8d9cc2dc00253caae78</a></li>
+</ul>
+
+<p>
+File: unix-mmap.c 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">stdio.h</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">stdlib.h</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">stdint.h</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span> 
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">assert.h</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+
+<span class="org-comment-delimiter">// </span><span class="org-comment">--- Unix/Posix headers ---------//</span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">unistd.h</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">sys/mman.h</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">sys/stat.h</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">fcntl.h</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+
+<span class="org-preprocessor">#define</span> <span class="org-variable-name">IMAGE_SIZEOF_SHORT_NAME</span>            8
+<span class="org-preprocessor">#define</span> <span class="org-variable-name">IMAGE_NUMBEROF_DIRECTORY_ENTRIES</span>  16
+
+<span class="org-keyword">typedef</span> <span class="org-type">int32_t</span>  <span class="org-type">LONG</span>;
+<span class="org-keyword">typedef</span> <span class="org-type">uint16_t</span> <span class="org-type">WORD</span>;
+<span class="org-keyword">typedef</span> <span class="org-type">uint32_t</span> <span class="org-type">DWORD</span>;
+<span class="org-keyword">typedef</span> <span class="org-type">uint8_t</span>  <span class="org-type">BYTE</span>;
+<span class="org-keyword">typedef</span> <span class="org-type">uint64_t</span> <span class="org-type">ULONGLONG</span>;;
+
+<span class="org-comment-delimiter">// </span><span class="org-comment">Source: &lt;winttt.h&gt;  =&gt; Original: typedef struct _IMAGE_DOS_HEADER</span>
+<span class="org-keyword">typedef</span> <span class="org-keyword">struct</span> <span class="org-rainbow-delimiters-depth-1">{</span>            
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_magic</span>;                     
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_cblp</span>;                   
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_cp</span>;                     
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_crlc</span>;                   
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_cparhdr</span>;                
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_minalloc</span>;               
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_maxalloc</span>;               
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_ss</span>;                     
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_sp</span>;                     
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_csum</span>;                   
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_ip</span>;                     
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_cs</span>;                     
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_lfarlc</span>;                 
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_ovno</span>;                   
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_res</span><span class="org-rainbow-delimiters-depth-2">[</span>4<span class="org-rainbow-delimiters-depth-2">]</span>;                 
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_oemid</span>;                  
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_oeminfo</span>;                
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_res2</span><span class="org-rainbow-delimiters-depth-2">[</span>10<span class="org-rainbow-delimiters-depth-2">]</span>;               
+    <span class="org-comment-delimiter">//  </span><span class="org-comment">Offset to the PE header from the beginning of the file. </span>
+    <span class="org-type">LONG</span>   <span class="org-variable-name">e_lfanew</span>;                    
+  <span class="org-rainbow-delimiters-depth-1">}</span> <span class="org-type">IMAGE_DOS_HEADER</span>;
+
+ <span class="org-keyword">typedef</span> <span class="org-keyword">struct</span> <span class="org-rainbow-delimiters-depth-1">{</span>
+    <span class="org-type">DWORD</span> <span class="org-variable-name">Signature</span>; 
+    <span class="org-type">WORD</span>  <span class="org-variable-name">Machine</span>;
+    <span class="org-type">WORD</span>  <span class="org-variable-name">NumberOfSections</span>;
+    <span class="org-type">DWORD</span> <span class="org-variable-name">TimeDateStamp</span>;
+    <span class="org-type">DWORD</span> <span class="org-variable-name">PointerToSymbolTable</span>;
+    <span class="org-type">DWORD</span> <span class="org-variable-name">NumberOfSymbols</span>;
+    <span class="org-type">WORD</span>  <span class="org-variable-name">SizeOfOptionalHeader</span>;
+    <span class="org-type">WORD</span>  <span class="org-variable-name">Characteristics</span>;
+ <span class="org-rainbow-delimiters-depth-1">}</span> <span class="org-type">PE_HEADER</span>;
+
+
+<span class="org-type">ssize_t</span> <span class="org-function-name">get_file_size</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">int</span> <span class="org-variable-name">fd</span><span class="org-rainbow-delimiters-depth-1">)</span>
+<span class="org-rainbow-delimiters-depth-1">{</span>
+    <span class="org-keyword">struct</span> <span class="org-type">stat</span> <span class="org-variable-name">file_stat</span>; 
+    <span class="org-keyword">if</span><span class="org-rainbow-delimiters-depth-2">(</span> fstat<span class="org-rainbow-delimiters-depth-3">(</span>fd, &amp;file_stat<span class="org-rainbow-delimiters-depth-3">)</span> == -1 <span class="org-rainbow-delimiters-depth-2">)</span>
+        <span class="org-keyword">return</span> -1;
+    <span class="org-keyword">return</span> file_stat.st_size;
+<span class="org-rainbow-delimiters-depth-1">}</span>
+
+<span class="org-type">int</span> <span class="org-function-name">main</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">int</span> <span class="org-variable-name">argc</span>, <span class="org-type">char</span>** <span class="org-variable-name">argv</span><span class="org-rainbow-delimiters-depth-1">)</span>
+<span class="org-rainbow-delimiters-depth-1">{</span>   
+    <span class="org-comment-delimiter">// </span><span class="org-comment">----------- Validate arguments ----------------------------//</span>
+    <span class="org-keyword">if</span><span class="org-rainbow-delimiters-depth-2">(</span>argc &lt; 2<span class="org-rainbow-delimiters-depth-2">)</span>
+    <span class="org-rainbow-delimiters-depth-2">{</span>
+        fprintf<span class="org-rainbow-delimiters-depth-3">(</span>stderr, <span class="org-string">"Usage: /unix-mmap &lt;FILE&gt; \n"</span><span class="org-rainbow-delimiters-depth-3">)</span>;
+        <span class="org-keyword">return</span> EXIT_FAILURE;
+    <span class="org-rainbow-delimiters-depth-2">}</span>
+
+    <span class="org-comment-delimiter">// </span><span class="org-comment">----------- Get file descriptor ----------------------------//</span>
+
+    <span class="org-comment-delimiter">// </span><span class="org-comment">Get read-only file descriptor of file </span>
+    <span class="org-type">int</span> <span class="org-variable-name">fd</span> = open<span class="org-rainbow-delimiters-depth-2">(</span>argv<span class="org-rainbow-delimiters-depth-3">[</span>1<span class="org-rainbow-delimiters-depth-3">]</span>, O_RDONLY<span class="org-rainbow-delimiters-depth-2">)</span>;
+    <span class="org-keyword">if</span><span class="org-rainbow-delimiters-depth-2">(</span>fd == -1<span class="org-rainbow-delimiters-depth-2">){</span>
+        fprintf<span class="org-rainbow-delimiters-depth-3">(</span>stderr, <span class="org-string">" Error: unable to open file. check ERRNO variable \n"</span><span class="org-rainbow-delimiters-depth-3">)</span>;
+        <span class="org-keyword">return</span> EXIT_FAILURE;
+    <span class="org-rainbow-delimiters-depth-2">}</span>
+
+    <span class="org-type">ssize_t</span> <span class="org-variable-name">size</span> = get_file_size<span class="org-rainbow-delimiters-depth-2">(</span>fd<span class="org-rainbow-delimiters-depth-2">)</span>;
+    <span class="org-keyword">if</span><span class="org-rainbow-delimiters-depth-2">(</span>size == -1<span class="org-rainbow-delimiters-depth-2">){</span>
+        fprintf<span class="org-rainbow-delimiters-depth-3">(</span>stderr, <span class="org-string">" Error: unable to get file size \n"</span><span class="org-rainbow-delimiters-depth-3">)</span>;
+        <span class="org-keyword">return</span> EXIT_FAILURE;
+    <span class="org-rainbow-delimiters-depth-2">}</span>
+
+    <span class="org-comment-delimiter">// </span><span class="org-comment">----------- Map file in to process' virtual memory ---------------------------//</span>
+
+    <span class="org-type">void</span>* <span class="org-variable-name">fmap</span> = mmap<span class="org-rainbow-delimiters-depth-2">(</span>    <span class="org-constant">NULL</span>        <span class="org-comment-delimiter">/* </span><span class="org-comment">Often set to zero, aka nullpointer           */</span>
+                        , size        <span class="org-comment-delimiter">/* </span><span class="org-comment">Size of file mapping in bytes                */</span>
+                        , PROT_READ   <span class="org-comment-delimiter">/* </span><span class="org-comment">Open in read-only mode                       */</span>
+                        , MAP_PRIVATE <span class="org-comment-delimiter">/* </span><span class="org-comment">Only this process can access this memory-map */</span>
+                        , fd          <span class="org-comment-delimiter">/* </span><span class="org-comment">File descriptor of file to be memory mapped  */</span>
+                        , 0x00        <span class="org-comment-delimiter">/* </span><span class="org-comment">Offset from the beggining of the file        */</span>
+                     <span class="org-rainbow-delimiters-depth-2">)</span>;
+
+    <span class="org-keyword">if</span><span class="org-rainbow-delimiters-depth-2">(</span> fmap == MAP_FAILED<span class="org-rainbow-delimiters-depth-2">)</span>
+    <span class="org-rainbow-delimiters-depth-2">{</span>
+        fprintf<span class="org-rainbow-delimiters-depth-3">(</span>stderr, <span class="org-string">" Error: memory mapped failed. check ERRNO \n"</span><span class="org-rainbow-delimiters-depth-3">)</span>;
+        <span class="org-keyword">return</span> EXIT_FAILURE;
+    <span class="org-rainbow-delimiters-depth-2">}</span>
+
+    <span class="org-comment-delimiter">// </span><span class="org-comment">--------- Process file -----------------------------------------// </span>
+
+    <span class="org-type">unsigned</span> <span class="org-type">char</span>* <span class="org-variable-name">bmap</span> = <span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">unsigned</span> <span class="org-type">char</span>*<span class="org-rainbow-delimiters-depth-2">)</span> fmap; 
+
+    <span class="org-comment-delimiter">// </span><span class="org-comment">char file_signature [2] = { bmap[0], bmap[1], bmap[2], bmap[3], 0x00 };</span>
+    printf<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">" File signature = %c %c 0x%X 0x%X \n"</span>, bmap<span class="org-rainbow-delimiters-depth-3">[</span>0<span class="org-rainbow-delimiters-depth-3">]</span>, bmap<span class="org-rainbow-delimiters-depth-3">[</span>1<span class="org-rainbow-delimiters-depth-3">]</span>, bmap<span class="org-rainbow-delimiters-depth-3">[</span>2<span class="org-rainbow-delimiters-depth-3">]</span>, bmap<span class="org-rainbow-delimiters-depth-3">[</span>3<span class="org-rainbow-delimiters-depth-3">]</span><span class="org-rainbow-delimiters-depth-2">)</span>;
+
+    <span class="org-type">IMAGE_DOS_HEADER</span>* <span class="org-variable-name">dos_header</span> = <span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">IMAGE_DOS_HEADER</span>*<span class="org-rainbow-delimiters-depth-2">)</span> fmap;
+    <span class="org-type">PE_HEADER</span>*        <span class="org-variable-name">pe_header</span>  = fmap + dos_header-&gt;e_lfanew;
+
+    assert<span class="org-rainbow-delimiters-depth-2">(</span> pe_header-&gt;Signature == 0x4550 <span class="org-rainbow-delimiters-depth-2">)</span>;
+
+    printf<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">"\n ========= [DOS HEADER] =================\n"</span><span class="org-rainbow-delimiters-depth-2">)</span>;
+    printf<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">"   MAGIC NUMBER = 0x%X (hex) \n"</span>, dos_header-&gt;e_magic<span class="org-rainbow-delimiters-depth-2">)</span>;
+    printf<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">"   MAGIC NUMBER = %c %c  (str) \n"</span>, dos_header-&gt;e_magic &amp; 0xFF, <span class="org-rainbow-delimiters-depth-3">(</span>dos_header-&gt;e_magic &gt;&gt; 8<span class="org-rainbow-delimiters-depth-3">)</span> &amp; 0xFF<span class="org-rainbow-delimiters-depth-2">)</span>;
+    printf<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">"       e_lfanew = 0x%X \n"</span>,      dos_header-&gt;e_lfanew<span class="org-rainbow-delimiters-depth-2">)</span>;
+
+    printf<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">"\n ======== [PE - Header] ================\n"</span><span class="org-rainbow-delimiters-depth-2">)</span>;
+    printf<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">" Note: if machine is 0x8664 =&gt; the processor is AMD-Intel x86-64 \n"</span><span class="org-rainbow-delimiters-depth-2">)</span>;
+    printf<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">"\n"</span><span class="org-rainbow-delimiters-depth-2">)</span>;
+    printf<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">"          Signature = 0x%X \n"</span>, pe_header-&gt;Signature<span class="org-rainbow-delimiters-depth-2">)</span>;
+    printf<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">"            Machine = 0x%X \n"</span>, pe_header-&gt;Machine<span class="org-rainbow-delimiters-depth-2">)</span>;
+    printf<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">" Number of sections = %d \n"</span>,   pe_header-&gt;NumberOfSections<span class="org-rainbow-delimiters-depth-2">)</span>;
+
+    <span class="org-comment-delimiter">// </span><span class="org-comment">---------- Release Resource ------------------------------------// </span>
+
+    <span class="org-comment-delimiter">// </span><span class="org-comment">Unmap memory segment </span>
+    munmap<span class="org-rainbow-delimiters-depth-2">(</span>fmap, size<span class="org-rainbow-delimiters-depth-2">)</span>;
+    <span class="org-comment-delimiter">// </span><span class="org-comment">Release file-descriptor resource</span>
+    close<span class="org-rainbow-delimiters-depth-2">(</span>fd<span class="org-rainbow-delimiters-depth-2">)</span>;
+
+    <span class="org-keyword">return</span> 0;
+<span class="org-rainbow-delimiters-depth-1">}</span> <span class="org-comment-delimiter">// </span><span class="org-comment">--- End of main() ----// </span>
+
+
+</pre>
+</div>
+
+<p>
+Build: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">$ gcc unix-mmap.c -o <span class="org-keyword">unix-mmap-c.bin</span> -Wall -Wextra -g
+</pre>
+</div>
+
+<p>
+Running: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">$ ./unix-mmap-c.bin notepad.exe 
+ File signature = M Z 0x90 0x0 
+
+ ========= [DOS HEADER] =================
+   MAGIC NUMBER = 0x5A4D (hex) 
+   MAGIC NUMBER = M Z  (str) 
+       e_lfanew = 0xF8 
+
+ ======== [PE - Header] ================
+ Note: if machine is 0x8664 =&gt; the processor is AMD-Intel x86-64 
+
+          Signature = 0x4550 
+            Machine = 0x8664 
+ Number of sections = 7 
+
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-orgda2822c" class="outline-4">
+<h4 id="orgda2822c"><span class="section-number-4">1.9.3</span> Example (C++) - mmap for reading Windows PE32 files</h4>
+<div class="outline-text-4" id="text-1-9-3">
+<p>
+GIST: 
+</p>
+<ul class="org-ul">
+<li><a href="https://gist.github.com/166265f6dc85c8d9cc2dc00253caae78">https://gist.github.com/166265f6dc85c8d9cc2dc00253caae78</a></li>
+</ul>
+
+<p>
+File: unix-mmap.cpp 
 </p>
 
 <div class="org-src-container">
 <pre class="src src-cpp"><span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">iostream</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
-<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">string</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
-<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">iterator</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
-<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">iomanip</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
-<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">filesystem</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">string</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span> 
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">fstream</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span> 
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">cstdint</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span> 
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">cassert</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
 
-<span class="org-keyword">namespace</span> <span class="org-constant">fs</span> = <span class="org-constant">std</span>::filesystem;
+<span class="org-comment-delimiter">// </span><span class="org-comment">--- Unix/Posix headers ---------//</span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">unistd.h</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">sys/mman.h</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">sys/stat.h</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">fcntl.h</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
 
-<span class="org-keyword">template</span><span class="org-rainbow-delimiters-depth-1">&lt;</span><span class="org-keyword">typename</span> <span class="org-type">Range</span>, <span class="org-keyword">typename</span> <span class="org-type">Function</span><span class="org-rainbow-delimiters-depth-1">&gt;</span>
-<span class="org-keyword">auto</span> <span class="org-function-name">dotimes</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">size_t</span> <span class="org-variable-name">n</span>, <span class="org-type">Range</span>&amp;&amp; <span class="org-variable-name">iterable</span>, <span class="org-type">Function</span> <span class="org-variable-name">fun</span><span class="org-rainbow-delimiters-depth-1">)</span>
+<span class="org-keyword">constexpr</span> <span class="org-type">size_t</span> <span class="org-variable-name">IMAGE_SIZEOF_SHORT_NAME</span> = 8;
+<span class="org-keyword">constexpr</span> <span class="org-type">size_t</span> <span class="org-variable-name">IMAGE_NUMBEROF_DIRECTORY_ENTRIES</span> = 16;
+
+<span class="org-comment-delimiter">// </span><span class="org-comment">using LONG      = long;</span>
+<span class="org-keyword">using</span> <span class="org-type">LONG</span>      = <span class="org-constant">std</span>::int32_t;
+<span class="org-keyword">using</span> <span class="org-type">WORD</span>      = <span class="org-constant">std</span>::uint16_t;  <span class="org-comment-delimiter">// </span><span class="org-comment">unsigned short;</span>
+<span class="org-keyword">using</span> <span class="org-type">DWORD</span>     = <span class="org-constant">std</span>::uint32_t;  <span class="org-comment-delimiter">// </span><span class="org-comment">unsigned long; </span>
+<span class="org-keyword">using</span> <span class="org-type">BYTE</span>      = <span class="org-constant">std</span>::uint8_t;   <span class="org-comment-delimiter">//</span><span class="org-comment">unsigned char;</span>
+<span class="org-keyword">using</span> <span class="org-type">ULONGLONG</span> = <span class="org-constant">std</span>::uint64_t;  <span class="org-comment-delimiter">// </span><span class="org-comment">unsigned long long </span>
+
+<span class="org-comment-delimiter">// </span><span class="org-comment">Source: &lt;winttt.h&gt;  =&gt; Original: typedef struct _IMAGE_DOS_HEADER</span>
+<span class="org-keyword">struct</span> <span class="org-type">IMAGE_DOS_HEADER</span> <span class="org-rainbow-delimiters-depth-1">{</span>            
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_magic</span>;                     
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_cblp</span>;                   
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_cp</span>;                     
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_crlc</span>;                   
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_cparhdr</span>;                
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_minalloc</span>;               
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_maxalloc</span>;               
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_ss</span>;                     
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_sp</span>;                     
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_csum</span>;                   
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_ip</span>;                     
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_cs</span>;                     
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_lfarlc</span>;                 
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_ovno</span>;                   
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_res</span><span class="org-rainbow-delimiters-depth-2">[</span>4<span class="org-rainbow-delimiters-depth-2">]</span>;                 
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_oemid</span>;                  
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_oeminfo</span>;                
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_res2</span><span class="org-rainbow-delimiters-depth-2">[</span>10<span class="org-rainbow-delimiters-depth-2">]</span>;               
+    <span class="org-comment-delimiter">//  </span><span class="org-comment">Offset to the PE header from the beginning of the file. </span>
+    <span class="org-type">LONG</span>   <span class="org-variable-name">e_lfanew</span>;                    
+  <span class="org-rainbow-delimiters-depth-1">}</span>;
+
+ <span class="org-keyword">struct</span> <span class="org-type">PE_HEADER</span>
+ <span class="org-rainbow-delimiters-depth-1">{</span>
+    <span class="org-type">DWORD</span> <span class="org-variable-name">Signature</span>; 
+    <span class="org-type">WORD</span>  <span class="org-variable-name">Machine</span>;
+    <span class="org-type">WORD</span>  <span class="org-variable-name">NumberOfSections</span>;
+    <span class="org-type">DWORD</span> <span class="org-variable-name">TimeDateStamp</span>;
+    <span class="org-type">DWORD</span> <span class="org-variable-name">PointerToSymbolTable</span>;
+    <span class="org-type">DWORD</span> <span class="org-variable-name">NumberOfSymbols</span>;
+    <span class="org-type">WORD</span>  <span class="org-variable-name">SizeOfOptionalHeader</span>;
+    <span class="org-type">WORD</span>  <span class="org-variable-name">Characteristics</span>;
+ <span class="org-rainbow-delimiters-depth-1">}</span>;
+
+
+<span class="org-type">ssize_t</span> <span class="org-function-name">get_file_size</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">int</span> <span class="org-variable-name">fd</span><span class="org-rainbow-delimiters-depth-1">)</span>
 <span class="org-rainbow-delimiters-depth-1">{</span>
-    <span class="org-type">size_t</span> <span class="org-variable-name">i</span> = 0;
-    <span class="org-keyword">auto</span> <span class="org-variable-name">it</span> = <span class="org-constant">fs</span>::begin<span class="org-rainbow-delimiters-depth-2">(</span>iterable<span class="org-rainbow-delimiters-depth-2">)</span>;
-    <span class="org-keyword">auto</span> <span class="org-variable-name">end</span> = <span class="org-constant">fs</span>::end<span class="org-rainbow-delimiters-depth-2">(</span>iterable<span class="org-rainbow-delimiters-depth-2">)</span>;
-    <span class="org-keyword">while</span><span class="org-rainbow-delimiters-depth-2">(</span>i &lt; n &amp;&amp; it != end <span class="org-rainbow-delimiters-depth-2">){</span>
-            fun<span class="org-rainbow-delimiters-depth-3">(</span>it<span class="org-rainbow-delimiters-depth-3">)</span>;
-            ++it;
-            i++;
+    <span class="org-keyword">struct</span> <span class="org-type">stat</span> <span class="org-variable-name">file_stat</span>; 
+    <span class="org-keyword">if</span><span class="org-rainbow-delimiters-depth-2">(</span> fstat<span class="org-rainbow-delimiters-depth-3">(</span>fd, &amp;file_stat<span class="org-rainbow-delimiters-depth-3">)</span> == -1 <span class="org-rainbow-delimiters-depth-2">)</span>
+        <span class="org-keyword">throw</span> <span class="org-constant">std</span>::runtime_error<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">"Error: unable to get file size"</span><span class="org-rainbow-delimiters-depth-2">)</span>;
+    <span class="org-keyword">return</span> file_stat.st_size;
+<span class="org-rainbow-delimiters-depth-1">}</span>
+
+<span class="org-type">int</span> <span class="org-function-name">main</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">int</span> <span class="org-variable-name">argc</span>, <span class="org-type">char</span>** <span class="org-variable-name">argv</span><span class="org-rainbow-delimiters-depth-1">)</span>
+<span class="org-rainbow-delimiters-depth-1">{</span>   
+    <span class="org-comment-delimiter">// </span><span class="org-comment">----------- Validate arguments ----------------------------//</span>
+    <span class="org-keyword">if</span><span class="org-rainbow-delimiters-depth-2">(</span>argc &lt; 2<span class="org-rainbow-delimiters-depth-2">)</span>
+    <span class="org-rainbow-delimiters-depth-2">{</span>
+        <span class="org-constant">std</span>::fprintf<span class="org-rainbow-delimiters-depth-3">(</span>stderr, <span class="org-string">"Usage: /unix-mmap &lt;FILE&gt; \n"</span><span class="org-rainbow-delimiters-depth-3">)</span>;
+        <span class="org-keyword">return</span> EXIT_FAILURE;
     <span class="org-rainbow-delimiters-depth-2">}</span>
-<span class="org-rainbow-delimiters-depth-1">}</span>
 
-<span class="org-type">int</span> <span class="org-function-name">main</span><span class="org-rainbow-delimiters-depth-1">(){</span>
+    <span class="org-comment-delimiter">// </span><span class="org-comment">----------- Get file descriptor ----------------------------//</span>
 
-     <span class="org-constant">std</span>::cout &lt;&lt; <span class="org-constant">std</span>::boolalpha;
-     <span class="org-constant">std</span>::cout &lt;&lt; <span class="org-string">"\n ===== Listing directory /etc ====="</span> &lt;&lt; <span class="org-constant">std</span>::endl;
-     <span class="org-comment-delimiter">// </span><span class="org-comment">Show first 10 files of directory /etc </span>
-     dotimes<span class="org-rainbow-delimiters-depth-2">(</span>10, <span class="org-constant">fs</span>::directory_iterator<span class="org-rainbow-delimiters-depth-3">(</span><span class="org-string">"/etc"</span><span class="org-rainbow-delimiters-depth-3">)</span>,
-             <span class="org-rainbow-delimiters-depth-3">[](</span><span class="org-keyword">auto</span> <span class="org-variable-name">p</span><span class="org-rainbow-delimiters-depth-3">){</span>
-                  <span class="org-keyword">auto</span> <span class="org-variable-name">path</span> = p-&gt;path<span class="org-rainbow-delimiters-depth-4">()</span>;
-                  <span class="org-constant">std</span>::cout &lt;&lt; <span class="org-constant">std</span>::left
-                            &lt;&lt; <span class="org-constant">std</span>::setw<span class="org-rainbow-delimiters-depth-4">(</span>0<span class="org-rainbow-delimiters-depth-4">)</span> &lt;&lt; path.filename<span class="org-rainbow-delimiters-depth-4">()</span>.string<span class="org-rainbow-delimiters-depth-4">()</span>
-                            &lt;&lt; <span class="org-string">" "</span> &lt;&lt; <span class="org-constant">std</span>::setw<span class="org-rainbow-delimiters-depth-4">(</span>35<span class="org-rainbow-delimiters-depth-4">)</span>
-                            &lt;&lt; <span class="org-constant">std</span>::right &lt;&lt; <span class="org-constant">std</span>::setw<span class="org-rainbow-delimiters-depth-4">(</span>40<span class="org-rainbow-delimiters-depth-4">)</span> &lt;&lt; path
-                            &lt;&lt; <span class="org-constant">std</span>::endl;               
-             <span class="org-rainbow-delimiters-depth-3">}</span><span class="org-rainbow-delimiters-depth-2">)</span>;        
-     <span class="org-keyword">return</span> EXIT_SUCCESS;
-<span class="org-rainbow-delimiters-depth-1">}</span>
+    <span class="org-comment-delimiter">// </span><span class="org-comment">Get read-only file descriptor of file </span>
+    <span class="org-type">int</span> <span class="org-variable-name">fd</span> = open<span class="org-rainbow-delimiters-depth-2">(</span>argv<span class="org-rainbow-delimiters-depth-3">[</span>1<span class="org-rainbow-delimiters-depth-3">]</span>, O_RDONLY<span class="org-rainbow-delimiters-depth-2">)</span>;
+    <span class="org-keyword">if</span><span class="org-rainbow-delimiters-depth-2">(</span>fd == -1<span class="org-rainbow-delimiters-depth-2">){</span>
+        <span class="org-constant">std</span>::fprintf<span class="org-rainbow-delimiters-depth-3">(</span>stderr, <span class="org-string">" Error: unable to open file. check ERRNO variable \n"</span><span class="org-rainbow-delimiters-depth-3">)</span>;
+        <span class="org-keyword">return</span> EXIT_FAILURE;
+    <span class="org-rainbow-delimiters-depth-2">}</span>
+
+    <span class="org-type">ssize_t</span> <span class="org-variable-name">size</span> = get_file_size<span class="org-rainbow-delimiters-depth-2">(</span>fd<span class="org-rainbow-delimiters-depth-2">)</span>;
+
+    <span class="org-comment-delimiter">// </span><span class="org-comment">----------- Map file in to process' virtual memory ---------------------------//</span>
+
+    <span class="org-type">void</span>* <span class="org-variable-name">fmap</span> = mmap<span class="org-rainbow-delimiters-depth-2">(</span>    <span class="org-constant">nullptr</span>     <span class="org-comment-delimiter">/* </span><span class="org-comment">Often set to zero, aka nullpointer           */</span>
+                        , size        <span class="org-comment-delimiter">/* </span><span class="org-comment">Size of file mapping in bytes                */</span>
+                        , PROT_READ   <span class="org-comment-delimiter">/* </span><span class="org-comment">Open in read-only mode                       */</span>
+                        , MAP_PRIVATE <span class="org-comment-delimiter">/* </span><span class="org-comment">Only this process can access this memory-map */</span>
+                        , fd          <span class="org-comment-delimiter">/* </span><span class="org-comment">File descriptor of file to be memory mapped  */</span>
+                        , 0x00        <span class="org-comment-delimiter">/* </span><span class="org-comment">Offset from the beggining of the file        */</span>
+                     <span class="org-rainbow-delimiters-depth-2">)</span>;
+
+    <span class="org-keyword">if</span><span class="org-rainbow-delimiters-depth-2">(</span> fmap == MAP_FAILED<span class="org-rainbow-delimiters-depth-2">)</span>
+    <span class="org-rainbow-delimiters-depth-2">{</span>
+        <span class="org-constant">std</span>::fprintf<span class="org-rainbow-delimiters-depth-3">(</span>stderr, <span class="org-string">" Error: memory mapped failed. check ERRNO \n"</span><span class="org-rainbow-delimiters-depth-3">)</span>;
+        <span class="org-keyword">return</span> EXIT_FAILURE;
+    <span class="org-rainbow-delimiters-depth-2">}</span>
+
+    <span class="org-comment-delimiter">// </span><span class="org-comment">--------- Process file -----------------------------------------// </span>
+
+    <span class="org-keyword">const</span> <span class="org-keyword">auto</span> bmap = <span class="org-keyword">reinterpret_cast</span><span class="org-rainbow-delimiters-depth-2">&lt;</span><span class="org-type">unsigned</span> <span class="org-type">char</span>*<span class="org-rainbow-delimiters-depth-2">&gt;(</span>fmap<span class="org-rainbow-delimiters-depth-2">)</span>; 
+
+    <span class="org-comment-delimiter">// </span><span class="org-comment">char file_signature [2] = { bmap[0], bmap[1], bmap[2], bmap[3], 0x00 };</span>
+    <span class="org-constant">std</span>::printf<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">" File signature = %c %c 0x%X 0x%X \n"</span>, bmap<span class="org-rainbow-delimiters-depth-3">[</span>0<span class="org-rainbow-delimiters-depth-3">]</span>, bmap<span class="org-rainbow-delimiters-depth-3">[</span>1<span class="org-rainbow-delimiters-depth-3">]</span>, bmap<span class="org-rainbow-delimiters-depth-3">[</span>2<span class="org-rainbow-delimiters-depth-3">]</span>, bmap<span class="org-rainbow-delimiters-depth-3">[</span>3<span class="org-rainbow-delimiters-depth-3">]</span><span class="org-rainbow-delimiters-depth-2">)</span>;
+
+    <span class="org-type">IMAGE_DOS_HEADER</span>* <span class="org-variable-name">dos_header</span> = <span class="org-keyword">reinterpret_cast</span><span class="org-rainbow-delimiters-depth-2">&lt;</span><span class="org-type">IMAGE_DOS_HEADER</span>*<span class="org-rainbow-delimiters-depth-2">&gt;(</span>fmap<span class="org-rainbow-delimiters-depth-2">)</span>;
+    <span class="org-type">PE_HEADER</span>*        <span class="org-variable-name">pe_header</span>  = <span class="org-keyword">reinterpret_cast</span><span class="org-rainbow-delimiters-depth-2">&lt;</span><span class="org-type">PE_HEADER</span>*<span class="org-rainbow-delimiters-depth-2">&gt;(</span> <span class="org-rainbow-delimiters-depth-3">(</span><span class="org-type">uintptr_t</span><span class="org-rainbow-delimiters-depth-3">)</span> fmap + dos_header-&gt;e_lfanew<span class="org-rainbow-delimiters-depth-2">)</span>;
+
+    assert<span class="org-rainbow-delimiters-depth-2">(</span> pe_header-&gt;Signature == 0x4550 <span class="org-rainbow-delimiters-depth-2">)</span>;
+
+    <span class="org-constant">std</span>::printf<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">"\n ========= [DOS HEADER] =================\n"</span><span class="org-rainbow-delimiters-depth-2">)</span>;
+    <span class="org-constant">std</span>::printf<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">"   MAGIC NUMBER = 0x%X (hex) \n"</span>, dos_header-&gt;e_magic<span class="org-rainbow-delimiters-depth-2">)</span>;
+    <span class="org-constant">std</span>::printf<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">"   MAGIC NUMBER = %c %c  (str) \n"</span>, dos_header-&gt;e_magic &amp; 0xFF, <span class="org-rainbow-delimiters-depth-3">(</span>dos_header-&gt;e_magic &gt;&gt; 8<span class="org-rainbow-delimiters-depth-3">)</span> &amp; 0xFF<span class="org-rainbow-delimiters-depth-2">)</span>;
+    <span class="org-constant">std</span>::printf<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">"       e_lfanew = 0x%X \n"</span>,      dos_header-&gt;e_lfanew<span class="org-rainbow-delimiters-depth-2">)</span>;
+
+    <span class="org-constant">std</span>::printf<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">"\n ======== [PE - Header] ================\n"</span><span class="org-rainbow-delimiters-depth-2">)</span>;
+    <span class="org-constant">std</span>::printf<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">" Note: if machine is 0x8664 =&gt; the processor is AMD-Intel x86-64 \n"</span><span class="org-rainbow-delimiters-depth-2">)</span>;
+    <span class="org-constant">std</span>::printf<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">"\n"</span><span class="org-rainbow-delimiters-depth-2">)</span>;
+    <span class="org-constant">std</span>::printf<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">"          Signature = 0x%X \n"</span>, pe_header-&gt;Signature<span class="org-rainbow-delimiters-depth-2">)</span>;
+    <span class="org-constant">std</span>::printf<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">"            Machine = 0x%X \n"</span>, pe_header-&gt;Machine<span class="org-rainbow-delimiters-depth-2">)</span>;
+    <span class="org-constant">std</span>::printf<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">" Number of sections = %d \n"</span>,   pe_header-&gt;NumberOfSections<span class="org-rainbow-delimiters-depth-2">)</span>;
+
+
+    <span class="org-comment-delimiter">// </span><span class="org-comment">---------- Release Resource ------------------------------------// </span>
+
+    <span class="org-comment-delimiter">// </span><span class="org-comment">Unmap memory segment </span>
+    munmap<span class="org-rainbow-delimiters-depth-2">(</span>fmap, size<span class="org-rainbow-delimiters-depth-2">)</span>;
+    <span class="org-comment-delimiter">// </span><span class="org-comment">Release file-descriptor resource</span>
+    close<span class="org-rainbow-delimiters-depth-2">(</span>fd<span class="org-rainbow-delimiters-depth-2">)</span>;
+
+    <span class="org-keyword">return</span> 0;
+<span class="org-rainbow-delimiters-depth-1">}</span> <span class="org-comment-delimiter">// </span><span class="org-comment">--- End of main() ----// </span>
+
+
 </pre>
 </div>
 
 <p>
-<b>Steps for reproducing the problem</b> 
-</p>
-
-<p>
-STEP 1: Get current machine infomation. 
-</p>
-
-<ul class="org-ul">
-<li>GLIBC Version is: 2.34-2.fc32</li>
-</ul>
-
-<div class="org-src-container">
-<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">Current machine </span>
-$ cat /etc/fedora-release 
-Fedora release 32 (Thirty Two)
-
-<span class="org-comment-delimiter"># </span><span class="org-comment">Current GLIBC Version </span>
-$ ld --version
-GNU ld version 2.34-2.fc32
-... ... ... ... 
-</pre>
-</div>
-
-<p>
-STEP 2: Build the application. 
-</p>
-
-<div class="org-src-container">
-<pre class="src src-sh">$ git clone https://gist.github.com/0557cd0fa1d5370723b015e443a7c036 gist &amp;&amp; <span class="org-builtin">cd</span> gist 
-$ cmake --config Debug -H. -B_build1
-$ cmake --build _build1 --target 
-
-$ file _build1/filesys 
-<span class="org-function-name">_build1/filesys</span>: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked, 
-interpreter /lib64/ld-linux-x86-64.so.2, <span class="org-variable-name">BuildID</span>[sha1]=d1a3628f794c66bcfb29303cfa4a528910f4e3e2
-, for GNU/Linux 3.2.0, not stripped
-</pre>
-</div>
-
-<p>
-STEP 3: Run in the current machine (newer version of GLIBC)
-</p>
-
-<div class="org-src-container">
-<pre class="src src-sh">$ _build1/filesys 
-
- ===== Listing directory /etc =====
-chrony.conf                       <span class="org-string">"/etc/chrony.conf"</span>
-xl2tpd                            <span class="org-string">"/etc/xl2tpd"</span>
-group                             <span class="org-string">"/etc/group"</span>
-profile.d                         <span class="org-string">"/etc/profile.d"</span>
-kde4rc                            <span class="org-string">"/etc/kde4rc"</span>
-resolv.conf.8LUAL0                <span class="org-string">"/etc/resolv.conf.8LUAL0"</span>
-geoclue                           <span class="org-string">"/etc/geoclue"</span>
-bash_completion.d                 <span class="org-string">"/etc/bash_completion.d"</span>
-cups                              <span class="org-string">"/etc/cups"</span>
-mime.types                        <span class="org-string">"/etc/mime.types"</span>
-</pre>
-</div>
-
-<p>
-STEP 4: Attempt to run the binary in a distribution using an older
-version of GLIBC. The distribution used was a QEMU-KVM virtual
-machine running MX-Linux 19.2, distribution based on Debian, with
-GLIBC version .
+Building: 
 </p>
 
 <div class="org-src-container">
-<pre class="src src-sh"><span class="org-comment-delimiter">#</span><span class="org-comment">---------- Failure ------------------------------------#</span>
- $ _build1/filesys 
- _build1/filesys: /lib/x86_64-linux-gnu/libstdc++.so.6: version 
-  <span class="org-sh-quoted-exec">`GLIBCXX_3.4.26' not found (required by _build1/filesys)</span>
+<pre class="src src-sh">$ clang++ unix-mmap.cpp -o <span class="org-keyword">unix-mmap.bin</span> -std=c++1z -Wall -Wextra -g
+</pre>
+</div>
 
-<span class="org-sh-quoted-exec"> #----------- Machine Info (MX Linux 19.2) -------------#</span>
-<span class="org-sh-quoted-exec"> # Kernel version </span>
-<span class="org-sh-quoted-exec"> $ uname -r</span>
-<span class="org-sh-quoted-exec"> 4.19.0-9-amd64</span>
+<p>
+Running: 
+</p>
 
-<span class="org-sh-quoted-exec"> # Distro name </span>
-<span class="org-sh-quoted-exec"> $ cat /etc/issue </span>
-<span class="org-sh-quoted-exec"> Welcome to MX 19.2 (patito feo) 64-bit! Powered by Debian.</span>
-<span class="org-sh-quoted-exec"> ... ... ... ... ............ .... ... ... .. </span>
+<div class="org-src-container">
+<pre class="src src-sh">$ ./unix-mmap.bin ipconfig.exe 
+ File signature = M Z 0x90 0x0 
 
-<span class="org-sh-quoted-exec"> $ ld --version</span>
-<span class="org-sh-quoted-exec"> GNU ld (GNU Binutils for Debian) 2.31.1</span>
-<span class="org-sh-quoted-exec"> ... ... ... ... ... ... ... ... ... ... ... ... </span>
+ ========= [DOS HEADER] =================
+   MAGIC NUMBER = 0x5A4D (hex) 
+   MAGIC NUMBER = M Z  (str) 
+       e_lfanew = 0xE8 
+
+ ======== [PE - Header] ================
+ Note: if machine is 0x8664 =&gt; the processor is AMD-Intel x86-64 
+
+          Signature = 0x4550 
+            Machine = 0x8664 
+ Number of sections = 6 
+
+
+$ ./unix-mmap.bin notepad.exe 
+ File signature = M Z 0x90 0x0 
+
+ ========= [DOS HEADER] =================
+   MAGIC NUMBER = 0x5A4D (hex) 
+   MAGIC NUMBER = M Z  (str) 
+       e_lfanew = 0xF8 
+
+ ======== [PE - Header] ================
+ Note: if machine is 0x8664 =&gt; the processor is AMD-Intel x86-64 
+
+          Signature = 0x4550 
+            Machine = 0x8664 
+ Number of sections = 7 
 </pre>
 </div>
 </div>
 </div>
-<div id="outline-container-org0513074" class="outline-4">
-<h4 id="org0513074"><span class="section-number-4">1.8.3</span> Solution 1 - via linking against older GLIBC</h4>
-<div class="outline-text-4" id="text-1-8-3">
+<div id="outline-container-org98d61b2" class="outline-4">
+<h4 id="org98d61b2"><span class="section-number-4">1.9.4</span> Example (C++) - mmap for reading Windows PE32 with class</h4>
+<div class="outline-text-4" id="text-1-9-4">
 <p>
-As GLIBC is <span class="underline">forward compatible</span>, but not <span class="underline">backward compatible</span>. The
-solution for this issue is to build the application on a <span class="underline">system</span> with
-the oldest possible version of GLIBC. System in this context, means: a
-Linux virtual machine; a Chroot environment; or Docker image with an
-older version of GLIBC. Other alternative is to replace GLIBC with
-<span class="underline">MUSL</span> CRT (C Runtime library), but the drawback is that MUSL does not
-support dynamic loading (_dlopen_, <span class="underline">dlsym</span> APIs). 
+This code uses a class FileMapping for encapsulating Unix
+memory-mapped files which simplifies the usage of the mmap feature and
+makes the code cleaner and safer. 
 </p>
 
 <p>
-The solution adopted for solving this issue was to use a Docker image
-based on <a href="https://github.com/phusion/holy-build-box">holy-build-box</a>, which is a Docker image based on Centos 6
-Linux distribution containing a modern version of GCC compiler, CMake
-and an older version of GLIBC.
-</p>
-
-<p>
-See: 
+GIST: 
 </p>
 <ul class="org-ul">
-<li><a href="https://github.com/phusion/holy-build-box">https://github.com/phusion/holy-build-box</a></li>
+<li><a href="https://gist.github.com/166265f6dc85c8d9cc2dc00253caae78">https://gist.github.com/166265f6dc85c8d9cc2dc00253caae78</a></li>
 </ul>
 
 <p>
-<span class="underline">File: Dockerfile</span> (Available at <a href="https://gist.github.com/0557cd0fa1d5370723b015e443a7c036">gist url</a>)
+File: unix-mmap-class.cpp 
 </p>
 
 <div class="org-src-container">
-<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">$ docker run -it --rm -v $PWD:/work -w /work phusion/holy-build-box-64:latest bash </span>
-FROM phusion/holy-build-box-64:latest
+<pre class="src src-cpp"><span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">iostream</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">string</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span> 
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">fstream</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span> 
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">cstdint</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span> 
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">cassert</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
 
-ENTRYPOINT [ <span class="org-string">"/hbb_exe/activate-exec"</span>, <span class="org-string">"bash"</span>  ]
+<span class="org-comment-delimiter">// </span><span class="org-comment">--- Unix/Posix headers ---------//</span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">unistd.h</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">sys/mman.h</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">sys/stat.h</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">fcntl.h</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+
+<span class="org-keyword">constexpr</span> <span class="org-type">size_t</span> <span class="org-variable-name">IMAGE_SIZEOF_SHORT_NAME</span> = 8;
+<span class="org-keyword">constexpr</span> <span class="org-type">size_t</span> <span class="org-variable-name">IMAGE_NUMBEROF_DIRECTORY_ENTRIES</span> = 16;
+
+<span class="org-comment-delimiter">// </span><span class="org-comment">using LONG      = long;</span>
+<span class="org-keyword">using</span> <span class="org-type">LONG</span>      = <span class="org-constant">std</span>::int32_t;
+<span class="org-keyword">using</span> <span class="org-type">WORD</span>      = <span class="org-constant">std</span>::uint16_t;  <span class="org-comment-delimiter">// </span><span class="org-comment">unsigned short;</span>
+<span class="org-keyword">using</span> <span class="org-type">DWORD</span>     = <span class="org-constant">std</span>::uint32_t;  <span class="org-comment-delimiter">// </span><span class="org-comment">unsigned long; </span>
+<span class="org-keyword">using</span> <span class="org-type">BYTE</span>      = <span class="org-constant">std</span>::uint8_t;   <span class="org-comment-delimiter">//</span><span class="org-comment">unsigned char;</span>
+<span class="org-keyword">using</span> <span class="org-type">ULONGLONG</span> = <span class="org-constant">std</span>::uint64_t;  <span class="org-comment-delimiter">// </span><span class="org-comment">unsigned long long </span>
+
+<span class="org-comment-delimiter">// </span><span class="org-comment">Source: &lt;winttt.h&gt;  =&gt; Original: typedef struct _IMAGE_DOS_HEADER</span>
+<span class="org-keyword">struct</span> <span class="org-type">IMAGE_DOS_HEADER</span> <span class="org-rainbow-delimiters-depth-1">{</span>            
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_magic</span>;                     
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_cblp</span>;                   
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_cp</span>;                     
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_crlc</span>;                   
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_cparhdr</span>;                
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_minalloc</span>;               
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_maxalloc</span>;               
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_ss</span>;                     
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_sp</span>;                     
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_csum</span>;                   
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_ip</span>;                     
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_cs</span>;                     
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_lfarlc</span>;                 
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_ovno</span>;                   
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_res</span><span class="org-rainbow-delimiters-depth-2">[</span>4<span class="org-rainbow-delimiters-depth-2">]</span>;                 
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_oemid</span>;                  
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_oeminfo</span>;                
+    <span class="org-type">WORD</span>   <span class="org-variable-name">e_res2</span><span class="org-rainbow-delimiters-depth-2">[</span>10<span class="org-rainbow-delimiters-depth-2">]</span>;               
+    <span class="org-comment-delimiter">//  </span><span class="org-comment">Offset to the PE header from the beginning of the file. </span>
+    <span class="org-type">LONG</span>   <span class="org-variable-name">e_lfanew</span>;                    
+  <span class="org-rainbow-delimiters-depth-1">}</span>;
+
+ <span class="org-keyword">struct</span> <span class="org-type">PE_HEADER</span>
+ <span class="org-rainbow-delimiters-depth-1">{</span>
+    <span class="org-type">DWORD</span> <span class="org-variable-name">Signature</span>; 
+    <span class="org-type">WORD</span>  <span class="org-variable-name">Machine</span>;
+    <span class="org-type">WORD</span>  <span class="org-variable-name">NumberOfSections</span>;
+    <span class="org-type">DWORD</span> <span class="org-variable-name">TimeDateStamp</span>;
+    <span class="org-type">DWORD</span> <span class="org-variable-name">PointerToSymbolTable</span>;
+    <span class="org-type">DWORD</span> <span class="org-variable-name">NumberOfSymbols</span>;
+    <span class="org-type">WORD</span>  <span class="org-variable-name">SizeOfOptionalHeader</span>;
+    <span class="org-type">WORD</span>  <span class="org-variable-name">Characteristics</span>;
+ <span class="org-rainbow-delimiters-depth-1">}</span>;
+
+<span class="org-comment-delimiter">/** </span><span class="org-comment">Class for encapsulating memory mapped files*/</span>
+<span class="org-keyword">class</span> <span class="org-type">FileMapping</span>
+<span class="org-rainbow-delimiters-depth-1">{</span>
+    <span class="org-type">int</span>   <span class="org-variable-name">m_fd</span>      = -1; 
+    <span class="org-type">void</span>* <span class="org-variable-name">m_addr</span>    = <span class="org-constant">nullptr</span>; 
+    <span class="org-type">ssize_t</span> <span class="org-variable-name">m_size</span>  = -1;
+
+    <span class="org-type">ssize_t</span> <span class="org-function-name">get_file_size</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">int</span> <span class="org-variable-name">fd</span><span class="org-rainbow-delimiters-depth-2">)</span>
+    <span class="org-rainbow-delimiters-depth-2">{</span>
+        <span class="org-keyword">struct</span> <span class="org-type">stat</span> <span class="org-variable-name">file_stat</span>; 
+        <span class="org-keyword">if</span><span class="org-rainbow-delimiters-depth-3">(</span> fstat<span class="org-rainbow-delimiters-depth-4">(</span>fd, &amp;file_stat<span class="org-rainbow-delimiters-depth-4">)</span> == -1 <span class="org-rainbow-delimiters-depth-3">)</span>
+            <span class="org-keyword">throw</span> <span class="org-constant">std</span>::runtime_error<span class="org-rainbow-delimiters-depth-3">(</span><span class="org-string">"Error: unable to get file size"</span><span class="org-rainbow-delimiters-depth-3">)</span>;
+        <span class="org-keyword">return</span> file_stat.st_size;
+    <span class="org-rainbow-delimiters-depth-2">}</span>
+
+<span class="org-function-name">public</span>: 
+    <span class="org-comment-delimiter">// </span><span class="org-comment">Disable copy constructor </span>
+    <span class="org-function-name">FileMapping</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">FileMapping</span> <span class="org-keyword">const</span>&amp;<span class="org-rainbow-delimiters-depth-2">)</span> = <span class="org-keyword">delete</span>;
+    <span class="org-comment-delimiter">// </span><span class="org-comment">Disable copy assignment operator </span>
+    <span class="org-type">FileMapping</span>&amp; <span class="org-keyword">operator</span><span class="org-function-name">=</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">FileMapping</span> <span class="org-keyword">const</span>&amp;<span class="org-rainbow-delimiters-depth-2">)</span> = <span class="org-keyword">delete</span>;    
+
+    <span class="org-comment-delimiter">/** </span>
+<span class="org-comment">     * @param file_path - File to be memory-mapped to current process. </span>
+<span class="org-comment">     */</span>
+    <span class="org-function-name">FileMapping</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-constant">std</span>::<span class="org-type">string</span> <span class="org-variable-name">file_path</span><span class="org-rainbow-delimiters-depth-2">)</span>
+    <span class="org-rainbow-delimiters-depth-2">{</span>
+        <span class="org-comment-delimiter">// </span><span class="org-comment">Get read-only file descriptor of file </span>
+        m_fd = open<span class="org-rainbow-delimiters-depth-3">(</span>file_path.c_str<span class="org-rainbow-delimiters-depth-4">()</span>, O_RDONLY<span class="org-rainbow-delimiters-depth-3">)</span>;        
+        <span class="org-keyword">if</span><span class="org-rainbow-delimiters-depth-3">(</span>m_fd == -1<span class="org-rainbow-delimiters-depth-3">){</span>
+            <span class="org-keyword">throw</span> <span class="org-constant">std</span>::runtime_error<span class="org-rainbow-delimiters-depth-4">(</span><span class="org-string">"Unable to open file"</span><span class="org-rainbow-delimiters-depth-4">)</span>;
+        <span class="org-rainbow-delimiters-depth-3">}</span>      
+
+        m_size = get_file_size<span class="org-rainbow-delimiters-depth-3">(</span>m_fd<span class="org-rainbow-delimiters-depth-3">)</span>;
+        <span class="org-keyword">if</span><span class="org-rainbow-delimiters-depth-3">(</span>m_size == -1<span class="org-rainbow-delimiters-depth-3">)</span>
+            <span class="org-keyword">throw</span> <span class="org-constant">std</span>::runtime_error<span class="org-rainbow-delimiters-depth-3">(</span><span class="org-string">"Unable to get file size"</span><span class="org-rainbow-delimiters-depth-3">)</span>;
+
+
+        m_addr = ::mmap<span class="org-rainbow-delimiters-depth-3">(</span> <span class="org-constant">nullptr</span>     
+                        , m_size       
+                        , PROT_READ   
+                        , MAP_PRIVATE 
+                        , m_fd        
+                        , 0x00        
+                    <span class="org-rainbow-delimiters-depth-3">)</span>;
+        <span class="org-keyword">if</span><span class="org-rainbow-delimiters-depth-3">(</span> m_addr == MAP_FAILED<span class="org-rainbow-delimiters-depth-3">)</span>
+        <span class="org-rainbow-delimiters-depth-3">{</span>
+            <span class="org-keyword">throw</span> <span class="org-constant">std</span>::runtime_error<span class="org-rainbow-delimiters-depth-4">(</span><span class="org-string">"Error: failed to map file to memory"</span><span class="org-rainbow-delimiters-depth-4">)</span>;
+        <span class="org-rainbow-delimiters-depth-3">}</span>
+
+    <span class="org-rainbow-delimiters-depth-2">}</span>
+
+    ~<span class="org-function-name">FileMapping</span><span class="org-rainbow-delimiters-depth-2">()</span>
+    <span class="org-rainbow-delimiters-depth-2">{</span>
+        <span class="org-comment-delimiter">// </span><span class="org-comment">Unmap memory segment </span>
+        munmap<span class="org-rainbow-delimiters-depth-3">(</span>m_addr, m_size<span class="org-rainbow-delimiters-depth-3">)</span>;
+        <span class="org-comment-delimiter">// </span><span class="org-comment">Release file-descriptor resource</span>
+        close<span class="org-rainbow-delimiters-depth-3">(</span>m_fd<span class="org-rainbow-delimiters-depth-3">)</span>;
+
+        m_fd = -1;
+        m_addr = <span class="org-constant">nullptr</span>;
+        m_size = -1;
+    <span class="org-rainbow-delimiters-depth-2">}</span>
+
+    <span class="org-comment-delimiter">/** </span><span class="org-comment">@brief Returns pointer file mapping address. */</span>
+    <span class="org-type">void</span>* <span class="org-function-name">addr</span><span class="org-rainbow-delimiters-depth-2">()</span> <span class="org-keyword">const</span> <span class="org-rainbow-delimiters-depth-2">{</span> <span class="org-keyword">return</span> m_addr; <span class="org-rainbow-delimiters-depth-2">}</span>  
+
+    <span class="org-comment-delimiter">/** </span><span class="org-comment">@brief  Get casted pointer to an offset of the file mapping address. */</span>
+    <span class="org-keyword">template</span><span class="org-rainbow-delimiters-depth-2">&lt;</span><span class="org-keyword">typename</span> <span class="org-type">T</span><span class="org-rainbow-delimiters-depth-2">&gt;</span>
+    <span class="org-type">T</span> <span class="org-function-name">addr_rel</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-constant">std</span>::<span class="org-type">ptrdiff_t</span> <span class="org-variable-name">offset</span><span class="org-rainbow-delimiters-depth-2">)</span> <span class="org-keyword">const</span> <span class="org-rainbow-delimiters-depth-2">{</span> 
+        <span class="org-keyword">return</span> <span class="org-keyword">reinterpret_cast</span><span class="org-rainbow-delimiters-depth-3">&lt;</span><span class="org-type">T</span><span class="org-rainbow-delimiters-depth-3">&gt;(</span> <span class="org-keyword">reinterpret_cast</span><span class="org-rainbow-delimiters-depth-4">&lt;</span><span class="org-type">uintptr_t</span><span class="org-rainbow-delimiters-depth-4">&gt;(</span>m_addr<span class="org-rainbow-delimiters-depth-4">)</span> + offset<span class="org-rainbow-delimiters-depth-3">)</span>;  
+    <span class="org-rainbow-delimiters-depth-2">}</span>
+
+<span class="org-rainbow-delimiters-depth-1">}</span>; <span class="org-comment-delimiter">// </span><span class="org-comment">--- End of class FileMapping ---- //</span>
+
+
+<span class="org-type">int</span> <span class="org-function-name">main</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">int</span> <span class="org-variable-name">argc</span>, <span class="org-type">char</span>** <span class="org-variable-name">argv</span><span class="org-rainbow-delimiters-depth-1">)</span>
+<span class="org-rainbow-delimiters-depth-1">{</span>   
+    <span class="org-comment-delimiter">// </span><span class="org-comment">----------- Validate arguments ----------------------------//</span>
+    <span class="org-keyword">if</span><span class="org-rainbow-delimiters-depth-2">(</span>argc &lt; 2<span class="org-rainbow-delimiters-depth-2">)</span>
+    <span class="org-rainbow-delimiters-depth-2">{</span>
+        <span class="org-constant">std</span>::fprintf<span class="org-rainbow-delimiters-depth-3">(</span>stderr, <span class="org-string">"Usage: /unix-mmap &lt;FILE&gt; \n"</span><span class="org-rainbow-delimiters-depth-3">)</span>;
+        <span class="org-keyword">return</span> EXIT_FAILURE;
+    <span class="org-rainbow-delimiters-depth-2">}</span>
+
+    <span class="org-type">FileMapping</span> <span class="org-variable-name">fmap</span><span class="org-rainbow-delimiters-depth-2">(</span>argv<span class="org-rainbow-delimiters-depth-3">[</span>1<span class="org-rainbow-delimiters-depth-3">]</span><span class="org-rainbow-delimiters-depth-2">)</span>;
+
+    <span class="org-comment-delimiter">// </span><span class="org-comment">--------- Process file -----------------------------------------// </span>
+
+    <span class="org-keyword">const</span> <span class="org-keyword">auto</span> bmap = fmap.addr_rel<span class="org-rainbow-delimiters-depth-2">&lt;</span><span class="org-type">unsigned</span> <span class="org-type">char</span>*<span class="org-rainbow-delimiters-depth-2">&gt;(</span>0x00<span class="org-rainbow-delimiters-depth-2">)</span>;
+
+    <span class="org-comment-delimiter">// </span><span class="org-comment">char file_signature [2] = { bmap[0], bmap[1], bmap[2], bmap[3], 0x00 };</span>
+    <span class="org-constant">std</span>::printf<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">" File signature = %c %c 0x%X 0x%X \n"</span>, bmap<span class="org-rainbow-delimiters-depth-3">[</span>0<span class="org-rainbow-delimiters-depth-3">]</span>, bmap<span class="org-rainbow-delimiters-depth-3">[</span>1<span class="org-rainbow-delimiters-depth-3">]</span>, bmap<span class="org-rainbow-delimiters-depth-3">[</span>2<span class="org-rainbow-delimiters-depth-3">]</span>, bmap<span class="org-rainbow-delimiters-depth-3">[</span>3<span class="org-rainbow-delimiters-depth-3">]</span><span class="org-rainbow-delimiters-depth-2">)</span>;
+
+    <span class="org-type">IMAGE_DOS_HEADER</span>* <span class="org-variable-name">dos_header</span> = fmap.addr_rel<span class="org-rainbow-delimiters-depth-2">&lt;</span><span class="org-type">IMAGE_DOS_HEADER</span>*<span class="org-rainbow-delimiters-depth-2">&gt;(</span>0x00<span class="org-rainbow-delimiters-depth-2">)</span>;
+    <span class="org-type">PE_HEADER</span>*        <span class="org-variable-name">pe_header</span>  = fmap.addr_rel<span class="org-rainbow-delimiters-depth-2">&lt;</span><span class="org-type">PE_HEADER</span>*<span class="org-rainbow-delimiters-depth-2">&gt;(</span> dos_header-&gt;e_lfanew<span class="org-rainbow-delimiters-depth-2">)</span>;
+
+    assert<span class="org-rainbow-delimiters-depth-2">(</span> pe_header-&gt;Signature == 0x4550 <span class="org-rainbow-delimiters-depth-2">)</span>;
+
+    <span class="org-constant">std</span>::printf<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">"\n ========= [DOS HEADER] =================\n"</span><span class="org-rainbow-delimiters-depth-2">)</span>;
+    <span class="org-constant">std</span>::printf<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">"   MAGIC NUMBER = 0x%X (hex) \n"</span>, dos_header-&gt;e_magic<span class="org-rainbow-delimiters-depth-2">)</span>;
+    <span class="org-constant">std</span>::printf<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">"   MAGIC NUMBER = %c %c  (str) \n"</span>, dos_header-&gt;e_magic &amp; 0xFF, <span class="org-rainbow-delimiters-depth-3">(</span>dos_header-&gt;e_magic &gt;&gt; 8<span class="org-rainbow-delimiters-depth-3">)</span> &amp; 0xFF<span class="org-rainbow-delimiters-depth-2">)</span>;
+    <span class="org-constant">std</span>::printf<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">"       e_lfanew = 0x%X \n"</span>,      dos_header-&gt;e_lfanew<span class="org-rainbow-delimiters-depth-2">)</span>;
+
+    <span class="org-constant">std</span>::printf<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">"\n ======== [PE - Header] ================\n"</span><span class="org-rainbow-delimiters-depth-2">)</span>;
+    <span class="org-constant">std</span>::printf<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">" Note: if machine is 0x8664 =&gt; the processor is AMD-Intel x86-64 \n"</span><span class="org-rainbow-delimiters-depth-2">)</span>;
+    <span class="org-constant">std</span>::printf<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">"\n"</span><span class="org-rainbow-delimiters-depth-2">)</span>;
+    <span class="org-constant">std</span>::printf<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">"          Signature = 0x%X \n"</span>, pe_header-&gt;Signature<span class="org-rainbow-delimiters-depth-2">)</span>;
+    <span class="org-constant">std</span>::printf<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">"            Machine = 0x%X \n"</span>, pe_header-&gt;Machine<span class="org-rainbow-delimiters-depth-2">)</span>;
+    <span class="org-constant">std</span>::printf<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">" Number of sections = %d \n"</span>,   pe_header-&gt;NumberOfSections<span class="org-rainbow-delimiters-depth-2">)</span>;
+
+    <span class="org-keyword">return</span> 0;
+<span class="org-rainbow-delimiters-depth-1">}</span> <span class="org-comment-delimiter">// </span><span class="org-comment">--- End of main() ----// </span>
+
+
 </pre>
 </div>
 
 <p>
-Build docker image: 
+Building: 
 </p>
 
 <div class="org-src-container">
-<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">Run at the directory where is Dockerfile </span>
-$ docker build -f Dockerfile -t linux-build . 
+<pre class="src src-sh">$ g++ unix-mmap-class.cpp -o <span class="org-keyword">unix-mmap-class.bin</span> -std=c++1z -g -Wall -Wextra
 </pre>
 </div>
 
 <p>
-Enter in the docker image shell: 
+Running: 
 </p>
 
 <div class="org-src-container">
-<pre class="src src-sh">$ docker run --rm -it -v $<span class="org-variable-name">PWD</span>:/cwd -w /cwd linux-build 
-Holy build box activated
-<span class="org-function-name">Prefix</span>: /hbb_exe
-<span class="org-function-name">CFLAGS/CXXFLAGS</span>: -g -O2 -fvisibility=hidden -I/hbb_exe/include 
-<span class="org-function-name">LDFLAGS</span>: -L/hbb_exe/lib -static-libstdc++
-<span class="org-function-name">STATICLIB_CFLAGS</span>: -g -O2 -fvisibility=hidden -I/hbb_exe/include 
-<span class="org-function-name">SHLIB_CFLAGS</span>: -g -O2 -fvisibility=hidden -I/hbb_exe/include 
-<span class="org-function-name">SHLIB_LDFLAGS</span>: -L/hbb_exe/lib -static-libstdc++
+<pre class="src src-sh">$ ./unix-mmap-class.bin notepad.exe 
+ File signature = M Z 0x90 0x0 
 
-[root@88c9630a2008 cwd]# ls
-_build1  CMakeLists.txt   Dockerfile   filesys.cpp   Makefile
-</pre>
-</div>
+ ========= [DOS HEADER] =================
+   MAGIC NUMBER = 0x5A4D (hex) 
+   MAGIC NUMBER = M Z  (str) 
+       e_lfanew = 0xF8 
 
-<p>
-Build the application: 
-</p>
+ ======== [PE - Header] ================
+ Note: if machine is 0x8664 =&gt; the processor is AMD-Intel x86-64 
 
-<div class="org-src-container">
-<pre class="src src-sh">[root@88c9630a2008 cwd]# make 
-cmake --config Debug -H. -B_build2
--- Configuring done
--- Generating done
--- Build files have been written to: /cwd/_build2
-cmake --build _build2 --target 
-<span class="org-function-name">gmake</span>[<span class="org-compilation-line-number">1</span>]: Entering directory <span class="org-string">'/cwd/_build2'</span>
-/hbb/bin/cmake -S/cwd -B/cwd/_build2 --check-build-system CMakeFiles/Makefile.cmake 0
-... ... ... ... ... ... ... ... ... 
-... ... ... ... ... ... ... ... ... ... ... ... 
-
-[root@88c9630a2008 cwd]# ls _build2
-CMakeCache.txt  CMakeFiles  cmake_install.cmake  filesys  Makefile
-</pre>
-</div>
-
-<p>
-Run the application _build2/filesys in MX-Linux: 
-</p>
-
-<div class="org-src-container">
-<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">Built on Fedora 32 with newer version of GLIBC [FAILURE]</span>
-$ _build1/filesys
-<span class="org-function-name">_build1/filesys</span>: /lib/x86_64-linux-gnu/libstdc++.so.6: 
-version <span class="org-string">'GLIBCXX_3.4.26'</span> not found (required by _build1/filesys)
-
-
-<span class="org-comment-delimiter"># </span><span class="org-comment">Built on Centos6 docker with older version of GLIBC [OK, WORKS]</span>
-<span class="org-comment-delimiter">#</span><span class="org-comment">--------------------------------------</span>
-$ _build2/filesys
-
- ===== Listing directory /etc =====
-.java                             <span class="org-string">"/etc/.java"</span>
-.pwd.lock                         <span class="org-string">"/etc/.pwd.lock"</span>
-ImageMagick-6                     <span class="org-string">"/etc/ImageMagick-6"</span>
-NetworkManager                    <span class="org-string">"/etc/NetworkManager"</span>
-UPower                            <span class="org-string">"/etc/UPower"</span>
-X11                               <span class="org-string">"/etc/X11"</span>
-acpi                              <span class="org-string">"/etc/acpi"</span>
-adduser.conf                      <span class="org-string">"/etc/adduser.conf"</span>
-adjtime                           <span class="org-string">"/etc/adjtime"</span>
-alsa                              <span class="org-string">"/etc/alsa"</span>
-</pre>
-</div>
-</div>
-</div>
-<div id="outline-container-orge33624a" class="outline-4">
-<h4 id="orge33624a"><span class="section-number-4">1.8.4</span> Solution 2 - via linking against MUSL</h4>
-<div class="outline-text-4" id="text-1-8-4">
-<p>
-Other alternative to avoid the GLIBC dependency problem is to build
-the application statically linking against <a href="https://www.musl-libc.org/">MUSL - LibC</a> which is an CRT
-(C runtime library), initially developed for embedded systems, but that has
-become an alternative to GLIBC. The easiest way to build statically
-linking against MUSL is to use an Alpine docker image: 
-</p>
-
-<ul class="org-ul">
-<li>Note: CRT - is a central component of Unix-like operating
-systems. It encapsulates system-calls and other operating system
-services for user-space applications.</li>
-</ul>
-
-<p>
-See: 
-</p>
-<ul class="org-ul">
-<li><a href="https://en.wikipedia.org/wiki/Musl">Musl - Wikipedia</a></li>
-<li><a href="https://wiki.debian.org/musl">Musl - Debian</a></li>
-<li><a href="https://www.arangodb.com/2018/04/static-binaries-c-plus-plus-application/">Static Binaries for a C++ Application - ArangoDB</a></li>
-<li><a href="https://doc.rust-lang.org/edition-guide/rust-2018/platform-and-target-support/musl-support-for-fully-static-binaries.html">MUSL support for fully static binaries - Rust Docs</a></li>
-<li><a href="http://www.etalabs.net/compare_libcs.html">Comparison of C/POSIX standard library implementations for Linux</a></li>
-<li><a href="https://elinux.org/images/8/8b/Room_For_Cooperation-_Bionic_and_musl.pdf">Elinux/Linaro - Bionic and musl - room for cooperation?</a></li>
-</ul>
-
-<p>
-File: MuslBuilder.docker (<a href="https://gist.github.com/0557cd0fa1d5370723b015e443a7c036">Available at gist</a>)
-</p>
-
-<div class="org-src-container">
-<pre class="src src-docker">FROM alpine:latest
-RUN apk add musl cmake make g++
-</pre>
-</div>
-
-<p>
-<b>Building:</b> 
-</p>
-
-<p>
-Buildilg the docker containing MUSL and development tools:
-</p>
-
-<div class="org-src-container">
-<pre class="src src-sh">$ git clone https://gist.github.com/0557cd0fa1d5370723b015e443a7c036 &amp;&amp; <span class="org-builtin">cd</span> gist 
-$ docker build -f MuslBuilder.docker -t musl-builder . 
-</pre>
-</div>
-
-<p>
-Running a container of this docker image: 
-</p>
-
-<div class="org-src-container">
-<pre class="src src-sh">$ docker run -it --rm -v $(<span class="org-sh-quoted-exec">pwd</span>):/cwd -w /cwd -e <span class="org-variable-name">UID</span>=$(<span class="org-sh-quoted-exec">id</span> -u) -e <span class="org-variable-name">GID</span>=$(<span class="org-sh-quoted-exec">id</span> -g) musl-builder 
-/cwd $ cmake --config Debug -H. -B_build-musl -DCMAKE_EXE_LINKER_FLAGS=<span class="org-string">"-static -Os"</span>
-/cwd <span class="org-comment-delimiter"># </span><span class="org-comment">cmake --build _build-musl --target </span>
-</pre>
-</div>
-
-<p>
-Exiting from the container and check the executable:
-</p>
-
-<div class="org-src-container">
-<pre class="src src-sh">$ du -h _build-musl/filesys 
-8.7M    _build-musl/filesys
-8.7M    total
-
-$ file _build-musl/filesys 
-<span class="org-function-name">_build-musl/filesys</span>: ELF 64-bit LSB shared object, x86-64, version 1 (SYSV)
-, statically linked, with debug_info, not stripped
-
-<span class="org-comment-delimiter"># </span><span class="org-comment">Check dependencies </span>
-$ ldd _build-musl/filesys 
-        statically linked
-</pre>
-</div>
-
-<p>
-Attempt to run from MX-Linux 19.2 (Older GLIBC)
-</p>
-
-<div class="org-src-container">
-<pre class="src src-sh">$ _build-musl/filesys 
-
- ===== Listing directory /etc =====
-.java                             <span class="org-string">"/etc/.java"</span>
-.pwd.lock                         <span class="org-string">"/etc/.pwd.lock"</span>
-ImageMagick-6                     <span class="org-string">"/etc/ImageMagick-6"</span>
-NetworkManager                    <span class="org-string">"/etc/NetworkManager"</span>
-UPower                            <span class="org-string">"/etc/UPower"</span>
-X11                               <span class="org-string">"/etc/X11"</span>
-acpi                              <span class="org-string">"/etc/acpi"</span>
-adduser.conf                      <span class="org-string">"/etc/adduser.conf"</span>
-adjtime                           <span class="org-string">"/etc/adjtime"</span>
-alsa                              <span class="org-string">"/etc/alsa"</span>
+          Signature = 0x4550 
+            Machine = 0x8664 
+ Number of sections = 7 
 </pre>
 </div>
 </div>
@@ -2274,7 +3638,7 @@ alsa                              <span class="org-string">"/etc/alsa"</span>
 </div>
 </div>
 <div id="postamble" class="status">
-<p class="date">Created: 2020-06-21 Sun 20:55</p>
+<p class="date">Created: 2020-06-26 Fri 14:07</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
 </body>
