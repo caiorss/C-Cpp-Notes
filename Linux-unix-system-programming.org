@@ -1321,6 +1321,379 @@ Verify exported symbols by gtk3 shared library:
           ... ... ... ... ..
           ... ... ... ... ..
 #+END_SRC
+
+*** GTK3/GTK2 GUI using dynamic loading - high level C++ wrapper
+
+This proof-of-concept code contains a high-level wrapper class
+SharedLibrary for abstracting away the dlopen() API. This class is
+used for loading GTK3 or GTk2 shared library at runtime and then
+showing modal notifications dialogs. The advantage of the dynamic
+loading approach is the flexibility, portability and easier deployment
+as the binary does not depends on any particular GTK shared library
+version.
+
+Note:
+
+  + The code of the class SharedLibrary can be reused on any other
+    unix-like operating system with dlopen() API, such as FreeBDS,
+    NetBSD, MacOSX and so on.
+
+  + The Windows API for dynamic loading is LoadLibrary(),
+    GetProcAddress().
+
+GIST:
+  + https://gist.github.com/6bbb3b9491d4fad01d3875a559b7365b
+
+  *Project Files*
+
+File: CMakeLists.txt
+
+#+BEGIN_SRC cmake
+  cmake_minimum_required(VERSION 3.9)
+  project(gtk-dynamic-load-dialog)
+
+  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+
+  # ---- TARGETS Configuration ---------------#
+         add_executable( gtk-dialog gtk-dialog.cpp gtk_types.hpp)
+  target_link_libraries( gtk-dialog dl )
+#+END_SRC
+
+File: gtk-dialog.cpp
+
+#+BEGIN_SRC cpp
+  #include <iostream>
+  #include <string>
+  #include <cstring>
+  #include <cassert>
+
+  // Uses: dlopen(), dlclose(), ...
+  #include <dlfcn.h>
+
+  #include "gtk_types.hpp"
+
+  /** Requires header: <dlfcn.h> and linking flag (-ldl) */
+  class SharedLibrary
+  {
+  public:
+      using HND  = void*;
+      using HSYM = void*;
+  private:
+      HND         m_hnd  = nullptr;
+      std::string m_lib = "" ;
+      int         m_flags = 0;
+  public:
+      SharedLibrary(){}
+      ~SharedLibrary(){ this->unload(); }
+
+      // Constructor delegation
+      SharedLibrary(std::string library)
+          : SharedLibrary(library, RTLD_NOW | RTLD_GLOBAL)
+      {  }
+
+      SharedLibrary(std::string library, int flags)
+      {
+          this->load(library, flags);
+      }
+
+      // Disable copy constructor and copy-assignment operator
+      SharedLibrary(SharedLibrary const &) = delete;
+      SharedLibrary& operator=(SharedLibrary const &) = delete;
+
+      // Move constructor
+      SharedLibrary(SharedLibrary&& rhs)
+      {
+          std::swap(m_hnd, rhs.m_hnd);
+          std::swap(m_lib, rhs.m_lib);
+          std::swap(m_flags, rhs.m_flags);
+      }
+
+      // Move assignment operator
+      SharedLibrary& operator=(SharedLibrary&& rhs)
+      {
+          this->unload();
+          std::swap(m_hnd, rhs.m_hnd);
+          std::swap(m_lib, rhs.m_lib);
+          std::swap(m_flags, rhs.m_flags);
+          return *this;
+      }
+
+      HND         handler()   const { return m_hnd; }
+      bool        is_loaded() const { return m_hnd != nullptr; }
+      std::string library()   const { return m_lib; }
+
+      /** Retrieve symbol from shared library */
+      HSYM symbol_ptr(std::string name) const
+      {
+          return ::dlsym(m_hnd, name.c_str());
+      }
+
+      /** @brief Get symbol from shared library
+       ,* Note: The caller is resposible for checking if the symbol is (null) nullptr.
+       ,*/
+      template<typename TFun>
+      TFun symbol(std::string name) const
+      {
+          HSYM sym = ::dlsym(m_hnd, name.c_str());
+          return reinterpret_cast<TFun>(sym);
+      }
+
+      /** @brief Attempts to load symbol and throws exception, if symbol is not found. */
+      template<typename TFun>
+      TFun symbol_or_fail(std::string name) const
+      {
+          HSYM sym = ::dlsym(m_hnd, name.c_str());
+
+          if(!sym){
+              std::string msg = " [ERROR] Dlopen / dlsym() => unable find symbol";
+              msg = msg + " <" + name + ">";
+              throw std::runtime_error(msg);
+          }
+          return reinterpret_cast<TFun>(sym);
+      }
+
+      void load(std::string library, int flags)
+      {
+          if(!this->is_loaded()) { this->unload(); }
+          m_lib   = library;
+          m_flags = flags;
+          m_hnd = dlopen(library.c_str(), RTLD_NOW | RTLD_GLOBAL);
+          if(m_hnd == nullptr){
+              std::string msg = " [ERROR] DlopenError: ";
+              msg = msg + dlerror();
+              throw std::runtime_error(msg);
+          }
+      }
+
+      void reload()
+      {
+          this->unload();
+          this->load(m_lib, m_flags);
+      }
+
+      void unload()
+      {
+          if(!this->is_loaded()) { return; }
+          ::dlclose(m_hnd);
+          m_hnd = nullptr;
+      }
+
+  }; // --- End of class SharedLibrary() ---- //
+
+  using namespace GtkPP::fpointer;
+  using namespace GtkPP::enums;
+
+  struct GtkLib
+  {
+      SharedLibrary slib;
+
+      GtkLib(std::string library)
+          : slib( std::move(SharedLibrary(library)) )
+      {
+          gtk_init_check         = slib.symbol_or_fail<gtk_init_check_t>("gtk_init_check");
+          gtk_main_quit          = slib.symbol_or_fail<gtk_main_quit_t>("gtk_main_quit");
+          // gtk_main               = slib.symbol_or_fail<void (*) ()>("gtk_main");
+          gtk_message_dialog_new = slib.symbol_or_fail<gtk_message_dialog_new_t>("gtk_message_dialog_new");
+          gtk_widget_destroy     = slib.symbol_or_fail<gtk_widget_destroy_t>("gtk_widget_destroy");
+          gtk_dialog_run         = slib.symbol_or_fail<gtk_dialog_run_t>("gtk_dialog_run");
+          gtk_window_set_title   = slib.symbol<gtk_window_set_title_t>("gtk_window_set_title");
+
+      }
+
+      gtk_init_check_t         gtk_init_check;
+      gtk_main_quit_t          gtk_main_quit;
+      // gtk_main_t               gtk_main;
+      gtk_message_dialog_new_t gtk_message_dialog_new;
+      gtk_widget_destroy_t     gtk_widget_destroy;
+      gtk_dialog_run_t         gtk_dialog_run;
+      gtk_window_set_title_t   gtk_window_set_title;
+
+      // Message box notification
+      void msgbox(  std::string title
+                  , std::string text
+                  , GtkMessageType mtype = GtkMessageType::GTK_MESSAGE_INFO
+                  )
+      {
+         GtkWidget* dialog = this->gtk_message_dialog_new(  nullptr
+                                                  , (int) GtkDialogFlags::GTK_DIALOG_MODAL
+                                                  , (int) mtype
+                                                  , (int) GtkButtonsType::GTK_BUTTONS_OK
+                                                  , text.c_str()
+                                                  );
+          assert( dialog != nullptr );
+          this->gtk_window_set_title(dialog, title.c_str());
+          this->gtk_dialog_run(dialog);
+          std::cout << " [INFO] Dialog destroyed OK " << "\n";
+          this->gtk_widget_destroy(dialog);
+      }
+  };
+
+
+  int main(int argc, char** argv)
+  {
+      // User can select his own GTK shared library, if it is not
+      // found. He can also select GTK2 shared library.
+      auto shared_lib =  [&]() -> std::string
+      {
+          if(argc < 2) return "libgtk-3.so.0";
+          return argv[1];
+      }();
+
+      std::cout << " [INFO] Loading shared library: " << shared_lib << "\n";
+      auto gtk = GtkLib{shared_lib};
+
+      // Alwas start the library before calling any GTK function
+      gtk.gtk_init_check(&argc, &argv);
+
+      gtk.msgbox("User notification", "Download completed. Ok.",     GtkMessageType::GTK_MESSAGE_INFO );
+      gtk.msgbox("Runtime error",     "KERNEL PANIC!! Reboot NOW!!", GtkMessageType::GTK_MESSAGE_ERROR );
+
+      std::cout << " [INFO] Shutdown gracefully. Ok. \n" ;
+      return EXIT_SUCCESS;
+  }
+#+END_SRC
+
+File: gtk_types.hpp
+
+#+BEGIN_SRC cpp
+  // ------ C++ Wrappers for dynamically loading GTK ----- //
+  #ifndef _GTK_TYPES_HPP
+  #define _GTK_TYPES_HPP
+
+  namespace GtkPP
+  {
+      namespace base {
+          using gchar    = char;
+          using gshort   = short;
+          using glong    = long;
+          using gint     = int;
+          using gboolean = gint;
+          using guchar   = unsigned short;
+          using gulong   = unsigned long;
+          using guint    = unsigned int;
+          using gfloat   = float;
+          using gdouble  = double;
+          using gpointer = void*;
+          using gconstpointer = const void*;
+
+      };
+      // ------- Opaque Types / incomplete types ---------//
+      namespace widget {
+          struct GtkWidget;
+          struct GClosure;
+          struct GtkWidget;
+          struct GtkWindow;
+          struct GtkDialog;
+      };
+
+      namespace enums {
+          enum class GtkWindowType
+          {
+              GTK_WINDOW_TOPLEVEL,
+              GTK_WINDOW_POPUP
+          };
+
+          enum class GConnectFlags
+          {
+          G_CONNECT_AFTER	= 1 << 0,
+          G_CONNECT_SWAPPED	= 1 << 1
+          };
+
+          enum class GtkMessageType
+          {
+          GTK_MESSAGE_INFO,
+          GTK_MESSAGE_WARNING,
+          GTK_MESSAGE_QUESTION,
+          GTK_MESSAGE_ERROR,
+          GTK_MESSAGE_OTHER
+          };
+
+          enum class GtkButtonsType
+          {
+          GTK_BUTTONS_NONE,
+          GTK_BUTTONS_OK,
+          GTK_BUTTONS_CLOSE,
+          GTK_BUTTONS_CANCEL,
+          GTK_BUTTONS_YES_NO,
+          GTK_BUTTONS_OK_CANCEL
+          };
+
+          enum class GtkDialogFlags
+          {
+          GTK_DIALOG_MODAL               = 1 << 0,
+          GTK_DIALOG_DESTROY_WITH_PARENT = 1 << 1,
+          GTK_DIALOG_USE_HEADER_BAR      = 1 << 2
+          };
+      };
+
+      /** @brief Function pointers type aliases  */
+      namespace fpointer
+      {
+          using namespace base;
+          using namespace widget;
+          using enums::GConnectFlags;
+
+          using GtkDialogFlags_t = int;
+          using GtkMessageType_t = int;
+          using GtkButtonsType_t = int;
+
+          using gtk_init_check_t = gboolean (*) (int* argc, char*** argv);
+          using gtk_dialog_run_t       = gint (*) (void* dialog);
+          using gtk_widget_destroy_t   = void (*) (GtkWidget* widget);
+          using gtk_window_set_title_t = void (*) (GtkWidget* window, const gchar* title);
+          using gtk_main_quit_t        = void (*) ();
+
+          using gtk_window_set_title_t = void (*) (GtkWidget* window, const gchar* title);
+
+
+          using GCallback      = void  (*) (void);
+          using GClosureNotify = void  (*) (gpointer data, GClosure* closure);
+          using g_signal_connect_data_t =  gulong	(*) ( gpointer        instance
+                                                      , const gchar*    detailed_signal
+                                                      , GCallback       c_handler
+                                                      , gpointer  	    data
+                                                      , GClosureNotify  destroy_data
+                                                      , GConnectFlags	connect_flags
+                                                      );
+
+
+          using gtk_message_dialog_new_t = GtkWidget* (*) ( GtkWindow       *parent,
+                                                            GtkDialogFlags_t  flags,
+                                                            GtkMessageType_t  type,
+                                                            GtkButtonsType_t  buttons,
+                                                            const gchar*    message_format
+                                                          );
+
+
+      };
+
+  };
+
+  #endif
+#+END_SRC
+
+Building and running:
+
+#+BEGIN_SRC sh
+   # Download
+   $ >> git clone https://gist.github.com/6bbb3b9491d4fad01d3875a559b7365b gtk-dialog && cd gtk-dialog
+
+   # Configure
+   $ >> cmake --config Debug -H. -B_build
+
+   # Build
+   $ >> cmake --build _build --target
+
+   # Run
+   $ >> _build/gtk-dialog
+   [INFO] Loading shared library: libgtk-3.so.0
+   [INFO] Dialog destroyed OK
+   [INFO] Dialog destroyed OK
+   [INFO] Shutdown gracefully. Ok.
+
+#+END_SRC
+
 ** Launching processes with exec and fork system wrappers 
 
 This code demonstrates the usage of exec and fork system-calls wrapper
