@@ -20,17 +20,23 @@ more likely to happen if the application was built on a Linux
 distribution using a newer version of GLIBC, but the program is
 deployed in a distribution using an older version of GLIBC.
 
-  + Side Note 1:
+  * Side Note 1:
     + Applications built with GO (Golang) programming
       language are less likely to be affected by the GLIBC-issue, as GO
       compiler often does not link against the GLIBC and builds
       statically linked binaries which can be deployed everywhere.
 
-  + Side Note 2:
+  * Side Note 2:
     + The GLIBC issue do not only affect C++, all programming
-      languages, such as Rust, D-Lang, OCaml, Haskell, which generates
-      native Linux executables or shared libraries are also affected
+      languages which generates native Linux executables, for
+      instance, D-lang, Rust, OCaml, Haskell are also affected
       by the GLIBC compability problem.
+
+  * Side Note 3:
+    + Even [[https://appimage.org/][AppImage]], which is a solution for distributing binaries on
+      Linux is affected by the GLIBC-problem. As a result, the
+      AppImage documentation recommends building AppImage on Linux
+      distributions with older versions of GlibC.
 
 Possible Solutions: 
 
@@ -41,23 +47,32 @@ Possible Solutions:
        GLIBC.
 
   2. Link against MUSL (CRT - C Runtime Library)
-     + The MUSL library, which is an alternative to GLIBC, allows
-       builting statically linked binaries. The drawback of this
-       approach is that dynamic loading with _dlopen_ API (dlopen,
-       dlclose, dlsym functions) is not supported.
+     + The MUSL library, is an alternative to GLIBC, which was
+       designed for embedded systems and static linking, allows
+       building statically linked binaries that does not suffer from
+       the GLIBC compatibility problems. The drawback of this
+       procedure is that dynamic loading with _dlopen_ API (dlopen,
+       dlclose, dlsym functions) is still not supported.
 
-  3. Distribute the application via Linux distribution repositories
+  3. Deploy via Docker
+     * Deploy the application via docker image. While this solution is
+       acceptable for compilers, building environments, servers and
+       command line applications, Docker is not suitable for games or
+       Desktop GUI (Graphical User Interface) applications intended
+       to be used by non-technical users.
+     * Advantage:
+       * Pack application, dependencies and configuration.
+       * The deployment environment can be reproduced everywhere. 
+
+  4. Distribute as source and recompile from source on every
+     deployment machine. 
+
+  5. Distribute the application via Linux distribution repositories
      * Distribute the application via official Linux distribution
        repositories by creating distribution-specific packages for
        every supported distribution. It means creating (.deb) Debian packages for
        Debian-based distributions; (.rpm) packages for Fedora and
        Centos; (.apk) alpine packages for Alpine.
-
-  4. Docker
-     * Deploy the application via docker image. While this solution is
-       acceptable for servers and command line applications, it is not
-       suitable for games or Desktop GUI (Graphical User Interface)
-       applications, intended to be used by non-technical users.
 
 *** The GLIBC Problem 
 
@@ -184,12 +199,18 @@ version of GLIBC. The distribution used was a QEMU-KVM virtual
 machine running MX-Linux 19.2, distribution based on Debian, with
 GLIBC version .
 
+GLIBC Failure on MX-Linux Virtual Machine: 
+
 #+BEGIN_SRC sh 
-  #---------- Failure ------------------------------------#
+  #---------- Failure!! GLIC Incompa ------------------------------------#
    $ _build1/filesys 
    _build1/filesys: /lib/x86_64-linux-gnu/libstdc++.so.6: version 
-    `GLIBCXX_3.4.26' not found (required by _build1/filesys)
+    'GLIBCXX_3.4.26' not found (required by _build1/filesys)
+#+END_SRC
 
+Virtual Machine Information: 
+
+#+BEGIN_SRC sh 
    #----------- Machine Info (MX Linux 19.2) -------------#
    # Kernel version 
    $ uname -r
@@ -204,6 +225,7 @@ GLIBC version .
    GNU ld (GNU Binutils for Debian) 2.31.1
    ... ... ... ... ... ... ... ... ... ... ... ... 
 #+END_SRC
+
 *** Solution 1 - via linking against older GLIBC 
 
 As GLIBC is _forward compatible_, but not _backward compatible_. The
@@ -254,7 +276,7 @@ Enter in the docker image shell:
    _build1  CMakeLists.txt   Dockerfile   filesys.cpp   Makefile
 #+END_SRC
 
-Build the application: 
+Building the application: 
 
 #+BEGIN_SRC sh 
   [root@88c9630a2008 cwd]# make 
@@ -272,7 +294,7 @@ Build the application:
   CMakeCache.txt  CMakeFiles  cmake_install.cmake  filesys  Makefile
 #+END_SRC
 
-Run the application _build2/filesys in MX-Linux: 
+Running the application _build2/filesys in MX-Linux: 
 
 #+BEGIN_SRC sh 
    # Built on Fedora 32 with newer version of GLIBC [FAILURE]
@@ -297,7 +319,7 @@ Run the application _build2/filesys in MX-Linux:
    adjtime                           "/etc/adjtime"
    alsa                              "/etc/alsa"
 #+END_SRC
-*** Solution 2 - via linking against MUSL 
+*** Solution 2 - via linking against MUSL libC
 
 Other alternative to avoid the GLIBC dependency problem is to build
 the application statically linking against [[https://www.musl-libc.org/][MUSL - LibC]] which is an CRT
@@ -374,7 +396,7 @@ Attempt to run from MX-Linux 19.2 (Older GLIBC)
    adjtime                           "/etc/adjtime"
    alsa                              "/etc/alsa"
 #+END_SRC
-** Low level IO functions 
+** Low level IO functions overview 
 
 C-Library functions which encapsulates file-related systems calls.
 
@@ -434,7 +456,6 @@ Headers:
 #+BEGIN_SRC cpp 
   ssize_t write(int fd, const void *buf, size_t count);
 #+END_SRC
-
 
 ** Low level IO - open(), read(), write() syscall functions
 
@@ -928,10 +949,10 @@ Running:
   [INFO] Finish Ok.
 #+END_SRC
 
-** Dynamic Loading Shared Libraries 
+** Dynamic Loading Shared Libraries / dlopen() API 
 *** Overview 
 
- The dlopen API provide access to the _dynamic linker_ services allowing
+The dlopen API provide access to the _dynamic linker_ services allowing
 the current process to load and unload shared objects or shared
 libraries in its address space (virtual memory).
 
@@ -949,6 +970,16 @@ Use cases:
   + Load native code extensions in languages with interpreters written
     in C, such as Python, Ruby, Lua and so on. Note: Python native
     extensions are shared libraries. 
+
+The Dlopen() API is available on most Unix-like operating systems,
+such as: 
+
+   * Linux 
+   * MacOSX 
+   * FreeBDS
+   * NetBSD
+   * OpenBSD
+   * QNX
 
 Documentation: 
 
@@ -1083,14 +1114,16 @@ Headers and libraries:
           throw std::runtime_error("Error: symbol not found"); 
        }
 
-       // Function signature type alias 
-       //  => The function to be loaded can only have C-linkage. 
+       // Type alias for function pointer in modern C++ 
+       //  => Note: The function to be loaded can only have C-linkage. 
        using name_of_function_t = void (*) (int param0, double param1, const char* param3);
-       
-       //  Function pointer. 
+
+       // Type alias for function pointer in old C++ (C++98)
+       typedef void (name_of_function_t*) (int param0, double param1, const char* param3);       
+
        auto name_of_function_ptr = reinterpret_cast<name_of_function_t>(hsym); 
-    
-       // Call loaded function 
+   
+       // Call loaded function (Function pointer)
        name_of_function_ptr(100, 2.51, "string");
 
        // Unload shared library 
@@ -1098,8 +1131,7 @@ Headers and libraries:
    }
 #+END_SRC
 
-
-*** GTK3 GUI with dynamic linking 
+*** GTK3/GTK2 GUI using dynamic loading - low level 
 
 The following sample code is a GTk3 or GTK2 GUI graphical user
 interface application with GTK functions loaded from a GTK shared
@@ -1181,19 +1213,19 @@ File: gtk-dlopen.cpp
     // -------- Function Pointers type aliases -------------------//
     using GCallback      = void  (*) (void);
     using GClosureNotify = void  (*) (gpointer data, GClosure* closure);
-    using g_signal_connect_data_t =  gulong	(*) (   gpointer instance
-                                                      , const gchar*    detailed_signal
-                                                      , GCallback       c_handler
-                                                      , gpointer        data
-                                                      , GClosureNotify  destroy_data
-                                                      , GConnectFlags	connect_flags
-                                                  );
+    using g_signal_connect_data_t =  gulong (*) (   gpointer instance
+                                                  , const gchar*    detailed_signal
+                                                  , GCallback       c_handler
+                                                  , gpointer        data
+                                                  , GClosureNotify  destroy_data
+                                                  , GConnectFlags	connect_flags
+                                              );
 
     int main(int argc, char** argv)
     {    
         std::string shared_lib =  [&]() -> std::string 
         {
-            if(argc < 2) return "/lib64/libgtk-3.so.0";
+            if(argc < 2) return "libgtk-3.so.0";
             return argv[1];
         }();
 
@@ -1322,7 +1354,7 @@ Verify exported symbols by gtk3 shared library:
           ... ... ... ... ..
 #+END_SRC
 
-*** GTK3/GTK2 GUI using dynamic loading - high level C++ wrapper
+*** GTK3/GTK2 GUI using dynamic loading - high level C++ wrapper 
 
 This proof-of-concept code contains a high-level wrapper class
 SharedLibrary for abstracting away the dlopen() API. This class is
@@ -1332,43 +1364,43 @@ loading approach is the flexibility, portability and easier deployment
 as the binary does not depends on any particular GTK shared library
 version.
 
-Note:
+Note: 
 
   + The code of the class SharedLibrary can be reused on any other
     unix-like operating system with dlopen() API, such as FreeBDS,
     NetBSD, MacOSX and so on.
 
   + The Windows API for dynamic loading is LoadLibrary(),
-    GetProcAddress().
+    GetProcAddress(). 
 
-GIST:
+GIST: 
   + https://gist.github.com/6bbb3b9491d4fad01d3875a559b7365b
 
-  *Project Files*
+  *Project Files* 
 
-File: CMakeLists.txt
+File: CMakeLists.txt 
 
-#+BEGIN_SRC cmake
+#+BEGIN_SRC cmake 
   cmake_minimum_required(VERSION 3.9)
   project(gtk-dynamic-load-dialog)
 
-  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_CXX_STANDARD 17)     
   set(CMAKE_VERBOSE_MAKEFILE ON)
 
   # ---- TARGETS Configuration ---------------#
          add_executable( gtk-dialog gtk-dialog.cpp gtk_types.hpp)
-  target_link_libraries( gtk-dialog dl )
+  target_link_libraries( gtk-dialog dl ) 
 #+END_SRC
 
-File: gtk-dialog.cpp
+File: gtk-dialog.cpp 
 
-#+BEGIN_SRC cpp
+#+BEGIN_SRC cpp 
   #include <iostream>
-  #include <string>
-  #include <cstring>
-  #include <cassert>
+  #include <string> 
+  #include <cstring> 
+  #include <cassert> 
 
-  // Uses: dlopen(), dlclose(), ...
+  // Uses: dlopen(), dlclose(), ... 
   #include <dlfcn.h>
 
   #include "gtk_types.hpp"
@@ -1377,17 +1409,17 @@ File: gtk-dialog.cpp
   class SharedLibrary
   {
   public:
-      using HND  = void*;
+      using HND  = void*; 
       using HSYM = void*;
   private:
-      HND         m_hnd  = nullptr;
-      std::string m_lib = "" ;
+      HND         m_hnd  = nullptr; 
+      std::string m_lib = "" ; 
       int         m_flags = 0;
   public:
-      SharedLibrary(){}
+      SharedLibrary(){}    
       ~SharedLibrary(){ this->unload(); }
 
-      // Constructor delegation
+      // Constructor delegation 
       SharedLibrary(std::string library)
           : SharedLibrary(library, RTLD_NOW | RTLD_GLOBAL)
       {  }
@@ -1397,20 +1429,20 @@ File: gtk-dialog.cpp
           this->load(library, flags);
       }
 
-      // Disable copy constructor and copy-assignment operator
+      // Disable copy constructor and copy-assignment operator 
       SharedLibrary(SharedLibrary const &) = delete;
       SharedLibrary& operator=(SharedLibrary const &) = delete;
 
-      // Move constructor
-      SharedLibrary(SharedLibrary&& rhs)
+      // Move constructor 
+      SharedLibrary(SharedLibrary&& rhs) 
       {
           std::swap(m_hnd, rhs.m_hnd);
           std::swap(m_lib, rhs.m_lib);
           std::swap(m_flags, rhs.m_flags);
       }
 
-      // Move assignment operator
-      SharedLibrary& operator=(SharedLibrary&& rhs)
+      // Move assignment operator 
+      SharedLibrary& operator=(SharedLibrary&& rhs) 
       {
           this->unload();
           std::swap(m_hnd, rhs.m_hnd);
@@ -1419,12 +1451,12 @@ File: gtk-dialog.cpp
           return *this;
       }
 
-      HND         handler()   const { return m_hnd; }
-      bool        is_loaded() const { return m_hnd != nullptr; }
+      HND         handler()   const { return m_hnd; }    
+      bool        is_loaded() const { return m_hnd != nullptr; }    
       std::string library()   const { return m_lib; }
 
       /** Retrieve symbol from shared library */
-      HSYM symbol_ptr(std::string name) const
+      HSYM symbol_ptr(std::string name) const 
       {
           return ::dlsym(m_hnd, name.c_str());
       }
@@ -1433,7 +1465,7 @@ File: gtk-dialog.cpp
        ,* Note: The caller is resposible for checking if the symbol is (null) nullptr.
        ,*/
       template<typename TFun>
-      TFun symbol(std::string name) const
+      TFun symbol(std::string name) const 
       {
           HSYM sym = ::dlsym(m_hnd, name.c_str());
           return reinterpret_cast<TFun>(sym);
@@ -1441,14 +1473,14 @@ File: gtk-dialog.cpp
 
       /** @brief Attempts to load symbol and throws exception, if symbol is not found. */
       template<typename TFun>
-      TFun symbol_or_fail(std::string name) const
+      TFun symbol_or_fail(std::string name) const 
       {
           HSYM sym = ::dlsym(m_hnd, name.c_str());
-
-          if(!sym){
+        
+          if(!sym){ 
               std::string msg = " [ERROR] Dlopen / dlsym() => unable find symbol";
               msg = msg + " <" + name + ">";
-              throw std::runtime_error(msg);
+              throw std::runtime_error(msg); 
           }
           return reinterpret_cast<TFun>(sym);
       }
@@ -1458,24 +1490,24 @@ File: gtk-dialog.cpp
           if(!this->is_loaded()) { this->unload(); }
           m_lib   = library;
           m_flags = flags;
-          m_hnd = dlopen(library.c_str(), RTLD_NOW | RTLD_GLOBAL);
-          if(m_hnd == nullptr){
+          m_hnd = dlopen(library.c_str(), RTLD_NOW | RTLD_GLOBAL);        
+          if(m_hnd == nullptr){ 
               std::string msg = " [ERROR] DlopenError: ";
               msg = msg + dlerror();
               throw std::runtime_error(msg);
           }
-      }
+      }    
 
-      void reload()
+      void reload() 
       {
           this->unload();
           this->load(m_lib, m_flags);
       }
 
-      void unload()
+      void unload() 
       {
           if(!this->is_loaded()) { return; }
-          ::dlclose(m_hnd);
+          ::dlclose(m_hnd);        
           m_hnd = nullptr;
       }
 
@@ -1490,8 +1522,8 @@ File: gtk-dialog.cpp
 
       GtkLib(std::string library)
           : slib( std::move(SharedLibrary(library)) )
-      {
-          gtk_init_check         = slib.symbol_or_fail<gtk_init_check_t>("gtk_init_check");
+      { 
+          gtk_init_check         = slib.symbol_or_fail<gtk_init_check_t>("gtk_init_check");       
           gtk_main_quit          = slib.symbol_or_fail<gtk_main_quit_t>("gtk_main_quit");
           // gtk_main               = slib.symbol_or_fail<void (*) ()>("gtk_main");
           gtk_message_dialog_new = slib.symbol_or_fail<gtk_message_dialog_new_t>("gtk_message_dialog_new");
@@ -1501,67 +1533,67 @@ File: gtk-dialog.cpp
 
       }
 
-      gtk_init_check_t         gtk_init_check;
-      gtk_main_quit_t          gtk_main_quit;
+      gtk_init_check_t         gtk_init_check; 
+      gtk_main_quit_t          gtk_main_quit; 
       // gtk_main_t               gtk_main;
       gtk_message_dialog_new_t gtk_message_dialog_new;
       gtk_widget_destroy_t     gtk_widget_destroy;
       gtk_dialog_run_t         gtk_dialog_run;
       gtk_window_set_title_t   gtk_window_set_title;
 
-      // Message box notification
+      // Message box notification 
       void msgbox(  std::string title
-                  , std::string text
-                  , GtkMessageType mtype = GtkMessageType::GTK_MESSAGE_INFO
-                  )
+                  , std::string text 
+                  , GtkMessageType mtype = GtkMessageType::GTK_MESSAGE_INFO 
+                  ) 
       {
-         GtkWidget* dialog = this->gtk_message_dialog_new(  nullptr
+         GtkWidget* dialog = this->gtk_message_dialog_new(  nullptr 
                                                   , (int) GtkDialogFlags::GTK_DIALOG_MODAL
-                                                  , (int) mtype
+                                                  , (int) mtype 
                                                   , (int) GtkButtonsType::GTK_BUTTONS_OK
                                                   , text.c_str()
-                                                  );
-          assert( dialog != nullptr );
+                                                  );                                            
+          assert( dialog != nullptr );    
           this->gtk_window_set_title(dialog, title.c_str());
           this->gtk_dialog_run(dialog);
           std::cout << " [INFO] Dialog destroyed OK " << "\n";
-          this->gtk_widget_destroy(dialog);
+          this->gtk_widget_destroy(dialog);   
       }
   };
 
 
   int main(int argc, char** argv)
-  {
-      // User can select his own GTK shared library, if it is not
-      // found. He can also select GTK2 shared library.
-      auto shared_lib =  [&]() -> std::string
+  {        
+      // User can select his own GTK shared library, if it is not 
+      // found. He can also select GTK2 shared library. 
+      auto shared_lib =  [&]() -> std::string 
       {
           if(argc < 2) return "libgtk-3.so.0";
           return argv[1];
       }();
+    
+      std::cout << " [INFO] Loading shared library: " << shared_lib << "\n";   
+      auto gtk = GtkLib{shared_lib};   
 
-      std::cout << " [INFO] Loading shared library: " << shared_lib << "\n";
-      auto gtk = GtkLib{shared_lib};
+      // Alwas start the library before calling any GTK function 
+      gtk.gtk_init_check(&argc, &argv);    
 
-      // Alwas start the library before calling any GTK function
-      gtk.gtk_init_check(&argc, &argv);
-
-      gtk.msgbox("User notification", "Download completed. Ok.",     GtkMessageType::GTK_MESSAGE_INFO );
-      gtk.msgbox("Runtime error",     "KERNEL PANIC!! Reboot NOW!!", GtkMessageType::GTK_MESSAGE_ERROR );
+      gtk.msgbox("User notification", "Download completed. Ok.",     GtkMessageType::GTK_MESSAGE_INFO );    
+      gtk.msgbox("Runtime error",     "KERNEL PANIC!! Reboot NOW!!", GtkMessageType::GTK_MESSAGE_ERROR );        
 
       std::cout << " [INFO] Shutdown gracefully. Ok. \n" ;
       return EXIT_SUCCESS;
   }
 #+END_SRC
 
-File: gtk_types.hpp
+File: gtk_types.hpp 
 
-#+BEGIN_SRC cpp
+#+BEGIN_SRC cpp 
   // ------ C++ Wrappers for dynamically loading GTK ----- //
   #ifndef _GTK_TYPES_HPP
   #define _GTK_TYPES_HPP
 
-  namespace GtkPP
+  namespace GtkPP 
   {
       namespace base {
           using gchar    = char;
@@ -1574,12 +1606,12 @@ File: gtk_types.hpp
           using guint    = unsigned int;
           using gfloat   = float;
           using gdouble  = double;
-          using gpointer = void*;
+          using gpointer = void*;          
           using gconstpointer = const void*;
 
       };
       // ------- Opaque Types / incomplete types ---------//
-      namespace widget {
+      namespace widget {        
           struct GtkWidget;
           struct GClosure;
           struct GtkWidget;
@@ -1628,14 +1660,14 @@ File: gtk_types.hpp
       };
 
       /** @brief Function pointers type aliases  */
-      namespace fpointer
+      namespace fpointer 
       {
           using namespace base;
           using namespace widget;
           using enums::GConnectFlags;
 
-          using GtkDialogFlags_t = int;
-          using GtkMessageType_t = int;
+          using GtkDialogFlags_t = int; 
+          using GtkMessageType_t = int; 
           using GtkButtonsType_t = int;
 
           using gtk_init_check_t = gboolean (*) (int* argc, char*** argv);
@@ -1670,27 +1702,27 @@ File: gtk_types.hpp
 
   };
 
-  #endif
+  #endif 
 #+END_SRC
 
-Building and running:
+Building and running: 
+ 
+#+BEGIN_SRC sh 
+   # Download 
+   $ >> git clone https://gist.github.com/6bbb3b9491d4fad01d3875a559b7365b gtk-dialog && cd gtk-dialog 
 
-#+BEGIN_SRC sh
-   # Download
-   $ >> git clone https://gist.github.com/6bbb3b9491d4fad01d3875a559b7365b gtk-dialog && cd gtk-dialog
-
-   # Configure
+   # Configure 
    $ >> cmake --config Debug -H. -B_build
 
-   # Build
-   $ >> cmake --build _build --target
+   # Build 
+   $ >> cmake --build _build --target 
 
-   # Run
-   $ >> _build/gtk-dialog
+   # Run 
+   $ >> _build/gtk-dialog 
    [INFO] Loading shared library: libgtk-3.so.0
-   [INFO] Dialog destroyed OK
-   [INFO] Dialog destroyed OK
-   [INFO] Shutdown gracefully. Ok.
+   [INFO] Dialog destroyed OK 
+   [INFO] Dialog destroyed OK 
+   [INFO] Shutdown gracefully. Ok. 
 
 #+END_SRC
 
@@ -1943,7 +1975,15 @@ Running:
    [TRACE] Running on child process => PID_CHILD = 774930 
    [TRACE] Waiting for child process to finish.  [TRACE] Child process has been terminated Ok. [TRACE] Finish execution. 
 #+END_SRC
-** Read/List directory contents 
+** Reading/Listings directory contents 
+
+API Documentations: 
+ 
+  + [[https://man7.org/linux/man-pages/man3/opendir.3.html][Linux Manpage - opendir()]]
+
+  + [[https://www.freebsd.org/cgi/man.cgi?query=opendir&sektion=3][FreeBSD manpage - opendir()]]
+
+  + [[https://www.man7.org/linux/man-pages/man3/readdir.3.html][Linux manpage - readdir()]]
 
 Functions used: 
 
@@ -2051,10 +2091,7 @@ Running:
 
 
 
-
-
-
-** Memory Mapped Files 
+** Memory Mapped Files - mmap 
 *** Overview 
 
 File mapping is an operating system mechanism which maps a disk file
@@ -2322,7 +2359,7 @@ File: unix-mmap.c
 
         // ----------- Map file in to process' virtual memory ---------------------------//
 
-        void* fmap = mmap(    NULL     /* Often set to zero, aka nullpointer           */
+        void* fmap = mmap(    NULL        /* Often set to zero, aka nullpointer           */
                             , size        /* Size of file mapping in bytes                */
                             , PROT_READ   /* Open in read-only mode                       */
                             , MAP_PRIVATE /* Only this process can access this memory-map */
