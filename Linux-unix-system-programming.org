@@ -2317,12 +2317,20 @@ Running:
 ** Reading subprocess output via Popen() 
 
 The convenience function popen(), which is a combination of fork() +
-exec() and pipe() sytem-calls, allows reading a subprocess
+exec() and pipe() functions, allows reading a subprocess
 output. Note: this function is also available on Windows.
 
 Header: 
   + <stdio.h> in C
   + <cstdio> in C++ 
+
+ *Documentation*
+
+  + [[https://pubs.opengroup.org/onlinepubs/009695399/functions/popen.html][Popen - opengroup()]] 
+
+  + [[https://www.freebsd.org/cgi/man.cgi?query=popen&sektion=3&manpath=freebsd-release-ports][FreeBSD Documentation]]
+
+  + [[https://en.m.wikipedia.org/wiki/Pipeline_(Unix)][Ppeline (Unix)]]
 
  *Functions*
 
@@ -2339,15 +2347,6 @@ Pclose
 #+BEGIN_SRC cpp
   int  pclose(FILE* stream);
 #+END_SRC
-
- *Documentation*
-
-  + [[https://pubs.opengroup.org/onlinepubs/009695399/functions/popen.html][Popen - opengroup()]] 
-
-  + [[https://www.freebsd.org/cgi/man.cgi?query=popen&sektion=3&manpath=freebsd-release-ports][FreeBSD Documentation]]
-
-  + [[https://en.m.wikipedia.org/wiki/Pipeline_(Unix)][Ppeline (Unix)]]
-
 
   *Sample Application* 
 
@@ -2435,6 +2434,195 @@ Running:
         [5] => root           6       2  0 Jun08 ?        00:00:00 [kworker/0:0H-events_highpri]
         [6] => root           9       2  0 Jun08 ?        00:00:00 [mm_percpu_wq]
         [7] => root          10       2  0 Jun08 ?        00:00:54 [ksoftirqd/0]
+#+END_SRC
+
+** Unix Pipes - Inter Process Communication 
+
+Unix pipe is an inter-process communication facility which allows the
+output of a process to be the input of a another. It can be used for
+reading the output of a subprocess. 
+
+ *Documentation* 
+
+   + [[https://www.freebsd.org/cgi/man.cgi?pipe(2)][FreeBSD - pipe()]]
+
+   + [[https://linuxhint.com/dup2_system_call_c/][Dup2 - system call]]
+
+   + [[https://en.wikipedia.org/wiki/Dup_(system_call)][Dup (system call)]]
+
+   + [[https://www.gnu.org/software/libc/manual/html_node/Duplicating-Descriptors.html][Duplicating Descriptors - GNU GlibC]]
+
+   + [[https://www-users.cs.umn.edu/~kauffman/4061/05-io-files-pipes.pdf][CSCI 4061: Input/Output with Files, Pipes]]
+
+   + http://unixwiz.net/techtips/remap-pipe-fds.html
+
+   + [[https://users.cs.cf.ac.uk/Dave.Marshall/C/node23.html][Inter Process Communication (IPC), pipes]]
+
+   + [[http://perugini.cps.udayton.edu/teaching/books/SPUC/www/lecture_notes/pipes.html][IPC - I/O Redirection & IPC, & Special Files: Unamed & Named Pipes, FIFOs]]
+
+   + [[https://www.cs.purdue.edu/homes/grr/SystemsProgrammingBook/Book/Chapter5-WritingYourOwnShell.pdf][Chapter 5 - Writing Your Own Shell]]
+
+ *Main Functions* 
+
+Function pipe()
+
+  + Encapsulates: pipe() system-call
+
+  + Linux Manpage: "pipe() creates a pipe, a unidirectional data
+    channel that can be used for interprocess communication.  The
+    array pipefd is used to return two file descriptors referring to
+    the ends of the pipe.  pipefd[0] refers to the read end of the
+    pipe.  pipefd[1] refers to the write end of the pipe."
+
+  + pipefd[0] => File descriptor for reading the pipe.
+
+  + pipefd[1] => File descriptor for writing to the pipe.
+
+#+BEGIN_SRC cpp 
+   #include <unistd.h>
+
+   int pipe(int pipefd[2]);
+#+END_SRC
+
+Function dup2()
+
+  + Encapsulates: dup2() system-call 
+
+  + Duplicate file descriptor, used for IO redirection.
+
+  + dup2( fd1, STDOUT_FILENO ) => Example: redirect current process'
+    stdout to file descriptor fd1. 
+
+#+BEGIN_SRC cpp 
+   int dup2(int oldfd, int newfd);
+#+END_SRC
+
+  *Sample Code* 
+
+This code spawns a subprocess using fork() + exec() and uses pipes to
+read the subprocess output which are stdout and stderr of the "ls -l -a /".  
+
+File: pipe-test.cpp
+
+#+BEGIN_SRC cpp 
+   #include <iostream>
+   #include <string> 
+
+   // ---- Unix headers --------// 
+   #include <unistd.h>
+   #include <sys/types.h>
+   #include <sys/wait.h>
+
+
+   int main(int argc, char** argv)
+   {	
+       /** Application to be called or its absolute path */
+       const char* app = "ls";
+
+       // Arguments ('-l' '-a' '/') for ls -l -a /
+       const char* args [] = { /* First argument - process name (can be anything)   */  
+                                "ls" 
+                               /* Arguments passed to application */
+                               , "-l", "-a", "/"
+                               /* Sentinel value - always nullptr */
+                               , nullptr  
+                            };
+
+       constexpr size_t PIPE_READ = 0;
+       constexpr size_t PIPE_WRITE = 1;
+
+       int fd[2];
+
+       // ----- Create pipe IPC channel --------//
+       if( pipe(fd) == -1){
+          std::fprintf(stderr, "Error: cannot create pipe \n");
+          return EXIT_FAILURE;
+       }
+
+       // ----------- Fork() ----------------//
+
+       pid_t cpid = fork();
+       if(cpid == -1)
+       {
+            std::fprintf(stderr, "Error: unable to launch process \n");
+            return EXIT_FAILURE;         
+       }
+       if(cpid == 0)
+       {
+           /** ------- BEGIN of child process ------ **/
+           std::printf(" [TRACE] Child process => PID_CHILD = %d \n", getpid());  		
+
+           // Connect child process' stdin to read-end of the pipe.
+           dup2( fd[PIPE_READ], STDIN_FILENO );
+
+           // Redirect child process' stdout (STDOUT_FILENO) to the write-end of the pipe. 
+           dup2( fd[PIPE_WRITE], STDOUT_FILENO );
+           // Redirect child process' stderr to write-end of the pipe.
+           dup2( fd[PIPE_WRITE], STDERR_FILENO );
+
+           // Run process - exec() syscall => the new process image 
+           // has the same PID as the child process. 
+           execvp(app, (char *const *) args);
+           return 0;          
+           /** ------- END of child process ------ **/
+        }
+
+        // ---- Continue parent process ---------//
+
+        std::printf(" [TRACE] <AFTER FORK> PID of parent process = %d \n", getpid());
+        constexpr size_t BUFSIZE = 200;
+        ssize_t nread = 0;
+        char buffer[BUFSIZE];
+
+        // Close unnused end of the pipe.
+        close(fd[PIPE_WRITE]);
+
+        // Write bytes read from the pipe (write-end), written by child process
+        // , to the stdout.
+        do {	
+             nread = read( fd[PIPE_READ], &buffer, BUFSIZE);
+             write(STDOUT_FILENO, buffer, nread);		
+        } while ( nread > 0);
+
+        std::printf(" [TRACE] Waiting for child process termination. \n");
+
+        close(fd[PIPE_READ]);
+
+        // Wait for child process termination 
+        ::wait(nullptr);
+        return EXIT_SUCCESS;
+
+        } // -- End of main() --- //
+#+END_SRC
+
+Building: 
+
+#+BEGIN_SRC cpp 
+   $ >> g++ pipe-test.cpp -o pipe-test.bin -std=c++1z -g -Wall -Wextra
+#+END_SRC
+
+Running:
+
+#+BEGIN_SRC cpp
+    $ >> ./pipe-test.bin 
+    [TRACE] <AFTER FORK> PID of parent process = 1352693 
+    [TRACE] Child process => PID_CHILD = 1352694 
+   total 72
+   dr-xr-xr-x.  18 root root  4096 May 17 21:36 .
+   dr-xr-xr-x.  18 root root  4096 May 17 21:36 ..
+   -rw-r--r--    1 root root     0 May 17 21:36 .autorelabel
+   lrwxrwxrwx.   1 root root     7 Jan 28 15:30 bin -> usr/bin
+   dr-xr-xr-x.   6 root root  4096 May 17 15:17 boot
+   drwxr-xr-x   21 root root  4200 Jun 28 19:22 dev
+   ... ... ... ... ... ... ... ... ... ... 
+   ... ... ... ... ... ... ... ... ... ... ... ... 
+   lrwxrwxrwx.   1 root root     8 Jan 28 15:30 sbin -> usr/sbin
+   drwxr-xr-x.   2 root root  4096 May 12 14:50 srv
+   dr-xr-xr-x   13 root root     0 Jun  8 11:58 sys
+   drwxrwxrwt   31 root root   680 Jun 30 04:02 tmp
+   drwxr-xr-x.  12 root root  4096 Apr 22 19:35 usr
+   drwxr-xr-x.  22 root root  4096 Apr 22 19:39 var
+    [TRACE] Waiting for child process termination. 
 #+END_SRC
 
 ** Reading/Listings directory contents 
