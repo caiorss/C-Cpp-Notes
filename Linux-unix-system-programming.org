@@ -2065,7 +2065,7 @@ Building and running:
 
 #+END_SRC
 
-** Launching processes with exec and fork system wrappers 
+** Launching processes with exec and fork system-call wrappers 
 
 This code demonstrates the usage of exec and fork system-calls wrapper
 functions, namely, execvp() and fork() functions. 
@@ -2314,6 +2314,129 @@ Running:
    [TRACE] Running on child process => PID_CHILD = 774930 
    [TRACE] Waiting for child process to finish.  [TRACE] Child process has been terminated Ok. [TRACE] Finish execution. 
 #+END_SRC
+** Reading subprocess output via Popen() 
+
+The convenience function popen(), which is a combination of fork() +
+exec() and pipe() sytem-calls, allows reading a subprocess
+output. Note: this function is also available on Windows.
+
+Header: 
+  + <stdio.h> in C
+  + <cstdio> in C++ 
+
+ *Functions*
+
+Popen: 
+   + This function executes: 'sh -c <COMMAND>' via, fork() + exec()
+     and pipe(), returning a file stream. Note: sh is a unix-shell.
+
+#+BEGIN_SRC cpp 
+   FILE* popen(const char* command, const char* mode); 
+#+END_SRC
+
+Pclose
+
+#+BEGIN_SRC cpp
+  int  pclose(FILE* stream);
+#+END_SRC
+
+ *Documentation*
+
+  + [[https://pubs.opengroup.org/onlinepubs/009695399/functions/popen.html][Popen - opengroup()]] 
+
+  + [[https://www.freebsd.org/cgi/man.cgi?query=popen&sektion=3&manpath=freebsd-release-ports][FreeBSD Documentation]]
+
+  + [[https://en.m.wikipedia.org/wiki/Pipeline_(Unix)][Ppeline (Unix)]]
+
+
+  *Sample Application* 
+
+File: popen-test.cpp
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string> 
+
+  // Provides; popen(), pclose()
+  #include <cstdio>
+
+  int main(int argc, char** argv)
+  {
+       std::puts("\n === EXPERIMENT 1 - popen() using buffer ========\n");
+       {
+           // Equivalent to: fork() + exec() + pipe()
+           FILE* fd = popen("ls /", "r");
+
+           if(fd == nullptr){
+              fprintf(stderr, "Error: failed to run command. Check ERRNO variable. \n");
+              return EXIT_FAILURE;
+           }
+
+           constexpr size_t BUFFER_SIZE = 500;
+           // Buffer initialized with null char 
+           char buffer[BUFFER_SIZE] = {0};
+
+           while( fgets(buffer, BUFFER_SIZE, fd) != nullptr )
+           {
+              fprintf(stdout, "%s", buffer);
+           }
+
+           pclose(fd);		
+       }
+
+       std::puts("\n === EXPERIMENT 2 - popen() reading line-by-line ========\n");
+       {
+           FILE* fd = popen("ps -ef", "r");
+           char*   pline = nullptr; 
+           size_t  size  = 0; 
+           ssize_t nread = 0;
+           int     count = 0;
+           do {
+              nread = getdelim(&pline, &size, '\n', fd);
+              std::cout << "  [" << count++ << "]" << " => " << pline;
+           } while( nread != -1 && count < 8);
+           pclose(fd);
+       }
+
+       return EXIT_SUCCESS;
+  }
+#+END_SRC
+
+Building: 
+
+#+BEGIN_SRC sh 
+  $ g++ popen-test.cpp -o popen-test -std=c++1z -Wall -Wextra -g
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC sh 
+      $ ./popen-test 
+
+       === EXPERIMENT 1 - popen() using buffer ========
+
+      bin
+      boot
+      dev
+      etc
+      home
+    . .... ... ... ... 
+      ... ... ... ... ...
+      usr
+      var
+
+       === EXPERIMENT 2 - popen() reading line-by-line ========
+
+        [0] => UID          PID    PPID  C STIME TTY          TIME CMD
+        [1] => root           1       0  0 Jun08 ?        00:48:25 /usr/lib/systemd/systemd ... ... ...
+        [2] => root           2       0  0 Jun08 ?        00:00:00 [kthreadd]
+        [3] => root           3       2  0 Jun08 ?        00:00:00 [rcu_gp]
+        [4] => root           4       2  0 Jun08 ?        00:00:00 [rcu_par_gp]
+        [5] => root           6       2  0 Jun08 ?        00:00:00 [kworker/0:0H-events_highpri]
+        [6] => root           9       2  0 Jun08 ?        00:00:00 [mm_percpu_wq]
+        [7] => root          10       2  0 Jun08 ?        00:00:54 [ksoftirqd/0]
+#+END_SRC
+
 ** Reading/Listings directory contents 
 
 API Documentations: 
