@@ -791,6 +791,203 @@ Attempt to run from MX-Linux 19.2 (Older GLIBC)
    adjtime                           "/etc/adjtime"
    alsa                              "/etc/alsa"
 #+END_SRC
+** Widely Used Functions for strings and buffers 
+
+This section provides a review and a recapitulation of the most widely
+used C functions in low level code bases. Those functions are in the
+header <string.h> for C or  <cstring> for C++. 
+
+  + _strlen()_ => Get length of null-terminated character array.
+    + Docs: $ man strlen 
+
+#+BEGIN_SRC cpp 
+   size_t strlen(const char *s);
+
+   root [39] const char* st1 = "unix posix irix linux";
+   root [40] const char* st2 = "bsd msdos";
+
+   root [41] strlen(st1)
+   (unsigned long) 21
+
+   root [42] strlen(st2)
+   (unsigned long) 9
+#+END_SRC
+
+  + _strdup()_ => Copy a C-string allocating the copy with malloc. 
+
+#+BEGIN_SRC cpp 
+   char* strdup(const char *s);
+
+   root [39] const char* st1 = "unix posix irix linux";
+
+   root [43] char* p_copy = strdup(st1)
+   (char *) "unix posix irix linux"
+
+   // Release memory for heap-allocated string 
+   root [47] free(p_copy)
+#+END_SRC
+
+  + _strcmp()_ => Compare two C-strings null-terminated (terminated with
+    '\0' or 0x00 null char) array of characters. This function returns
+    0 if the two strings are equal.
+    + Docs: $ man strcmp 
+
+#+BEGIN_SRC cpp 
+    int strcmp(const char *s1, const char *s2);
+
+    // ------- USAGE --------------------------//
+    if ( strmcp(STRING_A, STRING_B) == 0 )
+        puts(" => Strings are equal");
+    else 
+        puts(" => Strins are not equal");
+
+    // ------ CERN's Root REPL Session -------// 
+    root [0] #include <string.h>
+
+    root [1] const char* s1 = "hello"; 
+    root [2] const char* s2 = "world"; 
+    root [3] const char* s3 = "world C++17 c11 ADA spark"; 
+    root [4] const char* s4 = "hello"; 
+
+    root [5] strcmp(s1, s2)
+    (int) -15
+
+    root [6] strcmp(s1, s3)
+    (int) -15
+
+    root [7] strcmp(s1, s4)
+    (int) 0
+#+END_SRC
+
+  + _strcpy()_ => Copy string 'src' parameter (null-terminated array of
+    characters) to a buffer.
+    + Docs: $ man strcpy 
+    + Note: It is vulnerable to buffer
+      overflow, if the size of the string is bigger than the
+      buffer. This function is often used to for copying string literals
+      to a buffer.
+
+#+BEGIN_SRC cpp 
+     char* strcpy( char*       p_buffer      // Pointer to buffer (array of chars)
+                  ,const char* c_string_src  // C-string 
+                );
+
+     root [9] char buffer[200];
+
+     root [10] buffer
+     (char [200]) "\0\0\0\0\0\0\0\0\0\0\0\0\0\0 ...... \0\0\0\0"
+
+     root [11] strcpy(buffer, "Hello world C++17 C++20 ADA Rust")
+     (char *) "Hello world C++17 C++20 ADA Rust"
+
+     root [12] buffer
+     (char [200]) "Hello world C++17 C++20 ADA Rust\0\0\0\0\0\0\0 ... ... \0\0\0"
+#+END_SRC
+
+  + _strncpy()_ => Copy N characters from string to buffer.
+    + Docs: $ man strncpy 
+    + Linux mapage: "The strcpy() function copies the string pointed
+      to by src, including the terminating null byte ('\0'), to the
+      buffer pointed to by dest.  The strings may not overlap, and the
+      destination string dest must be large enough to receive the
+      copy. Beware of buffer overruns!  (See BUGS.)"
+    
+#+BEGIN_SRC cpp 
+   char* strncpy( char*       dest // Pointer to buffer 
+                , const char* src  // C-string (null-terminated) that will be copied 
+                , size_t      n    // Number of chars (bytes) from src that will be copied
+                );
+
+   // ---------- CERN's ROOT Repl Session ------------//
+
+   root [13] char buff1[30];
+   root [14] char buff2[30];
+
+   root [15] const char* cstr = "Hello world C++17 embedded systems real time control systems";
+
+   root [16] buff1
+   (char [30]) "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+
+   root [17] buff2
+   (char [30]) "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+
+   root [18] strncpy(buff1, cstr, 10)
+   (char *) "Hello worl"
+
+   root [19] buff1 
+   (char [30]) "Hello worl\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+
+   root [20] strncpy(buff2, cstr, 25)
+   (char *) "Hello world C++17 embedde"
+
+   root [21] buff2
+   (char [30]) "Hello world C++17 embedde\0\0\0"
+#+END_SRC  
+
+
+  + _memcmp()_  => Compare the first N bytes of two buffers. It returns
+    0 if all the first N bytes from two buffers are equal. 
+
+#+BEGIN_SRC cpp 
+     int memcmp(  const void* s1 // Pointer to the beginning of buffer 1 
+                , const void* s2 // Pointer to the beginning of buffer 2 
+                , size_t n       // Number of bytes that will be compared 
+              );  
+
+   // -------- CERN's ROOT REPL Session -----------------------// 
+    root [22] uint8_t bf1[] = { 0x01, 0xAB, 0x2C, 0x3C, 0xFF };
+    root [26] uint8_t bf2[] = { 0x01, 0xAB, 0x2C, 0x3C, 0xFF, 0x85, 0x2A, 0x45 };
+    root [30] uint8_t bfx[] = { 0x3A, 0xF8, 0x25 } 
+
+    // Result: Non-zero => First 3 bytes of two buffers are not equal. 
+    root [32] memcmp(bf1, bfx, 3)
+    (int) -57
+
+    // Result: Zero => First 5 bytes of two buffers are equal. 
+    root [36] memcmp(bf1, bf2, 5)
+    (int) 0
+
+    // Result: Zero => First 2 bytes of two buffers are equal. 
+    root [37] memcmp(bf1, bf2, 2)
+    (int) 0
+#+END_SRC
+
+  + _memcpy()_ => Copy N bytes from a memory area (or buffer) src to a
+    memory area dest.
+ 
+#+BEGIN_SRC cpp 
+   void* memcpy(void* dest, const void* src, size_t n);
+
+   // ------- CERN's ROOT Repl session ---------------// 
+   // 
+
+   // ---- Char array --------//
+   root [51] char buf1[10] = { 'h', 'e', 'l', 'l', 'o', ' ', 'c', 'p', 'p', '\0' }
+   (char [10]) "hello cpp"
+
+   root [53] char buf2[15] 
+   (char [15]) "\0\0\0\0\0\0\0\0\0\0\0\0\0"
+
+   root [54] memcpy(buf2, buf1, 10 * sizeof(char))
+   (void *) 0x7f5c5cd7d1b5
+
+   root [55] buf2
+   (char [15]) "hello cpp\0\0\0\0"
+
+   // ---- Int array -------//
+   root [56] int arr1[5] = { 10, 20, 25, 100, -2}
+   (int [5]) { 10, 20, 25, 100, -2 }
+
+   root [57] int arr2[10]
+   (int [10]) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
+
+   root [58] memcpy(arr2, arr1, 5 * sizeof(int))
+   (void *) 0x7f5c5cd7d1f0
+
+   root [59] arr2
+   (int [10]) { 10, 20, 25, 100, -2, 0, 0, 0, 0, 0 }
+#+END_SRC
+
 ** Low level IO functions overview 
 
 C-Library functions which encapsulates file-related systems calls.
