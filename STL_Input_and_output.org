@@ -410,7 +410,7 @@ Running 4:
    ENV[PROGRAM_TIMEOUT]      = 2.551
 #+END_SRC
 
-** C-legacy IO functions - format specifiers and examples
+** C-legacy Printf-like IO functions - format specifiers and examples
 *** Puts 
 
 Print a string without any formatting - header: [[https://en.cppreference.com/w/cpp/header/cstdio][<cstdio>]] for C++ and <stdio.h> for C.
@@ -776,7 +776,154 @@ Output:
   IMU sensor                    108.23
   Pressure transducer           205.90
 #+END_SRC
-** IO Class Hierarchy
+** C-legacy File IO functions 
+ 
+ *Headers Files* 
+
+  + #include <stdio.h> for C
+  + #include <cstdio> for C++ 
+
+ *Special File Streams*
+
+   + stdout (FILE*)  => Console/terminal standard output 
+   + stderr (FILE*)  => Console/terminal standard error output  
+   + stdin  (FILE*)  => Console/terminal standard input 
+  
+ *Fundamental Functions*
+
+  + _fopen()_ => Open a file returning a file _stream_ (FILE*)
+
+#+BEGIN_SRC cpp 
+   FILE *fopen(const char *pathname, const char *mode);
+#+END_SRC
+
+  + _fmemopen()_ => Associate a stream with a buffer. This function
+    allows applying file stream operations to a buffer. 
+    + Documentation:
+      + [[https://pubs.opengroup.org/onlinepubs/9699919799/functions/fmemopen.html][Open Group / Unix Specification]]
+      + [[https://linux.die.net/man/3/open_memstream][Linux Manpage]]
+
+#+BEGIN_SRC cpp 
+   FILE* fmemopen( void* restrict buf /* Pointer to beginning of buffer */
+                 , size_t size        /* Buffer size */
+                 , const char* restrict mode
+                );
+#+END_SRC
+
+  + _fclose()_ => Closes a stream.
+    + "The fclose() function dissociates the named stream from its
+      underlying file or set of functions. If the stream was being
+      used for output, any buffered data is written first, using
+      fflush(3)." [[https://www.freebsd.org/cgi/man.cgi?query=fclose&apropos=0&sektion=0&manpath=FreeBSD+7.0-RELEASE&format=html][(FreeBSD Manpage)]]
+
+#+BEGIN_SRC cpp 
+   int fclose(FILE *stream)
+#+END_SRC 
+
+  + _fflush()_ => Flushes a stream forcing to all data to be written to
+    the output.
+    + "For output streams, fflush() forces a write of all user-space
+      buffered data for the given output or update stream via the
+      stream's underlying write function. For input streams associated
+      with seekable files (e.g., disk files, but not pipes or
+      terminals), fflush() discards any buffered data that has been
+      fetched from the underlying file, but has not been consumed by
+      the application." (Linux Manpage)
+
+#+BEGIN_SRC cpp 
+   int fflush(FILE *stream);
+#+END_SRC
+
+  + _ftell()_ => Get current file offset as number of bytes from the
+    beginning of the file. 
+
+#+BEGIN_SRC cpp 
+   long ftell(FILE *stream);
+#+END_SRC
+
+  + _fseek()_ => Set current file offset as number of bytes from the
+    beginning of the file. 
+
+#+BEGIN_SRC cpp 
+  int fseek(FILE *stream, long offset, int whence);
+#+END_SRC
+
+ *Streams and File Descriptors* 
+
+  + Special File Descriptors (Unix) with type (int)
+    * STDIN_FILENO
+    * STDERR_FILENO 
+    * STDOUT_FILENO
+
+  + _fileno()_ => Get file descriptor associated to a stream. (Note: It
+    returns a file-descriptor as an integer.)
+
+#+BEGIN_SRC cpp 
+  int fileno(FILE* stream);
+#+END_SRC
+
+  + _fdopen()_ => Associate a stream with a file descriptor. [UNIX-ONLY]
+
+#+BEGIN_SRC cpp  
+   FILE* fdopen(int fd, const char* mode);
+#+END_SRC
+
+ *Text I/O - Input/Output*
+
+  + _fputs()_ => Write c-string (null-terminated '\0' array of
+    characters) to stream. 
+
+#+BEGIN_SRC cpp 
+   int fputs(const char* s, FILE* stream)
+#+END_SRC
+
+  + _fputc()_ => Write byte or character to stream. 
+
+#+BEGIN_SRC cpp 
+  int putc(int c, FILE* stream);
+#+END_SRC
+
+  + _fgets()_ => Read a buffer from a stream.
+
+#+BEGIN_SRC cpp 
+  char* fgets(char* s, int size, FILE* stream);
+#+END_SRC
+
+  + _fscanf()_ => Read formatted IO 
+
+#+BEGIN_SRC cpp 
+   int fscanf(FILE *stream, const char *format, ...);
+#+END_SRC
+  
+  + _getline()_ => Read file from a stream. 
+
+#+BEGIN_SRC cpp 
+   ssize_t getline(char** lineptr, size_t* n, FILE* stream);
+#+END_SRC
+
+   + _getdelim()_ => Similar, to getline, but can use other delimiters.
+
+#+BEGIN_SRC cpp 
+   ssize_t getdelim(char** lineptr, size_t* n, int delim, FILE* stream);
+#+END_SRC
+  
+ *Binary I/O - Input/Output related*
+
+  + _fread()_ => Read binary from stream 
+
+#+BEGIN_SRC cpp 
+   size_t fread(void* ptr, size_t size, size_t nmemb, FILE* stream);
+#+END_SRC
+
+  + _fwrite()_ => Write binary data to stream 
+
+#+BEGIN_SRC cpp 
+  size_t fread(void* ptr, size_t size, size_t nmemb, FILE* stream);
+#+END_SRC
+
+
+
+** Standard Library IO Class Hierarchy
 
  *C++ Standard Library IO Features:*
 
@@ -898,7 +1045,7 @@ manipulator std::noboolalpha.
   >> std::cout << "flag1 = " << true << " flag2 = " << false << "\n";
   flag1 = 1 flag2 = 0
 #+END_SRC
-** IO Manipulators 
+** Standard Library IO Manipulators 
 
  + All mapipulators: [[https://en.cppreference.com/w/cpp/io/manip][documentation]]
 
@@ -988,7 +1135,7 @@ Flushing manipulators:
   sqrt(pi) = 1.77245 x = 2.5
   >> 
 #+END_SRC
-** IO stream redirection 
+** Standard Library IO stream redirection 
 *** Stdout (cout) and Stderr (cerr) stream redirection
 
 Every process, has the following standard streams: 
