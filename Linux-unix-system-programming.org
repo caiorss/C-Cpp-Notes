@@ -3736,3 +3736,365 @@ Running:
                Machine = 0x8664 
     Number of sections = 7 
 #+END_SRC
+** Sockets - TCP/IP and Unix Domain Sockets 
+*** Overview 
+
+Sockets are inter process communication mechanism, intruduced by Unix
+BSD 4.1 circa 1982, which allows multiple processes running at
+different machines to communicate across TCP/IP network.
+
+ *Main Implementations*
+
+  + BSD Sockets => Pervarsive on Unix-like operating systems: BSD, Linux, MacOSX, ....,
+  + Winsocks    => Microsft Windows only (Windows NT and Windows CE families)
+
+ *Domain and Connection Type*
+
+A socket endpoint is defined by its _domain_ and connection _type_. 
+
+Most common socket domains:
+
+  * AF_INET   => IPv4 - Internet Protocol [Most used]
+  * AF_INET6  => IPv6 - Intenert Protocol (IPv6)
+  * AF_UNIX   => Unix Domain socket on local machine [Most used]
+
+Most common connection Types: 
+
+  * SOCK_STREAM => [[https://en.wikipedia.org/wiki/Transmission_Control_Protocol][TCP]] - Transmission Control Protocol
+  * SOCK_DGRAM  => [[https://en.wikipedia.org/wiki/User_Datagram_Protocol][UDP]] - User Datagram Protocol 
+  * SOCK_RAW    => Raw network protocol (Requires root permission)
+
+Socket server or socket client: 
+
+  * socket client
+    * => Connects to socket server and always starts the
+      connection. Example: curl; web browser (http client); netcat
+
+  * socket server
+    * => Listen some port and waits client connection. It can handle
+      one or more clients. Example: Http server, nginx, ssh server.
+
+TCP/IP connection tuple: 
+
+   + Hostname or IP address (IPv4 or IPv6)
+     + 0.0.0.0     / address used by a socket server for listening all hosts.
+     + 127.0.0.1   / Localhost
+     + 'localhost' / Local machine 
+   + Port number: 16 bits number 
+
+Common TCP/IP Ports: 
+
+   * 20, 21 - FTP server 
+   * 22 - SSH server
+   * 23 - Telnet (SSH predecessor)
+   * 80 - HTTP server
+   * 443 - HTTPS (HTTP + SSL/TSL) - Http with SSL encryption
+   * 143 - IMAP - Mail
+   * 25  - SMTP - Simple Mail Transfer Protocol
+   * More at: [[https://en.wikipedia.org/wiki/List_of_TCP_and_UDP_port_numbers][List of TCP and UDP port numbers]]
+
+*** BSD Socket APIs
+
+Headers: 
+   + #include <sys/types.h>         
+   + #include <sys/socket.h>
+   + #include <netdb.h> 
+
+Functions for creating and disposing sockets:  
+
+ + _socket()_
+   + Linux Manpage: "socket() creates an endpoint for communication
+     and returns a file descriptor that refers to that endpoint.  The
+     file descriptor returned by a successful call will be the
+     lowest-numbered file descriptor not currently open for the
+     process."
+   + Note: returns -1 when an error happens and sets the _errno_
+     thread-local global variable.
+
+#+BEGIN_SRC cpp 
+   int socket(int domain, int type, int protocol);
+
+   // Usage for TCP/IPv4 
+   int sockfd = socket(AF_INET, SOCK_STREAM, 0); 
+   if(sockfd == -1){ printf("Error: failed to create a socket connect."); abort(); }
+
+   // Usage for UDP/IPv4 
+   int sockfd = socket(AF_INET, SOCK_DGRAM, 0); 
+
+   // Usage for Unix socket with TCP 
+   int sockfd = socket(AF_UNIX, SOCK_STREAM, 0);
+
+   // Usage for Unix socket with UDP 
+   int sockfd = socket(AF_UNIX, SOCK_DGRAM, 0);
+#+END_SRC
+
+ + _close()_ => Close file descriptor or socket file descriptor. 
+
+#+BEGIN_SRC cpp 
+  int close(int fd);
+#+END_SRC
+
+Functions for setting socket as server sockets.
+
+  + _bind()_ [SOCKET SERVER] => Bind a given port for listening income
+    connections. (used for socket servers)
+
+#+BEGIN_SRC cpp 
+   int bind(int sockfd, const struct sockaddr* addr, socklen_t addrlen);
+
+    struct sockaddr {
+        sa_family_t sa_family;
+        char        sa_data[14];
+    };
+#+END_SRC
+
+  + listen() [SOCKET SERVER]
+
+    + Linux Manpage: "listen() marks the socket referred to by sockfd
+      as a passive socket, that is, as a socket that will be used to
+      accept incoming connection requests using accept(2)."
+
+    + Linux Manpage: "The backlog argument defines the maximum length
+      to which the queue of pending connections for sockfd may grow.
+      If a connection request arrives when the queue is full, the
+      client may receive an error with an indication of ECONNRE‐ FUSED
+      or, if the underlying protocol supports retransmission, the
+      request may be ignored so that a later reattempt at connection
+      succeeds."
+
+#+BEGIN_SRC cpp 
+  int listen(int sockfd, int backlog);
+#+END_SRC
+
+  + setsockopt() => Manipulate socket options.
+    + Doc: $ man setsockopt
+
+#+BEGIN_SRC cpp 
+       int setsockopt(int sockfd, int level, int optname, const void *optval, socklen_t optlen);
+#+END_SRC
+
+
+Functions for sending and receiving messages: 
+
+  + send() => Send a buffer to a socket.
+    + Doc: $ man send 
+
+#+BEGIN_SRC cpp 
+   ssize_t send(int sockfd, const void *buf, size_t len, int flags);
+#+END_SRC
+
+  + recv() => Receive a message from a socket.
+    + Doc: $ man recv 
+
+#+BEGIN_SRC cpp 
+  ssize_t recv(int sockfd, void *buf, size_t len, int flags);
+#+END_SRC
+
+Functions for dealing with network address: 
+
+  + gethostbyname()
+    + Translate hostname or IPv4 into IPv4 address. This function
+      performs a DNS query. 
+
+#+BEGIN_SRC cpp 
+   struct hostent*  gethostbyname(const char* name);
+
+   struct hostent {
+       char  *h_name;            /* official name of host */
+       char **h_aliases;         /* alias list */
+       int    h_addrtype;        /* host address type */
+       int    h_length;          /* length of address */
+       char **h_addr_list;       /* list of addresses */
+   }
+   #define h_addr h_addr_list[0] /* for backward compatibility */
+#+END_SRC
+
+
+
+
+
+
+
+*** Simple socket echo server 
+
+Description: 
+
+  + Sample code for a single-thread TCP/IP socket server listening at
+    port 8095. 
+
+GIST: 
+ + https://gist.github.com/6337cd80b9eadad26f386320c1c67cc6
+
+File: socket-echo-server.cpp
+
+#+BEGIN_SRC cpp 
+    // File: socket-echo-server.cpp 
+    // Desc: Simple socket server with a single thread. 
+
+    #include <iostream>
+    #include <string> 
+    #include <vector>
+    #include <cassert> 
+    #include <cstring>  // memcpy 
+
+    // ----- Unix/Linux headers -----// 
+    #include <unistd.h>
+    #include <fcntl.h>
+    #include <sys/types.h>    
+    #include <sys/socket.h>
+    #include <netdb.h>
+
+    // -------------  MAIN() ------------------------------//
+
+    int main(int argc, char** argv)
+    {
+         std::puts(" [INFO] Program started. ");
+
+         // The port should be a 16 bits number (Note: binding to some low port numbers 
+         // requires administrative/root privilege.)
+         std::uint16_t port = 8095;
+
+         // The address can be: 
+         //   '0.0.0.0'   for listening all hosts 
+         //   '127.0.0.1' for local host 
+         const char* hostname = "0.0.0.0";
+
+         // --- Create socket file descriptor -----------------------//
+
+         int sockfd = socket (  AF_INET       // domain:   IPv4
+                              , SOCK_STREAM   // type:     TCP 
+                              , 0             // protocol: (value 0) 
+                             );
+         // Returns (-1) on failure 
+         assert( sockfd != - 1);
+
+         // ---------- query address ------------------------------//
+
+         // Note: the keyword 'struct' is not necessary here (redundant). 
+         struct hostent* h = gethostbyname(hostname);
+         assert(h != nullptr);
+
+         struct sockaddr_in sa; 
+         // memset(&sa, 0x00, sizeof(sa));
+         // set address 
+         memcpy(&sa.sin_addr.s_addr, h->h_addr, h->h_length);
+
+         //bcopy( h->h_addr, &sa.sin_addr.s_addr, h->h_length );
+
+         sa.sin_family = AF_INET;
+         // The function htons convert a number to big-endian format. 
+         sa.sin_port   = htons(port); 
+
+         // ----- Bind to Port and wait for client connections ---------//
+
+         if( ::bind(sockfd, (sockaddr *) &sa, sizeof(sa)) == -1)
+         {
+             fprintf(stderr, "Error: unable to bind socket \n");
+             return EXIT_FAILURE;
+         }
+
+         // Enables binding to the same address 
+         int enable_reuseaddr = 1;
+         if ( setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &enable_reuseaddr, sizeof(int)) < 0 )
+         {
+             fprintf(stderr, "Error: unable to set socket option. \n");
+             return EXIT_FAILURE;
+         }
+
+         fprintf(stderr, " [TRACE] Listening client connection \n");
+
+         int backlog = 5;
+         assert( listen(sockfd, backlog) != -1 );
+
+         // --------------- Server Main Loop --------------------------//
+
+         // Infinite loop where client connections are handled
+         while(true)
+         {	
+             /* [[ ============== BEGIN client loop =========== ]] */
+
+             struct sockaddr_in client_sa; 
+             socklen_t addrlen = sizeof(sockaddr_in); 
+
+             fprintf(stderr, " [TRACE] Waiting for client connection. \n");
+             int sock_client = accept(sockfd, (sockaddr *) &client_sa, &addrlen );
+
+             if(sock_client == -1)
+             {
+                  fprintf(stderr, " Error: failure to handle client socket. Check errno \n");
+                  close(sock_client);
+                  continue;
+             }
+             const char* welcome_msg = "\n => [INFO] Hello world client side!! \n";		
+
+             // Send buffer content to client socket 
+             send(sock_client, welcome_msg, strlen(welcome_msg), 0);
+
+             char buffer[300];
+
+             while(true){
+                 // Read message from client socket 
+                 ssize_t n = recv(sock_client, &buffer, 300, 0);
+                 if(n == 0){ break; }
+
+                 std::fprintf(stdout, " [INFO] Received: ");			
+                 ::write(STDOUT_FILENO, buffer, n);
+
+                 // Send content back 
+                 send(sock_client, buffer, n, 0);
+
+                 // Compare 4 first bytes of buffer and 'quit' 
+                 if( strncmp(buffer, "quit", 4) == 0)
+                 {
+                     fprintf(stderr, " [TRACE] Shutdown connection. Ok. \n");
+                     // Close client connection 
+                     shutdown(sock_client, SHUT_RDWR);
+                     close(sock_client);
+                     break;
+                 }			
+             }
+
+         } /* [[ ============== END client loop =========== ]] */
+
+         // Release resource => RAII (Resource-Acquisition-Is-Initialization) fits here. 
+         close(sockfd);
+         return 0;
+    }
+#+END_SRC
+
+Building: 
+
+#+BEGIN_SRC sh 
+  $ g++ socket-echo-server.cpp -o socke-echo-server.elf -std=c++1z -Wall -Wextra
+#+END_SRC
+
+Running server: 
+
+#+BEGIN_SRC sh 
+   $ ./socke-echo-server.elf 
+    [INFO] Program started. 
+    [TRACE] Listening client connection 
+    [TRACE] Waiting for client connection. 
+   c++1z ada spark high performance
+   c++2z c++20 C++17 c++14 C89 c90 ancient unix
+   quit
+    [TRACE] Shutdown connection. Ok. 
+    [TRACE] Waiting for client connection. 
+
+#+END_SRC
+
+Running client: (netcat tool)
+
+#+BEGIN_SRC sh 
+   $ nc localhost 8095
+
+    => [INFO] Hello world client side!! 
+   c++1z ada spark high performance
+   c++1z ada spark high performance
+   c++2z c++20 C++17 c++14 C89 c90 ancient unix
+   c++2z c++20 C++17 c++14 C89 c90 ancient unix
+   quit
+   quit
+
+   ^C
+#+END_SRC
