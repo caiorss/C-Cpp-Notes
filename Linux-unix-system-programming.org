@@ -3793,6 +3793,20 @@ Common TCP/IP Ports:
    * 25  - SMTP - Simple Mail Transfer Protocol
    * More at: [[https://en.wikipedia.org/wiki/List_of_TCP_and_UDP_port_numbers][List of TCP and UDP port numbers]]
 
+ *Further Reading* 
+
+  + [[https://pubs.opengroup.org/onlinepubs/009695399/functions/xsh_chap02_10.html][Sockets - Unix Open Group Specification]]
+
+  + [[https://en.wikipedia.org/wiki/Berkeley_sockets][Berkeley sockets (BSD Sockets)]]
+
+  + [[https://www.networkworld.com/article/3327557/using-the-linux-ss-command-to-examine-network-and-socket-connections.html][Using the Linux ss command to examine network and socket connections]]
+
+  + [[http://www.qnx.com/developers/docs/qnx_4.25_docs/tcpip50/prog_guide/sock_ipc_tut.html][QNX - A socket-based IPC tutorial]]
+
+  + [[https://devblogs.microsoft.com/commandline/af_unix-comes-to-windows/][AF_UNIX comes to Windows | Windows Command Line / windows socket network]]
+
+  + [[https://blog.myhro.info/2017/01/how-fast-are-unix-domain-sockets][How fast are Unix Domain Sockets?]]
+
 *** BSD Socket APIs
 
 Headers: 
@@ -3834,7 +3848,16 @@ Functions for creating and disposing sockets:
   int close(int fd);
 #+END_SRC
 
-Functions for setting socket as server sockets.
+Functions for setting a socket as client-socket: 
+
+  + _connect()_ => Connect a client socket to a given address. On error,
+    (-1) is returned. On success, 0 is returned. 
+
+#+BEGIN_SRC cpp 
+   int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
+#+END_SRC
+
+Functions for setting a socket as a  server socket.
 
   + _bind()_ [SOCKET SERVER] => Bind a given port for listening income
     connections. (used for socket servers)
@@ -3914,8 +3937,7 @@ Functions for dealing with network address:
 
 
 
-
-*** Simple socket echo server 
+*** Simple TCP/IP socket echo server 
 
 Description: 
 
@@ -4098,3 +4120,175 @@ Running client: (netcat tool)
 
    ^C
 #+END_SRC
+*** Simple Unix-domain socket echo server 
+
+GIST:  
+  + https://gist.github.com/ac308ab6a4cd8d92f02b4f9baeb910f3
+
+File: unix-domain-echo-server.cpp
+
+#+BEGIN_SRC cpp 
+    // File: socket-echo-server.cpp 
+    // Desc: Simple socket server with a single thread. 
+
+    #include <iostream>
+    #include <string> 
+    #include <vector>
+    #include <cassert> 
+    #include <cstring>  // memcpy 
+
+    // ----- Unix/Linux headers -----// 
+    #include <unistd.h>
+    #include <fcntl.h>
+    #include <sys/types.h>    
+    #include <sys/socket.h>
+    #include <sys/un.h>
+
+    // -------------  MAIN() ------------------------------//
+
+    int main(int argc, char** argv)
+    {
+         std::puts(" [INFO] Program started. ");
+         const char* unix_sock_file = "/tmp/unix-socket-file";
+
+         // --- Create socket file descriptor -----------------------//
+
+         int sockfd = socket (  AF_UNIX, SOCK_STREAM, 0);
+         assert( sockfd != - 1);
+
+         struct sockaddr_un sa; 
+         sa.sun_family = AF_UNIX; 
+         strcpy( sa.sun_path, unix_sock_file);	
+
+         // Remove file if it exists.	
+         unlink(unix_sock_file);
+
+         // ----- Bind to unix domain socket and wait for client connections ---------//
+         if( ::bind(sockfd, (sockaddr *) &sa, sizeof(sa)) == -1)
+         {
+             int err = errno; 
+             fprintf(stderr, "Error: unable to bind socket \n");
+             fprintf(stderr, " [ERROR] => %s", strerror(err));
+             return EXIT_FAILURE;
+         }
+
+         // Enables binding to the same address 
+         int enable_reuseaddr = 1;
+         if ( setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &enable_reuseaddr, sizeof(int)) < 0 )
+         {
+             fprintf(stderr, "Error: unable to set socket option. \n");
+             return EXIT_FAILURE;
+         }
+
+
+         fprintf(stderr, " [TRACE] Listening client connection \n");
+
+         int backlog = 5;
+         assert( listen(sockfd, backlog) != -1 );
+
+         // --------------- Server Main Loop --------------------------//
+
+         // Infinite loop where client connections are handled
+         while(true)
+         {	
+               /* [[ ============== BEGIN client loop =========== ]] */
+
+               struct sockaddr_un client_sa; 
+               socklen_t addrlen = sizeof(sockaddr_un); 
+
+               fprintf(stderr, " [TRACE] Waiting for client connection. \n");
+               int sock_client = accept(sockfd, (sockaddr *) &client_sa, &addrlen );
+
+               if(sock_client == -1)
+               {
+                       fprintf(stderr, " Error: failure to handle client socket. Check errno \n");
+                       close(sock_client);
+                       continue;
+               }
+               const char* welcome_msg = "\n => [INFO] Hello world client side!! \n";		
+
+               // Send buffer content to client socket 
+               send(sock_client, welcome_msg, strlen(welcome_msg), 0);
+
+               char buffer[300];
+
+               while(true){
+                     // Read message from client socket 
+                     ssize_t n = recv(sock_client, &buffer, 300, 0);
+                     if(n == 0){ break; }
+
+                     std::fprintf(stdout, " [INFO] Received: ");			
+                     ::write(STDOUT_FILENO, buffer, n);
+
+                     // Send content back 
+                     send(sock_client, buffer, n, 0);
+
+                     // Compare 4 first bytes of buffer and 'quit' 
+                     if( strncmp(buffer, "quit", 4) == 0)
+                     {
+                        fprintf(stderr, " [TRACE] Shutdown connection. Ok. \n");
+                        // Close client connection 
+                        shutdown(sock_client, SHUT_RDWR);
+                        close(sock_client);
+                        break;
+                     }			
+             }
+
+       } /* [[ ============== END client loop =========== ]] */
+
+       // Release resource => RAII (Resource-Acquisition-Is-Initialization) fits here. 
+       close(sockfd);
+       return 0;
+    }
+#+END_SRC
+
+Build: 
+
+#+BEGIN_SRC sh 
+  $ g++ unix-domain-echo-server.cpp -o unix-domain-echo-server.bin -std=c++1z -Wall -Wextra -g
+#+END_SRC
+
+Run server: 
+
+#+BEGIN_SRC sh 
+  $ ./unix-domain-echo-server.bin 
+   [INFO] Program started. 
+   [TRACE] Listening client connection 
+   [TRACE] Waiting for client connection. 
+  unix irix posix linux macosx kernel
+  c++1z c++14 c++20 ADA spark ADA rust C++ Lisp
+
+  quit
+   [TRACE] Shutdown connection. Ok. 
+   [TRACE] Waiting for client connection. 
+#+END_SRC
+
+Run client (netcat) : 
+
+#+BEGIN_SRC sh 
+  $ nc -v -U /tmp/unix-socket-file 
+  Ncat: Version 7.80 ( https://nmap.org/ncat )
+  Ncat: Connected to /tmp/unix-socket-file.
+
+   => [INFO] Hello world client side!! 
+  unix irix posix linux macosx kernel
+  unix irix posix linux macosx kernel
+  c++1z c++14 c++20 ADA spark ADA rust C++ Lisp
+  c++1z c++14 c++20 ADA spark ADA rust C++ Lisp
+
+
+  quit
+  quit
+  ^C
+#+END_SRC
+
+Check unix-socket file: 
+
+#+BEGIN_SRC sh 
+  $ file /tmp/unix-socket-file 
+  /tmp/unix-socket-file: socket
+
+  $ ls -l /tmp/unix-socket-file 
+  srwxrwxr-x 1 mxpkf8 mxpkf8 0 Jul  2 01:22 /tmp/unix-socket-file=
+#+END_SRC
+
