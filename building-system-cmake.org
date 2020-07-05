@@ -1,6 +1,6 @@
 #+INCLUDE: theme/style.org 
 #+TITLE: CPP / C++ - CMake Building System
-#+DESCRIPTION: cpp/c++ code examples and demonstrations.
+#+DESCRIPTION: cpp/c++ cmake building system productivity devops survival 
 #+STARTUP: content 
 
 * CMake Building System 
@@ -682,7 +682,7 @@ instance: Code Blocks.
   1 directory, 4 files
 #+END_SRC
 
-** Project with multiple targets and a single CMakeLists
+** Sample Project with multiple targets and a single CMakeLists
 *** Adding and setting multiple targets  
 
 This section provides shows how to set up a project with additional
@@ -1149,6 +1149,752 @@ Install Dependencies - Shared Libraries:
  + [[https://cmake.org/pipermail/cmake/2009-June/030205.html][Install of library sub-project prior to building application]]
 
  + [[http://cmake.3232098.n2.nabble.com/Copying-Shared-Libraries-DLLs-Next-to-the-Executable-td7597163.html][Copying Shared Libraries (DLLs) Next to the Executable]]
+** Sample Project with sub-projects
+*** Overview 
+
+The following code is a cross-platform CMake project, with
+sub-projects, containing 5 targets: a install target; a shared and
+static libraries and two executables. The aim of this experiment is to
+asses how a installation of a CMake project with multiple sub-projects
+behaves on different operating systems.
+
+Repository: 
+
+  + https://github.com/caiorss/cmake-cpp-nested
+
+ *Directory structure*
+
+#+BEGIN_SRC sh 
+    $ >> tree . 
+   .
+   ├── app1.cpp
+   ├── app2.cpp
+   ├── build_msvc.bat
+   ├── CMakeLists.txt
+   ├── lib_tool
+   │   ├── CMakeLists.txt
+   │   ├── tool.cpp
+   │   └── tool.hpp
+   ├── lib_util
+   │   ├── CMakeLists.txt
+   │   ├── util.cpp
+   │   └── util.hpp
+   ├── LICENSE.txt
+   └── Makefile
+
+   2 directories, 12 files
+#+END_SRC
+
+ *Top-Level Files* 
+
+File: CMakeLists.txt 
+
+#+BEGIN_SRC cmake 
+   cmake_minimum_required(VERSION 3.9)
+   project(CMake_With_Makefile)
+
+   #========== Global Configurations =============#
+   #----------------------------------------------#
+
+   set(CMAKE_CXX_STANDARD 17)     
+   set(CMAKE_VERBOSE_MAKEFILE ON)
+
+   function(ADD_RUN_TARGET tname target)
+       add_custom_target( ${tname}
+           COMMAND ${target}
+           DEPENDS ${target}
+           WORKING_DIRECTORY ${CMAKE_PROJECT_DIR}
+       )
+   endfunction()
+
+   # Fix DLL not found problem on Windows 
+   # Note: Windows shared libraries do not have RPATH or RUNPATH
+   # DLLs are searched first at current directories and then in directories 
+   # listed in $PATH variable.
+   if(WIN32)
+       set(LIBRARY_OUTPUT_PATH    "${CMAKE_BINARY_DIR}")
+       set(EXECUTABLE_OUTPUT_PATH "${CMAKE_BINARY_DIR}")
+   endif()
+
+
+       #=============================================#
+       #  T A R G E T S  C O N F I G U R A T I O N   #  
+       #=============================================#
+
+
+   add_subdirectory(lib_util)
+   add_subdirectory(lib_tool)
+
+          add_executable( app1 app1.cpp )
+   target_link_libraries( app1 lib::util lib::tool )
+
+   if(UNIX)
+       # Set RPATH in the executable for making it relocatable on Unix.
+       # It allows installing the application on any directory or 
+       # running the application from any directory without 
+       # 'symbol not found or library not found' errros. 
+       #
+       # Note: The variable $ORIGIN is the executable absolute directory
+       set_target_properties( app1 PROPERTIES INSTALL_RPATH "$ORIGIN:$ORIGIN/../lib")                       
+   endif()
+
+          add_executable( app2 app2.cpp )
+   target_link_libraries( app2 lib::util lib::tool)
+   # set_target_properties( app2 PROPERTIES INSTALL_RPATH "$ORIGIN/../lib")                       
+
+
+   ADD_RUN_TARGET(run-app1 app1)
+   ADD_RUN_TARGET(run-app2 app2)
+
+       #===========================================#
+       #  I N S T A L  L    T A R G E T            #
+       #===========================================#
+
+
+   install( TARGETS  app1 app2 util tool 
+            # Executables and DLLs (Windows Only)
+            RUNTIME  DESTINATION ${CMAKE_INSTALL_BINDIR}            
+            # Shared libraries: *.so or *.dylib 
+            LIBRARY  DESTINATION ${CMAKE_INSTALL_LIBDIR}          
+            # Static libraries: *.a 
+            ARCHIVE  DESTINATION ${CMAKE_INSTALL_LIBDIR}
+
+   )
+
+   install(FILES LICENSE.txt DESTINATION data)
+
+#+END_SRC
+
+File: Makefile 
+  + Makefile for performing project commands.
+
+#+BEGIN_SRC sh 
+  # GNU Make file script for easier compilation from
+  # command line
+
+  all: help 
+
+  help:
+          @echo "Build options "
+          @echo " $ make debug                 => Debug build at _debug directory "
+          @echo " $ make release               => Release build at _release directory "	
+          @echo " $ make install prefix=<PATH> => Build in release mode and install app. at prefix path. "		
+
+  debug:
+          @echo " =>> DEBUG build "
+          # Only configs if '_debug' directory does not exist yet.
+          [ ! -f _debug ] && cmake --config Debug -B_debug -H.    
+          cmake --build _debug --target
+
+  release:
+          @echo " =>> RELEASE build " && sleep 1 
+          [ ! -f _release ] && cmake --config Release -B_release -H. 
+          cmake --build _release --target
+
+  install:
+          @echo " =>> INSTALL release" && sleep 1 
+          cmake --config Release -B_install -H. -DCMAKE_INSTALL_PREFIX=${prefix}
+          cmake --build _install --target install
+
+  run-app1:
+          @echo " =>> Run app1 " && sleep 1
+          [ ! -f _debug ] && cmake --config Debug -B_debug -H.    
+          cmake --build _debug --target run-app1 
+
+  clean:
+          rm -rfv ./_debug ./_release ./_install  
+
+  clean-debug:
+          rm -rf -v ./_debug 
+
+  clean-release:
+          rm -rf -v ./_release 
+#+END_SRC
+
+File: app1.cpp / target app1 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+
+  #include <util.hpp>
+  #include <tool.hpp>
+
+   int main(int argc, char** argv)
+   {
+      std::cout << " [INFO] Application 1 Called Ok." << std::endl;
+
+      util::util_function(100);
+      tool::too_lib_function();
+
+     #ifdef _WIN32
+        std::cout << " Type RETURN to exit " << "\n";
+        std::cin.get();
+     #endif	
+
+      return 0;
+   }
+#+END_SRC
+
+File: app2.cpp / target app2 
+
+#+BEGIN_SRC cpp 
+   #include <iostream>
+
+   #include <util.hpp>
+   #include <tool.hpp> 
+
+   int main(int argc, char** argv)
+   {
+       std::cout << " [INFO] Application 2 Called Ok." << std::endl;
+
+       util::util_function(20);
+       tool::too_lib_function();
+
+       #ifdef _WIN32
+          std::cout << " Type RETURN to exit " << "\n";
+          std::cin.get();
+       #endif 
+
+       return 0;
+   }
+#+END_SRC
+
+ *Sub-project lib_util*  (target lib::util)
+
+File: lib_util/CMakeLists.txt  
+
+#+BEGIN_SRC cmake 
+   cmake_minimum_required(VERSION 3.9)
+   project(CMake_With_Makefile)
+
+   #========== Global Configurations =============#
+   #----------------------------------------------#
+
+   set(CMAKE_CXX_STANDARD 17)     
+   set(CMAKE_VERBOSE_MAKEFILE ON)
+
+   # Export ALL DLLs symbols on Windows without __declspec(xxxx) annotations.
+   set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS true)
+
+   #========== Targets Configurations ============#
+
+                  add_library ( util SHARED util.cpp util.hpp)
+   target_include_directories ( util PUBLIC . )
+                  add_library ( lib::util ALIAS util )
+
+#+END_SRC
+
+File: lib_util/util.hpp 
+
+#+BEGIN_SRC cpp 
+   #ifndef _UTIL_HPP_
+   #define _UTIL_HPP_
+
+   namespace util {
+       void util_function(int n);
+   }
+
+   #endif 
+#+END_SRC
+
+File: lib_util/util.cpp 
+
+#+BEGIN_SRC cmake 
+   #include "util.hpp"
+
+   #include <iostream> 
+
+   namespace util {
+
+       void util_function(int n)
+       {
+           std::cout << " [TRACE] util_function() called with n = " << n << '\n';
+       }
+   }
+#+END_SRC
+
+
+ *Sub-project lib_tool*  (target lib::tool)
+
+File: lib_tool/CMakeLists.txt 
+
+#+BEGIN_SRC cmake 
+   cmake_minimum_required(VERSION 3.9)
+   project(CMake_With_Makefile)
+
+   #========== Global Configurations =============#
+   #----------------------------------------------#
+   set(CMAKE_CXX_STANDARD 17)     
+   set(CMAKE_VERBOSE_MAKEFILE ON)
+   # Export ALL DLLs symbols on Windows without __declspec(xxxx) annotations.
+   set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS true)
+
+   #========== Targets Configurations ============#
+
+                  add_library( tool STATIC tool.cpp tool.hpp )
+   target_include_directories( tool PUBLIC . )
+
+   add_library( lib::tool ALIAS tool )
+#+END_SRC
+
+File: lib_tool/tool.hpp 
+
+#+BEGIN_SRC cpp 
+  #ifndef _TOOL_HPP_
+  #define _TOOL_HPP_
+
+  namespace tool {
+      void too_lib_function();
+  };
+
+  #endif 
+#+END_SRC
+
+File: lib_tool/tool.cpp 
+
+#+BEGIN_SRC cpp 
+   #include "tool.hpp"
+
+   #include <iostream> 
+
+   namespace tool {
+       void too_lib_function()
+       {
+           std::cout << " [TRACE] Called tool_lib_function() OK. " << "\n";
+       }
+   };
+
+#+END_SRC
+*** Build and install on Linux 
+
+Clone the repository: 
+
+#+BEGIN_SRC sh 
+    $ git clone https://github.com/caiorss/cmake-cpp-nested cnest 
+    $ cd cnest
+#+END_SRC
+
+ *Run debug build*
+
+#+BEGIN_SRC sh 
+    $ >> make debug 
+    =>> DEBUG build 
+   # Only configs if '_debug' directory does not exist yet.
+   [ ! -f _debug ] && cmake --config Debug -B_debug -H.    
+   -- The C compiler identification is GNU 10.1.1
+   -- The CXX compiler identification is GNU 10.1.1
+   -- Check for working C compiler: /usr/bin/cc
+    ... ... ... 
+
+    $ >> ls _debug/
+   app1*  CMakeCache.txt  cmake_install.cmake  lib_util/
+   app2*  CMakeFiles/     lib_tool/            Makefile
+
+    # Test executable app1 
+    $ >> _debug/app1
+    [INFO] Application 2 Called Ok.
+    [TRACE] util_function() called with n = 100
+    [TRACE] Called tool_lib_function() OK. 
+
+    # Test executable app2 
+    ~/t/cnest
+    $ >> _debug/app2
+    [INFO] Application 1 Called Ok.
+    [TRACE] util_function() called with n = 20
+    [TRACE] Called tool_lib_function() OK. 
+#+END_SRC
+
+ *Building and Installing application locally*
+
+  + Building and installing application to directory $HOME/Applications/mycmake-app 
+
+#+BEGIN_SRC sh 
+     $ cmake --config Release -H. -B_install -DCMAKE_INSTALL_PREFIX=$HOME/Applications/mycmake-app
+     $ cmake --build _install --target install 
+#+END_SRC
+
+  + Building and installing application to directory
+    $HOME/Applications/mycmake-app using the Makefile. 
+
+#+BEGIN_SRC sh 
+   $ make install prefix=$HOME/Applications/mycmake-app
+#+END_SRC
+
+  + Checking installation directory: 
+
+#+BEGIN_SRC sh 
+    $ >> tree ~/Applications/mycmake-app
+   /home/user/Applications/mycmake-app
+   ├── bin
+   │   ├── app1
+   │   └── app2
+   ├── data
+   │   └── LICENSE.txt
+   └── lib
+       ├── libtool.a
+       └── libutil.so
+
+   3 directories, 5 files
+#+END_SRC
+
+  + Testing applications: 
+
+#+BEGIN_SRC sh 
+   # Attempt to run executable app1 
+   $ >> ~/Applications/mycmake-app/bin/app1 
+   [INFO] Application 1 Called Ok.
+   [TRACE] util_function() called with n = 100
+   [TRACE] Called tool_lib_function() OK. 
+
+
+   # Attempt to run executable app2   
+   $ >> ~/Applications/mycmake-app/bin/app2
+   [INFO] Application 2 Called Ok.
+  /home/mxpkf8/Applications/mycmake-app/bin/app2: symbol lookup error: /home/mxpkf8/Applications/mycmake-app/bin/app2: undefined symbol: _ZN4util13util_functionEi
+
+   $ >> env LD_LIBRARY_PATH=$HOME/Applications/mycmake-app/lib  ~/Applications/mycmake-app/bin/app2
+   [INFO] Application 2 Called Ok.
+   [TRACE] util_function() called with n = 20
+   [TRACE] Called tool_lib_function() OK. 
+#+END_SRC
+
+ + Running from applications from any directory [SOLUTION 1]. 
+
+#+BEGIN_SRC sh 
+   # [FAILURE] Attempt to run app1 from any directory 
+   $ app1
+   bash: app1: command not found
+
+   # Solution: Add the install directory to $PATH environment variable
+   # either in the shell or in the configuration files ~/.bashrc or ~/.profile
+   $ export PATH=$HOME/Applications/mycmake-app/bin:$PATH
+
+   $ app1
+    [INFO] Application 2 Called Ok.
+    [TRACE] util_function() called with n = 100
+    [TRACE] Called tool_lib_function() OK. 
+
+   $ app2
+    [INFO] Application 1 Called Ok.
+   app2: symbol lookup error: app2: undefined symbol: _ZN4util13util_functionEi
+
+   # Not recommended 
+   $ export LD_LIBRARY_PATH=$HOME/Applications/mycmake-app/lib:$LD_LIBARY_PATH
+
+   $ app2
+    [INFO] Application 1 Called Ok.
+    [TRACE] util_function() called with n = 20
+    [TRACE] Called tool_lib_function() OK. 
+#+END_SRC
+
+ + Running from applications from any directory [SOLUTION 2].
+   + Create symbolic links from the install directory to any directory
+     listed in $PATH variable such as /usr/local/bin 
+
+#+BEGIN_SRC sh 
+   $ ln -s ~/Applications/mycmake-app/bin/app1 /usr/local/bin/app1
+   $ ln -s ~/Applications/mycmake-app/bin/app2 /usr/local/bin/app2  
+#+END_SRC
+
+ + Checking shared libraries dependencies 
+
+#+BEGIN_SRC sh 
+   $ >> ldd  ~/Applications/mycmake-app/bin/app1
+   linux-vdso.so.1 (0x00007ffc945f6000)
+   libutil.so => /home/user/Applications/mycmake-app/bin/../lib/libutil.so (0x00007f6f95035000)
+   libstdc++.so.6 => /lib64/libstdc++.so.6 (0x00007f6f94e23000)
+   libm.so.6 => /lib64/libm.so.6 (0x00007f6f94cdd000)
+   libgcc_s.so.1 => /lib64/libgcc_s.so.1 (0x00007f6f94cc2000)
+   libc.so.6 => /lib64/libc.so.6 (0x00007f6f94af8000)
+   /lib64/ld-linux-x86-64.so.2 (0x00007f6f9503c000)
+#+END_SRC
+
+
+  *Build and Install application globally* (system-wide install)
+
+  + Run a docker-image containing building tools for simulating a virtual machine.
+
+#+BEGIN_SRC sh 
+   $ docker run -it --rm -v $PWD:/cwd -w /cwd --entrypoint=bash linux-build
+#+END_SRC
+
+ + The following commands are performed within the docker image: 
+
+   + Note: The default behavior of CMake install target on Linux is to
+     install libraries and executables in a system-wide mode to the
+     paths ~/usr/local/lib~ and ~/usr/local/bin/~. The shortcoming of
+     installing in this way are: different versions of the same
+     applications cannot coexist; possible dependency hell if installed
+     application libraries overrides existing ones already being used by
+     other applications.
+
+#+BEGIN_SRC sh 
+ $ cmake --config Release -H. -B_install 
+
+ $ cmake --build _install --target install
+     ... ... ... ... ... ... ... ... 
+     ... ... ... ... ... 
+  Install the project...
+  /hbb/bin/cmake -P cmake_install.cmake
+  -- Install configuration: ""
+  -- Installing: /usr/local/bin/app1
+  -- Set runtime path of "/usr/local/bin/app1" to "$ORIGIN:$ORIGIN/../lib"
+  -- Installing: /usr/local/bin/app2
+  -- Set runtime path of "/usr/local/bin/app2" to ""
+  -- Installing: /usr/local/lib/libutil.so
+  -- Installing: /usr/local/lib/libtool.a
+  -- Installing: /usr/local/data/LICENSE.txt
+#+END_SRC
+
+  + Testing executables: 
+
+#+BEGIN_SRC sh 
+   $ app1
+    [INFO] Application 1 Called Ok.
+    [TRACE] util_function() called with n = 100
+    [TRACE] Called tool_lib_function() OK. 
+
+   $ app2
+    [INFO] Application 2 Called Ok.
+   app2: symbol lookup error: app2: undefined symbol: _ZN4util13util_functionEi
+   [root@5bf932c0a153 cwd]# 
+#+END_SRC
+
+  + Checking executables: 
+
+#+BEGIN_SRC sh 
+   $ which app1
+   /usr/local/bin/app1
+
+   $ which app2
+   /usr/local/bin/app2
+
+  $ ldd $(which app1)
+     linux-vdso.so.1 =>  (0x00007ffe2752b000)
+     libutil.so => /usr/local/bin/../lib/libutil.so (0x00007f1530013000)
+     libstdc++.so.6 => /usr/lib64/libstdc++.so.6 (0x00007f152fd0d000)
+     libm.so.6 => /lib64/libm.so.6 (0x00007f152fa89000)
+     libgcc_s.so.1 => /lib64/libgcc_s.so.1 (0x00007f152f873000)
+     libc.so.6 => /lib64/libc.so.6 (0x00007f152f4df000)
+     /lib64/ld-linux-x86-64.so.2 (0x00007f1530215000)
+
+
+  $ ldd $(which app2)
+     linux-vdso.so.1 =>  (0x00007ffdad757000)
+     libutil.so => /usr/lib64/libutil.so (0x00007fed49570000)
+     libstdc++.so.6 => /usr/lib64/libstdc++.so.6 (0x00007fed4926a000)
+     libm.so.6 => /lib64/libm.so.6 (0x00007fed48fe6000)
+     libgcc_s.so.1 => /lib64/libgcc_s.so.1 (0x00007fed48dd0000)
+     libc.so.6 => /lib64/libc.so.6 (0x00007fed48a3c000)
+     /lib64/ld-linux-x86-64.so.2 (0x00007fed49773000)
+#+END_SRC
+
+*** Build and install on Windows 
+
+  *Building and installing locally* (non sytem wide mode)
+
+ + Clone repository: 
+
+#+BEGIN_SRC sh 
+    $ git clone https://github.com/caiorss/cmake-cpp-nested cnest 
+    $ cd cnest
+#+END_SRC
+
+  + Configure: 
+
+#+BEGIN_SRC sh 
+  $ cmake --config Release -H. -B_install1 -DCMAKE_INSTALL_PREFIX=C:\\Users\mxpkf8\Desktop\mycmake-app
+
+  -- Building for: Visual Studio 16 2019
+  -- The C compiler identification is MSVC 19.26.28806.0
+  -- The CXX compiler identification is MSVC 19.26.28806.0
+  -- Check for working C compiler: C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Tools/MSVC/14.26.28801/bin/Hostx64/x64/cl.exe
+  -- Check for working C compiler: C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Tools/MSVC/14.26.28801/bin/Hostx64/x64/cl.exe - works
+  -- Detecting C compiler ABI info
+  -- Detecting C compiler ABI info - done
+  -- Detecting C compile features
+  -- Detecting C compile features - done
+    ...   ...   ...   ...   ...   ...   ...   ...   ...   ... 
+    ...   ...   ...   ...   ...   ...   ...   ...   ... 
+  -- Detecting CXX compile features - done
+  -- Configuring done
+  -- Generating done
+  -- Build files have been written to: C:/Users/mxpkf8/Desktop/cnest/_install1
+#+END_SRC
+
+ + Build all targets: 
+
+#+BEGIN_SRC sh 
+  $ cmake --build _install1 --target
+#+END_SRC
+
+ + Show contents of build directory
+
+#+BEGIN_SRC sh 
+   $ dir _install1\Debug\
+
+    Volume in drive C has no label.
+    Volume Serial Number is 2AC0-732B
+
+    Directory of C:\Users\mxpkf8\Desktop\cnest\_install1\Debug
+
+   07/05/2020  03:09 PM    <DIR>          .
+   07/05/2020  03:09 PM    <DIR>          ..
+   07/05/2020  03:09 PM            58,368 app1.exe
+   07/05/2020  03:09 PM           599,064 app1.ilk
+   07/05/2020  03:09 PM           790,528 app1.pdb
+   07/05/2020  03:09 PM            58,368 app2.exe
+   07/05/2020  03:09 PM           599,064 app2.ilk
+   07/05/2020  03:09 PM           790,528 app2.pdb
+   07/05/2020  03:09 PM            53,116 tool.lib
+   07/05/2020  03:09 PM           421,888 tool.pdb
+   07/05/2020  03:09 PM            58,880 util.dll
+   07/05/2020  03:09 PM             4,505 util.exp
+   07/05/2020  03:09 PM           512,192 util.ilk
+   07/05/2020  03:09 PM             7,666 util.lib
+   07/05/2020  03:09 PM           724,992 util.pdb
+                 13 File(s)      4,679,159 bytes
+                  2 Dir(s)  49,404,833,792 bytes free
+#+END_SRC
+
+ + Testing executable targets: 
+
+#+BEGIN_SRC sh 
+  $ _install1\Debug\app1.exe
+   [INFO] Application 1 Called Ok.
+   [TRACE] util_function() called with n = 100
+   [TRACE] Called tool_lib_function() OK.
+   Type RETURN to exit
+
+  $ _install1\Debug\app2.exe
+   [INFO] Application 2 Called Ok.
+   [TRACE] util_function() called with n = 20
+   [TRACE] Called tool_lib_function() OK.
+   Type RETURN to exit
+#+END_SRC
+
+ + Peform installation 
+
+#+BEGIN_SRC sh 
+  $ cmake --build _install1 --target install
+
+  Microsoft (R) Build Engine version 16.6.0+5ff7b0c9e for .NET Framework
+  Copyright (C) Microsoft Corporation. All rights reserved.
+
+    tool.vcxproj -> C:\Users\mxpkf8\Desktop\cnest\_install1\Debug\tool.lib
+    Auto build dll exports
+    util.vcxproj -> C:\Users\mxpkf8\Desktop\cnest\_install1\Debug\util.dll
+    app1.vcxproj -> C:\Users\mxpkf8\Desktop\cnest\_install1\Debug\app1.exe
+    app2.vcxproj -> C:\Users\mxpkf8\Desktop\cnest\_install1\Debug\app2.exe
+    -- Install configuration: "Debug"
+    -- Installing: C:/Users/mxpkf8/Desktop/mycmake-app/bin/app1.exe
+    -- Installing: C:/Users/mxpkf8/Desktop/mycmake-app/bin/app2.exe
+    -- Installing: C:/Users/mxpkf8/Desktop/mycmake-app/lib/util.lib
+    -- Installing: C:/Users/mxpkf8/Desktop/mycmake-app/bin/util.dll
+    -- Installing: C:/Users/mxpkf8/Desktop/mycmake-app/lib/tool.lib
+    -- Installing: C:/Users/mxpkf8/Desktop/mycmake-app/data/LICENSE.txt
+#+END_SRC
+
+ + Listing installation directory. 
+
+#+BEGIN_SRC sh 
+    $ >> tree mycmake-app 
+   mycmake-app
+   ├── bin
+   │   ├── app1.exe
+   │   ├── app2.exe
+   │   └── util.dll
+   ├── data
+   │   └── LICENSE.txt
+   └── lib
+       ├── tool.lib
+       └── util.lib
+
+   3 directories, 6 files
+#+END_SRC
+
+ + Testing executables. 
+
+#+BEGIN_SRC sh 
+   $ %USERPROFILE%\Desktop\mycmake-app\bin\app1
+    [INFO] Application 1 Called Ok.
+    [TRACE] util_function() called with n = 100
+    [TRACE] Called tool_lib_function() OK.
+    Type RETURN to exit
+
+
+   $ %USERPROFILE%\Desktop\mycmake-app\bin\app2
+    [INFO] Application 2 Called Ok.
+    [TRACE] util_function() called with n = 20
+    [TRACE] Called tool_lib_function() OK.
+    Type RETURN to exit
+
+
+   $ %USERPROFILE%\Desktop\mycmake-app\bin\app1.exe
+    [INFO] Application 1 Called Ok.
+    [TRACE] util_function() called with n = 100
+    [TRACE] Called tool_lib_function() OK.
+    Type RETURN to exit
+#+END_SRC
+
+  *Building and installing globally* (sytem wide mode)
+
+ + Building and insttalling with default generator  
+
+#+BEGIN_SRC sh 
+  $ cmake --config Release -H. -B_install2 
+
+  $ cmake --build _install2 --target install
+  Microsoft (R) Build Engine version 16.6.0+5ff7b0c9e for .NET Framework
+  Copyright (C) Microsoft Corporation. All rights reserved.
+
+    tool.vcxproj -> C:\Users\mxpkf8\Desktop\cnest\_install2\Debug\tool.lib
+    Auto build dll exports
+    util.vcxproj -> C:\Users\mxpkf8\Desktop\cnest\_install2\Debug\util.dll
+    app1.vcxproj -> C:\Users\mxpkf8\Desktop\cnest\_install2\Debug\app1.exe
+    app2.vcxproj -> C:\Users\mxpkf8\Desktop\cnest\_install2\Debug\app2.exe
+    -- Install configuration: "Debug"
+    -- Installing: C:/Program Files (x86)/CMake_With_Makefile/bin/app1.exe
+    -- Installing: C:/Program Files (x86)/CMake_With_Makefile/bin/app2.exe
+    -- Installing: C:/Program Files (x86)/CMake_With_Makefile/lib/util.lib
+    -- Installing: C:/Program Files (x86)/CMake_With_Makefile/bin/util.dll
+    -- Installing: C:/Program Files (x86)/CMake_With_Makefile/lib/tool.lib
+    -- Installing: C:/Program Files (x86)/CMake_With_Makefile/data/LICENSE.txt
+#+END_SRC
+
+ + Building and insttalling with another CMake generator 
+
+ #+BEGIN_SRC sh 
+  $ cmake --config Release -H. -B_install3 -G "Visual Studio 14 2015 Win64"
+
+  $ cmake --build _install3 --target install 
+  ... ... ... ... ... ... ... ... ... 
+   Building Custom Rule C:/Users/mxpkf8/Desktop/cnest/CMakeLists.txt
+   -- Install configuration: "Debug"
+   -- Installing: C:/Program Files/CMake_With_Makefile/bin/app1.exe
+   -- Installing: C:/Program Files/CMake_With_Makefile/bin/app2.exe
+   -- Installing: C:/Program Files/CMake_With_Makefile/lib/util.lib
+   -- Installing: C:/Program Files/CMake_With_Makefile/bin/util.dll
+   -- Installing: C:/Program Files/CMake_With_Makefile/lib/tool.lib
+   -- Installing: C:/Program Files/CMake_With_Makefile/data/LICENSE.txt
+ #+END_SRC
+
+  + Running: 
+
+#+BEGIN_SRC sh 
+ $ "C:/Program Files/CMake_With_Makefile/bin/app1.exe"
+ [INFO] Application 1 Called Ok.
+ [TRACE] util_function() called with n = 100
+ [TRACE] Called tool_lib_function() OK.
+ Type RETURN to exit
+
+ $ "C:/Program Files/CMake_With_Makefile/bin/app2.exe"
+  [INFO] Application 2 Called Ok.
+  [TRACE] util_function() called with n = 20
+  [TRACE] Called tool_lib_function() OK.
+  Type RETURN to exit
+
+#+END_SRC
 ** Consuming or Dependencies 
 *** Overview 
 
