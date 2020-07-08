@@ -1184,6 +1184,602 @@ Attempt to run from MX-Linux 19.2 (Older GLIBC)
    adjtime                           "/etc/adjtime"
    alsa                              "/etc/alsa"
 #+END_SRC
+** Making command line applications with CLI11 Library
+*** Overview 
+
+Despite that GUI Graphical user interfaces applications are more used
+nowadays than CLI command line applications, it still worth developing
+CLI applications. Among other things, the benefits of CLI applications
+over GUI can be summarized as: 
+
+  + More precision
+    + They are more precise than GUI for performing task. It is easier
+      to guide someone by showing the command line steps rather than
+      describing all buttons, menus, context menus that someone should
+      click in order to accomplish some task. 
+
+  + Scriptability
+    + CLI applications are scriptable and they can be automated;
+      called from other applications or scripts.
+
+  + Reproducibility 
+    + Unlike GUIs, CLI applications are reproducible and the sequence
+      of steps for performing some task can be stored as text and
+      later replayed by pasting the commands in a terminal or running
+      them from a script. 
+
+  + They can be combined
+    + Unlike GUI, CLI applications can be combined with each other via
+      stdout, stderr redirection. Example: CLI tools such as 'grep',
+      'echo', 'ls', 'find', 'awk', 'sed' are often combined with each
+      other in shell scripts for system configuration or automation.
+
+
+  *Anotomy of CLI Applications* 
+
+Simple command line application: 
+
+#+BEGIN_SRC sh 
+  $ ./<COMMAND> <P0> <P1> ... <PN> --flag0 --flag1 --switch0 value0 --switch1 value1 --switch value2 ... 
+
+  # Or: 
+  $ ./<COMMAND> <P0> <P1> ... <PN> \
+       --flag0 --flag1 \
+       --switch0 value0 --switch1 value1 --switch value2 ... 
+
+  $ ./<COMMAND> <P0> <P1> ... <PN> --flag0 --flag1 \
+       --switch0=value0 --switch1=value1 --switch=value2 ... 
+#+END_SRC
+
+Command line application with multiple subcommands: (i.e: git, docker)
+
+#+BEGIN_SRC sh 
+  $ ./<COMMAND> <SUBCOMMAND> <P0> <P1> ... <PN> \
+       --flag0 --flag1 \
+       --switch0 value0 --switch1 value1 --switch value2 ... 
+
+  # OR: 
+  $ ./<COMMAND> <SUBCOMMAND> <P0> <P1> ... <PN> \
+       --flag0 --flag1 \
+       --switch0=value0 --switch1=value1 --switch=value2 ... 
+#+END_SRC
+
+Where: 
+
+   * <COMMAND>
+     * Appplication or executable.
+
+   * <SUBCOMMAND>
+     * Metaphor: an action or verb performed on subjects (positional
+       arguments).
+     * Subcommand, similar to 'git checkout' or'docker run'. A
+       subcommand or command represents an 
+
+   * <P0>, <P1>, ..., <PN>
+     + Metaphor: subjects 
+     + Positional arguments (without '-' dash prefix) - they are
+       essential (required) arguments for running an application. If
+       they are not provided, an error happens.
+
+   * -flag0 -flag1 ....
+     * Metaphor: adjectives  
+     * A flag is an optional command line switch which represents a
+       boolean value. The usage of a flag sets the represented value
+       as true and absence, sets the represented value as false.
+
+   * --switch0=value0 --switch1=value1 ....
+     * Metaphor: adjectives  
+     * Switches are optional command line arguments associated to some
+       program state. 
+
+  *Example* - Breaking down command line parts:
+
+#+BEGIN_SRC sh 
+   $ docker run -i -t --rm --volume=$PWD:/cwd -w=/cwd xdxd/docker-binwalk bash     
+#+END_SRC       
+ 
+  * Command:
+    + docker
+
+  * Sub-command:
+    + run
+
+  * Positional arguments:
+    + (xdxd/docker-binwalk) and (bash)
+
+  * Flags:
+    + (-i), (-t), (--rm)
+
+  * Switches:
+    + (--volume), (-w)
+
+ 
+  *General recommendations* 
+
+   * Do only one thing => The application should only do one thing. If
+     it needs to perform more than one task, the best choice is to
+     create a subcommand for every task.
+
+   * Status Code => Return status code '0' (EXIT_SUCCESS) when the
+     applications is terminated successfully or any other value
+     different than zero in case of failure.
+
+   * Create subcommands for the most common use-cases: make simple
+     things simple and coplex things possible (borrowed from Alan Kay). 
+
+   * Use reasonable default values for command line switches values
+     and flags.
+
+   * Show the default values for command line switches.
+
+   * Add usage examples. 
+
+*** Sample application with multiple sub-comamnds   
+
+The following code contains a sample CLI application containing
+multiple sub-commands:. 
+ 
+GIST: 
+  + https://gist.github.com/caiorss/1b6826b9722ba07667eefed2f82d667e 
+
+CLI11 Library Documentation: 
+
+  * [[https://cliutils.gitlab.io/CLI11Tutorial/][Introduction · CLI11 Tutorial]]
+
+  * [[https://cliutils.gitlab.io/CLI11Tutorial/chapters/subcommands.html][Subcommands and the App · CLI11 Tutorial]]
+
+  * [[https://indico.cern.ch/event/619465/contributions/2507949/attachments/1448567/2232649/20170424-diana-2.pdf][CLI11: Command line parsing made simple]] 
+
+ *Files* 
+
+File: CMakeLists.txt 
+
+#+BEGIN_SRC cmake 
+   cmake_minimum_required(VERSION 3.9)
+   project(cliapp)
+
+   #========== Global Configurations =============#
+   #----------------------------------------------#
+
+   set(CMAKE_CXX_STANDARD 17)     
+   set(CMAKE_VERBOSE_MAKEFILE ON)
+   set(CMAKE_CXX_EXTENSIONS OFF)
+
+   # ------------ Download CPM CMake Script ----------------#
+
+   ## Automatically donwload and use module CPM.cmake
+   file(DOWNLOAD https://raw.githubusercontent.com/TheLartians/CPM.cmake/v0.26.2/cmake/CPM.cmake
+                    "${CMAKE_BINARY_DIR}/CPM.cmake")
+   include("${CMAKE_BINARY_DIR}/CPM.cmake")
+
+   #----------- Add dependencies --------------------------#
+
+   CPMAddPackage(
+       NAME cli11
+       URL  https://github.com/CLIUtils/CLI11/archive/v1.9.0.zip
+       DOWNLOAD_ONLY YES
+   )
+
+   include_directories( ${cli11_SOURCE_DIR}/include )
+
+   message([TRACE] " cli11_SOURCE_DIR =  ${cli11_SOURCE_DIR} ")
+
+   #----------- Set targets -------------------------------#
+
+   add_executable(cliapp cliapp.cpp)
+   target_link_libraries(cliapp stdc++fs)
+
+   install( TARGETS cliapp 
+            RUNTIME DESTINATION bin)
+
+#+END_SRC
+
+File: cliapp.cpp 
+
+#+BEGIN_SRC cpp 
+   #include <iostream>
+   #include <string> 
+   #include <vector> 
+   #include <functional>
+   #include <filesystem>
+   #include <functional>
+
+   #include <CLI/CLI.hpp>
+
+
+   using namespace std::string_literals;
+   namespace fs = std::filesystem;
+
+   struct Command_list
+   {
+       std::string m_path = ".";
+       bool m_filter_file = false;
+       bool m_filter_dir  = false; 
+       bool m_recursive   = false; 
+
+       Command_list(CLI::App& app, std::string name)
+       {
+           this->install(app, name);
+       }
+
+       void install(CLI::App& app, std::string name)
+       {
+           CLI::App* cmd = app.add_subcommand(
+               name, "List directory"
+           );
+
+           cmd->callback([this](){
+               try {
+                   this->list_directory();
+                   // Status code  0 => OK finished successfuly 
+                   return true; 
+               } catch(std::exception const& ex) {
+                   std::cout << " Error: " << ex.what() << '\n';
+                   return false; 
+               }
+           });
+
+           cmd->add_option("<PATH>",        m_path,        "Directory to be listed." )->required();
+           cmd->add_flag("-f,--file",       m_filter_file, "Only list files");
+           cmd->add_flag("-d,--directory",  m_filter_dir,  "Only list directories");
+           cmd->add_flag("-r,--recursive",  m_recursive,   "List direcotyr in recursive way");
+       }
+
+   private:
+
+       void list_directory()
+       {
+           if(m_filter_file && m_filter_dir)
+               throw std::runtime_error("Error: --file and --dir flags cannot be simultaneously true.");
+
+           using Predfun = std::function<bool (fs::path const&)>;
+           auto predicate = Predfun{};
+
+           auto iterate_dir = [&predicate](auto&& iterable){
+               for(auto const& path :  iterable )
+               {
+                   if(predicate(path)) std::printf("  => %s\n", path.path().c_str()); 
+               }
+           };
+
+           using ptr = bool (*) (fs::path const&);
+
+           if(!m_filter_file && !m_filter_dir) 
+               predicate = [](fs::path const& p){ return true; };
+
+           if(m_filter_file) 
+               predicate = (ptr) &fs::is_regular_file;
+
+           if(m_filter_dir)
+               predicate = (ptr) &fs::is_directory;
+
+           if(!m_recursive)
+               iterate_dir( fs::directory_iterator(m_path) );
+           else 
+               iterate_dir( fs::recursive_directory_iterator(m_path) );
+       }   
+   };
+
+   class MiniWebServer
+   {
+       int         m_port = 8080; 
+       std::string m_host = "0.0.0.0";
+       std::string m_path = "."; 
+       bool        m_auth = false; 
+   public:
+       // Set server TCP Port 
+       void set_port(int port         ){ m_port = port; }
+       // Hostnames that server will listen to 
+       void set_host(std::string host ){ m_host = host; }
+       // Set path containing server data 
+       void set_path(std::string path ){ m_path = path; }
+       void set_auth(bool flag        ){ m_auth = flag; }
+
+       int  get_port(){ return m_port; }
+
+       void run_server()
+       {
+           std::printf(" [INFO] Running web server => port = %d ; host = %s; path = %s \n"
+               , m_port, m_host.c_str(), m_path.c_str());
+           std::printf(" [INFO] Server has authentication => %s \n", m_auth ? "TRUE" : "FALSE" );
+       }
+   };
+
+
+   template<typename T, typename Klass>
+   auto bind_setter(Klass& cls, void (Klass::* setter) (T&&) )
+   {
+       return [&](T&& q){ 
+           (cls.*setter)( std::forward(q) ); 
+       };
+   }
+
+   template<typename T, typename Klass>
+   auto bind_setter(std::shared_ptr<Klass> const& cls, void (Klass::* setter) (T) )
+   {
+       return [cls, setter](T q){ ((*cls).*setter)(q); };
+   }
+
+   void command_server( CLI::App&  app)
+   {    
+
+       CLI::App* cmd = app.add_subcommand(
+           "server", "Run HTTP server for sharing files from some folder."
+       );
+
+       cmd->footer("Run local file sharing web server");
+
+       // Created with shared_ptr in order to the object survive this scope
+       // and avoid reference to destroyed object when it is referenced from callback. 
+       auto server = std::make_shared<MiniWebServer>();
+
+       cmd->callback([=]
+       {
+           std::cout << " [TRACE] ----- Callback invoked OK ------ \n";
+           if(server->get_port() < 0 || server->get_port() > 65535)
+           {
+               std::cerr << " [ERROR] " << " Invalid TCP port range. " << '\n';
+               // Returns non-zero status code
+               return false;
+           }
+           server->run_server();
+           return true;
+       });
+
+       cmd->add_option_function<std::string>(
+             "<PATH>"
+           , bind_setter<std::string>(server, &MiniWebServer::set_path)
+           , "Directory to be shared in the web server."
+       )->required();
+
+       cmd->add_option_function<int>( 
+           "-p,--port"
+         , [=](auto q){ server->set_port(q); }
+         , "Server TCP port, default: 8080"
+       );
+
+       cmd->add_option_function<std::string>( 
+           "--host"
+         , [=](auto q){ server->set_host(q); }
+         , "Hostname that server will listen to (default: 0.0.0.0)"
+       );
+
+       cmd->add_flag( 
+           "-a,--auth"
+         // , [](auto q){ server->set_auth(q); }        
+          , bind_setter<bool>(server, &MiniWebServer::set_auth)
+          , "Shows the command line parameters passed to QEMU."
+       );   
+   }
+
+   void command_version( CLI::App&  app, std::string name)
+   {
+       auto cmd = app.add_subcommand(name, "Show application version.");
+
+       cmd->callback([=]{
+           std::printf("cliapp version 0.1 - Your favorite U-NIX swiss army knife \n");
+
+           // Return true for idnicating successful status code 
+           return true; 
+       });
+   }
+
+   int main(int argc, char** argv)
+   {
+       CLI::App app("cliapp");        
+       app.footer("\n Command line demo toolbox.");
+
+       command_version(app, "version");
+       command_version(app, "v");
+       Command_list cmd_list1(app, "ls");
+       Command_list cmd_list2(app, "list");
+       command_server(app); 
+
+       // ----------- Parse Arguments ---------------//
+       try
+       {
+           if(argc == 1){ 
+               std::cout << app.help() << "\n";
+               return 0;
+            }
+           app.require_subcommand();
+           app.validate_positionals();
+           app.parse(argc, argv);
+       } catch(const CLI::ParseError &e)
+       {
+
+           return app.exit(e);
+       } catch (std::exception& ex)
+       {
+           std::cout << ex.what() << std::endl;
+           return EXIT_FAILURE;
+       }
+
+       return 0;
+   }
+
+#+END_SRC
+
+ *Building on MacOSX* 
+
+Install GCC 9.0 via *brew*. Note: Apple's default Clang compiler does
+not have the C++17 file system library. 
+
+#+BEGIN_SRC sh 
+ $ brew install gcc@9
+#+END_SRC
+
+Get the code: 
+
+#+BEGIN_SRC sh 
+  $ git clone https://gist.github.com/caiorss/1b6826b9722ba07667eefed2f82d667e src 
+  $ cd src 
+#+END_SRC
+
+Override CMake default compiler: 
+
+#+BEGIN_SRC sh 
+   $ export CC=/usr/local/Cellar/gcc@9/9.3.0/bin/gcc-9
+   $ export CXX=/usr/local/Cellar/gcc@9/9.3.0/bin/g++-9
+#+END_SRC
+
+Configuration step: 
+
+#+BEGIN_SRC sh 
+   $ cmake --config Release -H. -B_build
+     ... .... ... ... .. ... ...
+   -- Checking whether CXX compiler supports OSX deployment target flag - yes
+   -- Check for working CXX compiler: /usr/local/Cellar/gcc@9/9.3.0/bin/g++-9
+   -- Check for working CXX compiler: /usr/local/Cellar/gcc@9/9.3.0/bin/g++-9 - works
+   -- Detecting CXX compiler ABI info
+   -- Detecting CXX compiler ABI info - done
+   -- Detecting CXX compile features
+   -- Detecting CXX compile features - done
+   -- CPM: adding package cli11@ ()
+
+   [TRACE] cli11_SOURCE_DIR =  /Volumes/data/cliapp/_build/_deps/cli11-src 
+   -- Configuring done
+   -- Generating done
+   -- Build files have been written to: /Volumes/data/cliapp/_build
+#+END_SRC
+
+Building step: 
+
+#+BEGIN_SRC sh 
+  $ cmake --build _build --target 
+   ... ... ... ... ... ... ... ... 
+   ... ... ... ... ... ... ... ... 
+  [ 50%] Building CXX object CMakeFiles/cliapp.dir/cliapp.cpp.o
+  /usr/local/Cellar/gcc@9/9.3.0/bin/g++-9   -I/Volumes/data/cliapp/_build/_deps/cli11-src/include  -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX10.15.sdk   -std=c++17 -o CMakeFiles/cliapp.dir/cliapp.cpp.o -c /Volumes/data/cliapp/cliapp.cpp
+  [100%] Linking CXX executable cliapp
+  /usr/local/Cellar/cmake/3.17.3/bin/cmake -E cmake_link_script CMakeFiles/cliapp.dir/link.txt --verbose=1
+  /usr/local/Cellar/gcc@9/9.3.0/bin/g++-9   -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX10.15.sdk -Wl,-search_paths_first -Wl,-headerpad_max_install_names  CMakeFiles/cliapp.dir/cliapp.cpp.o  -o cliapp  -lstdc++fs 
+  [100%] Built target cliapp
+  /usr/local/Cellar/cmake/3.17.3/bin/cmake -E cmake_progress_start /Volumes/data/cliapp/_build/CMakeFiles 0
+#+END_SRC
+
+Check executable: 
+
+#+BEGIN_SRC sh 
+  $ file _build/cliapp
+  _build/cliapp: Mach-O 64-bit executable x86_64
+#+END_SRC
+
+Show command line help: 
+
+#+BEGIN_SRC sh 
+  $ _build/cliapp 
+
+  cliapp
+  Usage: [OPTIONS] [SUBCOMMAND]
+
+  Options:
+    -h,--help                   Print this help message and exit
+
+  Subcommands:
+    version                     Show application version.
+    ls                          List directory
+    list                        List directory
+    server                      Run HTTP server for sharing files from some folder.
+
+
+   Command line demo toolbox.
+#+END_SRC
+
+Show help for 'server' subcommands: 
+
+#+BEGIN_SRC sh 
+  $ _build/cliapp server -h
+  Run HTTP server for sharing files from some folder.
+  Usage: _build/cliapp server [OPTIONS] <PATH>
+
+  Positionals:
+    <PATH> TEXT REQUIRED        Directory to be shared in the web server.
+
+  Options:
+    -h,--help                   Print this help message and exit
+    -p,--port INT               Server TCP port, default: 8080
+    --host TEXT                 Hostname that server will listen to (default: 0.0.0.0)
+    -a,--auth                   Shows the command line parameters passed to QEMU.
+
+  Run local file sharing web server
+#+END_SRC
+
+Show help for 'ls' subcommand: 
+
+#+BEGIN_SRC sh 
+  $ _build/cliapp ls -h
+  List directory
+  Usage: _build/cliapp ls [OPTIONS] <PATH>
+
+  Positionals:
+    <PATH> TEXT REQUIRED        Directory to be listed.
+
+  Options:
+    -h,--help                   Print this help message and exit
+    -f,--file                   Only list files
+    -d,--directory              Only list directories
+    -r,--recursive              List direcotyr in recursive way
+
+
+   Command line demo toolbox.
+#+END_SRC
+
+Run _server_ subcommand: 
+
+#+BEGIN_SRC sh 
+  $ _build/cliapp server /var/www 
+   [TRACE] ----- Callback invoked OK ------ 
+   [INFO] Running web server => port = 8080 ; host = 0.0.0.0; path = /var/www 
+   [INFO] Server has authentication => FALSE 
+
+  $ _build/cliapp server /var/www --port 9010 --host 127.0.0.1
+   [TRACE] ----- Callback invoked OK ------ 
+   [INFO] Running web server => port = 9010 ; host = 127.0.0.1; path = /var/www 
+   [INFO] Server has authentication => FALSE 
+
+  $ _build/cliapp server /var/www --port 9010 --host 127.0.0.1 --auth
+   [TRACE] ----- Callback invoked OK ------ 
+   [INFO] Running web server => port = 9010 ; host = 127.0.0.1; path = /var/www 
+   [INFO] Server has authentication => TRUE 
+
+  $ _build/cliapp server /var/www --port=9010 --host=127.0.0.1 --auth
+   [TRACE] ----- Callback invoked OK ------ 
+   [INFO] Running web server => port = 9010 ; host = 127.0.0.1; path = /var/www 
+   [INFO] Server has authentication => TRUE 
+#+END_SRC
+
+Run _ls_ subcommand: 
+
+#+BEGIN_SRC sh 
+   $ _build/cliapp ls
+   <PATH> is required
+   Run with --help for more information.
+
+
+   $ _build/cliapp ls /System/Applications
+     => /System/Applications/Siri.app
+     => /System/Applications/Music.app
+     => /System/Applications/FindMy.app
+     => /System/Applications/QuickTime Player.app
+     => /System/Applications/Chess.app
+     => /System/Applications/Photo Booth.app
+     => /System/Applications/Books.app
+   ... ... ... ... ... ... ... ... 
+   ... ... ... ... ... ... ... ... ... 
+
+   $ _build/cliapp ls /System/Applications/Utilities/Terminal.app --file --recursive
+   ... ... ... ... ... ... ... ... 
+   ... ... ... ... ... ... ... ... ... 
+
+     => /System/Applications/Utilities/Terminal.app/Contents/Resources/ca.lproj/TTFindPanel.strings
+     => /System/Applications/Utilities/Terminal.app/Contents/Info.plist
+     => /System/Applications/Utilities/Terminal.app/Contents/PkgInfo
+     => /System/Applications/Utilities/Terminal.app/Contents/version.plist
+
+
+#+END_SRC
+
 ** Widely Used Functions for strings and buffers 
 
 This section provides a review and a recapitulation of the most widely
@@ -2710,7 +3306,6 @@ Building and running:
    [INFO] Shutdown gracefully. Ok. 
 
 #+END_SRC
-
 ** Launching processes with exec and fork system-call wrappers 
 
 This code demonstrates the usage of exec and fork system-calls wrapper
@@ -3384,7 +3979,6 @@ Running:
     [6] path => /boot/initramfs-5.6.6-300.fc32.x86_64.img
      ... ... ...     ... ... ...     ... ... ...     ... ... ...     
 #+END_SRC
-
 ** Memory Mapped Files - mmap 
 *** Overview 
 
@@ -4323,7 +4917,6 @@ Functions for dealing with network address:
    }
    #define h_addr h_addr_list[0] /* for backward compatibility */
 #+END_SRC
-
 
 
 
