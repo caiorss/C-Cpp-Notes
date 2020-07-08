@@ -1228,14 +1228,17 @@ File: CMakeLists.txt
           add_executable( app1 app1.cpp )
    target_link_libraries( app1 lib::util lib::tool )
 
-   if(UNIX)
-       # Set RPATH in the executable for making it relocatable on Unix.
-       # It allows installing the application on any directory or 
-       # running the application from any directory without 
-       # 'symbol not found or library not found' errros. 
-       #
-       # Note: The variable $ORIGIN is the executable absolute directory
+   # Set RPATH in the executable for making it relocatable on Unix.
+   # It allows installing the application on any directory or 
+   # running the application from any directory without 
+   # 'symbol not found or library not found' errros. 
+   #
+   # Note: The variable $ORIGIN is the executable absolute directory
+   if(UNIX AND NOT APPLE)
        set_target_properties( app1 PROPERTIES INSTALL_RPATH "$ORIGIN:$ORIGIN/../lib")                       
+   elseif(APPLE)
+       # For MacOSX (MacO - Binary Files)
+       set_target_properties( app1 PROPERTIES INSTALL_RPATH "@executable_path/../lib")                       
    endif()
 
           add_executable( app2 app2.cpp )
@@ -1261,8 +1264,7 @@ File: CMakeLists.txt
 
    )
 
-   install(FILES LICENSE.txt DESTINATION data)
-
+  install(FILES LICENSE.txt DESTINATION data)
 #+END_SRC
 
 File: Makefile 
@@ -1465,7 +1467,7 @@ File: lib_tool/tool.cpp
    };
 
 #+END_SRC
-*** Build and install on Linux 
+*** Building and installing on Linux 
 
 Clone the repository: 
 
@@ -1689,7 +1691,7 @@ Clone the repository:
      /lib64/ld-linux-x86-64.so.2 (0x00007fed49773000)
 #+END_SRC
 
-*** Build and install on Windows 
+*** Building and installing on Windows 
 
   *Building and installing locally* (non sytem wide mode)
 
@@ -1895,6 +1897,215 @@ Clone the repository:
   Type RETURN to exit
 
 #+END_SRC
+*** Building and installing on Mac OSX 
+
+ + Clone repository: 
+
+#+BEGIN_SRC sh 
+    $ git clone https://github.com/caiorss/cmake-cpp-nested cnest 
+    $ cd cnest
+#+END_SRC
+
+  *Building installing (non-system wide way)* 
+
+Configure: 
+
+#+BEGIN_SRC sh 
+  $ cmake --config Release -H. -B_build -DCMAKE_INSTALL_PREFIX=$HOME/Desktop/myappx
+
+  -- The C compiler identification is AppleClang 11.0.3.11030032
+  -- The CXX compiler identification is AppleClang 11.0.3.11030032
+  -- Check for working C compiler: /Library/Developer/CommandLineTools/usr/bin/cc
+  -- Check for working C compiler: /Library/Developer/CommandLineTools/usr/bin/cc - works
+  -- Detecting C compiler ABI info
+  -- Detecting C compiler ABI info - done
+  -- Detecting C compile features
+  -- Detecting C compile features - done
+  -- Check for working CXX compiler: /Library/Developer/CommandLineTools/usr/bin/c++
+  -- Check for working CXX compiler: /Library/Developer/CommandLineTools/usr/bin/c++ - works
+  -- Detecting CXX compiler ABI info
+  -- Detecting CXX compiler ABI info - done
+  -- Detecting CXX compile features
+  -- Detecting CXX compile features - done
+  -- Configuring done
+
+  -- Generating done
+  -- Build files have been written to: /Volumes/data/cnest/_build
+
+#+END_SRC
+
+Build: 
+
+#+BEGIN_SRC sh 
+ $ cmake --build _build --target 
+#+END_SRC
+
+View build-tree: 
+
+#+BEGIN_SRC sh 
+  $ tree -L 2 _build
+  _build
+  ├── CMakeCache.txt
+   ... ... ... ... ... 
+   ... ... ... ... ... 
+  ├── Makefile
+  ├── app1
+  ├── app2
+  ├── cmake_install.cmake
+  ├── lib_tool
+  │   ├── CMakeFiles
+  │   ├── Makefile
+  │   ├── cmake_install.cmake
+  │   └── libtool.a
+  └── lib_util
+      ├── CMakeFiles
+      ├── Makefile
+      ├── cmake_install.cmake
+      └── libutil.dylib
+#+END_SRC
+
+Show format of binary files: 
+
+#+BEGIN_SRC sh 
+  $ file _build/app1
+  _build/app1: Mach-O 64-bit executable x86_64
+
+  $ file _build/lib_tool/libtool.a
+  _build/lib_tool/libtool.a: current ar archive random library
+
+  $ file _build/lib_util/libutil.dylib
+  _build/lib_util/libutil.dylib: Mach-O 64-bit dynamically linked shared library x86_64
+#+END_SRC
+
+Test applications:
+
+#+BEGIN_SRC sh 
+  $ _build/app1
+   [INFO] Application 1 Called Ok.
+   [TRACE] util_function() called with n = 100
+   [TRACE] Called tool_lib_function() OK. 
+
+  $ _build/app2
+   [INFO] Application 2 Called Ok.
+   [TRACE] util_function() called with n = 20
+   [TRACE] Called tool_lib_function() OK.  
+#+END_SRC
+
+Install: 
+
+#+BEGIN_SRC sh 
+   $ cmake --build _build --target install
+     ... ... ... ... ... ... ... ... ...
+     ... ...  ... .... ... ... ... ... .. 
+   /Library/Developer/CommandLineTools/usr/bin/make  -f CMakeFiles/Makefile2 preinstall
+   make[1]: Nothing to be done for `preinstall'.
+   Install the project...
+   /usr/local/Cellar/cmake/3.17.3/bin/cmake -P cmake_install.cmake
+   -- Install configuration: ""
+   -- Installing: /Users/unix/Desktop/myappx/bin/app1
+   -- Installing: /Users/unix/Desktop/myappx/bin/app2
+   -- Installing: /Users/unix/Desktop/myappx/lib/libutil.dylib
+   -- Installing: /Users/unix/Desktop/myappx/lib/libtool.a
+   -- Installing: /Users/unix/Desktop/myappx/data/LICENSE.txt
+#+END_SRC
+
+Show installation directory: 
+
+#+BEGIN_SRC sh 
+  $ tree $HOME/Desktop/myappx
+  /Users/unix/Desktop/myappx
+  ├── bin
+  │   ├── app1
+  │   └── app2
+  ├── data
+  │   └── LICENSE.txt
+  └── lib
+      ├── libtool.a
+      └── libutil.dylib
+
+  3 directories, 5 files
+#+END_SRC
+
+Test applications from install directory:
+
+#+BEGIN_SRC sh 
+  $ /Users/unix/Desktop/myappx/bin/app1
+   [INFO] Application 1 Called Ok.
+   [TRACE] util_function() called with n = 100
+   [TRACE] Called tool_lib_function() OK. 
+
+
+  $ /Users/unix/Desktop/myappx/bin/app2
+   [INFO] Application 2 Called Ok.
+  dyld: lazy symbol binding failed: Symbol not found: __ZN4util13util_functionEi
+    Referenced from: /Users/unix/Desktop/myappx/bin/app2
+    Expected in: /usr/lib/libutil.dylib
+
+  dyld: Symbol not found: __ZN4util13util_functionEi
+    Referenced from: /Users/unix/Desktop/myappx/bin/app2
+    Expected in: /usr/lib/libutil.dylib
+
+
+  $ env DYLD_LIBRARY_PATH=/Users/unix/Desktop/myappx/lib   /Users/unix/Desktop/myappx/bin/app2
+   [INFO] Application 2 Called Ok.
+   [TRACE] util_function() called with n = 20
+   [TRACE] Called tool_lib_function() OK. 
+#+END_SRC
+
+Analysze depdencies of an executable: 
+
+#+BEGIN_SRC sh 
+  $ otool -l  /Users/unix/Desktop/myappx/bin/app1
+
+  /Users/unix/Desktop/myappx/bin/app1:
+  Mach header
+        magic cputype cpusubtype  caps    filetype ncmds sizeofcmds      flags
+   0xfeedfacf 16777223          3  0x00           2    19       1584 0x00218085
+  Load command 0
+        cmd LC_SEGMENT_64
+    cmdsize 72
+    segname __PAGEZERO
+     vmaddr 0x0000000000000000
+     vmsize 0x0000000100000000
+   .... .. .   .... .. .   .... .. .    .... .. .   .... .. .   .... .. .
+   .... .. .   .... .. .   .... .. .    .... .. .   .... .. .   .... .. .
+  Load command 17
+        cmd LC_DATA_IN_CODE
+    cmdsize 16
+    dataoff 22088
+   datasize 0
+  Load command 18
+            cmd LC_RPATH
+        cmdsize 40
+           path @executable_path/../lib (offset 12)
+#+END_SRC
+
+  *Install in system-wide way* 
+
+  + DO NOT ATTEMPT => It results in error as the command attempts to
+    install the applications to ~/bin~ directory which is a read-only file
+    system.
+  + Unlike other unix-like operating systems which installs everything
+    spread across the system (executables to /bin and libraries to
+    /lib), in Mac-OSX the most used approach for deploying
+    applications is to distribute them as _App bundles_, which are
+    directories terminated in _.app_ suffix containing all executables,
+    shared libraries dependencies (*.dylib), assets and metadata. The
+    advantage of the app-bundle method of deployment are: applications
+    are self-contained; they can be installed by just dragging and
+    dropping them to the /Applications directory; they can be removed
+    just by deleting a d single directory; different versions of the
+    same application can be installed without disrupting each other or
+    any other system library.
+
+#+BEGIN_SRC sh 
+  # Error: attemtps to install to read-only file system 
+  $ cmake --config Release -H. -B_build2 -DCMAKE_INSTALL_PREFIX=
+  $ cmake --build _build2 --target install
+#+END_SRC
+
+
+
 ** Consuming or Dependencies 
 *** Overview 
 
