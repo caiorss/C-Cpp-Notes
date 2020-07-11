@@ -241,6 +241,10 @@ systems, but they still have the following features in common:
       restrictions) and so on.
 
     + Common Linux Device Files associated to hardware 
+      + _/dev/mem_
+        + => Device file that represents the physical RAM
+          memory. It can be used for reading MMIO (Memory-Mapped IO)
+          devices. 
       + /dev/lp0, /dev/lp1 => Parallel ports 
       + /dev/ttyS0, /dev/ttyS1, ... => Serial Ports
       + /dev/ttyUSB0, /dev/ttyUSB1, ... => USB-to-serial converters such as FTDI
@@ -258,9 +262,10 @@ systems, but they still have the following features in common:
         (X-Windows System).
 
     + Linux Device Files not associated to hardware:
-      + /dev/kmsg  => text file containing kernel messages. The tool
-        'dmesg' which shows the kernel messages reads them from the
-        file /dev/kmsg.
+      + /dev/kmsg
+        + => text file containing kernel messages. The tool 'dmesg'
+          which shows the kernel messages reads them from the file
+          /dev/kmsg.
       + /dev/stdout => Console stdout 
       + /dev/stdin  => Console stdin 
       + /dev/stderr => Console stderr 
@@ -269,7 +274,7 @@ systems, but they still have the following features in common:
       + /dev/null => File used for discarding stdout or stderr of
         command line applications.
       + /dev/zero => Generate zero-values
-      + /dev/null 
+      + /dev/null
 
  *Quotes* 
 
@@ -5488,3 +5493,659 @@ Check unix-socket file:
   srwxrwxr-x 1 mxpkf8 mxpkf8 0 Jul  2 01:22 /tmp/unix-socket-file=
 #+END_SRC
 
+** Sockets with IO Multiplexing [DRAFT]
+*** Overview 
+
+A recurrent need in network socket programming is to handle multiple
+incoming client socket connections that need to be managed
+simultaneously. For instance, if a blocking read operation is
+performed on a client socket from a http(web) server, the server will
+not be able to serve the remaining client sockets while the read
+operation is ongoing. Several solutions have adopted for solving this
+issue, such as: 
+
+   * _Blocking IO (+) One process per connection_
+     + Peform fork() system call, creating a child process wich is a
+       copy of current process and let it manage the socket file
+       descriptor.
+     + Drawbacks: Complex, expensive and slow. A process has lots of operating
+       system resources associated with it, including virtual memory,
+       file descriptors and so on. Another issue is the complexity from
+       IPC - Inter-Process Communication. 
+
+   * _Blockign IO (+) One thread per connection_
+     * Spawn/create a new thread for every connection.
+     * Drawbacks: Although, this approach is less expensive than
+       open-process-per-connection method, it is still expensive and
+       non-scalable, specially for handling thousands of connections.
+
+   * _Bloking IO (+) Thread Pool_
+     * Reuse a set of pre-existing threads for managing each
+       connection and avoid the overhead of creating and destroying too
+       many threads.
+     * Drawbacks: It only works for non-long running client socket
+       connections such as HTTP connections that are closed as soon as
+       possible. The drawback of this method is that it assumption that
+       any task submited to thread pool will finish as soon as possible
+       and not block the worker thread, otherwise, it will be
+       unusable. The asummption implies that the connection should be
+       closed as fast as possible, which means that the thread-pool
+       approach is only suitable for HTTP servers which usually close
+       the client socket connection after every request.
+
+   * _Multiplexed IO_ [BEST]
+     * Many operating systems provide multiplexed IO facilities, such
+       as _select_, _poll_ and _epoll_ on Linux, _keque_ on BSD-variants and
+       Mac-OSX and _IOCP_ on Windows. Multiplexed IO allow managing
+       multiple file descriptors of any type in a single thread,
+       consequently this feature allows handling multiple client
+       socket connetions with far less overhead than using one thread
+       for every connection. This type IO API is that makes the
+       scalability of Nginx web server and NodeJS.
+
+     * Multiplexed IO works in the following way: first the
+       application register the file descriptors it is interested in
+       monitoring; then the calling code calls a multiplexed IO
+       function that blocks the current thread during some amount of
+       time or indefinitely, the IO multiplexing function only
+       returns when any of the file descriptors are ready to be read
+       or written. The calling code handles each file descriptor by
+       iterating over the data structure returned by the IO
+       multiplexing function which contains the file descriptors
+       events.
+
+     * Drawbacks:
+       * Event-driven with possible callback hell which can be avoided
+         with _user-space threads_ (aka: coroutines, goroutines, green
+         threads). 
+       * Any operation which takes a significant time needs to be run
+         in another thread, otherwise the threads handling the
+         connection will be blocked and unable to server any other
+         client request.
+
+     * Wrappers:
+       * Multiplexed IO APIs are not standardized. As a result,
+         several high level wrappers have been created for providing
+         an uniform and cross-platform API for multiplexed IO. Some of
+         those wrapper libraries are:
+         * /Boost.ASIO/ - C++ library for scalable and cross-platform network programming. 
+         * /libUV/      - C library used by NodeJS; Julia language and so on.
+         * /libev/
+         * /libEvent/
+
+     * Note: Many documents also calls multiplexed IO as _event-driven_
+       _IO_, _non-blocking IO_ and so on.
+*** Epoll() multiplexed IO API 
+
+Epoll is a highly scalable and efficient Linux-only multiplexed IO API
+which allows monitoring an unlimted amount of file descriptors, and
+consequentely file descriptors related to regular files, device files
+and sockets. This API is that makes the scalability of NodeJS and
+Nginx web server possible. 
+
+Manpage: 
+  + [[https://man7.org/linux/man-pages/man2/epoll_create.2.html][epoll_create()]]
+  + [[https://man7.org/linux/man-pages/man2/epoll_ctl.2.html][epoll_ctl()]]
+
+Header file: 
+  + #include <sys/epoll.h>
+
+Structs: 
+
+  + The events is a Or bitmaks, some of the flags are:
+    + EPOLLIN  => "The associated file is available for read(2) operations."
+    + EPOLLOUT => "The associated file is available for write(2) operations."
+    + EPOLLHUP => "Hang up happened on the associated file descriptor."
+    + EPOLLET => "Requests edge-triggered notification for the
+      associated file descriptor.  The default behavior for epoll is
+      level-triggered.  See epoll(7) for more detailed information
+      about edge triggered and level-triggered notification."
+
+#+BEGIN_SRC cpp 
+     typedef union epoll_data {
+         void        *ptr;
+         int          fd;
+         uint32_t     u32;
+         uint64_t     u64;
+     } epoll_data_t;
+
+     struct epoll_event {
+         uint32_t     events;      /* Epoll events */
+         epoll_data_t data;        /* User data variable */
+     };
+#+END_SRC
+
+Functions: 
+
+  + _epoll_create1(int)_ => Creates epoll object, returns epoll file descriptor.
+    + "If flags is 0, then, other than the fact that the obsolete size
+      argument is dropped, epoll_create1() is the same as
+      epoll_create().  The following value can be included in flags to
+      obtain different behavior:"
+
+#+BEGIN_SRC cpp 
+   int epoll_create1(int flags);
+
+   // ------ Usage ---------------------//
+   // Epoll file descriptor 
+   int epfd; 
+   if( (epfd = epoll_create1(0)) == -1 )
+   { 
+      perror("Unable to get epoll file descriptor. Check ERRNO variable."); 
+      exit(1);
+   }
+
+  // .... Use Epoll ....
+
+  // Close when no longer needed. 
+  close(epfd); 
+#+END_SRC
+
+  + _epoll_ctl()_ => Modify, remove or add file descriptors to the
+    /interest list/, set of monitored file descriptors.
+    + Doc: $ man epoll_ctl
+    + Doc: [[https://man7.org/linux/man-pages/man2/epoll_ctl.2.html][Manpage]]
+
+    + Some values of 'op': 
+
+#+BEGIN_SRC cpp  
+    int epoll_ctl(  int epfd                     // Epoll file descriptor (Epoll object)
+                  , int op                       // Operation to be performed 
+                  , int fd                       // File descritor 
+                  , struct epoll_event *event    // Pointer to epoll_event 
+                 );
+
+    //---------------------------------------------------//
+    // Usage example for registering file descriptor     //
+    // add file descriptor to interest list.             // 
+    // --------------------------------------------------//
+
+    int fd = STDIN_FILENO; // Stdin, console 
+    epoll_event ev; 
+    // Monitor when file descriptor is available for read operations.
+    ev.events  = EPOLLIN;
+    // Monitor when file descriptor is available for write operations.
+    ev.events  = EPOLLIN | EPOLLOUT;
+    ev.data.fd = fd; 
+    if( epoll_ctrl(epfd, EPOLL_CTL_ADD, fd, &ev ) == -1 )
+    {  perror("Error: failure. Check errno.");
+       exit(1);
+    }
+
+    //---------------------------------------------------//
+    // Usage example for removing file descriptor        //
+    // --------------------------------------------------//
+    epoll_event ev; 
+    ev.events  = EPOLLIN;
+    ev.data.fd = fd; 
+    if( epoll_ctrl(epfd, EPOLL_CTL_DEL, fd,  ) == -1 )
+    {  perror("Error: failure. Check errno.");
+       exit(1);
+    }
+#+END_SRC
+
+  + _epoll_wait()_ - IO multiplexing function - blocks the current
+    thread for some amount of time until an event related to a
+    monitored file descriptor has happened.
+    + Manpage: "wait for an I/O event on an epoll file descriptor"
+
+    + /epfd/ => Epoll file descriptor
+
+    + /events/ => (Output) Pointer to array containing the events
+      related to the monitored file descriptors. This array is
+      allocated by the calling code.
+
+    + /maxevents/ => Maximum number of monitored events (often the size
+      of events array).
+
+    + /timeout/ => Number of milliseconds that epoll_wait() blocks the
+      current thread. If this value is (-1), the calling thread is
+      indefinitely until some IO event happens.
+
+#+BEGIN_SRC cpp 
+   int epoll_wait(int epfd, struct epoll_event *events,
+                  int maxevents, int timeout); 
+#+END_SRC
+
+Usage example of epoll_wait() with level triggered.
+
+#+BEGIN_SRC cpp 
+    // ============ Usage for servers ===================// 
+    // 
+    void Epoll_fd_option(int epoll_fd, int fd, int events)
+     {
+         epoll_event ev; 
+         ev.events  = events;
+         ev.data.fd = fd; 
+         int res = epoll_ctl(epoll_fd, EPOLL_CTL_ADD, fd, &ev);
+         if(res == -1){
+             perror("Error: EPoll / unable to register file descritor");
+         }    
+    }
+
+    constexpr size_t MAX_EVENTS = 10;     
+    int server = socket(AF_INET, SOCK_STREAM, 0);
+     .. .... ... ...
+
+    // Create epoll object 
+    int epfd = epoll_create1(0);
+    epoll_event notifications[MAX_EVENTS];
+    
+    // Monitor incoming connections 
+    Epoll_fd_option(epfd, server, EPOLLIN);
+
+    // Monitor stdin (console file descriptor)
+    Epoll_fd_option(epfd, STDIN_FILENO, EPOLLIN);
+
+    charr buffer[300];
+
+    for(;;) {
+         // Current thread blocked until any event happens.
+         // Returns number of evetns 
+         int nfsd = epoll_wait(epfd, notifications, MAX_EVENTS, -1); 
+
+         for(int i = 0; i < nfsd; i++)
+         {
+             epoll_event ev = notifications[i];
+
+             if(ev.data.fd == server)
+             {
+                  // Accept connection return a client socket 
+                  int client_fd = accept(server, (sockaddr *) &client.sa, &addrlen);
+                  Epoll_fd_option(epfdm, client_fd, EPOLLIN);
+                  continue;
+             }
+
+            // Client socket ready for reading operations.
+            if(ev.events & EPOLLIN)
+            {
+                // Read 300 bytes from client socket file descriptor to buffer 
+                int n = read(ev.dada.fd, buffer, 300);
+
+                if(n == 0){ close(ev.data.fd); continue; }
+
+                // Send back n bytes to client socket 
+                write(ev.data.fd, buffer, n);
+                continue;
+            }
+
+            if(ev.events & EPOLLOUT)
+            { 
+               // Perform write operations 
+               ... ... .... ...                 
+            }
+
+         } // --- End for --- //
+
+    } // --- End for --- //
+
+    close(epfd);
+#+END_SRC
+*** Epoll() example - sample code 
+
+GIST: 
+  + https://gist.github.com/f88892ac263b96ba9d989c582dc3ccf1
+
+Description: 
+  + Sample TCP/IPv4 network server using epoll() multiplexed IO API
+    for managing STDIN (console input) and multiple client sockets in
+    a single thread. The server also sends any message typed in server
+    console to all connected clients.
+  + Note: It uses level triggered IO. 
+
+File: multiplex-epoll-server.cpp 
+
+#+BEGIN_SRC cpp 
+    // File: socket-echo-server.cpp
+    // Desc: Simple socket server with a single thread.
+
+    #include <iostream>
+    #include <string>
+    #include <vector>
+    #include <cassert>
+    #include <cstring> // memcpy
+
+    // ----- Unix/Linux headers -----//
+    #include <unistd.h>
+    #include <fcntl.h>
+    #include <sys/types.h>
+    #include <sys/socket.h>
+    #include <netdb.h>
+    #include <signal.h>
+
+    // Only available on Linux
+    #include <sys/epoll.h> 
+
+    struct Socket 
+    {
+        int           sockfd; 
+        sockaddr_in   sa;     
+    };
+
+    struct RecvMsg
+    {
+        ssize_t     size;
+        std::string msg;
+    };
+
+    void socket_close(Socket& sock);
+
+    void    fd_write(int fd, std::string const& text);
+    RecvMsg fd_read(int fd, size_t buffer_max = 500);
+
+    /** Make a server socket */
+    Socket socket_make_server(uint16_t port, const char* hostname = "0.0.0.0");
+    /** Accept connetion from a server socket and returns a client socket */
+    Socket socket_accept(Socket& server); 
+
+    /** Register file descriptor to be monitored by Epoll */
+    void Epoll_register_fd(int epoll_fd, int fd)
+    {
+        epoll_event ev; 
+        ev.events  = EPOLLIN;
+        ev.data.fd = fd; 
+        int res = epoll_ctl(epoll_fd, EPOLL_CTL_ADD, fd, &ev);
+        if(res == -1){
+            throw std::runtime_error("Error: EPoll / unable to register file descritor");
+        }    
+    }
+
+    /** Remove file descriptor from monitoring list. */
+    void Epoll_remove_fd(int epoll_fd, int fd)
+    {
+        epoll_event ev;
+        int res = epoll_ctl(epoll_fd, EPOLL_CTL_DEL, fd, &ev);
+    }
+
+    /*  Multiplex IO - Blocks current thread until any of monitored file descriptors 
+     *  has 
+     */
+    int Epoll_wait(int epoll_fd, size_t max_events, std::vector<epoll_event>& events)
+    {
+        // Returns number of events received 
+        int nfd = epoll_wait( epoll_fd     // Epoll file descripotr 
+                            , &events[0]   // [output] Array containing received events 
+                            , max_events   // Maximum number of events 
+                            , -1           // Timeout (-1) => Block indefinitely
+                            );
+
+        return nfd;
+    }
+
+
+    int main(int argc, char **argv)
+    {
+        std::puts(" [INFO] Program started. ");
+
+        // --- Create socket file descriptor -----------------------//
+        Socket server = socket_make_server(9026, "0.0.0.0");
+
+        constexpr size_t MAX_EVENTS = 10;     
+        int epfd = epoll_create1(0);
+        assert(epfd != - 1);
+        auto events = std::vector<epoll_event>(MAX_EVENTS);
+
+        // Register stdin 
+        Epoll_register_fd(epfd, STDIN_FILENO);
+
+        // Register socket server 
+        Epoll_register_fd(epfd, server.sockfd);
+
+        // Contains client sockets file descriptors 
+        std::vector<Socket> clients; 
+
+
+        // Server-accept infinite loop 
+        for(;;)
+        {
+            std::printf(" [TRACE] Epoll waiting for events \n");
+
+            int nfsd = Epoll_wait(epfd, MAX_EVENTS, events);            
+            assert( nfsd != - 1);
+
+            std::printf(" [TRACE] Epoll events arrived => nfsd = %d \n", nfsd);
+
+            for(int i = 0; i < nfsd; i++)
+            {
+                auto ev = events[i];
+
+                std::printf(" ----------------------------------------------------\n");
+
+                if( (ev.events & EPOLLERR) || (ev.events & EPOLLHUP) )
+                {
+                    std::printf(" [ERROR] Epoll error has happened. \n");
+                    continue;
+                }
+
+                // STDIN event => It happens after user types something and
+                // hit RETURN on terminal.
+                if( ev.data.fd == STDIN_FILENO )
+                {
+                    std::printf(" [TRACE] Received STDIN event \n");
+                    std::string line;
+                    std::getline(std::cin, line);
+                    std::cout << " \n STDIN = " + line << "\n";
+
+                    // Send typed message to all client sockets
+                    for(Socket& cli: clients)
+                        fd_write(cli.sockfd, " STDIN = " + line + "\n");
+
+                    // Quit server 
+                    if(line == "exit"){ 
+                        std::puts(" [INFO] Shutdown server OK.");
+                        return EXIT_SUCCESS;
+                    }
+                    continue;
+                }
+
+                // Event that happens when there is a new connection.
+                if(ev.data.fd == server.sockfd)
+                {                
+                    Socket client = socket_accept(server);        
+                    Epoll_register_fd(epfd, client.sockfd);
+
+                    std::printf(" [TRACE] Accept client connection => ID = %d \n", client.sockfd);                
+                    fd_write(client.sockfd,  "\n => [SERVER INFO] Hello world client side!! \n");
+                    // socket_nonblock(client);
+                    clients.push_back(client);
+                    continue;
+                }
+
+                // Event that happens when some client socket sends data. 
+                // EPOLIN event means that the file descriptor is ready for input. 
+                if(ev.events & EPOLLIN)            
+                {
+                   int fd = ev.data.fd;
+                   std::printf("\n [TRACE] Receive client event => ID = %d \n", fd);
+                   RecvMsg resp = fd_read(fd, 500);                                             
+                   if(resp.size == 0)
+                   {
+                       std::printf("\n [CLIENT ID = %d] =>> Disconnected from server. \n", fd);
+                       close(fd);
+                       continue;
+                   }
+                   std::printf("\n [CLIENT ID = %d] =>> size = %d ; msg = %s \n", fd, resp.size, resp.msg.c_str());
+                   fd_write(fd, " [SERVER ECHO] => ID = " + std::to_string(fd) + " => " + resp.msg);
+                }
+
+            }
+
+
+        } /* [[ ============== END client loop =========== ]] */
+
+        socket_close(server);
+        return 0;
+
+    } // --- End of main() -------------//
+
+    // ----------- Function Implementations ----------------------------------------//
+
+    void 
+    socket_close(Socket& sock)
+    {
+        ::close(sock.sockfd);
+        sock.sockfd = -1;    
+    }
+
+
+    void fd_write(int fd, std::string const& text)
+    {
+        ::write(fd, text.c_str(), text.size());
+    }
+
+    RecvMsg fd_read(int fd, size_t buffer_max)
+    {
+        std::string buffer(buffer_max, 0x00);
+        ssize_t n = read(fd, &buffer[0], buffer_max);
+        buffer.resize(n);
+        return RecvMsg{n, buffer};
+    }
+
+
+    Socket 
+    socket_make_server(uint16_t port, const char* hostname)
+    {
+        int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+        // Returns (-1) on failure
+        assert(sockfd != -1);
+
+        // ---------- query address ------------------------------//
+        // Note: the keyword 'struct' is not necessary here (redundant).
+        struct hostent *h = gethostbyname(hostname);
+        assert(h != nullptr);
+        struct sockaddr_in sa;
+        memcpy(&sa.sin_addr.s_addr, h->h_addr, h->h_length);
+        sa.sin_family = AF_INET;
+        // The function htons convert a number to big-endian format.
+        sa.sin_port = htons(port);
+
+        // ----- Bind to Port and wait for client connections ---------//
+        if (::bind(sockfd, (sockaddr *)&sa, sizeof(sa)) == -1)            
+            throw std::runtime_error("Error: unable to bind socket \n");
+
+
+        // Enables binding to the same address
+        int enable_reuseaddr = 1;
+        if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &enable_reuseaddr, sizeof(int)) < 0)
+            throw std::runtime_error("Error: unable to set socket option. \n");
+
+        // Ignore SIGPIPE signal which would cause abnormal termination of socket server
+        // Requires: #include <signal.h> header.
+        signal(SIGPIPE, SIG_IGN);
+
+        fprintf(stderr, " [TRACE] Listening client connection \n");
+        int backlog = 5;
+        assert(listen(sockfd, backlog) != -1);
+
+        return Socket{ sockfd, sa };
+    }
+
+    Socket 
+    socket_accept(Socket& server)
+    {
+        Socket client;
+        socklen_t addrlen = sizeof(sockaddr_in);
+        client.sockfd = accept(server.sockfd, (sockaddr *) &client.sa, &addrlen);
+
+        if (client.sockfd == -1)
+        {
+            fprintf(stderr, " Error: failure to handle client socket. Check errno \n");
+            close(client.sockfd);
+        }
+        return client;
+    }
+#+END_SRC
+
+Building: 
+
+#+BEGIN_SRC sh 
+   g++ multiplex-epoll-server.cpp -o out.bin -std=c++1z -Wall -Wextra 
+#+END_SRC
+
+Running: (Server - terminal 1)
+
+#+BEGIN_SRC sh 
+   ./out.bin 
+
+   [INFO] Program started. 
+   [TRACE] Listening client connection 
+   [TRACE] Epoll waiting for events 
+   [TRACE] Epoll events arrived => nfsd = 1 
+   ----------------------------------------------------
+   [TRACE] Accept client connection => ID = 7 
+   [TRACE] Epoll waiting for events 
+   [TRACE] Epoll events arrived => nfsd = 1 
+   ----------------------------------------------------
+
+   [TRACE] Receive client event => ID = 7 
+
+   [CLIENT ID = 7] =>> size = 19 ; msg = hello world server
+
+   [TRACE] Epoll waiting for events 
+   [TRACE] Epoll events arrived => nfsd = 1 
+   ----------------------------------------------------
+   [TRACE] Accept client connection => ID = 8 
+   [TRACE] Epoll waiting for events 
+   [TRACE] Epoll events arrived => nfsd = 1 
+   ----------------------------------------------------
+
+   [TRACE] Receive client event => ID = 8 
+
+   [CLIENT ID = 8] =>> size = 30 ; msg = connect server from client 2 
+
+   [TRACE] Epoll waiting for events 
+  message typed in stdin is sent to all client sockets.
+   [TRACE] Epoll events arrived => nfsd = 1 
+   ----------------------------------------------------
+   [TRACE] Received STDIN event 
+
+   STDIN = message typed in stdin is sent to all client sockets.
+   [TRACE] Epoll waiting for events 
+   [TRACE] Epoll events arrived => nfsd = 1 
+   ----------------------------------------------------
+
+   [TRACE] Receive client event => ID = 8 
+
+   [CLIENT ID = 8] =>> size = 24 ; msg = from client 2 to server
+
+   [TRACE] Epoll waiting for events 
+   [TRACE] Epoll events arrived => nfsd = 1 
+   ----------------------------------------------------
+#+END_SRC
+
+Running: (Client 1 netcat from terminal 2)
+
+#+BEGIN_SRC sh 
+   $ >> nc -v localhost 9026
+  Ncat: Version 7.80 ( https://nmap.org/ncat )
+  Ncat: Connection to ::1 failed: Connection refused.
+  Ncat: Trying next address...
+  Ncat: Connected to 127.0.0.1:9026.
+
+   => [SERVER INFO] Hello world client side!! 
+  hello world server
+   [SERVER ECHO] => ID = 7 => hello world server
+   STDIN = message typed in stdin is sent to all client sockets.
+  from client 1 to server
+   [SERVER ECHO] => ID = 7 => from client 1 to server
+  ^C⏎   
+#+END_SRC
+
+Running: (Client 2 netcat from terminal 3)
+
+#+BEGIN_SRC sh
+  $ nc -v localhost  9026
+  Ncat: Version 7.80 ( https://nmap.org/ncat )
+  Ncat: Connection to ::1 failed: Connection refused.
+  Ncat: Trying next address...
+  Ncat: Connected to 127.0.0.1:9026.
+
+   => [SERVER INFO] Hello world client side!! 
+  connect server from client 2 
+   [SERVER ECHO] => ID = 8 => connect server from client 2 
+   STDIN = message typed in stdin is sent to all client sockets.
+  from client 2 to server
+   [SERVER ECHO] => ID = 8 => from client 2 to server
+  ^C
+
+#+END_SRC
