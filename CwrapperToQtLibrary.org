@@ -1,0 +1,1344 @@
+#+INCLUDE: theme/style.org
+#+TITLE: C Wrappers for C++ Libraries and Interoperability
+#+DESCRIPTION: cpp/c++ interoperability ffi shim qt5 widgets gui library wrapper julia dlang
+#+STARTUP: content
+
+* C Wrappers for C++ Libraries and Interoperability
+** Overview
+
+One of the main advantages of the C language is the the possibility of
+calling libraries written in C from other programming languages via
+FFI (Foreign Function Interface), which allows calling C functions
+from C shared libraries. Unlike C, calling C++ libraries directly via
+FFI is not feasible as C++ lacks a standard ABI - Application Binary
+interface. A solution for this issue is to create a C wrapper for the
+C++ library using _opaque pointer_, _incomplete types_ and _extern C_
+annotation.
+
+** Example 1: Calling C++ from C
+
+This section presents how to call a statically linked C++ cod from C.
+
+ + Complete code:  [[https://gist.github.com/caiorss/c236aedbbb514717ad26e856654bb063][Example GIST - calling C++ from C]]
+
+File: *cppcode.hpp*
+ + Header file that can be used by a C or C++ code. All code between
+   #ifndef __cplusplus ... #edif is ignored by a C compiler.
+
+#+BEGIN_SRC cpp
+  #ifndef _CODECPP_
+  #define _CODECPP_
+
+  #ifdef __cplusplus
+    #define EXPORT_C extern "C"
+  #else
+    #define EXPORT_C
+  #endif
+
+  //============ C++ Only Header =================//
+  #ifdef __cplusplus  // Enabled only for C++ compilers
+  #include <iostream>
+
+  class Runstat
+  {
+      /// Sum of sequence processed
+      double m_sum;
+      /// Sum of squares processed
+      double m_sumsq;
+      /// Size of sequence processed
+      size_t m_N;
+  public:
+      Runstat();
+      Runstat(Runstat const&)            = delete;
+      Runstat& operator=(Runstat const&) = delete;
+      ~Runstat();
+      void   add(double x);
+      void   reset();
+      size_t size() const;
+      double mean() const;
+      /// Standard deviation
+      double sdev() const;
+  };
+
+  #endif //-- End of __cplusplus definition //
+
+
+  // ========== C-interface for std::string container
+  typedef  void* hString;
+
+  EXPORT_C hString string_new();
+  EXPORT_C hString string_new1 (const char* text);
+  EXPORT_C hString string_copy (hString self);
+  EXPORT_C void    string_del  (hString self);
+  EXPORT_C void    string_add  (hString self, const char* text);
+  EXPORT_C void    string_disp (hString, const char* name);
+
+
+  //============ C-interface for class Runstat ============//
+
+  // Opaque pointer type alias for C-lang
+  typedef void* pStat;
+
+  EXPORT_C pStat   Runstat_new();
+  EXPORT_C void    Runstat_del (pStat self);
+  EXPORT_C void    Runstat_add (pStat self, double x);
+  EXPORT_C double  Runstat_mean(pStat self);
+  EXPORT_C double  Runstat_sdev(pStat self);
+  EXPORT_C size_t  Runstat_size(pStat self);
+
+  #endif
+#+END_SRC
+
+File: *cppcode.cpp*
+ + Implementation of classes and C interface functions.
+
+Implementation of class RunStat member functions:
+
+#+BEGIN_SRC cpp
+   ... ... ... ...
+
+  Runstat::Runstat()
+  {
+      std::cout << " [TRACE] Object created Ok." << std::endl;
+      m_sum = 0.0;
+      m_sumsq = 0.0;
+      m_N = 0;
+  }
+
+  Runstat::~Runstat()
+  {
+      std::cout << " [TRACE] Object deleted OK" << std::endl;
+  }
+
+  void
+  Runstat::add(double x)
+  {
+      m_sum += x;
+      m_sumsq += x * x;
+      m_N++;
+  }
+
+  ...... ....   ...... ....   ...... ....
+
+  Runstat::~Runstat()
+  {
+      std::cout << " [TRACE] Object deleted OK" << std::endl;
+  }
+
+  ...... ....   ...... ....   ...... ....
+
+  void
+  Runstat::add(double x)
+  {
+      m_sum += x;
+      m_sumsq += x * x;
+      m_N++;
+  }
+
+ ... ...  ... ...  ... ...  ... ...
+#+END_SRC
+
+Implementation of the C-interface functions for class std::string.
+
+#+BEGIN_SRC cpp
+  //--------- C-Interface for class std::string ------------------//
+
+  hString string_new()
+  {
+      return new std::string{};
+  }
+
+  hString string_new1(const char* text)
+  {
+      return new std::string(text);
+  }
+
+  // Copy constructor
+  hString string_copy(hString self)
+  {
+      std::string* p = reinterpret_cast<std::string*>(self);
+      return new std::string(*p);
+  }
+
+  void string_del(hString self)
+  {
+      delete reinterpret_cast<std::string*>(self);
+  }
+
+  void string_add(hString self, const char* text)
+  {
+      auto p = reinterpret_cast<std::string*>(self);
+      ,*p = *p + text;
+  }
+
+  void string_disp(hString self, const char* name)
+  {
+      auto p = reinterpret_cast<std::string*>(self);
+      std::cout << name << " / std::string{ " << *p << "} " << std::endl;
+  }
+#+END_SRC
+
+Implementation of the C-interface functions for class RunStat.
+
+#+BEGIN_SRC cpp
+  //---------- C-Interface for class Runstat ---------------------//
+
+  pStat Runstat_new()
+  {
+      return new (std::nothrow) Runstat();
+  }
+
+  void Runstat_del(pStat self)
+  {
+      delete reinterpret_cast<Runstat*>(self);
+  }
+
+  void Runstat_add(pStat self, double x)
+  {
+      auto p = reinterpret_cast<Runstat*>(self);
+      p->add(x);
+  }
+
+  double Runstat_mean(pStat self)
+  {
+      Runstat* p = reinterpret_cast<Runstat*>(self);
+      return p->mean();
+  }
+
+  double Runstat_sdev(pStat self)
+  {
+      Runstat* p = reinterpret_cast<Runstat*>(self);
+      return p->sdev();
+  }
+
+
+  size_t Runstat_size(pStat self)
+  {
+      Runstat* p = reinterpret_cast<Runstat*>(self);
+      return p->size();
+  }
+#+END_SRC
+
+ *File: main.c*
+  + C client code that uses C-interface functions export by the C++ file cppcode.
+
+#+BEGIN_SRC C
+  #include <stdio.h>
+  #include <stdlib.h>
+
+  #include "codecpp.hpp"
+
+  int main()
+  {
+      printf("\n == EXPERIMENT 1 - std::string C-wrapper ======\n");
+      hString str = string_new1("A C++ string in C");
+      string_disp(str, "str");
+      hString str2 = string_copy(str);
+      string_add(str, " - hello world");
+      string_disp(str, "str");
+      string_disp(str2, "str2");
+      string_del(str);
+      string_del(str2);
+
+      printf("\n == EXPERIMENT 2 - Class Runstat ======\n");
+      pStat obj = Runstat_new();
+      Runstat_add(obj, 10.0);
+      Runstat_add(obj, 4.0);
+      Runstat_add(obj, 25.0);
+      Runstat_add(obj, 16.0);
+
+      printf(" Number of Elements processed = %zu \n", Runstat_size(obj));
+      printf(" Mean = %.5f \n", Runstat_mean(obj));
+      printf(" Sdev = %.5f \n", Runstat_sdev(obj));
+
+      Runstat_add(obj, -50.0);
+      Runstat_add(obj, 80.0);
+      printf(" Mean = %.5f \n", Runstat_mean(obj));
+      printf(" Sdev = %.5f \n", Runstat_sdev(obj));
+      // Delete C++ Object
+      Runstat_del(obj);
+      return 0;
+  }
+#+END_SRC
+
+ *File: CMakeLists.txt*
+
+#+BEGIN_SRC cpp
+  cmake_minimum_required(VERSION 3.9)
+  project( CallCppFromC)
+
+  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+
+  add_executable(main main.c codecpp.cpp codecpp.hpp)
+#+END_SRC
+
+Manual compilation:
+
+#+BEGIN_SRC sh
+  # Generate object code codecpp.o
+  $ g++ codecpp.cpp -o codecpp.o -c -std=c++1z -Wall -g
+
+  # Generate object-code main.o
+  $ gcc main.c -o main.o -c -g
+
+  # Link => generate main.bin
+  $ g++ main.o codecpp.o -o main.bin
+#+END_SRC
+
+Program output:
+
+#+BEGIN_SRC sh
+  ./main.bin
+
+   == EXPERIMENT 1 - std::string C-wrapper ======
+  str / std::string{ A C++ string in C}
+  str / std::string{ A C++ string in C - hello world}
+  str2 / std::string{ A C++ string in C}
+
+   == EXPERIMENT 2 - Class Runstat ======
+   [TRACE] Object created Ok.
+   Number of Elements processed = 4
+   Mean = 13.75000
+   Sdev = 8.95824
+   Mean = 14.16667
+   Sdev = 41.69612
+   [TRACE] Object deleted OK
+#+END_SRC
+
+** Example 2: Calling Qt5 Widgets library from C, Julia and D-lang
+*** Overview
+
+This sample code provides a C wrapper to the QT5 Widgets GUI
+library. This C-wrapper allows calling Qt5 from C, Julia language and
+also D-language.
+
+ *See:*
+
+QT5 Documentation for widgets classes used in the sample code: 
+
+  + [[https://doc.qt.io/qt-5/qobject.html][QObject Class | Qt Core 5.15.0]]
+
+  + [[https://doc.qt.io/qt-5/qwidget.html][QWidget Class | Qt Widgets 5.15.0]]
+
+  + [[https://doc.qt.io/qt-5/qapplication.html][QApplication Class | Qt Widgets 5.15.0]]
+
+  + [[https://doc.qt.io/qt-5/qpushbutton.html][QPushButton Class | Qt Widgets 5.15.0]]
+
+  + [[https://doc.qt.io/qt-5/qdoublespinbox.html][QDoubleSpinBox Class | Qt Widgets 5.15.0]]
+
+Julia language: 
+
+  + [[https://docs.julialang.org/en/v1/manual/calling-c-and-fortran-code/][Calling C and Fortran Code · The Julia Language]]
+
+  + [[https://docs.julialang.org/en/v1/manual/embedding/][Embedding Julia · The Julia Language]]
+
+  + [[https://en.wikipedia.org/wiki/Julia_(programming_language)][Julia (programming language) - Wikipedia]]
+
+  + [[https://www.nature.com/articles/d41586-019-02310-3][Julia: come for the syntax, stay for the speed]] - Nature Magazine
+
+  + [[https://juliabyexample.helpmanual.io/][Julia By Example]]
+
+D Language: 
+
+  + [[https://en.wikipedia.org/wiki/D_(programming_language)][D (programming language) - Wikipedia]]
+
+  + [[https://dlang.org/blog/2017/12/05/interfacing-d-with-c-getting-started/][Interfacing D with C: Getting Started – The D Blog]]
+
+  + [[https://dlang.org/spec/interfaceToC.html][Interfacing to C - D Programming Language]]
+
+  + [[https://forum.dlang.org/thread/o3sb8m$24vp$1@digitalmars.com][Using dlopen/dlsym - D Programming Language Discussion Forum]]
+
+  + [[https://dlang.org/spec/cpp_interface.html][Interfacing to C++ - D Programming Language]]
+
+
+*** Files
+
+  + GIST with all sources:
+    + https://gist.github.com/a59d0f1b17d286dad19842932c931e92
+
+File: CMakeLists.txt
+
+#+BEGIN_SRC cmake
+   cmake_minimum_required(VERSION 3.9)
+   project(Qt5_Widgets_Template)
+
+   #====== Global Configurations ==================#
+
+   set(CMAKE_CXX_STANDARD 17)
+   set(CMAKE_CXX_STANDARD_REQUIRED ON)
+   set(CMAKE_VERBOSE_MAKEFILE ON)
+
+   set(CMAKE_INCLUDE_CURRENT_DIR ON)
+   set(CMAKE_AUTOUIC ON)
+   set(CMAKE_AUTOMOC ON)
+   set(CMAKE_AUTORCC ON)
+
+   # Export ALL DLLs symbols on Windows without __declspec(xxxx) annotations.
+   set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS true)
+
+   find_package(Qt5 COMPONENTS Core Widgets Network UiTools REQUIRED)
+
+   #=============== Target Configurations ============#
+
+   # --------------------------------------------------#
+             add_library( qtwrapper SHARED qtwrapper.cpp )
+   target_link_libraries( qtwrapper PRIVATE Qt5::Core Qt5::Gui Qt5::Widgets )
+
+          add_executable( client1  client1.c )
+   target_link_libraries( client1  qtwrapper )
+
+#+END_SRC
+
+File: qtwrapper.cpp
+  + C-wrapper or C-interface to QT5
+
+#+BEGIN_SRC cpp
+  #include <QtWidgets>
+  #include <QApplication>
+  #include <QtUiTools/QtUiTools>
+  #include <QSysInfo>
+  #include <QtConcurrent/QtConcurrent>
+
+  #include <functional>
+  #include <iostream>
+  #include <fstream>
+  #include <string>
+  #include <map>
+
+  /** extern "C" =>  Remove C++ name mangling and makes the function
+   ,* compatible with C. It enforces C linkage to the annotated symbol.
+   ,**-----------------------------------------------------------------*/
+  #define EXPORT_C extern "C"
+
+  /** Delete any instance of a derived class of QObject
+   ,* Note: It can be used for deleting instances QWidget, QApplication or QLayout.
+   ,*/
+  EXPORT_C
+  void qt_qobject_del(QObject* self)
+  {
+      delete self;
+  }
+
+  EXPORT_C
+  const char* qt_qobject_ClassName(QObject* self)
+  {
+      return self->metaObject()->className();
+  }
+
+  EXPORT_C
+  void qt_qobject_dumpObjectInfo(QObject* self)
+  {
+      self->dumpObjectInfo();
+  }
+
+  EXPORT_C
+  void qt_qobject_dumpObjectTree(QObject* self)
+  {
+      self->dumpObjectTree();
+  }
+
+  EXPORT_C
+  void qt_qobject_print(QObject* self)
+  {
+      qDebug() << " [QOBjec] " << self;
+  }
+
+  enum class WidgetType
+  {
+        Window         = 1
+      , Window_main    = 2
+      , QPushButton    = 3
+      , QLabel         = 4
+      , QLineEdit      = 5
+      , QDoubleSpinBox = 6
+  };
+
+  using CtorFunction = std::function<QWidget* (QWidget* parent)>;
+  using CtorDatabase = std::map<int, CtorFunction>;
+
+  template<typename T> void register_ctor(CtorDatabase&  db, int type)
+  {
+      db[type] = [](QWidget* parent){ return new (std::nothrow) T(parent); };
+  }
+
+  // Create an object of a QWidget given class, given its name
+  EXPORT_C
+  QWidget* qt_widget_new(QWidget* parent, int type)
+  {
+      // 'static' => Initialize static object only once.
+      static const CtorDatabase ctordb = []{
+          auto db = CtorDatabase{};
+          register_ctor<QWidget>(db,        (int) WidgetType::Window);
+          register_ctor<QPushButton>(db,    (int) WidgetType::QPushButton);
+          register_ctor<QLabel>(db,         (int) WidgetType::QLabel);
+          register_ctor<QLineEdit>(db,      (int) WidgetType::QLineEdit);
+          register_ctor<QDoubleSpinBox>(db, (int) WidgetType::QDoubleSpinBox);
+
+          db[(int) WidgetType::Window_main] = [](QWidget* parent){
+              QWidget* w = new QWidget(parent);
+              w->resize(500, 400);
+              w->setWindowTitle("MainWindow");
+              w->show();
+              return w;
+          };
+          return db;
+      }();
+
+      if(auto it = ctordb.find(type); it != ctordb.end())
+      {  return it->second(parent);  }
+      return nullptr;
+  }
+
+  EXPORT_C
+  QWidget* qt_window_main()
+  {
+      QWidget* w = new QWidget(nullptr);
+      w->resize(500, 400);
+      w->setWindowTitle("MainWindow");
+      w->show();
+      return w;
+  }
+
+  EXPORT_C
+  QLayout* qt_layout_new(QWidget* parent, int type)
+  {
+      if(type == 1) return new QVBoxLayout(parent);
+      if(type == 2) return new QHBoxLayout(parent);
+      if(type == 3) return new QFormLayout(parent);
+      return nullptr;
+  }
+
+  EXPORT_C
+  QObject* qt_QFormLayout_addWidgetAndLabel(QFormLayout* self, int type, const char* label)
+  {
+      QWidget* wdg = qt_widget_new(nullptr, type);
+      if(wdg == nullptr){ return nullptr; }
+      self->addRow(label, wdg);
+      return wdg;
+  }
+
+  EXPORT_C
+  void qt_QFormLayout_addRowItem(QFormLayout* self, QWidget* field)
+  {
+      self->addRow(field);
+  }
+
+
+  EXPORT_C
+  QLabel* qt_QFormLayout_addLabel1(QFormLayout* self, const char* label_text)
+  {
+      auto btn = new QLabel(label_text);
+      self->addRow(btn);
+      return btn;
+  }
+
+
+  EXPORT_C
+  QApplication* qt_app_new(int argc, char** argv)
+  {
+      std::cout << " [TRACE] Create QAppliction Object Ok" << std::endl;
+      return new QApplication(argc, argv);
+  }
+
+  EXPORT_C
+  QApplication* qt_app_new2()
+  {
+      std::cout << " [TRACE] Create QAppliction Object Ok" << std::endl;
+      static int   argc = 1;
+      static const char* argv [] = { "dummy_app" };
+      return new QApplication(argc, (char**) argv);
+  }
+
+  EXPORT_C
+  int qt_app_exec(QApplication* self)
+  {
+      return self->exec();
+  }
+
+  // -------- Wrappers for QWidget Class ------------------//
+
+  EXPORT_C
+  void qt_widget_show(QWidget* self)
+  {
+      self->show();
+  }
+
+  template<typename T>
+  static bool set_text(QWidget* self, const char* text)
+  {
+      auto obj = qobject_cast<T>(self);
+      // Early return on Error.
+      if(obj == nullptr ){ return false;  }
+      obj->setText(text);
+      return true;
+  }
+
+  EXPORT_C
+  void qt_widget_setText(QWidget* self, const char* text)
+  {
+      if( set_text<QLabel*>(self, text))           return;
+      if( set_text<QLineEdit*>(self, text))        return;
+      if( set_text<QTextEdit*>(self, text))        return;
+      if( set_text<QMessageBox*>(self, text))      return;
+      if( set_text<QAbstractButton*>(self, text) ) return;
+      // logger().log() << " [TRACE] Called function " << __FUNCTION__ << std::endl;
+      self->setWindowTitle(text);
+  }
+
+
+  // -------- Wrappers for QPushButton Class ------------------//
+
+  // Install event handler (callback) for button clicked event
+  EXPORT_C
+  void qt_button_onClicked(  // Pointer to button
+                             QAbstractButton* self
+                             // Context of the callback. Note: C does not support closures
+                             // or stateful function pointer. All data needs to be passed
+                             // as arguments
+                           , void* ctx
+                             // Pointer to callback function pointer.
+                           , void (* callback) (void* self) )
+  {
+      QObject::connect(self, &QPushButton::clicked, [=]{
+          callback(ctx);
+      });
+  }
+
+
+  // Install event handler for
+  EXPORT_C
+  void qt_QLineEdit_onTextChanged(  QLineEdit* self
+                                  , void* ctx
+                                  , void (* callback) (void* ctx, QLineEdit* self) )
+  {
+      QObject::connect(self, &QLineEdit::textChanged, [=]{
+          callback(ctx, self);
+      });
+  }
+
+
+  EXPORT_C
+  void qt_msgbox_info(QWidget* parent, const char* title, const char* text)
+  {
+      QMessageBox::information(parent, title, text);
+  }
+
+  // Note: The string has to be released after with free() function.
+  EXPORT_C
+  const char* qt_QLineEdit_text(QLineEdit* self)
+  {
+      return self->text().toLocal8Bit().constData();
+  }
+
+  EXPORT_C
+  double qt_QDoubleSpinBox_value(QDoubleSpinBox* self)
+  {
+      return self->value();
+  }
+
+  EXPORT_C
+  void qt_QDoubleSpinBox_setValue(QDoubleSpinBox* self, double value)
+  {
+      self->setValue(value);
+  }
+
+  EXPORT_C
+  void qt_QDoubleSpinBox_onValueChanged(
+       QDoubleSpinBox* self
+     , void* ctx
+     , void (* callback)(void* ctx) )
+  {
+      QObject::connect(  self, qOverload<double>(&QDoubleSpinBox::valueChanged)
+                       , [=](double x){ callback(ctx);  }
+                      );
+  }
+#+END_SRC
+
+File: qtwrapper.h (header for the C-wrapper or C-interface)
+
+#+BEGIN_SRC cpp
+  // Non standard directive, but supported by most compiler to includer the
+  // header only once
+  #pragma once
+
+  // Type aliases
+  typedef void   ANY;
+  typedef void   QObject;
+  typedef void   QApplication;
+  typedef void   QPushButton;
+  typedef void   QWidget;
+  typedef void   QAbstractButton;
+  typedef void   QLineEdit;
+  typedef void   QLayout;
+  typedef void   QFormLayout;
+  typedef void   QLabel;
+
+  void qt_qobject_del(QObject* self);
+  void qt_qobject_dumpObjectInfo(QObject* self);
+  void qt_qobject_dumpObjectTree(QObject* self);
+  void qt_qobject_print(QObject* self);
+
+
+  QApplication* qt_app_new(int argc, char** argv);
+  QApplication* qt_app_new2();
+
+  // Instantiate any QT widget by name
+  QWidget* qt_widget_new(QWidget* parent, int type);
+
+  void qt_widget_setText(QWidget* self, const char* text);
+
+  // QApplication
+  int  qt_app_exec(QApplication* self);
+
+  // Any QtWidget
+  void          qt_QWidget_show(QWidget* self);
+  void          qt_QWidget_setToolTip(QWidget* self, const char* tooltip);
+
+  // QPushButton wrappers
+  QPushButton*  qt_QPushButton_new(QWidget* parent, const char* label);
+  void          qt_QPushButton_onClicked_test(QPushButton* self );
+
+  // Abstract PushbButton
+  void          qt_button_onClicked(QAbstractButton* self, void* ctx, void (* callback) (void*) );
+  void          qt_button_setText(QAbstractButton* self, const char* text);
+
+  const char*   qt_QLineEdit_text(QLineEdit* self);
+
+  QLayout*     qt_layout_new(QWidget* parent, int type);
+  QObject*     qt_QFormLayout_addWidgetAndLabel(QFormLayout* self, int type, const char* label);
+
+  QLabel* qt_QFormLayout_addLabel1(QFormLayout* self, const char* label_text);
+
+  void qt_msgbox_info(QWidget* parent, const char* title, const char* text);
+
+  void qt_QLineEdit_onTextChanged( QLineEdit* self
+                                 , void* ctx
+                                 , void (* callback) (void* ctx, QLineEdit* self) );
+#+END_SRC
+
+File: client1.c (C-client code)
+
+#+BEGIN_SRC cpp
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include <assert.h>
+
+  #include "qtwrapper.h"
+
+  typedef struct CallbackContext
+  {
+      QLineEdit* lin;
+      int        counter;
+  } CallbackContext;
+
+
+  // All callback (closure) state should be passed as arguments
+  void onclicked_callback(void* context)
+  {
+      CallbackContext* ctx = (CallbackContext*) context;
+      ctx->counter += 1;
+      const char* str = qt_QLineEdit_text(ctx->lin);
+
+      printf(" [TRACE] Button clicked => Counter incremented to: %d \n", ctx->counter);
+      printf(" [TRACE] QLineEdit Value = %s \n", str);
+      // free(str);
+
+      // qt_msgbox_info(NULL, "Message Info", "Button clicked Ok");
+  }
+
+  void lineEdit_Callback(void* ctx, QLineEdit* self)
+  {
+      const char* str = qt_QLineEdit_text(self);
+      QLabel*   label = (QLabel*) ctx;
+      qt_widget_setText(label, str);
+      printf(" [LineEdit Callback] Text changed to %s \n", str);
+  }
+
+  void onclick_msgbox_callback(void* context)
+  {
+      QLineEdit* lin = (QLineEdit*) context;
+      const char* str = qt_QLineEdit_text(lin);
+      qt_msgbox_info(NULL, "Message Info", str);
+      // free(str);
+  }
+
+  const int WIDGET_WINDOW           = 1;
+  const int WIDGET_WINDOW_MAIN      = 2;
+  const int WIDGET_QPUSH_BUTTON     = 3;
+  const int WIDGET_QLABEL           = 4;
+  const int WIDGET_QLINE_EDIT       = 5;
+  const int WIDGET_QDOUBLE_SPINBOX  = 6;
+
+  const int LAYOUT_QFORM_LAYOUT = 3;
+
+  int main(int argc, char** argv)
+  {
+      // QApplication* qapp = qt_app_new(argc, argv);
+      QApplication* qapp = qt_app_new2();
+
+      // -------- Create GUI - Graphical User Interface ------//
+
+      QPushButton* win = qt_widget_new(NULL, WIDGET_WINDOW_MAIN);
+      qt_widget_setText(win, "Window Title");
+      assert(win != NULL);
+
+      QFormLayout* form = qt_layout_new(win, LAYOUT_QFORM_LAYOUT);
+      assert(form != NULL);
+
+      QLineEdit*   lin  = qt_QFormLayout_addWidgetAndLabel(form, WIDGET_QLINE_EDIT,   "Input");
+      QPushButton* btn1 = qt_QFormLayout_addWidgetAndLabel(form, WIDGET_QPUSH_BUTTON, "");
+      QPushButton* btn2 = qt_QFormLayout_addWidgetAndLabel(form, WIDGET_QPUSH_BUTTON, "");
+      QLabel*      disp = qt_QFormLayout_addWidgetAndLabel(form, WIDGET_QLABEL,       "Display label");
+
+      qt_widget_setText(btn1, "Button 1");
+      qt_widget_setText(btn2 ,"Button 2");
+      // qt_widget_setToolTip(btn1, "Click at this button to play!");
+
+      qt_qobject_print(win);
+
+      // -------- Install Event Handlers --------------//
+      //
+
+      qt_QLineEdit_onTextChanged(lin, disp, lineEdit_Callback);
+      qt_button_onClicked(btn1, lin, &onclick_msgbox_callback);
+
+      CallbackContext ctx;
+      ctx.counter = 0;
+      ctx.lin = lin;
+      qt_button_onClicked(btn2, &ctx, &onclicked_callback);
+
+      // ---- Run QT event loop - blocking main thread  ---//
+      qt_app_exec(qapp);
+
+      // ----- Dispose objects ---------------------------//
+      qt_qobject_del(win);
+      qt_qobject_del(qapp);
+
+      puts("\n [TRACE] Terminate application Ok. ");
+
+      return 0;
+  }
+#+END_SRC
+
+File: loader.jl (Julia language client code)
+
+#+BEGIN_SRC julia
+  #!/usr/bin/env julia
+
+  # Refers to file libqexport.so
+  #
+  # On Linux:
+  #  It is assumed that the LD_LIBRARY_PATH environment variable of current
+  #  process contains the directory where libqtexport is located.
+  #
+  # On Windows:
+  #  It is made the assumption that the PATH environmenrt variable of current
+  #  process contains the directory where libqtexport is located.
+  #
+  #
+  const shlib = "libqtwrapper"
+
+  const QObject = Ptr{Cvoid}
+  const QWidget = Ptr{Cvoid}
+  const QLayout = Ptr{Cvoid}
+  const QApp    = Ptr{Cvoid}
+  const QButton = Ptr{Cvoid}
+  const QDoubleSpinbox = Ptr{Cvoid}
+
+  const WIDGET_WINDOW           = 1;
+  const WIDGET_WINDOW_MAIN      = 2;
+  const WIDGET_QPUSH_BUTTON     = 3;
+  const WIDGET_QLABEL           = 4;
+  const WIDGET_QLINE_EDIT       = 5;
+  const WIDGET_QDOUBLE_SPINBOX  = 6;
+  const LAYOUT_QFORM_LAYOUT     = 3;
+
+
+  # Wrapper to function:
+  # QWidget* qt_widget_new(QWidget* parent, const char* name)
+  function qt_widget_new(type::Int)::QWidget
+      return ccall(  (:qt_widget_new, shlib)
+                    # Function type signatrue
+                   , QWidget, (QWidget, Cint)
+                   # Function arguments (parent = null and name = name)
+                   , C_NULL, type
+                   )
+  end
+
+  # Delete any instance of QObject (QWidget, QApplictation, QLayout) and so on
+  function qt_qobject_del(obj::QObject)
+      ccall(  (:qt_qobject_del, shlib)
+            , Cvoid, ( QObject, )
+            , obj )
+  end
+
+  function qt_qobject_print(self::QObject)
+      ccall( (:qt_qobject_print, shlib)
+            , Cvoid, (QObject,)
+            , self )
+  end
+
+  ## => void qt_widget_setText(QWidget* self, const char* text);
+  function qt_widget_setText(self::QWidget, text::String)
+       ccall(  (:qt_widget_setText, shlib)
+              # Function type signatrue
+              , Cvoid, (QWidget, Cstring)
+              # Function arguments (parent = null and name = name)
+              , self, text )
+  end
+
+  # extern QLayout* qt_layout_new(QWidget* parent, const char* name);
+  function qt_layout_new(type::Int, parent::QWidget)::QLayout
+      return ccall(  (:qt_layout_new, shlib)
+                    # Function type signatrue
+                   , QLayout, (QWidget, Cint)
+                   # Function arguments (parent = null and name = name)
+                   , parent, type )
+  end
+
+  #  QPushButton* qt_QFormLayout_addButton(QFormLayout* self, const char* label)
+  function qt_QFormLayout_addWidgetAndLabel(form::QLayout, type::Int, label::String)::QWidget
+      return ccall(  (:qt_QFormLayout_addWidgetAndLabel, shlib)
+                   # Function type signatrue
+                   , QWidget, (QLayout, Cint, Cstring)
+                   # Function arguments
+                   , form, type, label )
+  end
+
+  function qt_qobject_ClassName(self::QObject)::String
+      res = ccall( (:qt_qobject_ClassName, shlib)
+                   , Cstring, (QObject, )
+                   , self )
+      return unsafe_string(res)
+  end
+
+  function QApplication_new()
+      # return ccall( (:qt_app_new2, shlib), Ptr{Cvoid}, ())
+      return ccall((:qt_app_new2, shlib), QApp, ())
+  end
+
+  function QApplication_exec(self)
+      ccall((:qt_app_exec, shlib), Cvoid, ( QApp, ), self )
+  end
+
+  function QPushButton_new(label::String)
+      # return ccall((:qt_QPushButton_new, shlib), ( Ptr{Cvoid}, Cstring ), C_NULL, label )
+      return  btn = ccall( (:qt_QPushButton_new, shlib)
+                          , Ptr{Cvoid}, (Ptr{Cvoid}, Cstring)
+                          , C_NULL, label
+                          )
+  end
+
+  function QWidget_show(self)
+      return ccall((:qt_QWidget_show, shlib), Cvoid, ( Ptr{Cvoid}, ), self)
+  end
+
+  function QPushButton_onClicked_test(self::QButton)
+      ccall((:qt_QPushButton_onClicked_test, shlib), Cvoid, ( QButton, ), self)
+  end
+
+  function qt_button_onClicked(self::QButton, handler)
+      callback = @cfunction $handler Cvoid ( Ptr{Cvoid}, )
+      ccall(  (:qt_button_onClicked, shlib)
+              # Function return type signature
+              , Cvoid
+              # Function arguments
+              , ( QButton, Ptr{Cvoid}, Ptr{Cvoid} )
+              # Arguments passed to function
+              , self, C_NULL, callback
+              )
+  end
+
+  function qt_QDoubleSpinBox_value(self::QDoubleSpinbox)
+      return ccall(  (:qt_QDoubleSpinBox_value, shlib)
+                  , Cdouble, ( QDoubleSpinbox,)
+                  , self)
+  end
+
+  # Wrapper:
+  #  void qt_msgbox_info(QWidget* parent, const char* title, const char* text);
+  function qt_msgbox_info(title::String, text::String)
+      ccall(  (:qt_msgbox_info, shlib)
+            , Cvoid, (Ptr{Cvoid}, Cstring, Cstring)
+            , C_NULL, title, text
+      )
+  end
+
+  # void qt_QDoubleSpinBox_onValueChanged(
+  #               QDoubleSpinBox* self
+  #             , void* ctx, void (* callback)(void* ctx))
+  function qt_QDoubleSpinBox_onValueChanged(self::QDoubleSpinbox, handler)
+      callback = @cfunction $handler Cvoid ( Ptr{Cvoid}, )
+      ccall(  (:qt_QDoubleSpinBox_onValueChanged, shlib)
+              # Function return type signature
+              , Cvoid
+              # Function arguments
+              , ( QButton, Ptr{Cvoid}, Ptr{Cvoid} )
+              # Arguments passed to function
+              , self, C_NULL, callback
+              )
+  end
+
+  function demo_qt_gui_form()
+      qapp = QApplication_new()
+
+      window = qt_widget_new( WIDGET_WINDOW_MAIN )
+      qt_widget_setText(window, "Sample QT GUI in Julia Language")
+
+      form   = qt_layout_new(LAYOUT_QFORM_LAYOUT, window)
+
+      entry1    = qt_QFormLayout_addWidgetAndLabel(form, WIDGET_QDOUBLE_SPINBOX, "Speed in m/s")
+      entry2    = qt_QFormLayout_addWidgetAndLabel(form, WIDGET_QDOUBLE_SPINBOX, "Acceleration m/s^2")
+      btn_run   = qt_QFormLayout_addWidgetAndLabel(form, WIDGET_QPUSH_BUTTON,    "")
+      btn_clean = qt_QFormLayout_addWidgetAndLabel(form, WIDGET_QPUSH_BUTTON,    "")
+      label     = qt_QFormLayout_addWidgetAndLabel(form, WIDGET_QLABEL,          "")
+
+      qt_widget_setText(btn_run,   "Run calculations");
+      qt_widget_setText(btn_clean, "Clean");
+
+      println(" [INFO] class of form object    = ", qt_qobject_ClassName(form))
+      println(" [INFO] class of btn_run object = ", qt_qobject_ClassName(btn_run))
+      println(" [INFO] class of entry1 object  = ", qt_qobject_ClassName(entry1))
+      println(" [INFO] class of entry2 object  = ", qt_qobject_ClassName(entry2))
+
+      qt_widget_setText(btn_run,   "RUN GUI")
+      qt_widget_setText(btn_clean, "CLEAN GUI")
+
+      qt_qobject_print(window)
+
+      update_calculations = (ctx) -> begin
+          speed = qt_QDoubleSpinBox_value(entry1)
+          accel = qt_QDoubleSpinBox_value(entry2)
+          z = 4.51 * speed + 9.81 * accel^2 / speed
+          out = string(" [JULIA] Result = ", round(z, digits = 4))
+          println(" speed = ", speed, " ; accel = ", accel)
+          println(out)
+          println(" --------------------------------- ")
+          qt_widget_setText(label, out)
+      end
+
+      qt_QDoubleSpinBox_onValueChanged(entry1, update_calculations)
+      qt_QDoubleSpinBox_onValueChanged(entry2, update_calculations)
+
+      n = 1
+      qt_button_onClicked(btn_run, (ctx) -> begin
+          n = n + 1
+          println(" [ JULIA ] I was clicked Ok. n = ", n, " times. ")
+          qt_msgbox_info("Notification", "Button was clicked Ok")
+      end)
+
+      qt_button_onClicked(btn_clean, (ctx) -> begin
+          println(" [TRACE] Button clean clicked Ok")
+          qt_widget_setText(label, "Button clean clicked")
+      end)
+
+      # --- Block main thread and run QT event loop ---//
+      QApplication_exec(qapp)
+
+      #  ----- Dispose objects ----------
+      # Only the root widget (window) need to be removed
+      qt_qobject_del(window)
+      qt_qobject_del(qapp)
+  end
+
+  demo_qt_gui_form()
+#+END_SRC
+
+File: d_client.d (Dlang / D-language client code)
+
+#+BEGIN_SRC cpp
+
+  import core.stdc.stdio;
+  import std.range: empty;
+  import str = std.string;
+
+  // Import dlopen
+  import DLL = core.sys.posix.dlfcn;
+
+  alias QLayout         = void;
+  alias QObject         = void;
+  alias QWidget         = void;
+  alias QLabel          = void;
+  alias QApplication    = void;
+  alias QPushButton     = void;
+  alias QFormLayout     = void;
+  alias QAbstractButton = void;
+
+
+  const int WIDGET_WINDOW           = 1;
+  const int WIDGET_WINDOW_MAIN      = 2;
+  const int WIDGET_QPUSH_BUTTON     = 3;
+  const int WIDGET_QLABEL           = 4;
+  const int WIDGET_QLINE_EDIT       = 5;
+  const int WIDGET_QDOUBLE_SPINBOX  = 6;
+  const int LAYOUT_QFORM_LAYOUT = 3;
+
+  alias qapp_new_t          = extern(C) QApplication* function ();
+  alias qapp_exec_t         = extern(C) int      function(QApplication* self);
+  alias qobject_del_t       = extern(C) void     function (QObject*);
+  alias qt_widget_new_t     = extern(C) QWidget* function(QWidget* parent, int type);
+  alias qt_window_main_t    = extern(C) QWidget* function();
+  alias qt_widget_setText_t = extern(C) void     function(QWidget* self, const char* text);
+  alias qt_layout_new_t     = extern(C) QLayout* function (QWidget* parent, int type);
+  alias qt_msgbox_info_t    = extern(C) void     function(QWidget* parent, const char* title, const char* text);
+
+  // QObject* qt_QFormLayout_addWidgetAndLabel(QFormLayout* self, int type, const char* label)
+  alias qt_QFormLayout_addWidgetAndLabel_t =
+          extern(C) QPushButton* function (QFormLayout* self, int type, const char* label);
+
+  alias qt_button_onClicked_t = extern(C) void function ( QAbstractButton* self
+                                                        , void* ctx
+                                                        , void function(void* self) );
+
+
+  struct callback_state
+  {
+      int                 counter           = 0;
+      QLabel*             label             = null;
+      qt_widget_setText_t qt_widget_setText = null;
+      qt_msgbox_info_t    qt_msgbox_info    = null;
+  };
+
+  extern(C) void button_callback1(void* ctx)
+  {
+      import std.conv: to;
+
+      auto pstate = cast(callback_state*) ctx;
+      pstate.counter = pstate.counter + 1;
+      printf(" [TRACE] Button click event happened => state = %d. \n", pstate.counter);
+      string text = "Button clicked / counter = ";
+      text = text ~ to!string(pstate.counter);
+
+      pstate.qt_widget_setText(pstate.label, str.toStringz(text));
+
+      if(pstate.counter > 20){
+          pstate.qt_msgbox_info(null, "QT Event => Button Clicked", str.toStringz(text));
+      }
+  }
+
+  int main()
+  {
+      // ------------- Load Symbols from Shared Library -------------------//
+
+      void* dll = DLL.dlopen("./build/libqtwrapper.so", DLL.RTLD_GLOBAL | DLL.RTLD_LAZY);
+      if (!dll)
+      {
+          fprintf(stderr, " [ERROR] dlopen error: %s\n", DLL.dlerror());
+          return 1;
+      }
+
+      auto  qapp_new   = cast(qapp_new_t) DLL.dlsym(dll, "qt_app_new2");
+      auto  qapp_exec   = cast(qapp_exec_t) DLL.dlsym(dll, "qt_app_exec");
+
+      auto qt_qobject_del      = cast(qobject_del_t)         DLL.dlsym(dll, "qt_qobject_del");
+      auto qt_widget_new       = cast(qt_widget_new_t)       DLL.dlsym(dll, "qt_widget_new");
+      auto qt_layout_new       = cast(qt_widget_new_t)       DLL.dlsym(dll, "qt_layout_new");
+      auto qt_window_main      = cast(qt_window_main_t)      DLL.dlsym(dll, "qt_window_main");
+      auto qt_widget_setText   = cast(qt_widget_setText_t)   DLL.dlsym(dll, "qt_widget_setText");
+      auto qt_button_onClicked = cast(qt_button_onClicked_t) DLL.dlsym(dll, "qt_button_onClicked");
+      auto qt_msgbox_info      = cast(qt_msgbox_info_t)      DLL.dlsym(dll, "qt_msgbox_info");
+
+      auto form_add_item = cast(qt_QFormLayout_addWidgetAndLabel_t) DLL.dlsym(dll, "qt_QFormLayout_addWidgetAndLabel");
+      assert(form_add_item);
+
+      // ---------- Create QT GUI -----------------------------//
+      //
+
+      // Create an instance of class QApplication
+      auto qapp   = qapp_new();
+
+      auto window = qt_widget_new(null, WIDGET_WINDOW_MAIN) ;
+      assert( window );
+      qt_widget_setText(window, "QT Widgets GUI in D Language");
+
+      auto form  = qt_layout_new(window, LAYOUT_QFORM_LAYOUT);
+      auto btn   = form_add_item(form, WIDGET_QPUSH_BUTTON, "");
+      auto label = form_add_item(form, WIDGET_QLABEL,       "Display");
+
+      qt_widget_setText(btn, "Click ME NOW!!");
+
+
+      callback_state state;
+      state.counter = 10;
+      state.label   = label;
+      state.qt_msgbox_info = qt_msgbox_info;
+      state.qt_widget_setText = qt_widget_setText;
+
+      // Install button event handler
+      qt_button_onClicked(btn, &state, &button_callback1);
+
+      // ------ Run QT Event Loop blocking main thread ------//
+      qapp_exec(qapp);
+
+      // ------ Dipose QT Objects ---------------------------//
+      //
+      qt_qobject_del(window);
+      qt_qobject_del(qapp);
+
+      return 0;
+  }
+#+END_SRC
+
+*** Building and running
+
+Fetch the sources:
+
+#+BEGIN_SRC sh
+  $ git clone https://gist.github.com/a59d0f1b17d286dad19842932c931e92 qt5-cwrapper
+  $ cd qt5-cwrapper
+
+  $ ls
+  client1.c  CMakeLists.txt  d_client.d  loader.jl  qtwrapper.cpp  qtwrapper.h
+#+END_SRC
+
+Build the project: (Note: Tested on Linux Fedora-32 64 bits x86-64)
+
+#+BEGIN_SRC sh
+  $ cmake --config Debug -H. -Bbuild
+  $ cmake --build build --target
+#+END_SRC
+
+Check binaries:
+
+#+BEGIN_SRC sh
+  $ file build/client1
+  build/client1: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2
+  , BuildID[sha1]=122650693cf9845a35afeb76bced113f3d92ed1a, for GNU/Linux 3.2.0, not stripped
+
+  $ file build/libqtwrapper.so
+  build/libqtwrapper.so: ELF 64-bit LSB shared object, x86-64, version 1 (GNU/Linux), statically linked
+  , BuildID[sha1]=47381d2f687f8cb5f6bf80be737c0baa2b0e2cb1, not stripped
+#+END_SRC
+
+Show symbols exported by the C-wrapper shared library:
+  + Note: On windows, the equivalent tool is _dumpbin_ and on MacOSX,
+    the equivalent tool is _otool_.
+
+#+BEGIN_SRC sh
+   $ nm build/client1
+   0000000000401155 t .annobin__dl_relocate_static_pie.end
+   0000000000401150 t .annobin__dl_relocate_static_pie.start
+   000000000040114f t .annobin_init.c
+   000000000040114f t .annobin_init.c_end
+   0000000000401120 t .annobin_init.c_end.exit
+     ... ...  ... ...  ... ...  ... ...  ... ...
+     ... ...  ... ...  ... ...  ... ...  ... ...
+                    U printf@@GLIBC_2.2.5
+                    U puts@@GLIBC_2.2.5
+                    U qt_app_exec
+                    U qt_app_new2
+                    U qt_button_onClicked
+                    U qt_layout_new
+                    U qt_msgbox_info
+                    U qt_QFormLayout_addWidgetAndLabel
+                    U qt_QLineEdit_onTextChanged
+                    U qt_QLineEdit_text
+                    U qt_qobject_del
+                    U qt_qobject_print
+                    U qt_widget_new
+                    U qt_widget_setText
+      ... ... ... ... ... ...
+    ... ... ... ... ... ...
+#+END_SRC
+
+
+ *Run the executable client1* (C client code)
+
+Run executable: 
+
+#+BEGIN_SRC sh
+  $ build/client1
+   [TRACE] Create QAppliction Object Ok
+   [LineEdit Callback] Text changed to h 
+   [LineEdit Callback] Text changed to h 
+   [LineEdit Callback] Text changed to h 
+   [LineEdit Callback] Text changed to h 
+   ...  ...  ...  ...  ...  ... 
+   ...  ...  ...  ...  ...  ...  ... 
+#+END_SRC
+
+User Interface Screenshot: 
+
+[[file:images/cwrapper-qt5-1.png][file:images/cwrapper-qt5-1.png]] 
+
+
+ *Run Julia Client Code: loader.jl* 
+
+Run julia script / attempt 1 -> error: 
+
+#+BEGIN_SRC sh 
+   $ julia loader.jl 
+   ERROR: LoadError: could not load library "libqtwrapper"
+   libqtwrapper.so: cannot open shared object file: No such file or directory
+   Stacktrace:
+   ... ... .... ... ... 
+   ... ... ... ... ... 
+#+END_SRC
+
+Run julia script / attempt 2 -> works: 
+  + Note: LD_LIBRARY_PATH only works on Linux. The equivalent of this
+    variable for windows is the _PATH_ environment variable and for
+    MacOSX, the equivalent is _DYLD_LIBRARY_PATH_.
+  + The _libqtwrapper.so_ shared library can be installed on Linux, by
+    moving the library file to /lib directory.
+
+#+BEGIN_SRC sh 
+     $ export LD_LIBRARY_PATH=build:$LD_LIBRARY_PATH
+
+     $ julia loader.jl 
+   [TRACE] Create QAppliction Object Ok
+   [INFO] class of form object    = QFormLayout
+   [INFO] class of btn_run object = QPushButton
+   [INFO] class of entry1 object  = QDoubleSpinBox
+   [INFO] class of entry2 object  = QDoubleSpinBox
+   speed = 1.0 ; accel = 0.0
+   [JULIA] Result = 4.51
+   --------------------------------- 
+   speed = 2.0 ; accel = 0.0
+   [JULIA] Result = 9.02
+   --------------------------------- 
+   speed = 3.0 ; accel = 0.0
+   [JULIA] Result = 13.53
+   --------------------------------- 
+   ... ... ... ... 
+#+END_SRC
+
+User Interface Screenshot: 
+
+[[file:images/cwrapper-qt5-2.png][file:images/cwrapper-qt5-2.png]]
+
+ *Run D-lang Client Code: d_client.d* 
+
+Run file d_client.d as a script: 
+
+#+BEGIN_SRC 
+  $ rdmd d_client.d 
+   [TRACE] Create QAppliction Object Ok
+   [TRACE] Button click event happened => state = 11. 
+   [TRACE] Button click event happened => state = 12. 
+   [TRACE] Button click event happened => state = 13. 
+   [TRACE] Button click event happened => state = 14. 
+   [TRACE] Button click event happened => state = 15. 
+    ... ... ... ... ... ... ... ...   
+#+END_SRC
+
+Build and run executable: 
+
+#+BEGIN_SRC sh 
+  $ dmd d_client.d -g 
+ 
+  $ ./d_client 
+   [TRACE] Create QAppliction Object Ok
+   [TRACE] Button click event happened => state = 11. 
+   [TRACE] Button click event happened => state = 12. 
+   [TRACE] Button click event happened => state = 13.
+   ... ... ...  ... ... ...  ... ... ...  ... ... ... 
+   ... ... ...  ... ... ...  ... ... ...  ... ... ... 
+#+END_SRC
+
+User Interface Screenshot: 
+
+[[file:images/cwrapper-qt5-3.png][file:images/cwrapper-qt5-3.png]]
+
+
