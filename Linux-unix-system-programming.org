@@ -998,6 +998,403 @@ Mac OSX:
    PS1= $> 
    _=/usr/bin/env
 #+END_SRC
+** Widely used functions for strings and buffers in low level codes 
+
+This section provides a review and a recapitulation of the most widely
+used C functions in low level code bases and legacy C codes. Those
+functions are in the header <string.h> for C or <cstring> for C++.
+
+  + _strlen()_ => Get length of null-terminated character array.
+    + Docs: $ man strlen 
+
+#+BEGIN_SRC cpp 
+   size_t strlen(const char *s);
+
+   root [39] const char* st1 = "unix posix irix linux";
+   root [40] const char* st2 = "bsd msdos";
+
+   root [41] strlen(st1)
+   (unsigned long) 21
+
+   root [42] strlen(st2)
+   (unsigned long) 9
+#+END_SRC
+
+  + _strdup()_ => Copy a C-string allocating the copy with malloc. 
+
+#+BEGIN_SRC cpp 
+   char* strdup(const char *s);
+
+   root [39] const char* st1 = "unix posix irix linux";
+
+   root [43] char* p_copy = strdup(st1)
+   (char *) "unix posix irix linux"
+
+   // Release memory for heap-allocated string 
+   root [47] free(p_copy)
+#+END_SRC
+
+  + _strcmp()_ => Compare two C-strings null-terminated (terminated with
+    '\0' or 0x00 null char) array of characters. This function returns
+    0 if the two strings are equal.
+    + Docs: $ man strcmp 
+
+#+BEGIN_SRC cpp 
+    int strcmp(const char *s1, const char *s2);
+
+    // ------- USAGE --------------------------//
+    if ( strmcp(STRING_A, STRING_B) == 0 )
+        puts(" => Strings are equal");
+    else 
+        puts(" => Strins are not equal");
+
+    // ------ CERN's Root REPL Session -------// 
+    root [0] #include <string.h>
+
+    root [1] const char* s1 = "hello"; 
+    root [2] const char* s2 = "world"; 
+    root [3] const char* s3 = "world C++17 c11 ADA spark"; 
+    root [4] const char* s4 = "hello"; 
+
+    root [5] strcmp(s1, s2)
+    (int) -15
+
+    root [6] strcmp(s1, s3)
+    (int) -15
+
+    root [7] strcmp(s1, s4)
+    (int) 0
+#+END_SRC
+
+  + _strcpy()_ => Copy string 'src' parameter (null-terminated array of
+    characters) to a buffer.
+    + Docs: $ man strcpy 
+    + Note: It is vulnerable to buffer
+      overflow, if the size of the string is bigger than the
+      buffer. This function is often used to for copying string literals
+      to a buffer.
+
+#+BEGIN_SRC cpp 
+     char* strcpy( char*       p_buffer      // Pointer to buffer (array of chars)
+                  ,const char* c_string_src  // C-string 
+                );
+
+     root [9] char buffer[200];
+
+     root [10] buffer
+     (char [200]) "\0\0\0\0\0\0\0\0\0\0\0\0\0\0 ...... \0\0\0\0"
+
+     root [11] strcpy(buffer, "Hello world C++17 C++20 ADA Rust")
+     (char *) "Hello world C++17 C++20 ADA Rust"
+
+     root [12] buffer
+     (char [200]) "Hello world C++17 C++20 ADA Rust\0\0\0\0\0\0\0 ... ... \0\0\0"
+#+END_SRC
+
+  + _strncpy()_ => Copy N characters from string to buffer.
+    + Docs: $ man strncpy 
+    + Linux mapage: "The strcpy() function copies the string pointed
+      to by src, including the terminating null byte ('\0'), to the
+      buffer pointed to by dest.  The strings may not overlap, and the
+      destination string dest must be large enough to receive the
+      copy. Beware of buffer overruns!  (See BUGS.)"
+    
+#+BEGIN_SRC cpp 
+   char* strncpy( char*       dest // Pointer to buffer 
+                , const char* src  // C-string (null-terminated) that will be copied 
+                , size_t      n    // Number of chars (bytes) from src that will be copied
+                );
+
+   // ---------- CERN's ROOT Repl Session ------------//
+
+   root [13] char buff1[30];
+   root [14] char buff2[30];
+
+   root [15] const char* cstr = "Hello world C++17 embedded systems real time control systems";
+
+   root [16] buff1
+   (char [30]) "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+
+   root [17] buff2
+   (char [30]) "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+
+   root [18] strncpy(buff1, cstr, 10)
+   (char *) "Hello worl"
+
+   root [19] buff1 
+   (char [30]) "Hello worl\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+
+   root [20] strncpy(buff2, cstr, 25)
+   (char *) "Hello world C++17 embedde"
+
+   root [21] buff2
+   (char [30]) "Hello world C++17 embedde\0\0\0"
+#+END_SRC  
+
+ 
+  + _strcat()_ => Manpage: "The strcat() function appends the src string
+    to the dest string, over‐ writing the terminating null byte ('\0')
+    at the end of dest, and then adds a terminating null byte.  The
+    strings may not overlap, and the dest string must have enough
+    space for the result.  If dest is not large enough, program
+    behavior is unpredictable; buffer overruns (aka buffer overflow)
+    are a favorite avenue for attacking secure program"
+
+    + Note: This function is unsafe and can introduce buffer overflow
+      vulnerability if the size of the _src_ string is not limited.
+
+#+BEGIN_SRC cpp 
+   char *strcat(char *dest, const char *src);
+
+   // ------------- CERN Root REPL  ------------------//
+   const char* null_terminated_char_array1= "C++1z KALMAN FILTER sensor fusion data";
+   char buffer1[100] = "Append cstring: ";
+
+   root [3] buffer1
+   (char [100]) "Append cstring: \0\0\0\0\0\0\0\0\0\0\0\0\0...\0\0"
+
+
+   root [4] strcat(buffer1, null_terminated_char_array1)
+   (char *) "Append cstring: C++1z KALMAN FILTER sensor fusion data"
+
+   root [5] buffer1
+   (char [100]) "Append cstring: C++1z KALMAN FILTER sensor fusion data\0\0....\0\0"
+
+   root [6] strcat(buffer1, " string literal ")
+   (char *) "Append cstring: C++1z KALMAN FILTER sensor fusion data string literal "
+
+   root [7] buffer1 
+   (char [100]) "Append cstring: C++1z KALMAN FILTER sensor fusion data string literal \0\0\0\0...\0\0"
+#+END_SRC
+
+  + _strncat()_ => Similar to strcat, but it limits the number of
+    character to be copied from _src_ to a buffer. 
+
+#+BEGIN_SRC cpp 
+    char* strncat(char *dest, const char *src, size_t n);
+
+    // ------------ CERN's Root REPL session ----------------------// 
+    // 
+
+    // Stack-allocated buffer 
+    root [8] char buff[100];
+    root [11] memset(buff, 100, 0x00); // Initialize buffer
+
+    root [12] const char* str1 = "Hello world APL C++1z ADA RUST DLang OCaml";
+
+    root [13] buff
+    (char [100]) "\0\0\0\0\0\0\0\0\0\0\0\0\0\0...\0\0"
+
+    root [14] strncat(buff, str1, 10)
+    (char *) "Hello worl"
+
+
+    root [15] buff
+    (char [100]) "Hello worl\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0 .. \0\0"
+
+    root [16] strncat(buff, str1, 20)
+    (char *) "Hello worlHello world APL C++1"
+
+    root [17] buff
+    (char [100]) "Hello worlHello world APL C++1\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0....\0\0"
+
+    root [18] strncat(buff, str1 + 25, 30)
+    (char *) "Hello worlHello world APL C++1 RUST DLang OCaml"
+
+    root [19] buff
+    (char [100]) "Hello worlHello world APL C++1 RUST DLang OCaml\0\0...\0\0"
+#+END_SRC
+
+  + _memset()_ => Fill some memory area (buffer) with a constant byte. 
+
+#+BEGIN_SRC cpp 
+   void*  memset(void *s, int c, size_t n);
+
+   // ------ CERN's ROOT REPL session -------------// 
+   // 
+
+   // Create a heap-allocated buffer containing 6 characters. 
+   root [0] char* char_heap_buffer = (char*) malloc(6 * sizeof(char))
+   (char *) "@\x0e" "e\x01"
+
+   root [1] char_heap_buffer[0]
+   (char) '@'
+
+   root [2] char_heap_buffer[1]
+   (char) '0x0e'
+
+   root [3] char_heap_buffer[2]
+   (char) 'e'
+
+   // Intialize buffer char_hepa_buffer 
+   root [9] memset(char_heap_buffer, 'z', 6)
+   (void *) 0x128c760
+
+   root [10] char_heap_buffer[0]
+   (char) 'z'
+
+   root [11] char_heap_buffer[1]
+   (char) 'z'
+
+   root [12] char_heap_buffer[2]
+   (char) 'z'
+
+   root [13] char_heap_buffer[3]
+   (char) 'z'
+
+   root [14] char_heap_buffer 
+   (char *) "zzzzzz"
+
+   root [15] free(char_heap_buffer)
+#+END_SRC
+
+  + _memcmp()_  => Compare the first N bytes of two buffers. It returns
+    0 if all the first N bytes from two buffers are equal. Note: This
+    function can only compare buffers containing POD data (Plain-Old
+    Data) without any internal pointer or heap-allocated data. 
+
+#+BEGIN_SRC cpp 
+     int memcmp(  const void* s1 // Pointer to the beginning of buffer 1 
+                , const void* s2 // Pointer to the beginning of buffer 2 
+                , size_t n       // Number of bytes that will be compared 
+              );  
+
+   // -------- CERN's ROOT REPL Session -----------------------// 
+    root [22] uint8_t bf1[] = { 0x01, 0xAB, 0x2C, 0x3C, 0xFF };
+    root [26] uint8_t bf2[] = { 0x01, 0xAB, 0x2C, 0x3C, 0xFF, 0x85, 0x2A, 0x45 };
+    root [30] uint8_t bfx[] = { 0x3A, 0xF8, 0x25 } 
+
+    // Result: Non-zero => First 3 bytes of two buffers are not equal. 
+    root [32] memcmp(bf1, bfx, 3)
+    (int) -57
+
+    // Result: Zero => First 5 bytes of two buffers are equal. 
+    root [36] memcmp(bf1, bf2, 5)
+    (int) 0
+
+    // Result: Zero => First 2 bytes of two buffers are equal. 
+    root [37] memcmp(bf1, bf2, 2)
+    (int) 0
+
+    root [13] free(heap_buffer)
+#+END_SRC
+
+  + _memcpy()_ => Copy N bytes from a memory area (or buffer) src to a
+    memory area dest. This function can only copy POD (Plain Old Data)
+    types, it cannot copy anything which contains pointers or
+    heap-allocated data. 
+ 
+#+BEGIN_SRC cpp 
+   void* memcpy(void* dest, const void* src, size_t n);
+
+   // ------- CERN's ROOT Repl session ---------------// 
+   // 
+
+   // ---- Char array --------//
+   root [51] char buf1[10] = { 'h', 'e', 'l', 'l', 'o', ' ', 'c', 'p', 'p', '\0' }
+   (char [10]) "hello cpp"
+
+   root [53] char buf2[15] 
+   (char [15]) "\0\0\0\0\0\0\0\0\0\0\0\0\0"
+
+   root [54] memcpy(buf2, buf1, 10 * sizeof(char))
+   (void *) 0x7f5c5cd7d1b5
+
+   root [55] buf2
+   (char [15]) "hello cpp\0\0\0\0"
+
+   // ---- Int array -------//
+   root [56] int arr1[5] = { 10, 20, 25, 100, -2}
+   (int [5]) { 10, 20, 25, 100, -2 }
+
+   root [57] int arr2[10]
+   (int [10]) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
+
+   root [58] memcpy(arr2, arr1, 5 * sizeof(int))
+   (void *) 0x7f5c5cd7d1f0
+
+   root [59] arr2
+   (int [10]) { 10, 20, 25, 100, -2, 0, 0, 0, 0, 0 }
+#+END_SRC
+
+  + _bzero()_ => Zero-initialize some memory area. In the words of
+    manpage: "The bzero() function erases the data in the n bytes of
+    the memory starting at the location pointed to by s, by writing
+    zeros (bytes containing '\0') to that area."
+
+#+BEGIN_SRC cpp 
+   void bzero(void *s, size_t n);
+
+   // ------------ CERN's ROOT REPL session --------------//
+   //    
+
+   // Heap-allocated buffer with 5 integers
+   root [1] int* heap_buffer = (int*) malloc(5 * sizeof(int)) 
+   (int *) 0x2c50ea0
+
+   root [2] heap_buffer[0]
+   (int) 37832720
+
+   root [3] heap_buffer[1]
+   (int) 0
+
+   root [4] heap_buffer[2]
+   (int) 51513872
+
+   // Initialize buffer, filling it with zeroes. 
+   root [7] bzero(heap_buffer, 5 * sizeof(int))
+
+   root [8] heap_buffer
+   (int *) 0x2c50ea0
+
+   root [9] heap_buffer[0]
+   (int) 0
+
+   root [10] heap_buffer[1]
+   (int) 0
+
+   root [11] heap_buffer[2]
+   (int) 0
+
+   root [12] heap_buffer[4]
+   (int) 0
+#+END_SRC
+
+  + _bcopy()_ => Manpage: "The bcopy() function copies n bytes from src
+    to dest.  The result is correct, even when both areas overlap."
+    + Note: Despite the manpage state that the function is deprecated
+      it is still used by many legacy codes, so it is still worth
+      knowing about it. 
+
+#+BEGIN_SRC cpp 
+   void bcopy(const void *src, void *dest, size_t n);
+
+   // ----------- CERN's ROOT Repl Session --------------// 
+
+   root [0] char buffer[50];
+   root [1] bzero(buffer, 50 * sizeof(char))
+
+   root [2] buffer 
+   (char [50]) "\0\0\0\0\0\0\0\0\0\0\0... ...\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+
+   // Null terminated array of chars
+   root [3] const char* src1 = "This is the buffer 1"; 
+
+   root [4] bcopy(src1, buffer, 10)
+
+   root [5] buffer
+   (char [50]) "This is th\0\0\0\0\0\0\0\0... ...0\0\0\0\0\0\0"
+
+   root [6] bcopy(src1, buffer, 25)
+
+   root [7] buffer
+   (char [50]) "This is the buffer 1\0\0\0\0\x14\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+
+   root [8] bcopy("control system Modelica / state space model / SIMULINK", buffer, 40)
+
+   root [9] buffer
+   (char [50]) "control system Modelica / state space mo\0\0\0\0\0\0\0\0"
+#+END_SRC
 
 ** Creating Portable Binaries for Linux / GLIBC hell 
 *** Overview 
@@ -1031,6 +1428,13 @@ deployed in a distribution using an older version of GLIBC.
       Linux is affected by the GLIBC-problem. As a result, the
       AppImage documentation recommends building AppImage on Linux
       distributions with older versions of GlibC.
+
+  * Side Node 4:
+    * The GLIBC can be bypassed if the application invokes
+      system-calls directly using assembly or inline assembly. On
+      Linux, this is possible because the system calls are stable and well
+      documented. This might be the approach used by Golang for
+      avoiding the GLIBC dependency. 
 
 Possible Solutions: 
 
@@ -1390,7 +1794,7 @@ Attempt to run from MX-Linux 19.2 (Older GLIBC)
    adjtime                           "/etc/adjtime"
    alsa                              "/etc/alsa"
 #+END_SRC
-** Making command line applications with CLI11 Library
+** Creating command line applications with CLI11 C++ Library
 *** Overview 
 
 Despite that GUI Graphical user interfaces applications are more used
@@ -2007,204 +2411,6 @@ Run _ls_ subcommand:
 
 
 #+END_SRC
-
-** Widely Used Functions for strings and buffers 
-
-This section provides a review and a recapitulation of the most widely
-used C functions in low level code bases. Those functions are in the
-header <string.h> for C or  <cstring> for C++. 
-
-  + _strlen()_ => Get length of null-terminated character array.
-    + Docs: $ man strlen 
-
-#+BEGIN_SRC cpp 
-   size_t strlen(const char *s);
-
-   root [39] const char* st1 = "unix posix irix linux";
-   root [40] const char* st2 = "bsd msdos";
-
-   root [41] strlen(st1)
-   (unsigned long) 21
-
-   root [42] strlen(st2)
-   (unsigned long) 9
-#+END_SRC
-
-  + _strdup()_ => Copy a C-string allocating the copy with malloc. 
-
-#+BEGIN_SRC cpp 
-   char* strdup(const char *s);
-
-   root [39] const char* st1 = "unix posix irix linux";
-
-   root [43] char* p_copy = strdup(st1)
-   (char *) "unix posix irix linux"
-
-   // Release memory for heap-allocated string 
-   root [47] free(p_copy)
-#+END_SRC
-
-  + _strcmp()_ => Compare two C-strings null-terminated (terminated with
-    '\0' or 0x00 null char) array of characters. This function returns
-    0 if the two strings are equal.
-    + Docs: $ man strcmp 
-
-#+BEGIN_SRC cpp 
-    int strcmp(const char *s1, const char *s2);
-
-    // ------- USAGE --------------------------//
-    if ( strmcp(STRING_A, STRING_B) == 0 )
-        puts(" => Strings are equal");
-    else 
-        puts(" => Strins are not equal");
-
-    // ------ CERN's Root REPL Session -------// 
-    root [0] #include <string.h>
-
-    root [1] const char* s1 = "hello"; 
-    root [2] const char* s2 = "world"; 
-    root [3] const char* s3 = "world C++17 c11 ADA spark"; 
-    root [4] const char* s4 = "hello"; 
-
-    root [5] strcmp(s1, s2)
-    (int) -15
-
-    root [6] strcmp(s1, s3)
-    (int) -15
-
-    root [7] strcmp(s1, s4)
-    (int) 0
-#+END_SRC
-
-  + _strcpy()_ => Copy string 'src' parameter (null-terminated array of
-    characters) to a buffer.
-    + Docs: $ man strcpy 
-    + Note: It is vulnerable to buffer
-      overflow, if the size of the string is bigger than the
-      buffer. This function is often used to for copying string literals
-      to a buffer.
-
-#+BEGIN_SRC cpp 
-     char* strcpy( char*       p_buffer      // Pointer to buffer (array of chars)
-                  ,const char* c_string_src  // C-string 
-                );
-
-     root [9] char buffer[200];
-
-     root [10] buffer
-     (char [200]) "\0\0\0\0\0\0\0\0\0\0\0\0\0\0 ...... \0\0\0\0"
-
-     root [11] strcpy(buffer, "Hello world C++17 C++20 ADA Rust")
-     (char *) "Hello world C++17 C++20 ADA Rust"
-
-     root [12] buffer
-     (char [200]) "Hello world C++17 C++20 ADA Rust\0\0\0\0\0\0\0 ... ... \0\0\0"
-#+END_SRC
-
-  + _strncpy()_ => Copy N characters from string to buffer.
-    + Docs: $ man strncpy 
-    + Linux mapage: "The strcpy() function copies the string pointed
-      to by src, including the terminating null byte ('\0'), to the
-      buffer pointed to by dest.  The strings may not overlap, and the
-      destination string dest must be large enough to receive the
-      copy. Beware of buffer overruns!  (See BUGS.)"
-    
-#+BEGIN_SRC cpp 
-   char* strncpy( char*       dest // Pointer to buffer 
-                , const char* src  // C-string (null-terminated) that will be copied 
-                , size_t      n    // Number of chars (bytes) from src that will be copied
-                );
-
-   // ---------- CERN's ROOT Repl Session ------------//
-
-   root [13] char buff1[30];
-   root [14] char buff2[30];
-
-   root [15] const char* cstr = "Hello world C++17 embedded systems real time control systems";
-
-   root [16] buff1
-   (char [30]) "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
-
-   root [17] buff2
-   (char [30]) "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
-
-   root [18] strncpy(buff1, cstr, 10)
-   (char *) "Hello worl"
-
-   root [19] buff1 
-   (char [30]) "Hello worl\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
-
-   root [20] strncpy(buff2, cstr, 25)
-   (char *) "Hello world C++17 embedde"
-
-   root [21] buff2
-   (char [30]) "Hello world C++17 embedde\0\0\0"
-#+END_SRC  
-
-
-  + _memcmp()_  => Compare the first N bytes of two buffers. It returns
-    0 if all the first N bytes from two buffers are equal. 
-
-#+BEGIN_SRC cpp 
-     int memcmp(  const void* s1 // Pointer to the beginning of buffer 1 
-                , const void* s2 // Pointer to the beginning of buffer 2 
-                , size_t n       // Number of bytes that will be compared 
-              );  
-
-   // -------- CERN's ROOT REPL Session -----------------------// 
-    root [22] uint8_t bf1[] = { 0x01, 0xAB, 0x2C, 0x3C, 0xFF };
-    root [26] uint8_t bf2[] = { 0x01, 0xAB, 0x2C, 0x3C, 0xFF, 0x85, 0x2A, 0x45 };
-    root [30] uint8_t bfx[] = { 0x3A, 0xF8, 0x25 } 
-
-    // Result: Non-zero => First 3 bytes of two buffers are not equal. 
-    root [32] memcmp(bf1, bfx, 3)
-    (int) -57
-
-    // Result: Zero => First 5 bytes of two buffers are equal. 
-    root [36] memcmp(bf1, bf2, 5)
-    (int) 0
-
-    // Result: Zero => First 2 bytes of two buffers are equal. 
-    root [37] memcmp(bf1, bf2, 2)
-    (int) 0
-#+END_SRC
-
-  + _memcpy()_ => Copy N bytes from a memory area (or buffer) src to a
-    memory area dest.
- 
-#+BEGIN_SRC cpp 
-   void* memcpy(void* dest, const void* src, size_t n);
-
-   // ------- CERN's ROOT Repl session ---------------// 
-   // 
-
-   // ---- Char array --------//
-   root [51] char buf1[10] = { 'h', 'e', 'l', 'l', 'o', ' ', 'c', 'p', 'p', '\0' }
-   (char [10]) "hello cpp"
-
-   root [53] char buf2[15] 
-   (char [15]) "\0\0\0\0\0\0\0\0\0\0\0\0\0"
-
-   root [54] memcpy(buf2, buf1, 10 * sizeof(char))
-   (void *) 0x7f5c5cd7d1b5
-
-   root [55] buf2
-   (char [15]) "hello cpp\0\0\0\0"
-
-   // ---- Int array -------//
-   root [56] int arr1[5] = { 10, 20, 25, 100, -2}
-   (int [5]) { 10, 20, 25, 100, -2 }
-
-   root [57] int arr2[10]
-   (int [10]) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
-
-   root [58] memcpy(arr2, arr1, 5 * sizeof(int))
-   (void *) 0x7f5c5cd7d1f0
-
-   root [59] arr2
-   (int [10]) { 10, 20, 25, 100, -2, 0, 0, 0, 0, 0 }
-#+END_SRC
-
 ** Low level IO functions overview 
 
 C-Library functions which encapsulates file-related systems calls.
@@ -5585,6 +5791,9 @@ issue, such as:
 
      * Note: Many documents also calls multiplexed IO as _event-driven_
        _IO_, _non-blocking IO_ and so on.
+
+     * Note: The EPool API cannot monitor file descriptors of regular
+       files. For this case, the Linux kernel provides the _iNotify_ API.
 
 See: 
 
