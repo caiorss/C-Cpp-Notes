@@ -4025,6 +4025,306 @@ According to goldbot, this call generates the following object-code
           ret 
 #+END_SRC
 
+** C++20 Concepts [DRAFT]
+*** Overview
+
+Some major shortcoming of C++ generic programming are duck typing
+and the long error messages which makes harder to read and debug
+generic code. Those drawbacks stem from lack of language constructs
+to express generic programming, _concepts_, which are the type
+requirements that type arguments must satisfy in order to instantiate
+a template or function templates.
+
+C++20 addresses those generic programming issues by providing concepts
+and type requirement as core language features which improves type
+checking, error messages and code readability.
+
+Benefits summary:
+
+   + Better code readability and documentation
+     * Formal specification of concepts as code which improves
+       readability and documentation of generic code. Without concepts
+       language feature, concepts should be specified by comments and
+       code examples which may be out of sync with the code.
+
+   + Better and shorter error messages with more context information.
+
+   + Better for IDEs and tooling
+
+   + No SFINAE
+     * Eliminates the need for cryptic SFINAE tricks which improves
+       the code readability and maintainability.
+
+Related headers files and documentation:
+
+  + [[https://en.cppreference.com/w/cpp/language/constraints][Constraints and concepts (since C++20) - cppreference.com]]
+
+  + [[https://en.cppreference.com/w/cpp/compiler_support][C++ compiler support - cppreference.com]]
+
+  + [[https://github.com/isocpp/CppCoreGuidelines/blob/master/CppCoreGuidelines.md#tcon-use-concept-use][CppCore Guidelines Concepts]]
+
+  + [[http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0734r0.pdf][P0734R0 - Wording Paper, C++ extension for Concepts]]
+
+Headers:
+   +  [[https://en.cppreference.com/w/cpp/header/concepts][<concepts>]] =>> Standard library concepts
+   +  [[https://en.cppreference.com/w/cpp/header/type_traits][<type_traits>]] =>> Type metafunctions for performing computation on types.
+
+*** Concepts as type predicates
+
+In C++20, concepts core-language features are type predicates
+evaluated at compile-time which can be used for specifying and
+enforcing template type constraints.
+
+The following expression declares the concept _Shape_ which requires
+that type T must have the member functions T::area() which returns a
+double, and the member function T::name() which returns any type
+convertible to std::string.
+
+#+BEGIN_SRC cpp
+  #include <concepts>
+  #include <string>
+
+  /** C++20 Concept Declaration */
+  template<typename T>
+  concept Shape = require(T obj) {
+
+     // The type T must have a member function T::area() that returns double type.
+     { obj.area() } -> std::same_as<double>;
+
+     // The type T must have a member function T::name() that
+     // returns a type convertible to std::string
+     { obj.name() } -> std::convertible_to<std::string>;
+  };
+#+END_SRC
+
+This Shape concept can be used for specifying and constraining
+template arguments as it is shown in the following code.
+
+#+BEGIN_SRC cpp
+    template<Shape T>
+    void show_informationA(const T& sh)
+    {
+        std::cout << " Shape { name = " << sh.name()
+                  << " ; area = " << sh.area()  << "  } "
+                  << '\n';
+    }
+
+    template<typename T> requires Shape<T>
+    void show_informationB(const T& sh)
+    {
+        std::cout << " Shape { name = " << sh.name()
+                  << " ; area = " << sh.area()  << "  } "
+                  << '\n';
+    }
+#+END_SRC
+
+In this piece of code, some types, that satisfy and does not satisfy the
+concept Shape, are defined.
+
+#+BEGIN_SRC cpp
+  struct Circle
+  {
+       /// ... ... //
+       const char* name(){ return "circle"; }
+       double      area(){ return pi * radius * radius;  }
+
+       void nonCommonMethod1() {
+          ....
+       }
+  };
+
+  class Rectangle
+  {
+  public:
+       // ... ... //
+         const char* name(){ return "rectangle"; }
+         double      area(){ return width * height;  }
+
+         void nonCommonMethod2() {
+            ....
+         }
+  };
+
+  // Does not satisfy the concept as this type lacks the
+  // member function area()
+  struct Blob
+  {
+       /// ... ... //
+       const char* name(){ return "blob"; }
+       void nonCommonMethod1() {
+          ....
+       }
+  };
+#+END_SRC
+
+This next code shows that, that attempting to instantiate the previous
+templated functions with types not satisfying the Shape concept
+results in compile-time error.
+
+#+BEGIN_SRC cpp
+  void main()
+  {
+     // Works => Code compiles
+     Rectangle r1;
+     show_informationA(r1);
+     show_informationB(r1);
+
+     // Works => Code compiles
+     static_assert( Shape<Rectangle> );
+     static_assert( Shape<decltype(r1)> );
+
+     // Works => Code compiles
+     Circle c1;
+     show_informationA(c1);
+     show_informationB(c1);
+     show_informationB<Circle>(c1);
+
+     // Works => Code compiles
+     static_assert( Shape<Circle> );
+     static_assert( Shape<decltype(c1)> )
+
+     // Compile-time ERROR!!
+     static_assert( Shape<int> );
+     static_assert( Shape<std::string> );
+     static_assert( Shape<Blob> );
+  }
+#+END_SRC
+
+
+*** Defining concepts from type predicates
+
+Simple concepts can be defined from custom type predicates or type
+predicates from the header. The concept IntegralA and IntegralB, which
+are built using the type predicate [[https://en.cppreference.com/w/cpp/types/is_integral][std::is_integral]] from the header
+(<type_traits), accept any integer type such as short, int, uint8_t,
+long and so on.
+
+#+BEGIN_SRC cpp
+   #include <type_traits> 
+   /* Concept: IntegralA  
+    * std::is_integral_v<T>::value => Evaluates to bool 
+    */
+   template<typename T>
+   concept IntegralA = std::is_integral_v<T>;
+
+   /* Concept: IntegralB - 
+    *   std::is_integral<T>::value => Evaluates to bool at compile-time 
+    */
+   template<typename T>
+   concept IntegralB = std::is_integral<T>::value;
+
+   // ------------ Usage Example -------------//
+
+   template<typename T> requires IntegralA<T>
+   auto my_function_A1(T x, T y) -> T
+   {
+      return 10 + x * y * 20;
+   }
+
+   template<IntegralA T>
+   auto my_function_A2(T x, T y) -> T
+   {
+      return 10 + x * y * 20;
+   }
+
+   template<IntegralB T>
+   auto my_function_B1(T x, T y) -> T
+   {
+      return 10 + x * y * 20;
+   }
+
+   template<class T> requires Integral<B>
+   auto my_function_B1(T x, T y) -> T
+   {
+      return 10 + x * y * 20;
+   }
+
+   // Compiles   
+   static_assert(  IntegralA<int> );
+   static_assert(  IntegralA<uint8_t> );
+   static_assert(  IntegralB<long> );
+
+   // Error: DO NOT COMPILE!!
+   static_assert(  IntegralA<std::string> );
+   static_assert(  IntegralB<float> );
+
+#+END_SRC
+
+Concepts can also be built from other pre-existing concepts: 
+
+  + The concept CompositeConcept is comprised of a conjuction (and
+    operation) of 3 concepts. A type that satisfy the CompositeConcept
+    concept, must fullfil all requirements of conjuction concepts,
+    namely, Incrementable, Decrementable and std::is_base_v. 
+
+#+BEGIN_SRC cpp 
+  template<class X>
+  concept Incrementable = requires(X obj)
+  {
+     { obj++ } -> std::same_as<X>;
+  };
+
+  template<class X>
+  concept Decrementeable = requires(X obj)
+  {
+     { obj-- } -> std::same_as<X>;
+  };
+
+  template<typename T>
+  concept CompositeConcept = 
+             std::is_base_v<T, BaseClass> 
+         &&  Incrementable<T>
+         &&  Decrementeable<T>
+         ;
+#+END_SRC
+
+Usage of CompositeConcept: 
+
+#+BEGIN_SRC cpp 
+  template<CompositeConcept T>
+  void some_functionA(T&& x)
+  {
+    // ... ... ///
+  }
+
+  template<typename T> requires CompositeConcept<T>
+  void some_functionB(T&& x)
+  {
+    // ... ... ///
+  }
+
+  template<class T> 
+       requires CompositeConcept<T>
+  void some_functionC(T&& x)
+  {
+    // ... ... ///
+  }
+#+END_SRC
+
+Templates can also constrain arguments using conjuction (AND) of
+multiple concepts:
+
+#+BEGIN_SRC cpp 
+  /** Function Declaration */
+  template<typename T> 
+   requires  std::is_base_v<T, BaseClass> 
+         &&  Incrementable<T>
+         &&  Decrementeable<T>
+  void some_functionC(T&& x);
+
+  /** Function Definition */
+  template<typename T> 
+   requires  std::is_base_v<T, BaseClass> 
+         &&  Incrementable<T>
+         &&  Decrementeable<T>
+  void some_functionC(T&& x)
+  {
+    // ... ... ///
+  }
+#+END_SRC
+
+
+
 
 ** References and Bookmarks 
 *** General  
