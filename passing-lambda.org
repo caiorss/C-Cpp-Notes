@@ -1,0 +1,731 @@
+#+INCLUDE: theme/style.org 
+#+TITLE: Passing C++ lambdas to C-function pointer callbacks
+#+DESCRIPTION: Passing C++ lambdas to C callbacks
+#+STARTUP: content 
+
+* Passing C++ lambdas to C callbacks
+** Overview 
+
+A recurring need in C++ development is passing lambdas or functors,
+also known as callable objects, to C functions that takes a function
+pointer callback. This article aims to explore how to pass
+function-objects (functors) and C++ lambdas to C function-pointer
+callbacks. 
+** Sample code with C-function pointer callback 
+*** Source Code Listing 
+
+GIST with full sources: 
+  + https://gist.github.com/7db3de56dea0c502c6f749293b5013ef
+
+
+ + File: _CMakeLists.txt_
+
+#+BEGIN_SRC cmake 
+   cmake_minimum_required(VERSION 3.9)
+   project(cpp-lambda-test)
+
+   #========== Global Configurations =============#
+   #----------------------------------------------#
+
+   set(CMAKE_CXX_STANDARD 17)     
+   set(CMAKE_VERBOSE_MAKEFILE ON)
+
+   #========== Targets Configurations ============#
+
+             add_library( clib SHARED clib.c)
+
+          add_executable( consumer consumer.cpp)
+   target_link_libraries( consumer clib)
+#+END_SRC
+
+  + File: _clib.c_  (Target: clib / shared library)
+    + C Shared library exporting functions with C-linkage
+      dotimes_version1() and dotimes_version2() which take C function
+      pointers callbacks. 
+
+#+BEGIN_SRC cpp 
+   #include <stdio.h> 
+   #include <stdlib.h>
+
+   // Function without context pointer
+   typedef void (*callback_t) (int n);
+
+   typedef void (*callback_closure_t) (int n, void* context);
+
+   /** Function with C-callback argument without context pointer. */
+   void dotimes_version1(int size, callback_t fun)
+   {
+       printf(" [TRACE] <ENTRY> Called function: %s \n", __FUNCTION__);
+       for(int i = 0; i < size; i++){ fun(i); }
+       printf(" [TRACE] <EXIT> Called function: %s \n", __FUNCTION__);
+   }
+
+   /** Function with C-callback argument with context pointer for passing function state to
+    *  to the function pointer. 
+    */
+   void dotimes_version2(int size, callback_closure_t fun, void* context)
+   {
+       printf(" [TRACE] <ENTRY> Called function: %s \n", __FUNCTION__);
+       for(int i = 0; i < size; i++){ fun(i, context); }
+       printf(" [TRACE] <EXIT> Called function: %s \n", __FUNCTION__);
+   }
+#+END_SRC
+
+  + File: _consumer.cpp_ (Target: consumer / executable)
+    + C++ executable application which consumes the C shared library
+      clib.so (Linux or BSD); clib.dylib (MacOSX) or clib.dll
+      (Windows). 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <functional> // std::function container 
+  #include <cassert>
+
+  using callback_t         = void (*) (int n);
+  using callback_closure_t = void (*) (int n, void* context);
+
+  // Functions with C-linkage 
+  #define EXTERN_C extern "C"
+
+  /** Provided by the shared library (aka shared object on Unix-like systems) */
+  EXTERN_C void dotimes_version1(int size, callback_t fun);
+  EXTERN_C void dotimes_version2(int size, callback_closure_t fun, void* context);
+
+  using FunctionCallback1 = std::function<void (int )>;
+
+  /** Namespace contains workarounds for passing capturing lambdas 
+   ,* to function dotimes_version (C function without context void pointer)
+   ,* 
+   ,* Note: This solution is not thread-safe. The most suitable workaround for
+   ,* for passing capturing lambdas or C++ functors to C-callbakcs is to 
+   ,* redesign it for using a context void pointer, that allows passing state 
+   ,* to the C-callback.
+   ,*----------------------------------------------------------------------*/
+  namespace Workaround1 {
+     /* This function encapsulates callback global variable 
+     ,** for avoiding the global-initialization fiasco. 
+     ,*-----------------------------------------------------*/
+     auto get_callback() -> FunctionCallback1&
+     {
+          // Global variable, its lifetimes corresponds to the program lifetime.
+          static FunctionCallback1 callback;
+          return callback;
+     };
+
+     /** Set global variable callback */
+     auto set_callback(FunctionCallback1 func) -> void 
+     {
+          auto& callback = get_callback();
+          callback = func;
+     }
+
+     void workaround1_callback_adapter(int n)
+     {
+          get_callback()(n);
+     }
+
+     /* Disadvantage: This solution is not thread-safe and requires locks 
+     ,*  to protect the callback global state. Only one callback can be 
+     ,*  passed per thread.  
+     ,*/
+     void wrapper_to_dotimes_version1(int size, FunctionCallback1 func)
+     {
+           set_callback(func);
+           dotimes_version1(size, &workaround1_callback_adapter);
+     }
+
+  }
+
+  struct FunctionObject 
+  {	
+      int counter = 10;
+
+      FunctionObject(){ }
+      FunctionObject(int cnt): counter(cnt){}
+
+      void operator()(int n)
+      {
+          std::printf("  [FUNCTOR ] n = %d  / counter = %d \n", n, counter++);
+      }
+  };
+
+  void FunctionObject_adapter(int n, void* context)
+  {
+        assert(context != nullptr);
+        // Note: C-style cast also works, but prefer C++-style cast.
+        FunctionObject* pFunctor = static_cast<FunctionObject*>(context);
+
+        // [Also works in this way =>>] pFunctor->operator()(n);
+        (*pFunctor)(n);
+  }
+
+
+  int main(int argc, char** argv)
+  {
+        std::puts(" [INFO] Consumer started OK.");
+
+        /* EXPERIMENT 1 - Passing non-capturing lambda to C-function pointer callbacks without 
+        ,* void context pointer. 
+        ,*/
+        std::puts("\n ===== [EXPERIMENT 1] Passing non-capturing lambdas ===============\n");
+        {		
+             /** Non-capturing lambdas are converted to function pointers. */
+             dotimes_version1(5, [](int n){
+                     std::printf(" [EXPERIMENT 1] n = %d \n", n);
+             });
+
+        }
+
+        /* EXPERIMENT 2 - Passing capturing lambda to C-function pointer callbacks without
+         ,* void context pointer. 
+         ,*
+         ,* This experiment fails as capturing lambdas cannot be converted to function-pointers. 
+         ,*/
+        std::puts("\n ===== [EXPERIMENT 2] Passing Capturing lambdas <FAILURE>  ========= \n");
+        {
+             int counter = 10;
+             auto lamb = [&counter](int n){ 
+                   std::printf("  [EXPERIMENT 2] n = %d  / counter = %d \n", n, counter++);
+             };
+
+            /*  COMPILE-TIME-ERROR: Non-capturing lambdas cannot be passed to 
+             ,*  to function-pointers !!!
+             ,*  Remove the next comment ('//') in order to see the compile-time error:
+             ,* 
+             ,* Error: 
+             ,* ---------------------------------------------------------------
+             ,*  
+             ,*  [build] cpp-lambda-c/consumer.cpp:30:3: error: no matching function for call to 'dotimes_version1'
+             ,*  [build]                 dotimes_version1(5, lamb);
+             ,*  [build]                 ^~~~~~~~~~~~~~~~
+             ,*  [build] consumer.cpp:7:17: note: candidate function not viable: no known conversion from '(lambda at /home/mxpkf8/temp-projects/cpp-lambda-c/consumer.cpp:26:15)' to 'callback_t' (aka 'void (*)(int)') for 2nd argument
+             ,*  [build] extern "C" void dotimes_version1(int size, callback_t fun);
+             ,*  [build]                 ^
+              ,****************************************************************/
+
+             // Change from '0' to '1' to enable the compile-time error.
+             #if 0  
+               // => Compile-time error! 
+               dotimes_version1(5, lamb); 
+             #endif 
+
+        }
+
+        /* EXPERIMENT 3 - Passing capturing lambda to C-function pointer callbacks without
+         ,* void context pointer using a global-state workaround.
+         ,*/
+        std::puts("\n ===== [EXPERIMENT 3] Passing Capturing lambdas - Workaround 1  =====\n");	
+        {
+             int counter = 10;
+             auto lamb = [&counter](int n){ 
+                     std::printf("  [EXPERIMENT 3] n = %d  / counter = %d \n", n, counter++);
+             };
+
+             std::puts("\n --->> Passing C++ capturing lambda ");
+             Workaround1::wrapper_to_dotimes_version1(5, lamb);
+
+             std::puts("\n --->> Passing function-object (aka C++ Functor) ");
+             Workaround1::wrapper_to_dotimes_version1(5, FunctionObject(25));
+        }
+
+        /* EXPERIMENT 4 - Passing capturing lambda to C-function pointer callbacks with
+         ,* void context pointer. 
+         ,*/
+        std::puts("\n ===== [EXPERIMENT 4] Passing Functors to capturing lambda ==\n");	
+        {
+                std::puts("\n  --->> Passing function-object (aka C++ Functor) [APPROACH 1] ");
+                FunctionObject obj1(26);
+                dotimes_version2(5, &FunctionObject_adapter, &obj1);
+
+                // Note: This lambda can only be passed due to it be non-capturing.
+                auto adapter_for_FunctionObject = [](int n, void* context)
+                {
+                        assert(context != nullptr && "Context pointer should not be nullptr.");			
+                        FunctionObject* pFunctor = reinterpret_cast<FunctionObject*>(context);
+                        pFunctor->operator()(n);
+                };
+
+                std::puts("\n   --->> Passing function-object (aka C++ Functor) [APPROACH 2] ");
+                FunctionObject obj2;
+                dotimes_version2(5, adapter_for_FunctionObject, &obj2);
+        }
+
+        /* EXPERIMENT 5 - Passing capturing lambda to C-function pointer callbacks with
+         ,* void context pointer. 
+         ,*/
+        std::puts("\n ===== [EXPERIMENT 5] Passing Capturing lambdas <APPROACH 1> ==\n");	
+        {					
+             using FunctionCallback2 = std::function<void (int size)>;
+
+             auto adpter_for_lambda = [](int n, void* context) 
+             {
+                     assert(context != nullptr && "Context pointer (state) should not be null.");
+                     FunctionCallback2* pFunc = reinterpret_cast<FunctionCallback2*>(context);
+                     (*pFunc)(n);
+             };				
+
+             int counter = -100;
+             auto callback_lambda = [&counter](int n){ 
+                     std::printf("  [EXPERIMENT 5] n = %d  / counter = %d \n", n, counter++);
+             };
+             FunctionCallback2 callback_object = callback_lambda; 
+
+             std::puts("\n  --->> Passing capturing lambda [APPROACH 1 - Type erasure] --- ");
+             dotimes_version2(5, adpter_for_lambda, &callback_object);
+
+        }
+
+        std::puts("\n\n [INFO] System shutdown gracefully Ok.");
+        return 0;
+  }
+
+#+END_SRC
+ 
+*** Building and running 
+
+Donwload and build sources: 
+
+#+BEGIN_SRC sh  
+  # Get sources 
+   $ >> cd /tmp && git clone https://gist.github.com/7db3de56dea0c502c6f749293b5013ef callback && cd callback
+
+   # Build 
+   $ >> cmake --config Debug -H. -B_build 
+   $ >> cmake --build _build --target 
+
+   # Show _build directory 
+   $ >> ls _build/
+   CMakeCache.txt  CMakeFiles/  cmake_install.cmake  consumer*  libclib.so*  Makefile
+#+END_SRC
+
+Run executable: 'consumer'
+
+#+BEGIN_SRC sh 
+    $ >> _build/consumer 
+    [INFO] Consumer started OK.
+
+    ===== [EXPERIMENT 1] Passing non-capturing lambdas ===============
+
+    [TRACE] <ENTRY> Called function: dotimes_version1 
+    [EXPERIMENT 1] n = 0 
+    [EXPERIMENT 1] n = 1 
+    [EXPERIMENT 1] n = 2 
+    [EXPERIMENT 1] n = 3 
+    [EXPERIMENT 1] n = 4 
+    [TRACE] <EXIT> Called function: dotimes_version1 
+
+    ===== [EXPERIMENT 2] Passing Capturing lambdas <FAILURE>  ========= 
+
+
+    ===== [EXPERIMENT 3] Passing Capturing lambdas - Workaround 1  =====
+
+
+    --->> Passing C++ capturing lambda 
+    [TRACE] <ENTRY> Called function: dotimes_version1 
+     [EXPERIMENT 3] n = 0  / counter = 10 
+     [EXPERIMENT 3] n = 1  / counter = 11 
+     [EXPERIMENT 3] n = 2  / counter = 12 
+     [EXPERIMENT 3] n = 3  / counter = 13 
+     [EXPERIMENT 3] n = 4  / counter = 14 
+    [TRACE] <EXIT> Called function: dotimes_version1 
+
+    --->> Passing function-object (aka C++ Functor) 
+    [TRACE] <ENTRY> Called function: dotimes_version1 
+     [FUNCTOR ] n = 0  / counter = 25 
+     [FUNCTOR ] n = 1  / counter = 26 
+     [FUNCTOR ] n = 2  / counter = 27 
+     [FUNCTOR ] n = 3  / counter = 28 
+     [FUNCTOR ] n = 4  / counter = 29 
+    [TRACE] <EXIT> Called function: dotimes_version1 
+
+    ===== [EXPERIMENT 4] Passing Functors to capturing lambda ==
+
+
+     --->> Passing function-object (aka C++ Functor) [APPROACH 1] 
+    [TRACE] <ENTRY> Called function: dotimes_version2 
+     [FUNCTOR ] n = 0  / counter = 26 
+     [FUNCTOR ] n = 1  / counter = 27 
+     [FUNCTOR ] n = 2  / counter = 28 
+     [FUNCTOR ] n = 3  / counter = 29 
+     [FUNCTOR ] n = 4  / counter = 30 
+    [TRACE] <EXIT> Called function: dotimes_version2 
+
+      --->> Passing function-object (aka C++ Functor) [APPROACH 2] 
+    [TRACE] <ENTRY> Called function: dotimes_version2 
+     [FUNCTOR ] n = 0  / counter = 10 
+     [FUNCTOR ] n = 1  / counter = 11 
+     [FUNCTOR ] n = 2  / counter = 12 
+     [FUNCTOR ] n = 3  / counter = 13 
+     [FUNCTOR ] n = 4  / counter = 14 
+    [TRACE] <EXIT> Called function: dotimes_version2 
+
+    ===== [EXPERIMENT 5] Passing Capturing lambdas <APPROACH 1> ==
+
+
+     --->> Passing capturing lambda [APPROACH 1 - Type erasure] --- 
+    [TRACE] <ENTRY> Called function: dotimes_version2 
+     [EXPERIMENT 5] n = 0  / counter = -100 
+     [EXPERIMENT 5] n = 1  / counter = -99 
+     [EXPERIMENT 5] n = 2  / counter = -98 
+     [EXPERIMENT 5] n = 3  / counter = -97 
+     [EXPERIMENT 5] n = 4  / counter = -96 
+    [TRACE] <EXIT> Called function: dotimes_version2 
+
+
+    [INFO] System shutdown gracefully Ok.
+
+#+END_SRC
+
+
+
+
+*** Analysis 
+
+The goal of the application (consumer.cpp) is to call pass C++ lambdas
+and C++ callable objects (functors) as he following C-functions which
+takes C-function pointer callbacks:
+
+#+BEGIN_SRC cpp 
+  using callback_t         = void (*) (int n);
+  using callback_closure_t = void (*) (int n, void* context);
+
+  // Functions with C-linkage 
+  #define EXTERN_C extern "C"
+
+  /** Provided by the shared library (aka shared object on Unix-like systems) */
+  EXTERN_C void dotimes_version1(int size, callback_t fun);
+  EXTERN_C void dotimes_version2(int size, callback_closure_t fun, void* context);
+#+END_SRC
+
+
+  *Experiment 1:*
+
+  + _Non-capturing_ lambdas are converted to function-pointers when
+    passed to C-function pointer callbacks. 
+
+#+BEGIN_SRC cpp 
+   /* EXPERIMENT 1 - Passing non-capturing lambda to C-function pointer callbacks without 
+    ,* void context pointer. 
+    ,*/
+    std::puts("\n ===== [EXPERIMENT 1] Passing non-capturing lambdas ===============\n");
+    {		
+         /** Non-capturing lambdas are converted to function pointers. */
+         dotimes_version1(5, [](int n){
+                 std::printf(" [EXPERIMENT 1] n = %d \n", n);
+         });
+
+    }
+#+END_SRC
+
+Program output: 
+
+#+BEGIN_SRC sh 
+   [INFO] Consumer started OK.
+
+   ===== [EXPERIMENT 1] Passing non-capturing lambdas ===============
+
+   [TRACE] <ENTRY> Called function: dotimes_version1 
+   [EXPERIMENT 1] n = 0 
+   [EXPERIMENT 1] n = 1 
+   [EXPERIMENT 1] n = 2 
+   [EXPERIMENT 1] n = 3 
+   [EXPERIMENT 1] n = 4 
+   [TRACE] <EXIT> Called function: dotimes_version1 
+
+#+END_SRC
+
+  *Experiment 2:* [COMPILE-TIME ERROR]
+
+  + A a _capturing lambdas_ cannot be converted into a function pointer,
+    the following code causes a compile-time error if the "#if" is
+    enabled as "#if 1". 
+
+#+BEGIN_SRC cpp 
+     std::puts("\n ===== [EXPERIMENT 2] Passing Capturing lambdas <FAILURE>  ========= \n");
+     {
+          int counter = 10;
+          auto lamb = [&counter](int n){ 
+                std::printf("  [EXPERIMENT 2] n = %d  / counter = %d \n", n, counter++);
+          };
+
+          // Change from '0' to '1' to enable the compile-time error.
+          #if 0  
+            // => Compile-time error! 
+            dotimes_version1(5, lamb); 
+          #endif 
+
+     }
+#+END_SRC
+
+Compile-time error: 
+
+#+BEGIN_SRC cpp 
+   [build] cpp-lambda-c/consumer.cpp:30:3: error: no matching function for call to 'dotimes_version1'
+   [build]                 dotimes_version1(5, lamb);
+   [build]                 ^~~~~~~~~~~~~~~~
+   [build] consumer.cpp:7:17: note: candidate function not viable: no known conversion from '
+            (lambda at /consumer.cpp:26:15)' to 'callback_t' (aka 'void (*)(int)') for 2nd argument
+
+   [build] extern "C" void dotimes_version1(int size, callback_t fun);
+   [build]                 ^
+#+END_SRC
+
+
+  *Experiment 3:* Workaround for passing capturing-lambdas to C-function  pointer callbacks. 
+
+  + Passing a capturing lambda to a C-function that takes a C function
+    pointer callback, requires a workaround using global state. The
+    shortcoming of this method is the lack of thread-safety due to the
+    usage of global state. A thread-safe version of this workaround
+    requires using locks, such as mutex, in order to avoid race
+    condition undefined-behaviors. The most suitable solution to this
+    issue is to redesign the function _dotimes_version1_ by making it
+    take an extra void pointer for passing the C function pointer
+    state. 
+
+#+BEGIN_SRC cpp 
+    std::puts("\n ===== [EXPERIMENT 3] Passing Capturing lambdas - Workaround 1  =====\n");	
+    {
+         int counter = 10;
+         auto lamb = [&counter](int n){ 
+             std::printf("  [EXPERIMENT 3] n = %d  / counter = %d \n", n, counter++);
+         };
+
+         std::puts("\n --->> Passing C++ capturing lambda ");
+         Workaround1::wrapper_to_dotimes_version1(5, lamb);
+
+         std::puts("\n --->> Passing function-object (aka C++ Functor) ");
+         Workaround1::wrapper_to_dotimes_version1(5, FunctionObject(25));
+    }
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC cpp 
+   ===== [EXPERIMENT 3] Passing Capturing lambdas - Workaround 1  =====
+
+
+   --->> Passing C++ capturing lambda 
+   [TRACE] <ENTRY> Called function: dotimes_version1 
+    [EXPERIMENT 3] n = 0  / counter = 10 
+    [EXPERIMENT 3] n = 1  / counter = 11 
+    [EXPERIMENT 3] n = 2  / counter = 12 
+    [EXPERIMENT 3] n = 3  / counter = 13 
+    [EXPERIMENT 3] n = 4  / counter = 14 
+   [TRACE] <EXIT> Called function: dotimes_version1 
+
+   --->> Passing function-object (aka C++ Functor) 
+   [TRACE] <ENTRY> Called function: dotimes_version1 
+    [FUNCTOR ] n = 0  / counter = 25 
+    [FUNCTOR ] n = 1  / counter = 26 
+    [FUNCTOR ] n = 2  / counter = 27 
+    [FUNCTOR ] n = 3  / counter = 28 
+    [FUNCTOR ] n = 4  / counter = 29 
+   [TRACE] <EXIT> Called function: dotimes_version1 
+
+#+END_SRC
+
+Workaround code at to of file consumer.cpp: 
+
+  + The function _get__callback_ returns a reference to the global state
+    or global variable named callback whose lifetime is the same as
+    the application lifetime. The global variable is encapsulated in
+    this function for avoiding global-initialization-fiasco undefined
+    behavior. 
+
+  + The function _set_callback_ sets the global variable (global state)
+    encapsulated by the function _set_callback_.
+
+  + The function _wrapper_to_dotimes_version1_ sets the callback global
+    variable and calls the C-function dotimes_version1. 
+
+#+BEGIN_SRC cpp 
+    using FunctionCallback1 = std::function<void (int )>;
+
+
+    namespace Workaround1 {
+       /* This function encapsulates callback global variable 
+       ,** for avoiding the global-initialization fiasco. 
+       ,*-----------------------------------------------------*/
+       auto get_callback() -> FunctionCallback1&
+       {
+            // Global variable, its lifetimes corresponds to the program lifetime.
+            static FunctionCallback1 callback;
+            return callback;
+       };
+
+       /** Set global variable callback */
+       auto set_callback(FunctionCallback1 func) -> void 
+       {
+            auto& callback = get_callback();
+            callback = func;
+       }
+
+       void workaround1_callback_adapter(int n)
+       {
+            get_callback()(n);
+       }
+
+       /* Disadvantage: This solution is not thread-safe and requires locks 
+       ,*  to protect the callback global state. Only one callback can be 
+       ,*  passed per thread.  
+       ,*/
+       void wrapper_to_dotimes_version1(int size, FunctionCallback1 func)
+       {
+             set_callback(func);
+             dotimes_version1(size, &workaround1_callback_adapter);
+       }
+
+    }
+#+END_SRC
+
+  *Experiment 4:* Passing functors to function-pointer arguments.
+
+  + Selected code before main function.
+
+#+BEGIN_SRC cpp 
+    using callback_closure_t = void (*) (int n, void* context);
+   
+    // Provided by the shared library (clib)
+    EXTERN_C void dotimes_version2( int size
+                                    // C-function pointer argument 
+                                   , callback_closure_t fun
+
+                                    // void-pointer (context pointer) 
+                                    // Extra argument for passing state 
+                                    // to the callback function-pointer.
+                                   , void* context
+                                  );
+
+
+    struct FunctionObject 
+    {	
+        int counter = 10;
+
+        FunctionObject(){ }
+        FunctionObject(int cnt): counter(cnt){}
+
+        void operator()(int n)
+        {
+            std::printf("  [FUNCTOR ] n = %d  / counter = %d \n", n, counter++);
+        }
+    };
+
+    void FunctionObject_adapter(int n, void* context)
+    {
+         assert(context != nullptr);
+        // Note: C-style cast also works, but prefer C++-style cast.
+        FunctionObject* pFunctor = static_cast<FunctionObject*>(context);
+
+        // [Also works in this way =>>] pFunctor->operator()(n);
+        (*pFunctor)(n);
+    }
+#+END_SRC
+
+  + Often C-functions that takes a function pointer callback provide
+    an extra void-pointer parameter for passing a pointer to the
+    function-pointer context or state. If a function takes this extra
+    parameter, passing lambdas or functors becomes easier. The
+    following code takes advantage of this extra void pointer for
+    passing the function FunctionObject to the C function
+    _dotimes_version2_. 
+  
+
+#+BEGIN_SRC cpp 
+  std::puts("\n ===== [EXPERIMENT 4] Passing Functors to capturing lambda ==\n");	
+  {
+      std::puts("\n  --->> Passing function-object (aka C++ Functor) [APPROACH 1] ");
+      FunctionObject obj1(26);
+      dotimes_version2(5, &FunctionObject_adapter, &obj1);
+
+      // Note: This lambda can only be passed due to it be non-capturing.
+      auto adapter_for_FunctionObject = [](int n, void* context)
+      {
+          assert(context != nullptr && "Context pointer should not be nullptr.");			
+          FunctionObject* pFunctor = reinterpret_cast<FunctionObject*>(context);
+          pFunctor->operator()(n);
+      };
+
+      std::puts("\n   --->> Passing function-object (aka C++ Functor) [APPROACH 2] ");
+      FunctionObject obj2;
+      dotimes_version2(5, adapter_for_FunctionObject, &obj2);
+  }
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC sh 
+    ===== [EXPERIMENT 4] Passing Functors to capturing lambda ==
+
+
+     --->> Passing function-object (aka C++ Functor) [APPROACH 1] 
+    [TRACE] <ENTRY> Called function: dotimes_version2 
+     [FUNCTOR ] n = 0  / counter = 26 
+     [FUNCTOR ] n = 1  / counter = 27 
+     [FUNCTOR ] n = 2  / counter = 28 
+     [FUNCTOR ] n = 3  / counter = 29 
+     [FUNCTOR ] n = 4  / counter = 30 
+    [TRACE] <EXIT> Called function: dotimes_version2 
+
+      --->> Passing function-object (aka C++ Functor) [APPROACH 2] 
+    [TRACE] <ENTRY> Called function: dotimes_version2 
+     [FUNCTOR ] n = 0  / counter = 10 
+     [FUNCTOR ] n = 1  / counter = 11 
+     [FUNCTOR ] n = 2  / counter = 12 
+     [FUNCTOR ] n = 3  / counter = 13 
+     [FUNCTOR ] n = 4  / counter = 14 
+    [TRACE] <EXIT> Called function: dotimes_version2 
+#+END_SRC
+
+  *Experiment 5:* Passing capturing-lambdas to function-pointer arguments.
+
+  + This code is similar to the one from experiment 4. It passes
+    capturing lambda to the C function _dotimes_version2_ using the
+    extra void pointer (context) of this function. 
+
+#+BEGIN_SRC cpp 
+   /* EXPERIMENT 5 - Passing capturing lambda to C-function pointer callbacks with
+    ,* void context pointer. 
+    ,*/
+   std::puts("\n ===== [EXPERIMENT 5] Passing Capturing lambdas <APPROACH 1> ==\n");	
+   {					
+        using FunctionCallback2 = std::function<void (int size)>;
+
+        auto adpter_for_lambda = [](int n, void* context) 
+        {
+                assert(context != nullptr && "Context pointer (state) should not be null.");
+                FunctionCallback2* pFunc = reinterpret_cast<FunctionCallback2*>(context);
+                (*pFunc)(n);
+        };				
+
+        int counter = -100;
+        auto callback_lambda = [&counter](int n){ 
+                std::printf("  [EXPERIMENT 5] n = %d  / counter = %d \n", n, counter++);
+        };
+        FunctionCallback2 callback_object = callback_lambda; 
+
+        std::puts("\n  --->> Passing capturing lambda [APPROACH 1 - Type erasure] --- ");
+        dotimes_version2(5, adpter_for_lambda, &callback_object);
+
+   }
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC sh 
+   ===== [EXPERIMENT 5] Passing Capturing lambdas <APPROACH 1> ==
+
+
+    --->> Passing capturing lambda [APPROACH 1 - Type erasure] --- 
+   [TRACE] <ENTRY> Called function: dotimes_version2 
+    [EXPERIMENT 5] n = 0  / counter = -100 
+    [EXPERIMENT 5] n = 1  / counter = -99 
+    [EXPERIMENT 5] n = 2  / counter = -98 
+    [EXPERIMENT 5] n = 3  / counter = -97 
+    [EXPERIMENT 5] n = 4  / counter = -96 
+   [TRACE] <EXIT> Called function: dotimes_version2 
+
+
+   [INFO] System shutdown gracefully Ok.
+
+#+END_SRC
