@@ -4672,1622 +4672,6 @@ Example: CERN's root shell.
    (bool) true
    >> 
 #+END_SRC
-** Functor Function-Object and higher order functions 
-
-Functor is any object which behaves like a function and callable like
-a function. Unlike C++ ordinary functions, functors can have internal
-state and change its internal data as well.
-
-Functors are implementing in C++ by overloading the function
-application operator. 
-
-The code in the file: [[file:src/cpp-functor.cpp][file:src/cpp-functor.cpp]] shows an
-exhaustive example about how to implement, use functors and implement
-client code using dynamic polymorphism (aka subtyping or inheritance),
-static polymorphism (aka template metaprogramming) and C++11's
-function type _std::function_.
-
-Example: 
- + File:            [[file:src/cpp-functor.cpp][file:src/cpp-functor.cpp]] 
- + Online Compiler: http://rextester.com/VGE78113
-
- + Math functor interface class representing a general math function. 
-
-#+BEGIN_SRC cpp  
-  class IMathFunctor {
-  public:
-          // Pure virtual function
-          // => const -> Means that the function cannot change the object internal state.
-          // => (= 0) -> Means abstract member function or abstract method.
-          virtual double operator()(double x)	const = 0;
-          virtual ~IMathFunctor() = default;
-  };
-#+END_SRC
-
- - Linear Function "C++ functor." - function-object 
-
-#+BEGIN_SRC cpp 
-  /** Linear Function "C++ functor." - function-object 
-   ,*   LinFun(x) = A * x + B
-   ,*/
-  class LinFun: public IMathFunctor {
-  private:
-          // Linear coefficient or line slope 
-          double _a; 
-          double _b;
-  public:
-          LinFun(double a, double b): _a(a), _b(b){}
-          auto getA()				-> double   { return _a;}
-          auto setA(double a)			-> void	    { _a = a; }
-          auto getB()				-> double   { return _b;}
-          auto setB(double b)			-> void	    { _b = b; }
-
-          // Function-call operator => Makes this object callable
-          //------------------------------
-          // double operator()(double x)	-> double	{ return _a * x + _b;}	
-          double operator()(double x)	const { return _a * x + _b;}	
-  };
-#+END_SRC
-
-Usage: 
-
-#+BEGIN_SRC cpp 
-  // Function linear object - modelling a linear function 3 * x + 4.0 
-  LinFun fun1(3.0, 4.0);
-  std::cout << "a = " << fun1.getA() << " ; b = " << fun1.getB() << nl;
-  std::cout << "fun1(3.0) = " << fun1(3.0) << nl;  
-  std::cout << "fun1(4.0) = " << fun1(4.0) << nl;
-#+END_SRC
-
-Output: 
-
-#+BEGIN_SRC text 
-  a = 3 ; b = 4
-  fun1(3.0) = 13
-  fun1(4.0) = 16
-  fun1(5.0) = 19
-#+END_SRC
-
-
-Higher order functions (functions that calls or return functions) can
-be implemented using dynamic polymorphis or inheritance; static
-polymorphism, also known as template metaprogramming and using the
-type std::function from C++11.
-
-
- - *Higher order function using dynamic polymorphism*
-   (inheritance). This function only accepts implementations of
-   IMathFunctor and cannot worth with an arbitrary function-object,
-   ordinary functions or C++11 lambda function. Another drawback is
-   the runtime overhead of virtual function-calls.
-
-Example:
-
-#+BEGIN_SRC cpp 
-  void tabulateDynamic(const IMathFunctor& fun, double start, double stop, double step){
-          std::cout << std::fixed << std::setprecision(3);
-          for(double x = start; x <= stop ; x += step)
-                  std::cout << std::setw(10) << x << std::setw(10) << fun(x) << "\n";
-  }
-#+END_SRC
-
-Usage:
-
-#+BEGIN_SRC cpp 
-    tabulatDynamic(fun1, 0.0, 5.0, 1.0);
-#+END_SRC
-
-Sample Output: 
-
-#+BEGIN_SRC text 
-  -----> Tabulating fun1
-      0.000     4.000
-      1.000     7.000
-      2.000    10.000
-      3.000    13.000
-      4.000    16.000
-      5.000    19.000
-#+END_SRC
-
- - *Higher order function using static polymorphism* - The advantage
-   of this function is that it can work with any callable object like
-   functors (function-objects), ordinary functions and C++11 lambda
-   functions. Another benefit is the lower runtime overhead than the
-   implementation using dynamic polymorphism. For this case, the
-   runtime cost of dynamic polymorphism is not significant, however it
-   can become noticeable on large scale computation or high
-   performance computations.
-
- - Example:
-
-#+BEGIN_SRC cpp 
-  template<class Function>
-  void tabulateStatic(const Function& fun, double start, double stop, double step){
-          std::cout << std::fixed << std::setprecision(3);
-          for(double x = start; x <= stop ; x += step)
-                  std::cout << std::setw(10) << x << std::setw(10) << fun(x) << "\n";
-  }
-#+END_SRC
-
-Usage:
-
-#+BEGIN_SRC cpp 
-    std::cout << " -----> Tabulating fun1" << nl;
-    tabulateStatic(fun1, 0.0, 5.0, 1.0);
-    std::cout << " -----> Tabulating fun2" << nl;
-    tabulateStatic(fun2, 0.0, 5.0, 1.0);
-#+END_SRC
-
-
- - *Higher order function using the C++11 type std::function* - The type
-   std::function provides type erasure and can work with any functor,
-   ordinary function and C++11 lambda functions, in addition it also
-   allows all those types of functions to be stored in STL containers.
-
-Example: 
-
-#+BEGIN_SRC cpp 
-  void tabulateLambdaList(
-        const std::vector<std::function<double (double)>> funlist
-       ,double start
-       ,double stop
-       ,double step
-       ){
-       std::cout << std::fixed << std::setprecision(3);
-       for(double x = start; x <= stop ; x += step){
-               std::cout << std::setw(10) << x;
-               // const auto& is used for avoid uncessary copies 
-               for(const auto& fun: funlist)
-                       std::cout << std::setw(10) << fun(x);
-               std::cout << "\n";
-       }
-  }
-#+END_SRC
-
-Usage:
-
-#+BEGIN_SRC cpp 
-   tabulateLambdaList({fun1, fun2, exp, ordinaryFunction}, 0.0, 5.0, 1.0)
-#+END_SRC
-
-Output:
-
-#+BEGIN_SRC text 
-         x         fun1     fun2      exp      ordinaryFunction
-       0.000     4.000     4.000     1.000     0.000
-       1.000     7.000     9.000     2.718     3.000
-       2.000    10.000    18.000     7.389     6.000
-       3.000    13.000    31.000    20.086     9.000
-       4.000    16.000    48.000    54.598    12.000
-       5.000    19.000    69.000   148.413    15.000
-#+END_SRC
-
-Compilation of [[file:src/cpp-functor.cpp][file:src/cpp-functor.cpp]] 
-
-#+BEGIN_SRC sh 
-  $ clang++ cpp-functor.cpp -o cpp-functor.bin -g -std=c++11 -Wall -Wextra &&
-#+END_SRC
-
-Complete program output of [[file:src/cpp-functor.cpp][file:src/cpp-functor.cpp]] 
-
-#+BEGIN_SRC sh 
-  ./cpp-functor.bin
-
-  a = 3 ; b = 4
-  fun1(3.0) = 13
-  fun1(4.0) = 16
-  fun1(5.0) = 19
-  =======================
-  a = 2 ; b = 3 ; c = 4
-  fun2(3.0) = 31
-  fun2(4.0) = 48
-  fun2(5.0) = 69
-  ======= [1] Client Code using dynamic polymorphism  ================
-   -----> Tabulating fun1
-       0.000     4.000
-       1.000     7.000
-       2.000    10.000
-       3.000    13.000
-       4.000    16.000
-       5.000    19.000
-   -----> Tabulating fun2
-       0.000     4.000
-       1.000     9.000
-       2.000    18.000
-       3.000    31.000
-       4.000    48.000
-       5.000    69.000
-  ======= [2] Client Code using dynamic polymorphism  ================
-       0.000     4.000     4.000
-       1.000     7.000     9.000
-       2.000    10.000    18.000
-       3.000    13.000    31.000
-       4.000    16.000    48.000
-       5.000    19.000    69.000
-  ======= Client Code using static polymorphism (template)  ================
-   -----> Tabulating fun1
-       0.000     4.000
-       1.000     7.000
-       2.000    10.000
-       3.000    13.000
-       4.000    16.000
-       5.000    19.000
-   -----> Tabulating fun2
-       0.000     4.000
-       1.000     9.000
-       2.000    18.000
-       3.000    31.000
-       4.000    48.000
-       5.000    69.000
-   -----> Tabulating lambda function f(x) = x * x
-       0.000     0.000
-       1.000     1.000
-       2.000     4.000
-       3.000     9.000
-       4.000    16.000
-       5.000    25.000
-   -----> Tabulating ordinary function f(x) = 3 * x
-       0.000     0.000
-       1.000     3.000
-       2.000     6.000
-       3.000     9.000
-       4.000    12.000
-       5.000    15.000
-   -----> Tabulating ordinary function f(x) = exp(x)
-       0.000     1.000
-       1.000     2.718
-       2.000     7.389
-       3.000    20.086
-       4.000    54.598
-       5.000   148.413
-  ======= Client Code using C++11 lambda std::function  ================
-       0.000     4.000     4.000     1.000     0.000
-       1.000     7.000     9.000     2.718     3.000
-       2.000    10.000    18.000     7.389     6.000
-       3.000    13.000    31.000    20.086     9.000
-       4.000    16.000    48.000    54.598    12.000
-       5.000    19.000    69.000   148.413    15.000
-#+END_SRC
-
-** Lambda Expressions 
-   :PROPERTIES:
-   :ID:       02be1a97-c100-44ce-ad76-63835818d406
-   :END:
-*** Overview 
-
-Lambda expressions, also known as lambda functions or lambda
-abstractions, are ubiquitous in functional programming languages such
-as Haskell, OCaml, Scala and Scheme. They were by introduced in a
-theoretical way by Alonzo Church in the lambda calculus. Lisp was
-first programming language to use lambda functions and now this
-function programming feature has made its way into mainstream and has
-arrived to C# (Cshap), Java 8 and C++11.
-
-In C++, Lambda functions are not ordinary functions, actually, they
-are special function-objects or "C++ functors". Lambda abstractions
-can be passed as arguments to any function; returned from functions;
-can have state and also they can be defined locally at the call-site
-simplifying all the boilerplate code necessary to pass a function to
-callbacks, event handlers and higher order functions.
-
-Summary:
-
-  * Lambda functions were introduced in C++11. Before C++11 lambdas
-    were available as Boost.Lambda. 
-
-  * Lambda functions can be:
-    + returned from functions.
-    + be passed as function parameters.
-    + Can be stored in data structures.
-    + Hold state and capture variables (closure).
-    + Non-capturing lambdas can be converted to function pointers what
-      is useful with old C-APIs.
-
-  * Lambda turns C++11 is a *game changer* and turns C++ into an
-    quasi-functional programming language.
-
-  * Practical Use Cases:
-    + Callbacks
-    + Higher order functions
-    + Simplify design patterns
-    + Asynchronous code
-    + Create functions at runtime. 
-
-*Main parts* 
- 
- - Capture list between square brackets ~[ ]~
- - Argument list between parenthesis ~()~
- - Function body between curly braces ~{}~
-
-Syntax: 
-
-#+BEGIN_SRC text 
-  [capture](parameters) -> return-type {body}
-#+END_SRC
-
-Some lambda functions: 
-
-#+BEGIN_SRC cpp 
- auto fn = [](int n){ return n * 10; }
-
- // Test in CERN's ROOT REPL
- >> auto fn = [](int n){ return n * 10; }
- ((lambda) &) @0x7f5e578f2010
- >> 
-
- >> auto fn = [](int n){ return n * 10; }
- ((lambda) &) @0x7f5e578f2010
- >> 
-#+END_SRC
-
-
-*Parts of a C++'s lambda expression:*  - ([[https://msdn.microsoft.com/en-us/library/dd293608.aspx][Microsoft Inc. Lambda C++]])
-
- 1. Capture clause - Specifies captured variables (closure).
-    - ~[ ]~ - Empty capture clause means that no variable from escope
-      is captured.
-    - ~[x, y]~- The variables x and y are captured by value and the
-      the lambda body will get a copy of x and y. They cannot be
-      modified in the body of the lambda expression. 
-    - ~[&x , y]~ - The variable x is captured by reference and y by
-      value, therefore x can be modified in the body of the lambda
-      expression and y cannot.
-    - ~[&]~ - Capture all variables used in the lambda's body by
-      reference.
-    - ~[=]~- Captures all variables used in the body by value
-      (copy). The variables cannot be modifed as they are passed by
-      value.
-    - ~[=, &blob]~- The variable blob is captured by reference and all
-      other variables are captured by value (copy).
-    - ~[this]~ - Captures the "this" pointer of the enclosing class.
-
- 2. Parameter list (Optional)- Parameters, aka arguments, of the lambda expression.
- 3. Mutable specification (optional)
- 4. exception-specification (optional)
- 5. trailing return type (optional)
- 6. lambda-body - The body can access variables such as:
-    - Lambda parameters passed between parenthesis:  ~(int x)~
-    - Captured variables from the enclosing scope.
-    - Global variables.
-    - Class data members if the lambda expression is defined inside a
-      class. 
-
-#+BEGIN_SRC text 
-  --
-              (1)  (2)    (3)       (4)         (5)
-                 |    |         |            |           |
-                ...  ....  .....+....  ...+....     ......
-                [ ]  ( )  mutable  throw()  -> int
-                {                                                   
-                  // (6)                                              
-                  // Lambda body 
-                  int n = x + y;
-                  x = y;
-                  y  = n;
-                  return n;
-                }
-#+END_SRC
-
-*** TODO Basic Examples 
-
-*Proof-of-concept code* 
-
- + File: [[file:src/lambdaFun.cpp][file:src/lambdaFun.cpp]]
- + Online Compiler: http://rextester.com/SCQP30593
-
-Code Highlights:
-
- - Lambda function - lambda1 
-
-#+BEGIN_SRC cpp 
-  // Example (1)
-  auto lambda1 = [](const std::string& str){
-     std::cout << "Lambda1: : I got the value = " << str << "\n";
-  };
-
-  // Alternative 1:
-  //------------------------------
-  std::function<void (const std::string&)> lambda1A = [](const std::string& str) {
-    std::cout << "Lambda1: : I got the value = " << str << endl;
-  };
-
-  // Alternative 2:
-  //------------------------------
-  std::function<auto (const std::string&) -> void> lambda1B = [](const std::string& str) {
-    std::cout << "Lambda1: : I got the value = " << str << endl;
-  };
-
-  // Alternative 3:
-  //------------------------------
-  // Type synonym 
-  using FnAction = std::function<void (const std::string&)>;
-  // Alternative type synonym: 
-  using FnAction = std::function<auto (const std::string&) -> void>;
-
-  FnAction lambda1C = [](const std::string& str) {
-    std::cout << "Lambda1: : I got the value = " << str << endl;
-  };
-
-  >> lambda1("hello world")
-  Lambda1: : I got the value = hello world
-
-  >> lambda1("hola mundo")
-  Lambda1: : I got the value = hola mundo
-
-  >> lambda1A("testing C++")
-  Lambda1: : I got the value = testing C++
-
-  >> lambda1B("Running lambda1B")
-  Lambda1: : I got the value = Running lambda1B
-
-  >> lambda1C("I am lambda1C function")
-  Lambda1: : I got the value = I am lambda1C function
-  >> 	
-#+END_SRC
-
-
- - Higher order function which returns a lambda function which takes
-   two ints as parameters returning an int. This function captures the
-   parameter m by value, it means that the parameter is copied in the
-   function body. 
-
-#+BEGIN_SRC cpp 
-  // As it is in the code.
-  //-----------------------------------------	
-  std::function<int (int, int)> makeFunction1(int m){
-      return [m](int x, int y){ return m * (x + y); };
-  }
-
-  >> auto fn = makeFunction1(4)
-  (std::function<int (int, int)> &) @0x7fb73017f010
-  >> fn(3, 5)
-  (int) 32
-  >> fn(4, 3)
-  (int) 28
-  >> 
-
-  // Alternative 1:
-  //-----------------------------------------
-  auto makeFunction1A(int m) -> std::function<int (int, int)>{
-      return [m](int x, int y){ return m * (x + y); };
-  }
-
-  >> fna(3, 5)
-  (int) 32
-  >> fna(4, 3)
-  (int) 28
-  >> auto fna6 = makeFunction1A(6)
-  (std::function<int (int, int)> &) @0x7f696d823030
-  >> fna6(3, 5)
-  (int) 48
-  >> fna6(4, 3)
-  (int) 42
-  >> 
-
-  // Alternative 2:
-  //-----------------------------------------
-  auto makeFunction1B(int m) -> std::function<auto (int, int) -> int>{
-      return [m](int x, int y){ return m * (x + y); };
-  }
-
-  // Alternative 3:
-  //-----------------------------------------
-  // C++11 Type synonym
-  using BinaryIntFunctionA = std::function<int (int, int)>;
-  using BinaryIntFunctionB = std::function<auto (int, int) -> int>;
-  // Prior to C++11 type synonym
-  typedef std::function<auto (int, int) -> int> BinaryIntFunction;
-
-  auto makeFunction1C(int m) -> BinaryIntFunctionB {
-      return [m](int x, int y){ return m * (x + y); };
-  }
-
-  >> auto fnc = makeFunction1C(8)
-  (std::function<int (int, int)> &) @0x7f696d823050
-  >> fnc(3, 5)
-  (int) 64
-  >> fnc(6, 7)
-  (int) 104
-  >> 8 * (6 + 7)
-  (int) 104
-  >> 
-#+END_SRC
-
-
-Complete program output ([[file:src/lambdaFun.cpp][file:src/lambdaFun.cpp]]) : 
-
-#+BEGIN_SRC sh
-  g++ lamdaFun.cpp -o bin/lamdaFun.bin && bin/lamdaFun.bin
-
-  -----------------------------------------------------------------------------------------
-  >> Example(1) - Testing function lambda1
-  Lambda1: : I got the value = Hello
-  Lambda1: : I got the value = World
-
-  -----------------------------------------------------------------------------------------
-  >> Example(2) Testing function lambda2
-  Lambda 2 :: I got the value  = Japan
-  Lambda 2 :: I got the value  = Korea
-
-  -----------------------------------------------------------------------------------------
-  >> Example(3) Testing function lambda3
-     - Lambda function can be defined and executed at the call-site
-  Lambda 3 :: I got the value = C++11 is awesome!
-
-  -----------------------------------------------------------------------------------------
-  >> Example(4) Testing function sumLambda
-     - Lambda functions  can return values as any function.
-  sumLambda(10.0, 25.34) = 35.34
-  sumLambda(-10.23, 4.56) = -5.67
-
-  -----------------------------------------------------------------------------------------
-  >> Example(5) Testing function lamdaCapture
-     - Lambda functions  can capture its environment (closures) and have state as "function objects"
-    x  = 5  c = 3
-  lamdaCapture(2, 5)  = 32
-    x  = 5  c = 4
-    lamdaCapture(1, 2) =  16
-    x  = 5  c = 5
-
-  -----------------------------------------------------------------------------------------
-  >> Example(6) Testing function sumLambda
-     - Lambda functions  can play well with STL algorithms
-  Print all vector elements - Version 1
-    v[0] = 1
-    v[1] = 2
-    v[2] = 3
-    v[3] = 4
-    v[4] = 5
-    v[5] = 6
-    v[6] = 7
-    v[7] = 8
-  Print all vector element Version 2  - local state with 'static' keyword
-    v[0] = 1
-    v[1] = 2
-    v[2] = 3
-    v[3] = 4
-    v[4] = 5
-    v[5] = 6
-    v[6] = 7
-    v[7] = 8
-
-  -----------------------------------------------------------------------------------------
-  >> Example(7) 
-     Playing with STL transform algorithm.
-    Vector transformed =  
-  v  [0] = 4
-  v  [1] = 7
-  v  [2] = 10
-  v  [3] = 13
-  v  [4] = 16
-  v  [5] = 19
-  v  [6] = 22
-  v  [7] = 25
-
-  -----------------------------------------------------------------------------------------
-  >> Example(8) 
-     Lambda functions can be returned from functions and be generated at run-time.
-    mulSumBy2(2, 4) = 12
-    mulSumBy2(3, 1) = 8
-    mulSumBy5(2, 4) = 30
-    mulSumBy5(9, 2) = 55
-
-  -----------------------------------------------------------------------------------------
-  >> Example(9) 
-     Lambda functions can be returned from functions and have state.
-    Running dummy function
-      (*) m = 2, n = 0, x = 1, y = 3, z = 8
-    Running dummy function
-      (*) m = 2, n = 1, x = 2, y = 5, z = 15
-    Running dummy function
-      (*) m = 3, n = 0, x = 1, y = 3, z = 12
-    Running dummy function
-      (*) m = 3, n = 1, x = 2, y = 5, z = 22
-
-  -----------------------------------------------------------------------------------------
-  >> Example(10) 
-     Lambda functions can return lambda functions!!
-    addTo5(4) = 9
-    addTo5(3) = 8
-    addTo10(4) = 14
-    addTo10(3) = 13
-
-  -----------------------------------------------------------------------------------------
-  >> Example(11) 
-     Lambda functions can be passed as function arguments!
-  foldVector(dataset2, 0, add) = 28
-  foldVector(dataset2, 1, mul) = 5040
-
-  -----------------------------------------------------------------------------------------
-  >> Example(12) - Observer pattern
-  (observer 1) Temperature changed to 30.5 C
-  (observer 2) Sensor temperature changed to 30.5 C
-  (observer 1) Temperature changed to 20.5 C
-  (observer 2) Sensor temperature changed to 20.5 C
-
-#+END_SRC
-
-*References*
-
- - *Lambda Expressions in C++* -
-   <https://msdn.microsoft.com/en-us/library/dd293608.aspx>
-
- - *Lambda expressions (since C++11)* -
-   <http://en.cppreference.com/w/cpp/language/lambda> 
-
- - *C++ Core Guidelines: Function Objects and Lambdas* -
-   <http://www.modernescpp.com/index.php/c-core-guidelines-function-objects-and-lambas> 
-
- - *C++11/C++14 lambda functions - 2017* -
-   <http://www.bogotobogo.com/cplusplus/C11/C11_lambda_functions_expressions.php>
-
- - *Lambda Functions in C++11 - the Definitive Guide* -
-   <https://www.cprogramming.com/c++11/c++11-lambda-closures.html> 
-
- - *Fun with Lambdas: C++14 Style (part 1)* -
-   <https://www.slideshare.net/SumantTambe/fun-with-lambdas-c14-style> 
-
- - *ICS 45C Fall 2016 - Notes and Examples: Functions and Lambdas* -
-   <http://www.ics.uci.edu/~thornton/ics45c/Notes/FunctionsAndLambdas/>
-
- - *Creating Recursive Lambdas ... and returning them too!* -
-   <http://cpptruths.blogspot.com.br/2013/10/creating-recursive-lambdas-and.html> 
-*** Lambdas in Deep 
-
-Define two test functions: 
-
-#+BEGIN_SRC cpp 
-  >> auto add_10 = [](int x){ return x + 10; };
-  >> auto mul_3  = [](int x){ return x * 3; };
-
-  >> add_10(5)
-  (int) 15
-
-  >> mul_3(5)
-  (int) 15
-#+END_SRC
-
-The lambda objects add_10 and mul_3 can be called like functors
-(callable objects) overloading the function-call operator. 
-
-#+BEGIN_SRC cpp 
-  >> add_10.operator()(5)
-  (int) 15
-
-  >> mul_3.operator()(5)
-  (int) 15
-  >> 
-#+END_SRC
-
-Define two functions fun_add_10 and fun_mul_3; 
-
-#+BEGIN_SRC cpp 
-  >> int fun_add_10(int n){ return n + 10; }
-  >> int fun_mul_3(int n){ return n * 3; }
-
-  >> fun_add_10(2)
-  (int) 12
-
-  >> fun_add_10(5)
-  (int) 15
-
-  >> fun_mul_3(5)
-  (int) 15
-#+END_SRC
-
-Both functions have the same type and can be reffered by the same
-function-pointer: 
-
-#+BEGIN_SRC cpp 
-  >> if(typeid(fun_add_10) == typeid(fun_mul_3)) puts(" => Function have same type"); 
-  => Function have same type
-
-  >> int (* funptr)(int) = nullptr;
-
-  >> funptr = fun_add_10;
-  >> funptr(4)
-  (int) 14
-
-  >> funptr = fun_mul_3;
-  >> funptr(4)
-  (int) 12
-#+END_SRC
-
-Lambdas does not have the same type: 
-
-#+BEGIN_SRC cpp 
-  >> if(typeid(add_10) != typeid(mul_3)) puts(" => Lambdas do not have the same type");
-   => Lambdas do not have the same type
-
-  >> std::cout << std::boolalpha;
-  >> std::cout << "value = " << (typeid(add_10) != typeid(mul_3)) << std::endl;
-  value = true
-#+END_SRC
-
-Lambdas cannot be referred by the same pointer. 
-
-#+BEGIN_SRC cpp 
-  // Take the address of the object add_10 
-  >> auto ptr = &add_10;
-  >> ptr
-  ((lambda) *) @0x7ffed74b7368
-
-  // Apply to a value 
-  >> (*ptr)(4)
-  (int) 14
-  >> 
-  >> ptr->operator()(4)
-  (int) 14
-
-  // FAILURE!!! because both lambdas do not have the same type.  Attempt
-  // to assing the address of mul_3 to the pointer to add_10.
-  >> ptr = &mul_3;
-  ROOT_prompt_76:1:7: error: assigning to '(lambda at ROOT_prompt_0:1:15) *' from incompatible type '(lambda
-        at ROOT_prompt_2:1:15) *'
-  ptr = &mul_3;
-        ^~~~~~
-#+END_SRC
-
-Both objects are *add_10* and *mul_3* are instance of different anonymous
-classes created by the compiler which overloads the function-call
-operator member function. 
-
-The lambda object _add_10_ is equivalent to: 
-
-#+BEGIN_SRC cpp 
-  class _anonymous_lambda_class1
-  {
-  public:
-       int operator()(int n) const { return n + 10; }
-  };
-
-  _anonymous_lambda_class1 add_10; 
-#+END_SRC
-
-The lambda object _mul_3_ is equivalent to: 
-
-#+BEGIN_SRC cpp 
-  class _anonymous_lambda_class2
-  {
-  public:
-       int operator()(int n) const { return n * 3; }
-  };
-
-  _anonymous_lambda_class2 mul_3; 
-#+END_SRC
-
-
-The following capturing lambda is equivalent to: 
-
-#+BEGIN_SRC cpp 
-  // ----------- Capturing lambda -----------------// 
-  double x = 10; 
-  std::string name = "Somebody";
-
-  auto capture_lambda = [x, &name] (int n, const char* word) -> void 
-  {
-     printf(" n = %d ; word = %s, x = %f ; name = %s", n, word, x, name.c_str());
-  };
-
-  //--- The capturing lambda (closure) is the same as --------// 
-  // 
-  class _anonymous_lambda_class
-  {
-     double _x;
-     std::string& _name;  
-  public:     
-    _anonymous_lambda_class(double x, std::string& name): 
-       _x(x)
-     , _name(name) 
-    { 
-    }   
-
-    void operator()(int n, const char* word) const 
-    {
-       printf(" n = %d ; word = %s, x = %f ; name = %s", n, word, x, name.c_str());
-    }
-
-  } capture_lambda(x, name);
-#+END_SRC
-
-
- *Passing lambdas as function parameters:*
-
-Both lambda objects can be passed by using templated function like in
-the following code. The function apply_function, accepts any function
-pointer with type _int (*) (int)_, any callable object (functor) that
-takes an integer and returns an integer and also lambdas that are also
-callable objects.
-
-#+BEGIN_SRC cpp 
-  template<typename TFunc> void apply_function(TFunc func, int n){    
-      for(int i = 0; i < n; ++i){
-         printf(" i = %d\n", func(i));
-      }
-  }
-#+END_SRC
-
-Passing function pointers as parameter to the templated function: 
-
-#+BEGIN_SRC cpp 
-  >> apply_function(fun_add_10, 3)
-   i = 10
-   i = 11
-   i = 12
-
-  >> apply_function(&fun_add_10, 4)
-   i = 10
-   i = 11
-   i = 12
-   i = 13
-
-  >> apply_function(fun_mul_3, 3)
-   i = 0
-   i = 3
-   i = 6
-#+END_SRC
-
-Passing lambdas, aka lambda objects as parameters to the templated
-function: 
-
-#+BEGIN_SRC cpp 
-  // Pass lambda object add_10 
-  >> apply_function(add_10, 3)
-   i = 10
-   i = 11
-   i = 12
-
-  // Pass lambda object mul_3 as parameter 
-  >> apply_function(mul_3, 3)
-   i = 0
-   i = 3
-   i = 6
-
-  >> apply_function([](int x){ return 5 * x; }, 3)
-   i = 0
-   i = 5
-   i = 10  
-#+END_SRC
-
-Passign a functor to the templated function: 
-
-#+BEGIN_SRC cpp 
-  struct AFunctor{
-     int operator()(int x) { return 4 * x + 5; }
-  };
-
-  >> afc(4)
-  (int) 21
-
-  >> afc.operator()(4)
-  (int) 21
-  >> 
-
-  >> apply_function(afc, 3)
-   i = 5
-   i = 9
-   i = 13
-
-  >> apply_function(AFunctor(), 3)
-   i = 5
-   i = 9
-   i = 13
-#+END_SRC
-
-
-As a result: 
-
- * C++ *lambdas expressions are not functions*, as in most functional
-   languages such as Haskell, OCaml and so on. They are functors or
-   callable-objects instances of anonymous classes generated by the
-   compiler.
-
- * Lambda expressions with the same type parameters and same return
-   type do not have the same type and cannot be assigned to the same
-   variable or referred by the same pointer.
-
- * Lambdas can be passed as parameters by using templated
-   functions. In this case lambdas and functors are better than
-   passing function pointers as the both are most likely to be inlined
-   by the compiler removing the function-call overhead.
-
- * The only way to store lambdas in the same container or in an
-   std::vector container is by using type-erasure or type-erasure
-   containers such as [[https://en.cppreference.com/w/cpp/utility/functional/function][std::function]].
-
- * std::function<int (int)> is not the type of any of those lambda
-   functions.
-*** Stateful lambdas 
-
-The function-call operator member function operator()(args) of a
-lambda object is annotated with _const_, therefore it cannot modify
-captured parameters by value. 
-
-#+BEGIN_SRC cpp 
-  // Compile-time error!! 
-  auto incrementer = [n = 1]() { return ++n; };
-#+END_SRC
-
-The previous line is equivalent to: 
-
-#+BEGIN_SRC cpp 
-  // The previous line is the same as: 
-  class __Anonymous_lambda_classA {
-      int n = 1;
-  public: 
-      __Anonymous_lambda_class() = default;
- 
-      // Function-call operator annotated as const 
-      int operator()() const 
-      {  
-         // Value n cannot be modified!! 
-         // Compiel-time error!!
-         return ++n; 
-      }
-  };
-
-  __Anonymous_lambda_classA incrementer;
-#+END_SRC
-
-The _mutable_ keyword allows variables captured by value to be modified
-in the lambda expression.
-
-#+BEGIN_SRC cpp 
-  // Now it works
-  auto incrementer = [n = 1]() mutable { return ++n; };
-
-  // Could also be written as: 
-  auto incrementer = [n = 1]() mutable -> int 
-                    {  
-                       return ++n; 
-                    };
-
-  // Could also be written as: 
-  auto incrementer = [n = 1](void) mutable -> int 
-                     { 
-                       return ++n; 
-                     };
-#+END_SRC
-
-The previous lambda expression 'incrementer' is equivalent to: 
-
-#+BEGIN_SRC cpp 
-  // The previous line is the same as: 
-  class __Anonymous_lambda_classB {
-      int n = 1;
-  public: 
-      __Anonymous_lambda_class() = default;
- 
-      // Function-call operator non cost 
-      int operator()()  
-      {  
-         return ++n; 
-      }
-  };
-
-  __Anonymous_lambda_classB incrementer;
-#+END_SRC
-
-Test in Cling REPL: 
-
-#+BEGIN_SRC cpp 
-   $ ~/opt/cling_2018-09-16_fedora27/bin/cling -std=c++1z
-   // Now it works
-   auto incrementer = [n = 1]() mutable { return ++n; };
-   auto incrementerB = incrementer;
-
-   [cling]$ incrementer()
-   (int) 2
-   [cling]$ incrementer()
-   (int) 3
-   [cling]$ incrementer()
-   (int) 4
-   [cling]$ incrementer()
-   (int) 5
-
-   [cling]$ incrementerB()
-   (int) 2
-   [cling]$ incrementerB()
-   (int) 3
-   [cling]$ incrementerB()
-   (int) 4
-
-   [cling]$ inc()
-   (int) 6
-   [cling]$ inc()
-   (int) 7
-   [cling]$ inc()
-   (int) 8
-   [cling]$ incrementer()
-   (int) 6
-   [cling]$ 
-#+END_SRC
-
- *Example: stateful lambda X captured variable* 
-
-Sample code: main-stateful-lambda.cpp 
-
-#+BEGIN_SRC cpp 
-  #include <iostream>
-
-  int main()
-  {
-      int n = 10;
-      auto func = [n]() mutable { n = n + 1; return n; };
-
-      std::cout << " func() = " << func() << std::endl;
-      std::cout << " func() = " << func() << std::endl;
-      std::cout << " func() = " << func() << std::endl;
-      std::cout << " n = " << n << std::endl;
-      return 0;
-  }
-#+END_SRC
-
-Output: 
-
-#+BEGIN_SRC sh 
- func() = 11
- func() = 12
- func() = 13
- n = 10
-#+END_SRC
-
-*** Generic lambdas C++14
-**** Overview  
-
-C++14 introduced _generic-lambdas_ language feature which allows
-defining lambda with _auto_ keyword which behaves like templated
-functions. 
-
-Papers: 
-
-  * N3559 / *Proposal for Generic (Polymorphic) Lambda Expressions*
-    + <http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2013/n3559.pdf>
-
-  * N3649 / *Generic (Polymorphic) Lambda Expressions (Revision 3)*
-    * <http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2013/n3649.html>
-
-  * *C++ lambda expressions and closures*
-    * https://core.ac.uk/download/pdf/82307163.pdf
-    * https://eel.is/c++draft/expr.prim.lambda.closure
-
-Generic lambda expression named 'print_lambda' with generic parameter a.
-
-#+BEGIN_SRC cpp 
-     auto print_lambda = [](const auto& a){ std::cout << " Value of a = " << a << '\n'; };
-
-     // Or equivalent: 
-     auto print_lambda = [](auto const& a){ std::cout << " Value of a = " << a << '\n'; };
-#+END_SRC
-
-The previous lamba is an anonymous Functor (function-object) created
-by the compiler with a templated parameter in the function-call
-operator.
-
-#+BEGIN_SRC cpp 
-  // Anonymous functor 
-  class __Anonymous_generic_lambda
-  {
-  public: 
-     template<typename T>
-     void operator(const T& a)
-     {  
-         std::cout << " Value of a = " << a << '\n';
-     }
-  };
-#+END_SRC
-**** Example 1 - Basic Generic Lambdas
-
-File: cpp-generic-lambda.cpp 
-
-#+BEGIN_SRC cpp 
-  #include <iostream>
-  #include <vector>
-  #include <string>
-  #include <algorithm>
-
-  template<typename iterable, typename Callable>
-  void custom_algorithm(iterable const& seq, Callable func)
-  {
-      for(auto const& x: seq) func(x);
-  }
-
-  int main(int argc, char** argv)
-  {
-      auto print_lambda = [](auto a){ std::cout << " Value of a = " << a << '\n'; };
-
-      std::puts(" ---------- Apply to single argument ---------------");
-      print_lambda(10);
-      print_lambda('x');
-      print_lambda("<generic-lambda-on-the-rocks!>");
-
-      std::puts("\n ---- Apply to integer vector / st::for_each ------------");
-      std::vector<int> xs{10, 2, 5, 9};
-      std::for_each(xs.begin(), xs.end(), print_lambda);
-
-      std::puts("\n -- [1] Apply to string vector / std::for_each ------------");
-      std::vector<std::string> words = {"C++",  "ADA", "RUST", "DLang", "Dart" };
-      std::for_each(words.begin(), words.end(), print_lambda);
-
-      std::puts("\n -- [2] Apply to string vector / std::for_each ------------");
-
-      int i = 0;
-      // Capturing lambda defined at call-site.
-      std::for_each(words.begin(), words.end(),
-                    [&i](auto const& x){
-                          std::cout << " x[" << i++ << "] = " << x << '\n';
-                    });
-
-      std::puts("\n - Generic lambda with custom algorithm ----------------");
-      custom_algorithm(xs, print_lambda);
-
-     return 0;
-  }
-#+END_SRC
-
-Building: 
-
-#+BEGIN_SRC sh 
-  $ g++  cpp-generic-lambda.cpp -o app1.bin -std=c++1z -Wall -ggdb
-#+END_SRC
-
-Running: 
-
-#+BEGIN_SRC sh 
-  $ ./app1.bin 
-   ---------- Apply to single argument ---------------
-   Value of a = 10
-   Value of a = x
-   Value of a = <generic-lambda-on-the-rocks!>
-
-   ---- Apply to integer vector / st::for_each ------------
-   Value of a = 10
-   Value of a = 2
-   Value of a = 5
-   Value of a = 9
-
-   -- [1] Apply to string vector / std::for_each ------------
-   Value of a = C++
-   Value of a = ADA
-   Value of a = RUST
-   Value of a = DLang
-   Value of a = Dart
-
-   -- [2] Apply to string vector / std::for_each ------------
-   x[0] = C++
-   x[1] = ADA
-   x[2] = RUST
-   x[3] = DLang
-   x[4] = Dart
-
-   - Generic lambda with custom algorithm ----------------
-   Value of a = 10
-   Value of a = 2
-   Value of a = 5
-   Value of a = 9
-
-#+END_SRC
-**** Example 2 - Generic lambdas and templates 
-
-Generic lambdas work in a similar way to templated functions or
-classes. A lambda generic expression can be applied to any type
-satisfying its type requirements (concepts). In the following code,
-the generic lambda _mygen_lambda1_ which is similar to the functor
-_functor1_, can be applied to any class or type with members _get_param_
-and _get_name_ regardless of its class hierarchy. It works in a similar
-way to *duck typing* of dynamic languages such as Python, Ruby,
-JavaScript and so on. The difference for dynamic typed languages is
-that, if the type does not satisfy the requirements of the generic
-lambda, a compile-time error will happen.
-
-File: generic-lambda2.cpp 
-
-#+BEGIN_SRC cpp 
-   #include <iostream>
-   #include <vector>
-   #include <string>
-   #include <algorithm>
-
-   struct Circle
-   {
-       int rad = 0;
-
-       std::string get_name(){ return "circle"; }
-
-       void set_parameter(int rad)
-       {
-           std::printf("[INFO] Circle parameter set to %d \n", rad);
-           this->rad = rad;
-       }
-       int get_param() const {return rad; }
-   };
-
-   class Gearbox
-   {
-       int x = 10;
-    public:
-       std::string get_name(){ return "gearbox"; }
-
-       void set_parameter(int x)
-       {
-           std::printf("[INFO] Gearbox parameter set to %d \n", x);
-           this->x = x;
-       }
-
-       int get_param() const {return x; }
-
-       void dummy_non_common_method() { }
-   };
-
-   // The generic lambda mygen_lambda1 is similar to this
-   // templated functor.
-   struct functor1
-   {
-       template<typename T>
-       void operator()(T& obj, int k)
-       {
-           std::cout << " Object name = " << obj.get_name() << "\n";
-           obj.set_parameter(k);
-           std::cout << " Parameter set to " << k << "\n";
-       }
-   };
-
-
-   int main(int argc, char** argv)
-   {
-       auto mygen_lambda1 = [](auto& obj, int k){
-           std::cout << " Object name = " << obj.get_name() << "\n";
-           obj.set_parameter(k);
-           std::cout << " Parameter set to " << k << "\n";
-       };
-
-       std::puts("\n --- Apply lambda on Circle object ");
-       Circle c1;
-       mygen_lambda1(c1, 5);
-
-       std::puts("\n --- Apply lambda on Gearbox object ");
-       Gearbox g1;
-       mygen_lambda1(g1, 9);
-
-       std::puts("\n --- Apply functor on Gearbox object ");
-       functor1 fun1;
-       fun1(g1, 9);
-
-           return 0;
-   }
-
-#+END_SRC
-
-Program output: 
-
-#+BEGIN_SRC sh 
-   --- Apply lambda on Circle object 
-   Object name = circle
-  [INFO] Circle parameter set to 5 
-   Parameter set to 5
-
-   --- Apply lambda on Gearbox object 
-   Object name = gearbox
-  [INFO] Gearbox parameter set to 9 
-   Parameter set to 9
-
-   --- Apply functor on Gearbox object 
-   Object name = gearbox
-  [INFO] Gearbox parameter set to 9 
-   Parameter set to 9
-
-#+END_SRC
-*** Self-executable lambda for complex initialization 
-
-Self-executable lambdas functions can also be used for performing
-complex local or global static variables initialization.
-
-
- *Example 1:* Initialization of global variables.
-
- + Online compiler: https://rextester.com/CHRT64707
-
-#+BEGIN_SRC cpp 
-  #include <iostream>
-  #include <cstdio>
-
-  class AClass{
-  private:
-      double x, y, z;	
-  public:
-      AClass(): x(0), y(0), z(0) { }
-      ~AClass(){
-         std::printf("Object deleted\n");
-      }
-      void setX(double x){ this->x = x; }
-      void setY(double y){ this->y = y; }
-      void setZ(double z){ this->z = z; }
-      void show(){
-         std::printf("AClass{ x = %.3f ; y = %.3f ; z = %.3f}\n", x, y, z);
-      }	
-  };
-
-  AClass globalObject =
-      [](){
-          AClass cls;
-          cls.setX(10.0);
-          cls.setY(20.0);
-          cls.setZ(15.0);
-          cls.show();
-          return cls;
-      }();
-
-  int main(){
-      std::cout << "Program Initialized" << std::endl;
-      globalObject.show();
-      std::cout << "Program end" << std::endl;
-      return 0;
-  }
-#+END_SRC
-
-Output: 
-
-#+BEGIN_SRC text 
-  $ clang++ init1.cpp -o init1.bin -g -std=c++1z -Wall -Wextra
-  $ ./init1.bin
-
-  AClass{ x = 10.000 ; y = 20.000 ; z = 15.000}
-  Program Initialized
-  AClass{ x = 10.000 ; y = 20.000 ; z = 15.000}
-  Program end
-  Object deleted
-#+END_SRC
-
-
- *Example 2:* Initialization of function static variables.
-
- - Online compiler: https://rextester.com/RIGN6626
-
-#+BEGIN_SRC cpp 
-  #include <iostream>
-  #include <string>
-  #include <map>
-
-  int getDayOfWeekNum2(const std::string& weekDay){
-      // Type alias / synonym 
-      using WeekDayTable = std::map<std::string, int>;
-      static WeekDayTable week_table =
-               [](){ // Lambda function
-                  std::cerr << " [LOG] Initializing month table" << "\n";
-                  WeekDayTable tbl;
-                  tbl["Sun"] = 1;
-                  tbl["Mon"] = 2;
-                  tbl["Tue"] = 3;
-                  tbl["Wed"] = 4;
-                  tbl["Thu"] = 5;
-                  tbl["Fri"] = 6;
-                  tbl["Sat"] = 7;
-                  std::cerr << " [LOG] Month table initialization end. OK." << "\n";
-                  return tbl;
-          }();
-      if(week_table.find(weekDay) != week_table.end())
-         return week_table[weekDay];	
-      return -1;
-  }
-  int main(){
-      std::cout << "getDayOfWeekNum2(Mon)   = " << getDayOfWeekNum2("Mon")   << "\n";
-      std::cout << "getDayOfWeekNum2(Tue)   = " << getDayOfWeekNum2("Tue")   << "\n";
-      std::cout << "getDayOfWeekNum2(Sat)   = " << getDayOfWeekNum2("Sat")   << "\n";
-      std::cout << "getDayOfWeekNum2(ERROR) = " << getDayOfWeekNum2("ERROR") << "\n";
-      return 0;
-  };
-#+END_SRC
-
-Output stderr (Program logging)
-
-#+BEGIN_SRC txt 
- [LOG] Initializing month table
- [LOG] Month table initialization end. OK.
-#+END_SRC
-
-Output stdout (Program output) 
-
-#+BEGIN_SRC txt 
-  getDayOfWeekNum2(Mon)   = 2
-  getDayOfWeekNum2(Tue)   = 3
-  getDayOfWeekNum2(Sat)   = 7
-  getDayOfWeekNum2(ERROR) = -1
-#+END_SRC
-*** Universal function adapter - std::bind 
-**** Overview
-
-The operator std::bind can simplify help simplifying turning ordinary
-functions, instance methods (member functions) and static methods
-(static member functions) into ordinary functions.
-
-Example 1: Turn a function of signature: 
-  + Input Signature:
-    + double functionABC(double a, double c, double c)
-  + Target signature: 
-    + function<double (double)> 
-
-For the function functionABC
-
-#+BEGIN_SRC cpp 
-  double functionABC(double a, double c, double c);
-#+END_SRC
-
-The expression:
-
-#+BEGIN_SRC cpp 
- // Type of fnFunOfA is std::function<double (double)>
- auto fnFunOfA = std::bind(functionABC, _1, 10.0, 20.0)
- // It is the same as 
- auto fnFunOfA = [](double x){ return functionABC(x, 10.0, 20.0); };
- // It also equivalent to 
- std::function<double (double)> fnFunOfA = [](double x){ return functionABC(x, 10.0, 20.0); };
-#+END_SRC
-
-So, it follows that: 
-
-#+BEGIN_SRC cpp 
-  auto fnFunOfB = std::bind(functionABC, 25.0 , _1, 20.0);
-  // It is equivalent to 
-  auto fnFunOfB = [](double x){ return (functionABC, 25.0 , _1, 20.0); };
-#+END_SRC
-
-By using more lambda placeholders it is also possible to generate
-multi variable functions: 
-
-#+BEGIN_SRC cpp 
-  #include <functional> 
-  using namespace std::placeholders; // Import placeholders, _1, _2, _3 ...  
-
-  //----------------------------------//
-  auto fnFunOfAB = std::bind(functionABC, _1 , _2, 20.0);
-  // Equivalent to 
-  auto fnFunOfAB = [](double x, double y){ return functionABC( x , y, 20.0);};
-
-  //----------------------------------//
-  auto fnFunOfAC = std::bind(functionABC, _1 , 10.0, _2);
-  // Equivalent to 
-  auto fnFunOfAC = [](double x, double y){ return functionABC( x , 10.0, y);};
-
-  //----------------------------------//
-  auto fnFunOfABC = std::bind(functionABC, _1 , 10.0, _2);
-  // Equivalent to 
-  auto fnFunOfABC = [](double x, double y, double z){ return functionABC( x , y, z);};
-#+END_SRC
-
-
- *Binding non-static methods (member function)*
-
-For the following class:
-
-#+BEGIN_SRC cpp 
- struct FunctionObject{
-      double x;
-      double y;
-      FunctionObject(double x, double y): x(x), y(y) {};      
-      double operator ()(double a){   
-         return a * a;
-      }   
-      double operator ()(double a, double b, double c){
-          return a * x + b * y + c / (x + y);
-      }
-      double method1(double a){
-          return this->x * a  + this->y / a;
-      }
-      double method2(double a, double b, double c){
-          return  c * (a / x + b / y);
-      }       
-  };
-#+END_SRC
-
-It is possible to create lambda functions from those class methods
-(member functions):
-
-#+BEGIN_SRC cpp 
-  FunctionObject obj;
-
-  //-------------------------
-  auto method1LambdaA = std::bind(&FunctionObject::method1, fobj, _1);
-  // Equivalent to: 
-  auto method1LambdaA = [&obj](double a){return obj.method1(x); };
-
-  //-------------------------
-  auto method2LambdaAsFnOfAC = std::bind(&FunctionObject::method2, &fobj, _1, 10.0, _2);
-  // Equivalent to: 
-  auto method2LambdaAsFnOfAC = [&obj](double a, double c){ return obj.method2(a, 10.0, c); }
-
-  //-------------------------
-  auto functionOfObj = std::bind(&FunctionObject::method1, _1, 10.0);
-  // Equivalent to: 
-  auto functionOfobj = [](FunctionObject a){ return obj.method1(obj, 10.0);};
-#+END_SRC
-
-**** std::bind Example 
-     :PROPERTIES:
-     :ID:       219c4de9-3e9e-446f-bdd5-1ae6e7d45b5b
-     :END:
-
-File: 
- +  [[file:src/lambda-bind.cpp][file:src/lambda-bind.cpp]]
-
-Running: 
-
-#+BEGIN_SRC sh 
-  $ g++ lambda-bind.cpp -o lambda-bind.bin -g -std=c++11 -Wall -Wextra -ldl 
-  $ ./lambda-bind.bin
-
-  ======== Test 1 ========
-  lambda-bind.cpp:58: ; sum10(2.0) = 12
-  lambda-bind.cpp:59: ; sum10(4.5) = 14.5
-  lambda-bind.cpp:60: ; sum10(25.0) = 35
-  ======== Test 2 ========
-  lambda-bind.cpp:66: ; vectorLenAsFunctionOfX(4.0) = 27.2213
-  lambda-bind.cpp:67: ; std::bind(vectorLength, _1, 10.0, 25.0)(4.0) = 27.2213
-  lambda-bind.cpp:68: ; vectorLenAsFunctionOfX(10.0) = 28.7228
-  lambda-bind.cpp:69: ; std::bind(vectorLength, _1, 10.0, 25.0)(10.0) = 28.7228
-  Tabulating - vectorLenAsFunctionOfX
-       1.000    26.944
-       2.000    27.000
-       3.000    27.092
-       4.000    27.221
-       5.000    27.386
-  ======== Test 3 ========
-  lambda-bind.cpp:77: ; vectorLenAsFunctionOfY(14.0) = 30.348
-  lambda-bind.cpp:78: ; vectorLenAsFunctionOfY(20.0) = 33.541
-  Tabulating - vectorLenAsFunctionOfY
-       1.000    26.944
-       2.000    27.000
-       3.000    27.092
-       4.000    27.221
-       5.000    27.386
-  ======== Test 4 ========
-  lambda-bind.cpp:92: ; vectorLenAsFunctionOfYZ(3.0, 6.0) = 12.0416
-  lambda-bind.cpp:93: ; vectorLenAsFunctionOfYZ(15.0, 26.0) = 31.6386
-  ======== Test 5 ========
-  lambda-bind.cpp:97: ; fobj(4.0) = 16
-  lambda-bind.cpp:98: ; fobj(5.0) = 25
-  lambda-bind.cpp:99: ; fobj(10.0) = 100
-  lambda-bind.cpp:101: ; fobj(4.0, 10.0, 5.0) = 104.357
-  lambda-bind.cpp:102: ; fobj(6.0, 8.0, 9.0) = 100.643
-  Running: tabulate(0.0, 5.0, 1.0, fobj)
-       0.000     0.000
-       1.000     1.000
-       2.000     4.000
-       3.000     9.000
-       4.000    16.000
-       5.000    25.000
-  Turning class member function into lambda function 
-   Note: it is not possible (0.0, 5.0, 1.0, fobj.method1)
-  lambda-bind.cpp:111: ; fobj.method1(10.0) = 60.8
-  lambda-bind.cpp:112: ; method1LambdaA(10.0) = 60.8
-  lambda-bind.cpp:113: ; fobj.method1(20.0) = 120.4
-  lambda-bind.cpp:114: ; method1LambdaA(20.0) = 120.4
-  lambda-bind.cpp:115: ; fobj.method1(30.0) = 180.267
-  lambda-bind.cpp:116: ; method1LambdaA(30.0) = 180.267
-  Tabulating method1LambdaA
-       0.000       inf
-       1.000    14.000
-       2.000    16.000
-       3.000    20.667
-       4.000    26.000
-       5.000    31.600
-  Tabulating method1LambdaA using direct lambda
-       0.000       inf
-       1.000    14.000
-       2.000    16.000
-       3.000    20.667
-       4.000    26.000
-       5.000    31.600
-  ======== Test 6 ========
-  lambda-bind.cpp:129: ; method2LambdaAsFnOfA(5.0) = 41.6667
-  lambda-bind.cpp:130: ; method2LambdaAsFnOfA(6.0) = 45
-  lambda-bind.cpp:131: ; method2LambdaAsFnOfA(10.0) = 58.3333
-  lambda-bind.cpp:136: ; fobj.method2(3.0, 10.0, 4.0) = 7
-  lambda-bind.cpp:137: ; method2LambdaAsFnOfAC(3.0, 4.0) = 7
-  lambda-bind.cpp:138: ; fobj.method2(15.0, 10.0, 14.0) = 52.5
-  lambda-bind.cpp:139: ; method2LambdaAsFnOfAC(15.0, 14.0) = 52.5
-
-
-#+END_SRC
 ** OOP Simple Class
 
  - File: [[file:src/cppClasses1.cpp][file:src/cppClasses1.cpp]]
@@ -9005,7 +7389,6 @@ C++ Idioms related to Heap-Allocation:
 Debugging: 
  
  + [[https://www.eventhelix.com/RealtimeMantra/Basics/debugging_software_crashes_2.htm#.W-RbqB6YW00][Debugging Software Crashes in C and C++ - II]]
-
 ** OOP Object Lifecycle 
    :PROPERTIES:
    :ID:       69b48bc0-1b18-4997-b954-3da566a3508a
@@ -10581,7 +8964,6 @@ References:
 
  + How to correctly use std::reference_wrappers -
    <https://stackoverflow.com/questions/18127469/how-to-correctly-use-stdreference-wrappers>
-
 ** OOP Operator Overloading
 *** Overview  
 
@@ -11338,6 +9720,1621 @@ Calling the operator (<<) explicitly:
  *Further Reading* 
 
  + [[http://www.modernescpp.com/index.php/c-core-guidelines-rules-for-overloading-and-overload-operators][C++ Core Guidelines: Rules for Overloading and Overload Operators]] 
+** Lambda Expressions 
+   :PROPERTIES:
+   :ID:       02be1a97-c100-44ce-ad76-63835818d406
+   :END:
+*** Overview 
+
+Lambda expressions, also known as lambda functions or lambda
+abstractions, are ubiquitous in functional programming languages such
+as Haskell, OCaml, Scala and Scheme. They were by introduced in a
+theoretical way by Alonzo Church in the lambda calculus. Lisp was
+first programming language to use lambda functions and now this
+function programming feature has made its way into mainstream and has
+arrived to C# (Cshap), Java 8 and C++11.
+
+In C++, Lambda functions are not ordinary functions, actually, they
+are special function-objects or "C++ functors". Lambda abstractions
+can be passed as arguments to any function; returned from functions;
+can have state and also they can be defined locally at the call-site
+simplifying all the boilerplate code necessary to pass a function to
+callbacks, event handlers and higher order functions.
+
+Summary:
+
+  * Lambda functions were introduced in C++11. Before C++11 lambdas
+    were available as Boost.Lambda. 
+
+  * Lambda functions can be:
+    + returned from functions.
+    + be passed as function parameters.
+    + Can be stored in data structures.
+    + Hold state and capture variables (closure).
+    + Non-capturing lambdas can be converted to function pointers what
+      is useful with old C-APIs.
+
+  * Lambda turns C++11 is a *game changer* and turns C++ into an
+    quasi-functional programming language.
+
+  * Practical Use Cases:
+    + Callbacks
+    + Higher order functions
+    + Simplify design patterns
+    + Asynchronous code
+    + Create functions at runtime. 
+
+*Main parts* 
+ 
+ - Capture list between square brackets ~[ ]~
+ - Argument list between parenthesis ~()~
+ - Function body between curly braces ~{}~
+
+Syntax: 
+
+#+BEGIN_SRC text 
+  [capture](parameters) -> return-type {body}
+#+END_SRC
+
+Some lambda functions: 
+
+#+BEGIN_SRC cpp 
+ auto fn = [](int n){ return n * 10; }
+
+ // Test in CERN's ROOT REPL
+ >> auto fn = [](int n){ return n * 10; }
+ ((lambda) &) @0x7f5e578f2010
+ >> 
+
+ >> auto fn = [](int n){ return n * 10; }
+ ((lambda) &) @0x7f5e578f2010
+ >> 
+#+END_SRC
+
+
+*Parts of a C++'s lambda expression:*  - ([[https://msdn.microsoft.com/en-us/library/dd293608.aspx][Microsoft Inc. Lambda C++]])
+
+ 1. Capture clause - Specifies captured variables (closure).
+    - ~[ ]~ - Empty capture clause means that no variable from escope
+      is captured.
+    - ~[x, y]~- The variables x and y are captured by value and the
+      the lambda body will get a copy of x and y. They cannot be
+      modified in the body of the lambda expression. 
+    - ~[&x , y]~ - The variable x is captured by reference and y by
+      value, therefore x can be modified in the body of the lambda
+      expression and y cannot.
+    - ~[&]~ - Capture all variables used in the lambda's body by
+      reference.
+    - ~[=]~- Captures all variables used in the body by value
+      (copy). The variables cannot be modifed as they are passed by
+      value.
+    - ~[=, &blob]~- The variable blob is captured by reference and all
+      other variables are captured by value (copy).
+    - ~[this]~ - Captures the "this" pointer of the enclosing class.
+
+ 2. Parameter list (Optional)- Parameters, aka arguments, of the lambda expression.
+ 3. Mutable specification (optional)
+ 4. exception-specification (optional)
+ 5. trailing return type (optional)
+ 6. lambda-body - The body can access variables such as:
+    - Lambda parameters passed between parenthesis:  ~(int x)~
+    - Captured variables from the enclosing scope.
+    - Global variables.
+    - Class data members if the lambda expression is defined inside a
+      class. 
+
+#+BEGIN_SRC text 
+  --
+              (1)  (2)    (3)       (4)         (5)
+                 |    |         |            |           |
+                ...  ....  .....+....  ...+....     ......
+                [ ]  ( )  mutable  throw()  -> int
+                {                                                   
+                  // (6)                                              
+                  // Lambda body 
+                  int n = x + y;
+                  x = y;
+                  y  = n;
+                  return n;
+                }
+#+END_SRC
+
+*** TODO Basic Examples 
+
+*Proof-of-concept code* 
+
+ + File: [[file:src/lambdaFun.cpp][file:src/lambdaFun.cpp]]
+ + Online Compiler: http://rextester.com/SCQP30593
+
+Code Highlights:
+
+ - Lambda function - lambda1 
+
+#+BEGIN_SRC cpp 
+  // Example (1)
+  auto lambda1 = [](const std::string& str){
+     std::cout << "Lambda1: : I got the value = " << str << "\n";
+  };
+
+  // Alternative 1:
+  //------------------------------
+  std::function<void (const std::string&)> lambda1A = [](const std::string& str) {
+    std::cout << "Lambda1: : I got the value = " << str << endl;
+  };
+
+  // Alternative 2:
+  //------------------------------
+  std::function<auto (const std::string&) -> void> lambda1B = [](const std::string& str) {
+    std::cout << "Lambda1: : I got the value = " << str << endl;
+  };
+
+  // Alternative 3:
+  //------------------------------
+  // Type synonym 
+  using FnAction = std::function<void (const std::string&)>;
+  // Alternative type synonym: 
+  using FnAction = std::function<auto (const std::string&) -> void>;
+
+  FnAction lambda1C = [](const std::string& str) {
+    std::cout << "Lambda1: : I got the value = " << str << endl;
+  };
+
+  >> lambda1("hello world")
+  Lambda1: : I got the value = hello world
+
+  >> lambda1("hola mundo")
+  Lambda1: : I got the value = hola mundo
+
+  >> lambda1A("testing C++")
+  Lambda1: : I got the value = testing C++
+
+  >> lambda1B("Running lambda1B")
+  Lambda1: : I got the value = Running lambda1B
+
+  >> lambda1C("I am lambda1C function")
+  Lambda1: : I got the value = I am lambda1C function
+  >> 	
+#+END_SRC
+
+
+ - Higher order function which returns a lambda function which takes
+   two ints as parameters returning an int. This function captures the
+   parameter m by value, it means that the parameter is copied in the
+   function body. 
+
+#+BEGIN_SRC cpp 
+  // As it is in the code.
+  //-----------------------------------------	
+  std::function<int (int, int)> makeFunction1(int m){
+      return [m](int x, int y){ return m * (x + y); };
+  }
+
+  >> auto fn = makeFunction1(4)
+  (std::function<int (int, int)> &) @0x7fb73017f010
+  >> fn(3, 5)
+  (int) 32
+  >> fn(4, 3)
+  (int) 28
+  >> 
+
+  // Alternative 1:
+  //-----------------------------------------
+  auto makeFunction1A(int m) -> std::function<int (int, int)>{
+      return [m](int x, int y){ return m * (x + y); };
+  }
+
+  >> fna(3, 5)
+  (int) 32
+  >> fna(4, 3)
+  (int) 28
+  >> auto fna6 = makeFunction1A(6)
+  (std::function<int (int, int)> &) @0x7f696d823030
+  >> fna6(3, 5)
+  (int) 48
+  >> fna6(4, 3)
+  (int) 42
+  >> 
+
+  // Alternative 2:
+  //-----------------------------------------
+  auto makeFunction1B(int m) -> std::function<auto (int, int) -> int>{
+      return [m](int x, int y){ return m * (x + y); };
+  }
+
+  // Alternative 3:
+  //-----------------------------------------
+  // C++11 Type synonym
+  using BinaryIntFunctionA = std::function<int (int, int)>;
+  using BinaryIntFunctionB = std::function<auto (int, int) -> int>;
+  // Prior to C++11 type synonym
+  typedef std::function<auto (int, int) -> int> BinaryIntFunction;
+
+  auto makeFunction1C(int m) -> BinaryIntFunctionB {
+      return [m](int x, int y){ return m * (x + y); };
+  }
+
+  >> auto fnc = makeFunction1C(8)
+  (std::function<int (int, int)> &) @0x7f696d823050
+  >> fnc(3, 5)
+  (int) 64
+  >> fnc(6, 7)
+  (int) 104
+  >> 8 * (6 + 7)
+  (int) 104
+  >> 
+#+END_SRC
+
+
+Complete program output ([[file:src/lambdaFun.cpp][file:src/lambdaFun.cpp]]) : 
+
+#+BEGIN_SRC sh
+  g++ lamdaFun.cpp -o bin/lamdaFun.bin && bin/lamdaFun.bin
+
+  -----------------------------------------------------------------------------------------
+  >> Example(1) - Testing function lambda1
+  Lambda1: : I got the value = Hello
+  Lambda1: : I got the value = World
+
+  -----------------------------------------------------------------------------------------
+  >> Example(2) Testing function lambda2
+  Lambda 2 :: I got the value  = Japan
+  Lambda 2 :: I got the value  = Korea
+
+  -----------------------------------------------------------------------------------------
+  >> Example(3) Testing function lambda3
+     - Lambda function can be defined and executed at the call-site
+  Lambda 3 :: I got the value = C++11 is awesome!
+
+  -----------------------------------------------------------------------------------------
+  >> Example(4) Testing function sumLambda
+     - Lambda functions  can return values as any function.
+  sumLambda(10.0, 25.34) = 35.34
+  sumLambda(-10.23, 4.56) = -5.67
+
+  -----------------------------------------------------------------------------------------
+  >> Example(5) Testing function lamdaCapture
+     - Lambda functions  can capture its environment (closures) and have state as "function objects"
+    x  = 5  c = 3
+  lamdaCapture(2, 5)  = 32
+    x  = 5  c = 4
+    lamdaCapture(1, 2) =  16
+    x  = 5  c = 5
+
+  -----------------------------------------------------------------------------------------
+  >> Example(6) Testing function sumLambda
+     - Lambda functions  can play well with STL algorithms
+  Print all vector elements - Version 1
+    v[0] = 1
+    v[1] = 2
+    v[2] = 3
+    v[3] = 4
+    v[4] = 5
+    v[5] = 6
+    v[6] = 7
+    v[7] = 8
+  Print all vector element Version 2  - local state with 'static' keyword
+    v[0] = 1
+    v[1] = 2
+    v[2] = 3
+    v[3] = 4
+    v[4] = 5
+    v[5] = 6
+    v[6] = 7
+    v[7] = 8
+
+  -----------------------------------------------------------------------------------------
+  >> Example(7) 
+     Playing with STL transform algorithm.
+    Vector transformed =  
+  v  [0] = 4
+  v  [1] = 7
+  v  [2] = 10
+  v  [3] = 13
+  v  [4] = 16
+  v  [5] = 19
+  v  [6] = 22
+  v  [7] = 25
+
+  -----------------------------------------------------------------------------------------
+  >> Example(8) 
+     Lambda functions can be returned from functions and be generated at run-time.
+    mulSumBy2(2, 4) = 12
+    mulSumBy2(3, 1) = 8
+    mulSumBy5(2, 4) = 30
+    mulSumBy5(9, 2) = 55
+
+  -----------------------------------------------------------------------------------------
+  >> Example(9) 
+     Lambda functions can be returned from functions and have state.
+    Running dummy function
+      (*) m = 2, n = 0, x = 1, y = 3, z = 8
+    Running dummy function
+      (*) m = 2, n = 1, x = 2, y = 5, z = 15
+    Running dummy function
+      (*) m = 3, n = 0, x = 1, y = 3, z = 12
+    Running dummy function
+      (*) m = 3, n = 1, x = 2, y = 5, z = 22
+
+  -----------------------------------------------------------------------------------------
+  >> Example(10) 
+     Lambda functions can return lambda functions!!
+    addTo5(4) = 9
+    addTo5(3) = 8
+    addTo10(4) = 14
+    addTo10(3) = 13
+
+  -----------------------------------------------------------------------------------------
+  >> Example(11) 
+     Lambda functions can be passed as function arguments!
+  foldVector(dataset2, 0, add) = 28
+  foldVector(dataset2, 1, mul) = 5040
+
+  -----------------------------------------------------------------------------------------
+  >> Example(12) - Observer pattern
+  (observer 1) Temperature changed to 30.5 C
+  (observer 2) Sensor temperature changed to 30.5 C
+  (observer 1) Temperature changed to 20.5 C
+  (observer 2) Sensor temperature changed to 20.5 C
+
+#+END_SRC
+
+*References*
+
+ - *Lambda Expressions in C++* -
+   <https://msdn.microsoft.com/en-us/library/dd293608.aspx>
+
+ - *Lambda expressions (since C++11)* -
+   <http://en.cppreference.com/w/cpp/language/lambda> 
+
+ - *C++ Core Guidelines: Function Objects and Lambdas* -
+   <http://www.modernescpp.com/index.php/c-core-guidelines-function-objects-and-lambas> 
+
+ - *C++11/C++14 lambda functions - 2017* -
+   <http://www.bogotobogo.com/cplusplus/C11/C11_lambda_functions_expressions.php>
+
+ - *Lambda Functions in C++11 - the Definitive Guide* -
+   <https://www.cprogramming.com/c++11/c++11-lambda-closures.html> 
+
+ - *Fun with Lambdas: C++14 Style (part 1)* -
+   <https://www.slideshare.net/SumantTambe/fun-with-lambdas-c14-style> 
+
+ - *ICS 45C Fall 2016 - Notes and Examples: Functions and Lambdas* -
+   <http://www.ics.uci.edu/~thornton/ics45c/Notes/FunctionsAndLambdas/>
+
+ - *Creating Recursive Lambdas ... and returning them too!* -
+   <http://cpptruths.blogspot.com.br/2013/10/creating-recursive-lambdas-and.html> 
+*** Lambdas in Deep 
+
+Define two test functions: 
+
+#+BEGIN_SRC cpp 
+  >> auto add_10 = [](int x){ return x + 10; };
+  >> auto mul_3  = [](int x){ return x * 3; };
+
+  >> add_10(5)
+  (int) 15
+
+  >> mul_3(5)
+  (int) 15
+#+END_SRC
+
+The lambda objects add_10 and mul_3 can be called like functors
+(callable objects) overloading the function-call operator. 
+
+#+BEGIN_SRC cpp 
+  >> add_10.operator()(5)
+  (int) 15
+
+  >> mul_3.operator()(5)
+  (int) 15
+  >> 
+#+END_SRC
+
+Define two functions fun_add_10 and fun_mul_3; 
+
+#+BEGIN_SRC cpp 
+  >> int fun_add_10(int n){ return n + 10; }
+  >> int fun_mul_3(int n){ return n * 3; }
+
+  >> fun_add_10(2)
+  (int) 12
+
+  >> fun_add_10(5)
+  (int) 15
+
+  >> fun_mul_3(5)
+  (int) 15
+#+END_SRC
+
+Both functions have the same type and can be reffered by the same
+function-pointer: 
+
+#+BEGIN_SRC cpp 
+  >> if(typeid(fun_add_10) == typeid(fun_mul_3)) puts(" => Function have same type"); 
+  => Function have same type
+
+  >> int (* funptr)(int) = nullptr;
+
+  >> funptr = fun_add_10;
+  >> funptr(4)
+  (int) 14
+
+  >> funptr = fun_mul_3;
+  >> funptr(4)
+  (int) 12
+#+END_SRC
+
+Lambdas does not have the same type: 
+
+#+BEGIN_SRC cpp 
+  >> if(typeid(add_10) != typeid(mul_3)) puts(" => Lambdas do not have the same type");
+   => Lambdas do not have the same type
+
+  >> std::cout << std::boolalpha;
+  >> std::cout << "value = " << (typeid(add_10) != typeid(mul_3)) << std::endl;
+  value = true
+#+END_SRC
+
+Lambdas cannot be referred by the same pointer. 
+
+#+BEGIN_SRC cpp 
+  // Take the address of the object add_10 
+  >> auto ptr = &add_10;
+  >> ptr
+  ((lambda) *) @0x7ffed74b7368
+
+  // Apply to a value 
+  >> (*ptr)(4)
+  (int) 14
+  >> 
+  >> ptr->operator()(4)
+  (int) 14
+
+  // FAILURE!!! because both lambdas do not have the same type.  Attempt
+  // to assing the address of mul_3 to the pointer to add_10.
+  >> ptr = &mul_3;
+  ROOT_prompt_76:1:7: error: assigning to '(lambda at ROOT_prompt_0:1:15) *' from incompatible type '(lambda
+        at ROOT_prompt_2:1:15) *'
+  ptr = &mul_3;
+        ^~~~~~
+#+END_SRC
+
+Both objects are *add_10* and *mul_3* are instance of different anonymous
+classes created by the compiler which overloads the function-call
+operator member function. 
+
+The lambda object _add_10_ is equivalent to: 
+
+#+BEGIN_SRC cpp 
+  class _anonymous_lambda_class1
+  {
+  public:
+       int operator()(int n) const { return n + 10; }
+  };
+
+  _anonymous_lambda_class1 add_10; 
+#+END_SRC
+
+The lambda object _mul_3_ is equivalent to: 
+
+#+BEGIN_SRC cpp 
+  class _anonymous_lambda_class2
+  {
+  public:
+       int operator()(int n) const { return n * 3; }
+  };
+
+  _anonymous_lambda_class2 mul_3; 
+#+END_SRC
+
+
+The following capturing lambda is equivalent to: 
+
+#+BEGIN_SRC cpp 
+  // ----------- Capturing lambda -----------------// 
+  double x = 10; 
+  std::string name = "Somebody";
+
+  auto capture_lambda = [x, &name] (int n, const char* word) -> void 
+  {
+     printf(" n = %d ; word = %s, x = %f ; name = %s", n, word, x, name.c_str());
+  };
+
+  //--- The capturing lambda (closure) is the same as --------// 
+  // 
+  class _anonymous_lambda_class
+  {
+     double _x;
+     std::string& _name;  
+  public:     
+    _anonymous_lambda_class(double x, std::string& name): 
+       _x(x)
+     , _name(name) 
+    { 
+    }   
+
+    void operator()(int n, const char* word) const 
+    {
+       printf(" n = %d ; word = %s, x = %f ; name = %s", n, word, x, name.c_str());
+    }
+
+  } capture_lambda(x, name);
+#+END_SRC
+
+
+ *Passing lambdas as function parameters:*
+
+Both lambda objects can be passed by using templated function like in
+the following code. The function apply_function, accepts any function
+pointer with type _int (*) (int)_, any callable object (functor) that
+takes an integer and returns an integer and also lambdas that are also
+callable objects.
+
+#+BEGIN_SRC cpp 
+  template<typename TFunc> void apply_function(TFunc func, int n){    
+      for(int i = 0; i < n; ++i){
+         printf(" i = %d\n", func(i));
+      }
+  }
+#+END_SRC
+
+Passing function pointers as parameter to the templated function: 
+
+#+BEGIN_SRC cpp 
+  >> apply_function(fun_add_10, 3)
+   i = 10
+   i = 11
+   i = 12
+
+  >> apply_function(&fun_add_10, 4)
+   i = 10
+   i = 11
+   i = 12
+   i = 13
+
+  >> apply_function(fun_mul_3, 3)
+   i = 0
+   i = 3
+   i = 6
+#+END_SRC
+
+Passing lambdas, aka lambda objects as parameters to the templated
+function: 
+
+#+BEGIN_SRC cpp 
+  // Pass lambda object add_10 
+  >> apply_function(add_10, 3)
+   i = 10
+   i = 11
+   i = 12
+
+  // Pass lambda object mul_3 as parameter 
+  >> apply_function(mul_3, 3)
+   i = 0
+   i = 3
+   i = 6
+
+  >> apply_function([](int x){ return 5 * x; }, 3)
+   i = 0
+   i = 5
+   i = 10  
+#+END_SRC
+
+Passign a functor to the templated function: 
+
+#+BEGIN_SRC cpp 
+  struct AFunctor{
+     int operator()(int x) { return 4 * x + 5; }
+  };
+
+  >> afc(4)
+  (int) 21
+
+  >> afc.operator()(4)
+  (int) 21
+  >> 
+
+  >> apply_function(afc, 3)
+   i = 5
+   i = 9
+   i = 13
+
+  >> apply_function(AFunctor(), 3)
+   i = 5
+   i = 9
+   i = 13
+#+END_SRC
+
+
+As a result: 
+
+ * C++ *lambdas expressions are not functions*, as in most functional
+   languages such as Haskell, OCaml and so on. They are functors or
+   callable-objects instances of anonymous classes generated by the
+   compiler.
+
+ * Lambda expressions with the same type parameters and same return
+   type do not have the same type and cannot be assigned to the same
+   variable or referred by the same pointer.
+
+ * Lambdas can be passed as parameters by using templated
+   functions. In this case lambdas and functors are better than
+   passing function pointers as the both are most likely to be inlined
+   by the compiler removing the function-call overhead.
+
+ * The only way to store lambdas in the same container or in an
+   std::vector container is by using type-erasure or type-erasure
+   containers such as [[https://en.cppreference.com/w/cpp/utility/functional/function][std::function]].
+
+ * std::function<int (int)> is not the type of any of those lambda
+   functions.
+*** Stateful lambdas 
+
+The function-call operator member function operator()(args) of a
+lambda object is annotated with _const_, therefore it cannot modify
+captured parameters by value. 
+
+#+BEGIN_SRC cpp 
+  // Compile-time error!! 
+  auto incrementer = [n = 1]() { return ++n; };
+#+END_SRC
+
+The previous line is equivalent to: 
+
+#+BEGIN_SRC cpp 
+  // The previous line is the same as: 
+  class __Anonymous_lambda_classA {
+      int n = 1;
+  public: 
+      __Anonymous_lambda_class() = default;
+ 
+      // Function-call operator annotated as const 
+      int operator()() const 
+      {  
+         // Value n cannot be modified!! 
+         // Compiel-time error!!
+         return ++n; 
+      }
+  };
+
+  __Anonymous_lambda_classA incrementer;
+#+END_SRC
+
+The _mutable_ keyword allows variables captured by value to be modified
+in the lambda expression.
+
+#+BEGIN_SRC cpp 
+  // Now it works
+  auto incrementer = [n = 1]() mutable { return ++n; };
+
+  // Could also be written as: 
+  auto incrementer = [n = 1]() mutable -> int 
+                    {  
+                       return ++n; 
+                    };
+
+  // Could also be written as: 
+  auto incrementer = [n = 1](void) mutable -> int 
+                     { 
+                       return ++n; 
+                     };
+#+END_SRC
+
+The previous lambda expression 'incrementer' is equivalent to: 
+
+#+BEGIN_SRC cpp 
+  // The previous line is the same as: 
+  class __Anonymous_lambda_classB {
+      int n = 1;
+  public: 
+      __Anonymous_lambda_class() = default;
+ 
+      // Function-call operator non cost 
+      int operator()()  
+      {  
+         return ++n; 
+      }
+  };
+
+  __Anonymous_lambda_classB incrementer;
+#+END_SRC
+
+Test in Cling REPL: 
+
+#+BEGIN_SRC cpp 
+   $ ~/opt/cling_2018-09-16_fedora27/bin/cling -std=c++1z
+   // Now it works
+   auto incrementer = [n = 1]() mutable { return ++n; };
+   auto incrementerB = incrementer;
+
+   [cling]$ incrementer()
+   (int) 2
+   [cling]$ incrementer()
+   (int) 3
+   [cling]$ incrementer()
+   (int) 4
+   [cling]$ incrementer()
+   (int) 5
+
+   [cling]$ incrementerB()
+   (int) 2
+   [cling]$ incrementerB()
+   (int) 3
+   [cling]$ incrementerB()
+   (int) 4
+
+   [cling]$ inc()
+   (int) 6
+   [cling]$ inc()
+   (int) 7
+   [cling]$ inc()
+   (int) 8
+   [cling]$ incrementer()
+   (int) 6
+   [cling]$ 
+#+END_SRC
+
+ *Example: stateful lambda X captured variable* 
+
+Sample code: main-stateful-lambda.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+
+  int main()
+  {
+      int n = 10;
+      auto func = [n]() mutable { n = n + 1; return n; };
+
+      std::cout << " func() = " << func() << std::endl;
+      std::cout << " func() = " << func() << std::endl;
+      std::cout << " func() = " << func() << std::endl;
+      std::cout << " n = " << n << std::endl;
+      return 0;
+  }
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC sh 
+ func() = 11
+ func() = 12
+ func() = 13
+ n = 10
+#+END_SRC
+
+*** Generic lambdas C++14
+**** Overview  
+
+C++14 introduced _generic-lambdas_ language feature which allows
+defining lambda with _auto_ keyword which behaves like templated
+functions. 
+
+Papers: 
+
+  * N3559 / *Proposal for Generic (Polymorphic) Lambda Expressions*
+    + <http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2013/n3559.pdf>
+
+  * N3649 / *Generic (Polymorphic) Lambda Expressions (Revision 3)*
+    * <http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2013/n3649.html>
+
+  * *C++ lambda expressions and closures*
+    * https://core.ac.uk/download/pdf/82307163.pdf
+    * https://eel.is/c++draft/expr.prim.lambda.closure
+
+Generic lambda expression named 'print_lambda' with generic parameter a.
+
+#+BEGIN_SRC cpp 
+     auto print_lambda = [](const auto& a){ std::cout << " Value of a = " << a << '\n'; };
+
+     // Or equivalent: 
+     auto print_lambda = [](auto const& a){ std::cout << " Value of a = " << a << '\n'; };
+#+END_SRC
+
+The previous lamba is an anonymous Functor (function-object) created
+by the compiler with a templated parameter in the function-call
+operator.
+
+#+BEGIN_SRC cpp 
+  // Anonymous functor 
+  class __Anonymous_generic_lambda
+  {
+  public: 
+     template<typename T>
+     void operator(const T& a)
+     {  
+         std::cout << " Value of a = " << a << '\n';
+     }
+  };
+#+END_SRC
+**** Example 1 - Basic Generic Lambdas
+
+File: cpp-generic-lambda.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <vector>
+  #include <string>
+  #include <algorithm>
+
+  template<typename iterable, typename Callable>
+  void custom_algorithm(iterable const& seq, Callable func)
+  {
+      for(auto const& x: seq) func(x);
+  }
+
+  int main(int argc, char** argv)
+  {
+      auto print_lambda = [](auto a){ std::cout << " Value of a = " << a << '\n'; };
+
+      std::puts(" ---------- Apply to single argument ---------------");
+      print_lambda(10);
+      print_lambda('x');
+      print_lambda("<generic-lambda-on-the-rocks!>");
+
+      std::puts("\n ---- Apply to integer vector / st::for_each ------------");
+      std::vector<int> xs{10, 2, 5, 9};
+      std::for_each(xs.begin(), xs.end(), print_lambda);
+
+      std::puts("\n -- [1] Apply to string vector / std::for_each ------------");
+      std::vector<std::string> words = {"C++",  "ADA", "RUST", "DLang", "Dart" };
+      std::for_each(words.begin(), words.end(), print_lambda);
+
+      std::puts("\n -- [2] Apply to string vector / std::for_each ------------");
+
+      int i = 0;
+      // Capturing lambda defined at call-site.
+      std::for_each(words.begin(), words.end(),
+                    [&i](auto const& x){
+                          std::cout << " x[" << i++ << "] = " << x << '\n';
+                    });
+
+      std::puts("\n - Generic lambda with custom algorithm ----------------");
+      custom_algorithm(xs, print_lambda);
+
+     return 0;
+  }
+#+END_SRC
+
+Building: 
+
+#+BEGIN_SRC sh 
+  $ g++  cpp-generic-lambda.cpp -o app1.bin -std=c++1z -Wall -ggdb
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC sh 
+  $ ./app1.bin 
+   ---------- Apply to single argument ---------------
+   Value of a = 10
+   Value of a = x
+   Value of a = <generic-lambda-on-the-rocks!>
+
+   ---- Apply to integer vector / st::for_each ------------
+   Value of a = 10
+   Value of a = 2
+   Value of a = 5
+   Value of a = 9
+
+   -- [1] Apply to string vector / std::for_each ------------
+   Value of a = C++
+   Value of a = ADA
+   Value of a = RUST
+   Value of a = DLang
+   Value of a = Dart
+
+   -- [2] Apply to string vector / std::for_each ------------
+   x[0] = C++
+   x[1] = ADA
+   x[2] = RUST
+   x[3] = DLang
+   x[4] = Dart
+
+   - Generic lambda with custom algorithm ----------------
+   Value of a = 10
+   Value of a = 2
+   Value of a = 5
+   Value of a = 9
+
+#+END_SRC
+**** Example 2 - Generic lambdas and templates 
+
+Generic lambdas work in a similar way to templated functions or
+classes. A lambda generic expression can be applied to any type
+satisfying its type requirements (concepts). In the following code,
+the generic lambda _mygen_lambda1_ which is similar to the functor
+_functor1_, can be applied to any class or type with members _get_param_
+and _get_name_ regardless of its class hierarchy. It works in a similar
+way to *duck typing* of dynamic languages such as Python, Ruby,
+JavaScript and so on. The difference for dynamic typed languages is
+that, if the type does not satisfy the requirements of the generic
+lambda, a compile-time error will happen.
+
+File: generic-lambda2.cpp 
+
+#+BEGIN_SRC cpp 
+   #include <iostream>
+   #include <vector>
+   #include <string>
+   #include <algorithm>
+
+   struct Circle
+   {
+       int rad = 0;
+
+       std::string get_name(){ return "circle"; }
+
+       void set_parameter(int rad)
+       {
+           std::printf("[INFO] Circle parameter set to %d \n", rad);
+           this->rad = rad;
+       }
+       int get_param() const {return rad; }
+   };
+
+   class Gearbox
+   {
+       int x = 10;
+    public:
+       std::string get_name(){ return "gearbox"; }
+
+       void set_parameter(int x)
+       {
+           std::printf("[INFO] Gearbox parameter set to %d \n", x);
+           this->x = x;
+       }
+
+       int get_param() const {return x; }
+
+       void dummy_non_common_method() { }
+   };
+
+   // The generic lambda mygen_lambda1 is similar to this
+   // templated functor.
+   struct functor1
+   {
+       template<typename T>
+       void operator()(T& obj, int k)
+       {
+           std::cout << " Object name = " << obj.get_name() << "\n";
+           obj.set_parameter(k);
+           std::cout << " Parameter set to " << k << "\n";
+       }
+   };
+
+
+   int main(int argc, char** argv)
+   {
+       auto mygen_lambda1 = [](auto& obj, int k){
+           std::cout << " Object name = " << obj.get_name() << "\n";
+           obj.set_parameter(k);
+           std::cout << " Parameter set to " << k << "\n";
+       };
+
+       std::puts("\n --- Apply lambda on Circle object ");
+       Circle c1;
+       mygen_lambda1(c1, 5);
+
+       std::puts("\n --- Apply lambda on Gearbox object ");
+       Gearbox g1;
+       mygen_lambda1(g1, 9);
+
+       std::puts("\n --- Apply functor on Gearbox object ");
+       functor1 fun1;
+       fun1(g1, 9);
+
+           return 0;
+   }
+
+#+END_SRC
+
+Program output: 
+
+#+BEGIN_SRC sh 
+   --- Apply lambda on Circle object 
+   Object name = circle
+  [INFO] Circle parameter set to 5 
+   Parameter set to 5
+
+   --- Apply lambda on Gearbox object 
+   Object name = gearbox
+  [INFO] Gearbox parameter set to 9 
+   Parameter set to 9
+
+   --- Apply functor on Gearbox object 
+   Object name = gearbox
+  [INFO] Gearbox parameter set to 9 
+   Parameter set to 9
+
+#+END_SRC
+*** Self-executable lambda for complex initialization 
+
+Self-executable lambdas functions can also be used for performing
+complex local or global static variables initialization.
+
+
+ *Example 1:* Initialization of global variables.
+
+ + Online compiler: https://rextester.com/CHRT64707
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <cstdio>
+
+  class AClass{
+  private:
+      double x, y, z;	
+  public:
+      AClass(): x(0), y(0), z(0) { }
+      ~AClass(){
+         std::printf("Object deleted\n");
+      }
+      void setX(double x){ this->x = x; }
+      void setY(double y){ this->y = y; }
+      void setZ(double z){ this->z = z; }
+      void show(){
+         std::printf("AClass{ x = %.3f ; y = %.3f ; z = %.3f}\n", x, y, z);
+      }	
+  };
+
+  AClass globalObject =
+      [](){
+          AClass cls;
+          cls.setX(10.0);
+          cls.setY(20.0);
+          cls.setZ(15.0);
+          cls.show();
+          return cls;
+      }();
+
+  int main(){
+      std::cout << "Program Initialized" << std::endl;
+      globalObject.show();
+      std::cout << "Program end" << std::endl;
+      return 0;
+  }
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC text 
+  $ clang++ init1.cpp -o init1.bin -g -std=c++1z -Wall -Wextra
+  $ ./init1.bin
+
+  AClass{ x = 10.000 ; y = 20.000 ; z = 15.000}
+  Program Initialized
+  AClass{ x = 10.000 ; y = 20.000 ; z = 15.000}
+  Program end
+  Object deleted
+#+END_SRC
+
+
+ *Example 2:* Initialization of function static variables.
+
+ - Online compiler: https://rextester.com/RIGN6626
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+  #include <map>
+
+  int getDayOfWeekNum2(const std::string& weekDay){
+      // Type alias / synonym 
+      using WeekDayTable = std::map<std::string, int>;
+      static WeekDayTable week_table =
+               [](){ // Lambda function
+                  std::cerr << " [LOG] Initializing month table" << "\n";
+                  WeekDayTable tbl;
+                  tbl["Sun"] = 1;
+                  tbl["Mon"] = 2;
+                  tbl["Tue"] = 3;
+                  tbl["Wed"] = 4;
+                  tbl["Thu"] = 5;
+                  tbl["Fri"] = 6;
+                  tbl["Sat"] = 7;
+                  std::cerr << " [LOG] Month table initialization end. OK." << "\n";
+                  return tbl;
+          }();
+      if(week_table.find(weekDay) != week_table.end())
+         return week_table[weekDay];	
+      return -1;
+  }
+  int main(){
+      std::cout << "getDayOfWeekNum2(Mon)   = " << getDayOfWeekNum2("Mon")   << "\n";
+      std::cout << "getDayOfWeekNum2(Tue)   = " << getDayOfWeekNum2("Tue")   << "\n";
+      std::cout << "getDayOfWeekNum2(Sat)   = " << getDayOfWeekNum2("Sat")   << "\n";
+      std::cout << "getDayOfWeekNum2(ERROR) = " << getDayOfWeekNum2("ERROR") << "\n";
+      return 0;
+  };
+#+END_SRC
+
+Output stderr (Program logging)
+
+#+BEGIN_SRC txt 
+ [LOG] Initializing month table
+ [LOG] Month table initialization end. OK.
+#+END_SRC
+
+Output stdout (Program output) 
+
+#+BEGIN_SRC txt 
+  getDayOfWeekNum2(Mon)   = 2
+  getDayOfWeekNum2(Tue)   = 3
+  getDayOfWeekNum2(Sat)   = 7
+  getDayOfWeekNum2(ERROR) = -1
+#+END_SRC
+*** Universal function adapter - std::bind 
+**** Overview
+
+The operator std::bind can simplify help simplifying turning ordinary
+functions, instance methods (member functions) and static methods
+(static member functions) into ordinary functions.
+
+Example 1: Turn a function of signature: 
+  + Input Signature:
+    + double functionABC(double a, double c, double c)
+  + Target signature: 
+    + function<double (double)> 
+
+For the function functionABC
+
+#+BEGIN_SRC cpp 
+  double functionABC(double a, double c, double c);
+#+END_SRC
+
+The expression:
+
+#+BEGIN_SRC cpp 
+ // Type of fnFunOfA is std::function<double (double)>
+ auto fnFunOfA = std::bind(functionABC, _1, 10.0, 20.0)
+ // It is the same as 
+ auto fnFunOfA = [](double x){ return functionABC(x, 10.0, 20.0); };
+ // It also equivalent to 
+ std::function<double (double)> fnFunOfA = [](double x){ return functionABC(x, 10.0, 20.0); };
+#+END_SRC
+
+So, it follows that: 
+
+#+BEGIN_SRC cpp 
+  auto fnFunOfB = std::bind(functionABC, 25.0 , _1, 20.0);
+  // It is equivalent to 
+  auto fnFunOfB = [](double x){ return (functionABC, 25.0 , _1, 20.0); };
+#+END_SRC
+
+By using more lambda placeholders it is also possible to generate
+multi variable functions: 
+
+#+BEGIN_SRC cpp 
+  #include <functional> 
+  using namespace std::placeholders; // Import placeholders, _1, _2, _3 ...  
+
+  //----------------------------------//
+  auto fnFunOfAB = std::bind(functionABC, _1 , _2, 20.0);
+  // Equivalent to 
+  auto fnFunOfAB = [](double x, double y){ return functionABC( x , y, 20.0);};
+
+  //----------------------------------//
+  auto fnFunOfAC = std::bind(functionABC, _1 , 10.0, _2);
+  // Equivalent to 
+  auto fnFunOfAC = [](double x, double y){ return functionABC( x , 10.0, y);};
+
+  //----------------------------------//
+  auto fnFunOfABC = std::bind(functionABC, _1 , 10.0, _2);
+  // Equivalent to 
+  auto fnFunOfABC = [](double x, double y, double z){ return functionABC( x , y, z);};
+#+END_SRC
+
+
+ *Binding non-static methods (member function)*
+
+For the following class:
+
+#+BEGIN_SRC cpp 
+ struct FunctionObject{
+      double x;
+      double y;
+      FunctionObject(double x, double y): x(x), y(y) {};      
+      double operator ()(double a){   
+         return a * a;
+      }   
+      double operator ()(double a, double b, double c){
+          return a * x + b * y + c / (x + y);
+      }
+      double method1(double a){
+          return this->x * a  + this->y / a;
+      }
+      double method2(double a, double b, double c){
+          return  c * (a / x + b / y);
+      }       
+  };
+#+END_SRC
+
+It is possible to create lambda functions from those class methods
+(member functions):
+
+#+BEGIN_SRC cpp 
+  FunctionObject obj;
+
+  //-------------------------
+  auto method1LambdaA = std::bind(&FunctionObject::method1, fobj, _1);
+  // Equivalent to: 
+  auto method1LambdaA = [&obj](double a){return obj.method1(x); };
+
+  //-------------------------
+  auto method2LambdaAsFnOfAC = std::bind(&FunctionObject::method2, &fobj, _1, 10.0, _2);
+  // Equivalent to: 
+  auto method2LambdaAsFnOfAC = [&obj](double a, double c){ return obj.method2(a, 10.0, c); }
+
+  //-------------------------
+  auto functionOfObj = std::bind(&FunctionObject::method1, _1, 10.0);
+  // Equivalent to: 
+  auto functionOfobj = [](FunctionObject a){ return obj.method1(obj, 10.0);};
+#+END_SRC
+
+**** std::bind Example 
+     :PROPERTIES:
+     :ID:       219c4de9-3e9e-446f-bdd5-1ae6e7d45b5b
+     :END:
+
+File: 
+ +  [[file:src/lambda-bind.cpp][file:src/lambda-bind.cpp]]
+
+Running: 
+
+#+BEGIN_SRC sh 
+  $ g++ lambda-bind.cpp -o lambda-bind.bin -g -std=c++11 -Wall -Wextra -ldl 
+  $ ./lambda-bind.bin
+
+  ======== Test 1 ========
+  lambda-bind.cpp:58: ; sum10(2.0) = 12
+  lambda-bind.cpp:59: ; sum10(4.5) = 14.5
+  lambda-bind.cpp:60: ; sum10(25.0) = 35
+  ======== Test 2 ========
+  lambda-bind.cpp:66: ; vectorLenAsFunctionOfX(4.0) = 27.2213
+  lambda-bind.cpp:67: ; std::bind(vectorLength, _1, 10.0, 25.0)(4.0) = 27.2213
+  lambda-bind.cpp:68: ; vectorLenAsFunctionOfX(10.0) = 28.7228
+  lambda-bind.cpp:69: ; std::bind(vectorLength, _1, 10.0, 25.0)(10.0) = 28.7228
+  Tabulating - vectorLenAsFunctionOfX
+       1.000    26.944
+       2.000    27.000
+       3.000    27.092
+       4.000    27.221
+       5.000    27.386
+  ======== Test 3 ========
+  lambda-bind.cpp:77: ; vectorLenAsFunctionOfY(14.0) = 30.348
+  lambda-bind.cpp:78: ; vectorLenAsFunctionOfY(20.0) = 33.541
+  Tabulating - vectorLenAsFunctionOfY
+       1.000    26.944
+       2.000    27.000
+       3.000    27.092
+       4.000    27.221
+       5.000    27.386
+  ======== Test 4 ========
+  lambda-bind.cpp:92: ; vectorLenAsFunctionOfYZ(3.0, 6.0) = 12.0416
+  lambda-bind.cpp:93: ; vectorLenAsFunctionOfYZ(15.0, 26.0) = 31.6386
+  ======== Test 5 ========
+  lambda-bind.cpp:97: ; fobj(4.0) = 16
+  lambda-bind.cpp:98: ; fobj(5.0) = 25
+  lambda-bind.cpp:99: ; fobj(10.0) = 100
+  lambda-bind.cpp:101: ; fobj(4.0, 10.0, 5.0) = 104.357
+  lambda-bind.cpp:102: ; fobj(6.0, 8.0, 9.0) = 100.643
+  Running: tabulate(0.0, 5.0, 1.0, fobj)
+       0.000     0.000
+       1.000     1.000
+       2.000     4.000
+       3.000     9.000
+       4.000    16.000
+       5.000    25.000
+  Turning class member function into lambda function 
+   Note: it is not possible (0.0, 5.0, 1.0, fobj.method1)
+  lambda-bind.cpp:111: ; fobj.method1(10.0) = 60.8
+  lambda-bind.cpp:112: ; method1LambdaA(10.0) = 60.8
+  lambda-bind.cpp:113: ; fobj.method1(20.0) = 120.4
+  lambda-bind.cpp:114: ; method1LambdaA(20.0) = 120.4
+  lambda-bind.cpp:115: ; fobj.method1(30.0) = 180.267
+  lambda-bind.cpp:116: ; method1LambdaA(30.0) = 180.267
+  Tabulating method1LambdaA
+       0.000       inf
+       1.000    14.000
+       2.000    16.000
+       3.000    20.667
+       4.000    26.000
+       5.000    31.600
+  Tabulating method1LambdaA using direct lambda
+       0.000       inf
+       1.000    14.000
+       2.000    16.000
+       3.000    20.667
+       4.000    26.000
+       5.000    31.600
+  ======== Test 6 ========
+  lambda-bind.cpp:129: ; method2LambdaAsFnOfA(5.0) = 41.6667
+  lambda-bind.cpp:130: ; method2LambdaAsFnOfA(6.0) = 45
+  lambda-bind.cpp:131: ; method2LambdaAsFnOfA(10.0) = 58.3333
+  lambda-bind.cpp:136: ; fobj.method2(3.0, 10.0, 4.0) = 7
+  lambda-bind.cpp:137: ; method2LambdaAsFnOfAC(3.0, 4.0) = 7
+  lambda-bind.cpp:138: ; fobj.method2(15.0, 10.0, 14.0) = 52.5
+  lambda-bind.cpp:139: ; method2LambdaAsFnOfAC(15.0, 14.0) = 52.5
+
+
+#+END_SRC
+** Functor Function-Object and higher order functions 
+
+Functor is any object which behaves like a function and callable like
+a function. Unlike C++ ordinary functions, functors can have internal
+state and change its internal data as well.
+
+Functors are implementing in C++ by overloading the function
+application operator. 
+
+The code in the file: [[file:src/cpp-functor.cpp][file:src/cpp-functor.cpp]] shows an
+exhaustive example about how to implement, use functors and implement
+client code using dynamic polymorphism (aka subtyping or inheritance),
+static polymorphism (aka template metaprogramming) and C++11's
+function type _std::function_.
+
+Example: 
+ + File:            [[file:src/cpp-functor.cpp][file:src/cpp-functor.cpp]] 
+ + Online Compiler: http://rextester.com/VGE78113
+
+ + Math functor interface class representing a general math function. 
+
+#+BEGIN_SRC cpp  
+  class IMathFunctor {
+  public:
+          // Pure virtual function
+          // => const -> Means that the function cannot change the object internal state.
+          // => (= 0) -> Means abstract member function or abstract method.
+          virtual double operator()(double x)	const = 0;
+          virtual ~IMathFunctor() = default;
+  };
+#+END_SRC
+
+ - Linear Function "C++ functor." - function-object 
+
+#+BEGIN_SRC cpp 
+  /** Linear Function "C++ functor." - function-object 
+   ,*   LinFun(x) = A * x + B
+   ,*/
+  class LinFun: public IMathFunctor {
+  private:
+          // Linear coefficient or line slope 
+          double _a; 
+          double _b;
+  public:
+          LinFun(double a, double b): _a(a), _b(b){}
+          auto getA()				-> double   { return _a;}
+          auto setA(double a)			-> void	    { _a = a; }
+          auto getB()				-> double   { return _b;}
+          auto setB(double b)			-> void	    { _b = b; }
+
+          // Function-call operator => Makes this object callable
+          //------------------------------
+          // double operator()(double x)	-> double	{ return _a * x + _b;}	
+          double operator()(double x)	const { return _a * x + _b;}	
+  };
+#+END_SRC
+
+Usage: 
+
+#+BEGIN_SRC cpp 
+  // Function linear object - modelling a linear function 3 * x + 4.0 
+  LinFun fun1(3.0, 4.0);
+  std::cout << "a = " << fun1.getA() << " ; b = " << fun1.getB() << nl;
+  std::cout << "fun1(3.0) = " << fun1(3.0) << nl;  
+  std::cout << "fun1(4.0) = " << fun1(4.0) << nl;
+#+END_SRC
+
+Output: 
+
+#+BEGIN_SRC text 
+  a = 3 ; b = 4
+  fun1(3.0) = 13
+  fun1(4.0) = 16
+  fun1(5.0) = 19
+#+END_SRC
+
+
+Higher order functions (functions that calls or return functions) can
+be implemented using dynamic polymorphis or inheritance; static
+polymorphism, also known as template metaprogramming and using the
+type std::function from C++11.
+
+
+ - *Higher order function using dynamic polymorphism*
+   (inheritance). This function only accepts implementations of
+   IMathFunctor and cannot worth with an arbitrary function-object,
+   ordinary functions or C++11 lambda function. Another drawback is
+   the runtime overhead of virtual function-calls.
+
+Example:
+
+#+BEGIN_SRC cpp 
+  void tabulateDynamic(const IMathFunctor& fun, double start, double stop, double step){
+          std::cout << std::fixed << std::setprecision(3);
+          for(double x = start; x <= stop ; x += step)
+                  std::cout << std::setw(10) << x << std::setw(10) << fun(x) << "\n";
+  }
+#+END_SRC
+
+Usage:
+
+#+BEGIN_SRC cpp 
+    tabulatDynamic(fun1, 0.0, 5.0, 1.0);
+#+END_SRC
+
+Sample Output: 
+
+#+BEGIN_SRC text 
+  -----> Tabulating fun1
+      0.000     4.000
+      1.000     7.000
+      2.000    10.000
+      3.000    13.000
+      4.000    16.000
+      5.000    19.000
+#+END_SRC
+
+ - *Higher order function using static polymorphism* - The advantage
+   of this function is that it can work with any callable object like
+   functors (function-objects), ordinary functions and C++11 lambda
+   functions. Another benefit is the lower runtime overhead than the
+   implementation using dynamic polymorphism. For this case, the
+   runtime cost of dynamic polymorphism is not significant, however it
+   can become noticeable on large scale computation or high
+   performance computations.
+
+ - Example:
+
+#+BEGIN_SRC cpp 
+  template<class Function>
+  void tabulateStatic(const Function& fun, double start, double stop, double step){
+          std::cout << std::fixed << std::setprecision(3);
+          for(double x = start; x <= stop ; x += step)
+                  std::cout << std::setw(10) << x << std::setw(10) << fun(x) << "\n";
+  }
+#+END_SRC
+
+Usage:
+
+#+BEGIN_SRC cpp 
+    std::cout << " -----> Tabulating fun1" << nl;
+    tabulateStatic(fun1, 0.0, 5.0, 1.0);
+    std::cout << " -----> Tabulating fun2" << nl;
+    tabulateStatic(fun2, 0.0, 5.0, 1.0);
+#+END_SRC
+
+
+ - *Higher order function using the C++11 type std::function* - The type
+   std::function provides type erasure and can work with any functor,
+   ordinary function and C++11 lambda functions, in addition it also
+   allows all those types of functions to be stored in STL containers.
+
+Example: 
+
+#+BEGIN_SRC cpp 
+  void tabulateLambdaList(
+        const std::vector<std::function<double (double)>> funlist
+       ,double start
+       ,double stop
+       ,double step
+       ){
+       std::cout << std::fixed << std::setprecision(3);
+       for(double x = start; x <= stop ; x += step){
+               std::cout << std::setw(10) << x;
+               // const auto& is used for avoid uncessary copies 
+               for(const auto& fun: funlist)
+                       std::cout << std::setw(10) << fun(x);
+               std::cout << "\n";
+       }
+  }
+#+END_SRC
+
+Usage:
+
+#+BEGIN_SRC cpp 
+   tabulateLambdaList({fun1, fun2, exp, ordinaryFunction}, 0.0, 5.0, 1.0)
+#+END_SRC
+
+Output:
+
+#+BEGIN_SRC text 
+         x         fun1     fun2      exp      ordinaryFunction
+       0.000     4.000     4.000     1.000     0.000
+       1.000     7.000     9.000     2.718     3.000
+       2.000    10.000    18.000     7.389     6.000
+       3.000    13.000    31.000    20.086     9.000
+       4.000    16.000    48.000    54.598    12.000
+       5.000    19.000    69.000   148.413    15.000
+#+END_SRC
+
+Compilation of [[file:src/cpp-functor.cpp][file:src/cpp-functor.cpp]] 
+
+#+BEGIN_SRC sh 
+  $ clang++ cpp-functor.cpp -o cpp-functor.bin -g -std=c++11 -Wall -Wextra &&
+#+END_SRC
+
+Complete program output of [[file:src/cpp-functor.cpp][file:src/cpp-functor.cpp]] 
+
+#+BEGIN_SRC sh 
+  ./cpp-functor.bin
+
+  a = 3 ; b = 4
+  fun1(3.0) = 13
+  fun1(4.0) = 16
+  fun1(5.0) = 19
+  =======================
+  a = 2 ; b = 3 ; c = 4
+  fun2(3.0) = 31
+  fun2(4.0) = 48
+  fun2(5.0) = 69
+  ======= [1] Client Code using dynamic polymorphism  ================
+   -----> Tabulating fun1
+       0.000     4.000
+       1.000     7.000
+       2.000    10.000
+       3.000    13.000
+       4.000    16.000
+       5.000    19.000
+   -----> Tabulating fun2
+       0.000     4.000
+       1.000     9.000
+       2.000    18.000
+       3.000    31.000
+       4.000    48.000
+       5.000    69.000
+  ======= [2] Client Code using dynamic polymorphism  ================
+       0.000     4.000     4.000
+       1.000     7.000     9.000
+       2.000    10.000    18.000
+       3.000    13.000    31.000
+       4.000    16.000    48.000
+       5.000    19.000    69.000
+  ======= Client Code using static polymorphism (template)  ================
+   -----> Tabulating fun1
+       0.000     4.000
+       1.000     7.000
+       2.000    10.000
+       3.000    13.000
+       4.000    16.000
+       5.000    19.000
+   -----> Tabulating fun2
+       0.000     4.000
+       1.000     9.000
+       2.000    18.000
+       3.000    31.000
+       4.000    48.000
+       5.000    69.000
+   -----> Tabulating lambda function f(x) = x * x
+       0.000     0.000
+       1.000     1.000
+       2.000     4.000
+       3.000     9.000
+       4.000    16.000
+       5.000    25.000
+   -----> Tabulating ordinary function f(x) = 3 * x
+       0.000     0.000
+       1.000     3.000
+       2.000     6.000
+       3.000     9.000
+       4.000    12.000
+       5.000    15.000
+   -----> Tabulating ordinary function f(x) = exp(x)
+       0.000     1.000
+       1.000     2.718
+       2.000     7.389
+       3.000    20.086
+       4.000    54.598
+       5.000   148.413
+  ======= Client Code using C++11 lambda std::function  ================
+       0.000     4.000     4.000     1.000     0.000
+       1.000     7.000     9.000     2.718     3.000
+       2.000    10.000    18.000     7.389     6.000
+       3.000    13.000    31.000    20.086     9.000
+       4.000    16.000    48.000    54.598    12.000
+       5.000    19.000    69.000   148.413    15.000
+#+END_SRC
 ** TODO OOP Multiple Inheritance
 *** Ambiguity resolution 
 
