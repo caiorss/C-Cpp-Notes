@@ -4055,7 +4055,7 @@ Benefits summary:
      * Eliminates the need for cryptic SFINAE tricks which improves
        the code readability and maintainability.
 
-Related headers files and documentation:
+Related documentation:
 
   + [[https://en.cppreference.com/w/cpp/language/constraints][Constraints and concepts (since C++20) - cppreference.com]]
 
@@ -4063,11 +4063,25 @@ Related headers files and documentation:
 
   + [[https://github.com/isocpp/CppCoreGuidelines/blob/master/CppCoreGuidelines.md#tcon-use-concept-use][CppCore Guidelines Concepts]]
 
-  + [[http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0734r0.pdf][P0734R0 - Wording Paper, C++ extension for Concepts]]
+  + [[https://www.modernescpp.com/index.php/c-core-guidelines-rules-for-the-usage-of-concepts-2][C++ Core Guidelines: Rules for the Usage of Concepts - ModernesCpp.com]] 
 
-Headers:
+Headers files (CppReference):
+
    +  [[https://en.cppreference.com/w/cpp/header/concepts][<concepts>]] =>> Standard library concepts
    +  [[https://en.cppreference.com/w/cpp/header/type_traits][<type_traits>]] =>> Type metafunctions for performing computation on types.
+
+
+Papers:
+
+  + [[http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0734r0.pdf][P0734R0 - Wording Paper, C++ extension for Concepts]]
+
+  + [[http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2013/n3701.pdf][N3701 - Concepts Lite]] - Andrew Sutton, Bjarne Stroustrup, Gabriel
+    Dos Reis - Texas A&M University.
+
+  + [[https://www.stroustrup.com/good_concepts.pdf][P0557R1 - Concepts the Future of Generic programming]] - Bjarne
+    Stroustrup - Morgan Stanley and Columbia University.
+
+  + [[http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2015/n4502.pdf][N4502 - Proposing Standard Library Supoort for the C++ Detection Idiom v2]] 
 
 *** Concepts as type predicates
 
@@ -4190,8 +4204,7 @@ results in compile-time error.
   }
 #+END_SRC
 
-
-*** Defining concepts from type predicates
+*** Concepts from type predicates
 
 Simple concepts can be defined from custom type predicates or type
 predicates from the header. The concept IntegralA and IntegralB, which
@@ -4326,6 +4339,181 @@ multiple concepts:
 
 
 
+*** Compiling code with C++20 concepts
+
+Sample code containing concepts and template type constraints
+(requires): 
+
+ + File: concepts1.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string> 
+  #include <sstream>
+  #include <concepts>
+   // #include <utility>
+
+  template<typename T>
+  concept CallableObject = requires(T obj) {
+     { obj() } -> std::same_as<void>;
+   
+  };
+
+  /* Templated function wihout concepts */
+  template<typename T>
+  void dotimes_a(int n, T&& func)
+  {
+    for(int i = 0; i < n; i++) { func(); }
+  }
+
+  /** Templated function with concepts */
+  template<CallableObject T>
+  void dotimes_b(int n, T&& func)
+  {
+    for(int i = 0; i < n; i++) { func(); }
+  }
+
+  /** Templated function with type constraint */
+  template<typename T> requires CallableObject<T>
+  void dotimes_c(int n, T&& func)
+  {
+    for(int i = 0; i < n; i++) { func(); }
+  }
+
+
+  /** Matches any type for which 
+    ,* the friend function (<<) is defined. 
+    ,*/
+  template<typename T> 
+  concept Printable = requires(T x){
+    { std::cout << x };                            
+  };
+
+  template<typename T> requires Printable<T>
+  std::string to_string(T const& obj)
+  {
+     std::stringstream ss;
+     ss << obj;
+     return ss.str();
+  }
+
+  struct LinFun{
+    double a; 
+    double b; 
+  
+    double operator()(double x) const { return a * x + b; } 
+  
+    friend std::ostream& operator<<(std::ostream& os, LinFun const& obj)
+    {
+       return os << " Linfun => a = " << obj.a << " ; b = " << obj.b ;
+    }
+  };
+
+  int main(){
+
+    std::puts(" ======== [INFO] Started Ok. ===================");
+
+    // Causes compile-time error, when concept is not satisfied 
+    // static_assert( Printable<decltype(std::cout)>   ); => STATIC ASSERTION FAILURE 
+    static_assert( Printable<int>         );
+    static_assert( Printable<std::string> );
+    static_assert( Printable<double>      );
+    static_assert( Printable<LinFun>      );
+
+
+    // Evaluated at compile-time: 
+    if constexpr ( Printable<LinFun> )
+    {
+       std::cout << " Type LinFun models the concept Printable<T> \n";
+       auto q = LinFun{4, 5};
+       std::string s = to_string( q );
+       s = " Function: "  + s + " => functor(5.64) =  " +  std::to_string(q(5.64));
+       std::cout << " s => " << s << '\n';                                                                         
+     
+    } 
+
+    std::cout << " Object = " << to_string(LinFun{4, 5}) << "\n\n";
+  
+    int n = 5;
+
+    int a = 0; 
+    auto lamb1 = [&a](){ std::cout << " [A] i = " << a++ << "\n"; };
+    dotimes_a(n, lamb1);
+    static_assert( CallableObject<decltype(lamb1)> );
+ 
+    // static_assert( CallableObject<int> );
+
+    int b = 0; 
+    dotimes_b(n, [&b](){ 
+       std::cout << " [B] i = " << b++ << "\n";   
+    });
+
+    int c = 0; 
+  
+    dotimes_b(n, [&c](){ 
+       std::cout << " [C] i = " << c++ << "\n";   
+    });
+
+    return 0;
+  }
+#+END_SRC
+
+Current compilers information: 
+
+#+BEGIN_SRC sh
+   # GNU GCC (G++) Version
+   $ >> g++ --version
+   g++ (GCC) 10.1.1 20200507 (Red Hat 10.1.1-1)
+   Copyright (C) 2020 Free Software Foundation, Inc.
+   This is free software; see the source for copying conditions.  There is NO
+   warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+  # Clang++ LLVM Version 
+   $ >> clang --version
+   clang version 10.0.0 (Fedora 10.0.0-2.fc32)
+   Target: x86_64-unknown-linux-gnu
+   Thread model: posix
+   InstalledDir: /usr/bin
+
+#+END_SRC
+
+Building: 
+
+#+BEGIN_SRC sh 
+  # Built on Linux Fedora 32 (x86-64 64 bits)
+
+  # Building with GCC (GNU C/C++ Compiler)
+  $ >> g++ concepts-basic.cpp -o out.bin -std=c++2a -ggdb -Wall -Wextra 
+
+  # Building with Clang++ LLVM compiler 
+  $ >> clang++ concepts-basic.cpp -o out2.bin -std=c++2a -ggdb -Wall -Wextra
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC sh 
+   $ >> ./out.bin 
+   ======== [INFO] Started Ok. ===================
+   Type LinFun models the concept Printable<T> 
+   s =>  Function:  Linfun => a = 4 ; b = 5 => functor(5.64) =  27.560000
+   Object =  Linfun => a = 4 ; b = 5
+
+   [A] i = 0
+   [A] i = 1
+   [A] i = 2
+   [A] i = 3
+   [A] i = 4
+   [B] i = 0
+   [B] i = 1
+   [B] i = 2
+   [B] i = 3
+   [B] i = 4
+   [C] i = 0
+   [C] i = 1
+   [C] i = 2
+   [C] i = 3
+   [C] i = 4
+#+END_SRC
 ** References and Bookmarks 
 *** General  
 
