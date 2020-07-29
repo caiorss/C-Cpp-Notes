@@ -1,0 +1,1086 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<!-- 2020-07-29 Wed 17:32 -->
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Passing C++ lambdas to C-function pointer callbacks</title>
+<meta name="generator" content="Org mode" />
+<meta name="description" content="Passing C++ lambdas to C callbacks"
+ />
+<style type="text/css">
+ <!--/*--><![CDATA[/*><!--*/
+  .title  { text-align: center;
+             margin-bottom: .2em; }
+  .subtitle { text-align: center;
+              font-size: medium;
+              font-weight: bold;
+              margin-top:0; }
+  .todo   { font-family: monospace; color: red; }
+  .done   { font-family: monospace; color: green; }
+  .priority { font-family: monospace; color: orange; }
+  .tag    { background-color: #eee; font-family: monospace;
+            padding: 2px; font-size: 80%; font-weight: normal; }
+  .timestamp { color: #bebebe; }
+  .timestamp-kwd { color: #5f9ea0; }
+  .org-right  { margin-left: auto; margin-right: 0px;  text-align: right; }
+  .org-left   { margin-left: 0px;  margin-right: auto; text-align: left; }
+  .org-center { margin-left: auto; margin-right: auto; text-align: center; }
+  .underline { text-decoration: underline; }
+  #postamble p, #preamble p { font-size: 90%; margin: .2em; }
+  p.verse { margin-left: 3%; }
+  pre {
+    border: 1px solid #ccc;
+    box-shadow: 3px 3px 3px #eee;
+    padding: 8pt;
+    font-family: monospace;
+    overflow: auto;
+    margin: 1.2em;
+  }
+  pre.src {
+    position: relative;
+    overflow: visible;
+    padding-top: 1.2em;
+  }
+  pre.src:before {
+    display: none;
+    position: absolute;
+    background-color: white;
+    top: -10px;
+    right: 10px;
+    padding: 3px;
+    border: 1px solid black;
+  }
+  pre.src:hover:before { display: inline;}
+  /* Languages per Org manual */
+  pre.src-asymptote:before { content: 'Asymptote'; }
+  pre.src-awk:before { content: 'Awk'; }
+  pre.src-C:before { content: 'C'; }
+  /* pre.src-C++ doesn't work in CSS */
+  pre.src-clojure:before { content: 'Clojure'; }
+  pre.src-css:before { content: 'CSS'; }
+  pre.src-D:before { content: 'D'; }
+  pre.src-ditaa:before { content: 'ditaa'; }
+  pre.src-dot:before { content: 'Graphviz'; }
+  pre.src-calc:before { content: 'Emacs Calc'; }
+  pre.src-emacs-lisp:before { content: 'Emacs Lisp'; }
+  pre.src-fortran:before { content: 'Fortran'; }
+  pre.src-gnuplot:before { content: 'gnuplot'; }
+  pre.src-haskell:before { content: 'Haskell'; }
+  pre.src-hledger:before { content: 'hledger'; }
+  pre.src-java:before { content: 'Java'; }
+  pre.src-js:before { content: 'Javascript'; }
+  pre.src-latex:before { content: 'LaTeX'; }
+  pre.src-ledger:before { content: 'Ledger'; }
+  pre.src-lisp:before { content: 'Lisp'; }
+  pre.src-lilypond:before { content: 'Lilypond'; }
+  pre.src-lua:before { content: 'Lua'; }
+  pre.src-matlab:before { content: 'MATLAB'; }
+  pre.src-mscgen:before { content: 'Mscgen'; }
+  pre.src-ocaml:before { content: 'Objective Caml'; }
+  pre.src-octave:before { content: 'Octave'; }
+  pre.src-org:before { content: 'Org mode'; }
+  pre.src-oz:before { content: 'OZ'; }
+  pre.src-plantuml:before { content: 'Plantuml'; }
+  pre.src-processing:before { content: 'Processing.js'; }
+  pre.src-python:before { content: 'Python'; }
+  pre.src-R:before { content: 'R'; }
+  pre.src-ruby:before { content: 'Ruby'; }
+  pre.src-sass:before { content: 'Sass'; }
+  pre.src-scheme:before { content: 'Scheme'; }
+  pre.src-screen:before { content: 'Gnu Screen'; }
+  pre.src-sed:before { content: 'Sed'; }
+  pre.src-sh:before { content: 'shell'; }
+  pre.src-sql:before { content: 'SQL'; }
+  pre.src-sqlite:before { content: 'SQLite'; }
+  /* additional languages in org.el's org-babel-load-languages alist */
+  pre.src-forth:before { content: 'Forth'; }
+  pre.src-io:before { content: 'IO'; }
+  pre.src-J:before { content: 'J'; }
+  pre.src-makefile:before { content: 'Makefile'; }
+  pre.src-maxima:before { content: 'Maxima'; }
+  pre.src-perl:before { content: 'Perl'; }
+  pre.src-picolisp:before { content: 'Pico Lisp'; }
+  pre.src-scala:before { content: 'Scala'; }
+  pre.src-shell:before { content: 'Shell Script'; }
+  pre.src-ebnf2ps:before { content: 'ebfn2ps'; }
+  /* additional language identifiers per "defun org-babel-execute"
+       in ob-*.el */
+  pre.src-cpp:before  { content: 'C++'; }
+  pre.src-abc:before  { content: 'ABC'; }
+  pre.src-coq:before  { content: 'Coq'; }
+  pre.src-groovy:before  { content: 'Groovy'; }
+  /* additional language identifiers from org-babel-shell-names in
+     ob-shell.el: ob-shell is the only babel language using a lambda to put
+     the execution function name together. */
+  pre.src-bash:before  { content: 'bash'; }
+  pre.src-csh:before  { content: 'csh'; }
+  pre.src-ash:before  { content: 'ash'; }
+  pre.src-dash:before  { content: 'dash'; }
+  pre.src-ksh:before  { content: 'ksh'; }
+  pre.src-mksh:before  { content: 'mksh'; }
+  pre.src-posh:before  { content: 'posh'; }
+  /* Additional Emacs modes also supported by the LaTeX listings package */
+  pre.src-ada:before { content: 'Ada'; }
+  pre.src-asm:before { content: 'Assembler'; }
+  pre.src-caml:before { content: 'Caml'; }
+  pre.src-delphi:before { content: 'Delphi'; }
+  pre.src-html:before { content: 'HTML'; }
+  pre.src-idl:before { content: 'IDL'; }
+  pre.src-mercury:before { content: 'Mercury'; }
+  pre.src-metapost:before { content: 'MetaPost'; }
+  pre.src-modula-2:before { content: 'Modula-2'; }
+  pre.src-pascal:before { content: 'Pascal'; }
+  pre.src-ps:before { content: 'PostScript'; }
+  pre.src-prolog:before { content: 'Prolog'; }
+  pre.src-simula:before { content: 'Simula'; }
+  pre.src-tcl:before { content: 'tcl'; }
+  pre.src-tex:before { content: 'TeX'; }
+  pre.src-plain-tex:before { content: 'Plain TeX'; }
+  pre.src-verilog:before { content: 'Verilog'; }
+  pre.src-vhdl:before { content: 'VHDL'; }
+  pre.src-xml:before { content: 'XML'; }
+  pre.src-nxml:before { content: 'XML'; }
+  /* add a generic configuration mode; LaTeX export needs an additional
+     (add-to-list 'org-latex-listings-langs '(conf " ")) in .emacs */
+  pre.src-conf:before { content: 'Configuration File'; }
+
+  table { border-collapse:collapse; }
+  caption.t-above { caption-side: top; }
+  caption.t-bottom { caption-side: bottom; }
+  td, th { vertical-align:top;  }
+  th.org-right  { text-align: center;  }
+  th.org-left   { text-align: center;   }
+  th.org-center { text-align: center; }
+  td.org-right  { text-align: right;  }
+  td.org-left   { text-align: left;   }
+  td.org-center { text-align: center; }
+  dt { font-weight: bold; }
+  .footpara { display: inline; }
+  .footdef  { margin-bottom: 1em; }
+  .figure { padding: 1em; }
+  .figure p { text-align: center; }
+  .inlinetask {
+    padding: 10px;
+    border: 2px solid gray;
+    margin: 10px;
+    background: #ffffcc;
+  }
+  #org-div-home-and-up
+   { text-align: right; font-size: 70%; white-space: nowrap; }
+  textarea { overflow-x: auto; }
+  .linenr { font-size: smaller }
+  .code-highlighted { background-color: #ffff00; }
+  .org-info-js_info-navigation { border-style: none; }
+  #org-info-js_console-label
+    { font-size: 10px; font-weight: bold; white-space: nowrap; }
+  .org-info-js_search-highlight
+    { background-color: #ffff00; color: #000000; font-weight: bold; }
+  .org-svg { width: 90%; }
+  /*]]>*/-->
+</style>
+<meta name="viewport" content="width=device-width, minimum-scale=1.0, maximum-scale=1.0" />
+<link href="theme/org-nav-theme.css" rel="stylesheet">
+<script src="theme/org-nav-theme.js"></script>
+<link rel="icon" href="favicon.ico" type="image/vnd.microsoft.icon" />
+<script type="text/javascript">
+/*
+@licstart  The following is the entire license notice for the
+JavaScript code in this tag.
+
+Copyright (C) 2012-2019 Free Software Foundation, Inc.
+
+The JavaScript code in this tag is free software: you can
+redistribute it and/or modify it under the terms of the GNU
+General Public License (GNU GPL) as published by the Free Software
+Foundation, either version 3 of the License, or (at your option)
+any later version.  The code is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+As additional permission under GNU GPL version 3 section 7, you
+may distribute non-source (e.g., minimized or compacted) forms of
+that code without the copy of the GNU GPL normally required by
+section 4, provided you include this license notice and a URL
+through which recipients can access the Corresponding Source.
+
+
+@licend  The above is the entire license notice
+for the JavaScript code in this tag.
+*/
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+</head>
+<body>
+<div id="content">
+<h1 class="title">Passing C++ lambdas to C-function pointer callbacks</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#orgd49261f">1. Passing C++ lambdas to C callbacks</a>
+<ul>
+<li><a href="#org1ff2321">1.1. Overview</a></li>
+<li><a href="#orgea2726d">1.2. Sample code with C-function pointer callback</a>
+<ul>
+<li><a href="#org67fe679">1.2.1. Source Code Listing</a></li>
+<li><a href="#orgaf5adb2">1.2.2. Building and running</a></li>
+<li><a href="#orgd6c363a">1.2.3. Analysis</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-orgd49261f" class="outline-2">
+<h2 id="orgd49261f"><span class="section-number-2">1</span> Passing C++ lambdas to C callbacks</h2>
+<div class="outline-text-2" id="text-1">
+</div>
+<div id="outline-container-org1ff2321" class="outline-3">
+<h3 id="org1ff2321"><span class="section-number-3">1.1</span> Overview</h3>
+<div class="outline-text-3" id="text-1-1">
+<p>
+A recurring need in C++ development is passing lambdas or functors,
+also known as callable objects, to C functions that takes a function
+pointer callback. This article aims to explore how to pass
+function-objects (functors) and C++ lambdas to C function-pointer
+callbacks. 
+</p>
+</div>
+</div>
+<div id="outline-container-orgea2726d" class="outline-3">
+<h3 id="orgea2726d"><span class="section-number-3">1.2</span> Sample code with C-function pointer callback</h3>
+<div class="outline-text-3" id="text-1-2">
+</div>
+<div id="outline-container-org67fe679" class="outline-4">
+<h4 id="org67fe679"><span class="section-number-4">1.2.1</span> Source Code Listing</h4>
+<div class="outline-text-4" id="text-1-2-1">
+<p>
+GIST with full sources: 
+</p>
+<ul class="org-ul">
+<li><a href="https://gist.github.com/7db3de56dea0c502c6f749293b5013ef">https://gist.github.com/7db3de56dea0c502c6f749293b5013ef</a></li>
+</ul>
+
+
+<ul class="org-ul">
+<li>File: <span class="underline">CMakeLists.txt</span></li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-cmake"><span class="org-function-name">cmake_minimum_required</span>(VERSION 3.9)
+<span class="org-function-name">project</span>(cpp-lambda-test)
+
+<span class="org-comment">#========== Global Configurations =============#</span>
+<span class="org-comment">#----------------------------------------------#</span>
+
+<span class="org-function-name">set</span>(CMAKE_CXX_STANDARD 17)     
+<span class="org-function-name">set</span>(CMAKE_VERBOSE_MAKEFILE ON)
+
+<span class="org-comment">#========== Targets Configurations ============#</span>
+
+          <span class="org-function-name">add_library</span>( clib SHARED clib.c)
+
+       <span class="org-function-name">add_executable</span>( consumer consumer.cpp)
+<span class="org-function-name">target_link_libraries</span>( consumer clib)
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>File: <span class="underline">clib.c</span>  (Target: clib / shared library)
+<ul class="org-ul">
+<li>C Shared library exporting functions with C-linkage
+dotimes_version1() and dotimes_version2() which take C function
+pointers callbacks.</li>
+</ul></li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">stdio.h</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span> 
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">stdlib.h</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+
+<span class="org-comment-delimiter">// </span><span class="org-comment">Function without context pointer</span>
+<span class="org-keyword">typedef</span> <span class="org-type">void</span> <span class="org-rainbow-delimiters-depth-1">(</span>*<span class="org-type">callback_t</span><span class="org-rainbow-delimiters-depth-1">)</span> <span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">int</span> <span class="org-variable-name">n</span><span class="org-rainbow-delimiters-depth-1">)</span>;
+
+<span class="org-keyword">typedef</span> <span class="org-type">void</span> <span class="org-rainbow-delimiters-depth-1">(</span>*<span class="org-type">callback_closure_t</span><span class="org-rainbow-delimiters-depth-1">)</span> <span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">int</span> <span class="org-variable-name">n</span>, <span class="org-type">void</span>* <span class="org-variable-name">context</span><span class="org-rainbow-delimiters-depth-1">)</span>;
+
+<span class="org-doc">/** Function with C-callback argument without context pointer. */</span>
+<span class="org-type">void</span> <span class="org-function-name">dotimes_version1</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">int</span> <span class="org-variable-name">size</span>, <span class="org-type">callback_t</span> <span class="org-variable-name">fun</span><span class="org-rainbow-delimiters-depth-1">)</span>
+<span class="org-rainbow-delimiters-depth-1">{</span>
+    printf<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">" [TRACE] &lt;ENTRY&gt; Called function: %s \n"</span>, __FUNCTION__<span class="org-rainbow-delimiters-depth-2">)</span>;
+    <span class="org-keyword">for</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">int</span> <span class="org-variable-name">i</span> = 0; i &lt; size; i++<span class="org-rainbow-delimiters-depth-2">){</span> fun<span class="org-rainbow-delimiters-depth-3">(</span>i<span class="org-rainbow-delimiters-depth-3">)</span>; <span class="org-rainbow-delimiters-depth-2">}</span>
+    printf<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">" [TRACE] &lt;EXIT&gt; Called function: %s \n"</span>, __FUNCTION__<span class="org-rainbow-delimiters-depth-2">)</span>;
+<span class="org-rainbow-delimiters-depth-1">}</span>
+
+<span class="org-doc">/** Function with C-callback argument with context pointer for passing function state to</span>
+<span class="org-doc"> *  to the function pointer. </span>
+<span class="org-doc"> */</span>
+<span class="org-type">void</span> <span class="org-function-name">dotimes_version2</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">int</span> <span class="org-variable-name">size</span>, <span class="org-type">callback_closure_t</span> <span class="org-variable-name">fun</span>, <span class="org-type">void</span>* <span class="org-variable-name">context</span><span class="org-rainbow-delimiters-depth-1">)</span>
+<span class="org-rainbow-delimiters-depth-1">{</span>
+    printf<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">" [TRACE] &lt;ENTRY&gt; Called function: %s \n"</span>, __FUNCTION__<span class="org-rainbow-delimiters-depth-2">)</span>;
+    <span class="org-keyword">for</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">int</span> <span class="org-variable-name">i</span> = 0; i &lt; size; i++<span class="org-rainbow-delimiters-depth-2">){</span> fun<span class="org-rainbow-delimiters-depth-3">(</span>i, context<span class="org-rainbow-delimiters-depth-3">)</span>; <span class="org-rainbow-delimiters-depth-2">}</span>
+    printf<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">" [TRACE] &lt;EXIT&gt; Called function: %s \n"</span>, __FUNCTION__<span class="org-rainbow-delimiters-depth-2">)</span>;
+<span class="org-rainbow-delimiters-depth-1">}</span>
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>File: <span class="underline">consumer.cpp</span> (Target: consumer / executable)
+<ul class="org-ul">
+<li>C++ executable application which consumes the C shared library
+clib.so (Linux or BSD); clib.dylib (MacOSX) or clib.dll
+(Windows).</li>
+</ul></li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">iostream</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">functional</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span> <span class="org-comment-delimiter">// </span><span class="org-comment">std::function container </span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">cassert</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+
+<span class="org-keyword">using</span> <span class="org-type">callback_t</span>         = <span class="org-type">void</span> <span class="org-rainbow-delimiters-depth-1">(</span>*<span class="org-rainbow-delimiters-depth-1">)</span> <span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">int</span> <span class="org-variable-name">n</span><span class="org-rainbow-delimiters-depth-1">)</span>;
+<span class="org-keyword">using</span> <span class="org-type">callback_closure_t</span> = <span class="org-type">void</span> <span class="org-rainbow-delimiters-depth-1">(</span>*<span class="org-rainbow-delimiters-depth-1">)</span> <span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">int</span> <span class="org-variable-name">n</span>, <span class="org-type">void</span>* <span class="org-variable-name">context</span><span class="org-rainbow-delimiters-depth-1">)</span>;
+
+<span class="org-comment-delimiter">// </span><span class="org-comment">Functions with C-linkage </span>
+<span class="org-preprocessor">#define</span> <span class="org-variable-name">EXTERN_C</span> <span class="org-keyword">extern</span> <span class="org-string">"C"</span>
+
+<span class="org-comment-delimiter">/** </span><span class="org-comment">Provided by the shared library (aka shared object on Unix-like systems) */</span>
+EXTERN_C <span class="org-type">void</span> <span class="org-function-name">dotimes_version1</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">int</span> <span class="org-variable-name">size</span>, <span class="org-type">callback_t</span> <span class="org-variable-name">fun</span><span class="org-rainbow-delimiters-depth-1">)</span>;
+EXTERN_C <span class="org-type">void</span> <span class="org-function-name">dotimes_version2</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">int</span> <span class="org-variable-name">size</span>, <span class="org-type">callback_closure_t</span> <span class="org-variable-name">fun</span>, <span class="org-type">void</span>* <span class="org-variable-name">context</span><span class="org-rainbow-delimiters-depth-1">)</span>;
+
+<span class="org-keyword">using</span> <span class="org-type">FunctionCallback1</span> = <span class="org-constant">std</span>::<span class="org-type">function</span><span class="org-rainbow-delimiters-depth-1">&lt;</span><span class="org-type">void</span> <span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">int</span> <span class="org-rainbow-delimiters-depth-2">)</span><span class="org-rainbow-delimiters-depth-1">&gt;</span>;
+
+<span class="org-comment-delimiter">/** </span><span class="org-comment">Namespace contains workarounds for passing capturing lambdas </span>
+<span class="org-comment"> * to function dotimes_version (C function without context void pointer)</span>
+<span class="org-comment"> * </span>
+<span class="org-comment"> * Note: This solution is not thread-safe. The most suitable workaround for</span>
+<span class="org-comment"> * for passing capturing lambdas or C++ functors to C-callbakcs is to </span>
+<span class="org-comment"> * redesign it for using a context void pointer, that allows passing state </span>
+<span class="org-comment"> * to the C-callback.</span>
+<span class="org-comment"> *----------------------------------------------------------------------*/</span>
+<span class="org-keyword">namespace</span> <span class="org-constant">Workaround1</span> <span class="org-rainbow-delimiters-depth-1">{</span>
+   <span class="org-comment-delimiter">/* </span><span class="org-comment">This function encapsulates callback global variable </span>
+<span class="org-comment">   ** for avoiding the global-initialization fiasco. </span>
+<span class="org-comment">   *-----------------------------------------------------*/</span>
+   <span class="org-keyword">auto</span> <span class="org-function-name">get_callback</span><span class="org-rainbow-delimiters-depth-2">()</span> -&gt; <span class="org-type">FunctionCallback1</span>&amp;
+   <span class="org-rainbow-delimiters-depth-2">{</span>
+        <span class="org-comment-delimiter">// </span><span class="org-comment">Global variable, its lifetimes corresponds to the program lifetime.</span>
+        <span class="org-keyword">static</span> FunctionCallback1 callback;
+        <span class="org-keyword">return</span> callback;
+   <span class="org-rainbow-delimiters-depth-2">}</span>;
+
+   <span class="org-comment-delimiter">/** </span><span class="org-comment">Set global variable callback */</span>
+   <span class="org-keyword">auto</span> <span class="org-function-name">set_callback</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">FunctionCallback1</span> <span class="org-variable-name">func</span><span class="org-rainbow-delimiters-depth-2">)</span> -&gt; <span class="org-type">void</span> 
+   <span class="org-rainbow-delimiters-depth-2">{</span>
+        <span class="org-keyword">auto</span>&amp; <span class="org-variable-name">callback</span> = get_callback<span class="org-rainbow-delimiters-depth-3">()</span>;
+        callback = func;
+   <span class="org-rainbow-delimiters-depth-2">}</span>
+
+   <span class="org-type">void</span> <span class="org-function-name">workaround1_callback_adapter</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">int</span> <span class="org-variable-name">n</span><span class="org-rainbow-delimiters-depth-2">)</span>
+   <span class="org-rainbow-delimiters-depth-2">{</span>
+        get_callback<span class="org-rainbow-delimiters-depth-3">()(</span>n<span class="org-rainbow-delimiters-depth-3">)</span>;
+   <span class="org-rainbow-delimiters-depth-2">}</span>
+
+   <span class="org-comment-delimiter">/* </span><span class="org-comment">Disadvantage: This solution is not thread-safe and requires locks </span>
+<span class="org-comment">   *  to protect the callback global state. Only one callback can be </span>
+<span class="org-comment">   *  passed per thread.  </span>
+<span class="org-comment">   */</span>
+   <span class="org-type">void</span> <span class="org-function-name">wrapper_to_dotimes_version1</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">int</span> <span class="org-variable-name">size</span>, <span class="org-type">FunctionCallback1</span> <span class="org-variable-name">func</span><span class="org-rainbow-delimiters-depth-2">)</span>
+   <span class="org-rainbow-delimiters-depth-2">{</span>
+         set_callback<span class="org-rainbow-delimiters-depth-3">(</span>func<span class="org-rainbow-delimiters-depth-3">)</span>;
+         dotimes_version1<span class="org-rainbow-delimiters-depth-3">(</span>size, &amp;workaround1_callback_adapter<span class="org-rainbow-delimiters-depth-3">)</span>;
+   <span class="org-rainbow-delimiters-depth-2">}</span>
+
+<span class="org-rainbow-delimiters-depth-1">}</span>
+
+<span class="org-keyword">struct</span> <span class="org-type">FunctionObject</span> 
+<span class="org-rainbow-delimiters-depth-1">{</span>   
+    <span class="org-type">int</span> <span class="org-variable-name">counter</span> = 10;
+
+    <span class="org-function-name">FunctionObject</span><span class="org-rainbow-delimiters-depth-2">(){</span> <span class="org-rainbow-delimiters-depth-2">}</span>
+    <span class="org-function-name">FunctionObject</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">int</span> <span class="org-variable-name">cnt</span><span class="org-rainbow-delimiters-depth-2">)</span>: <span class="org-function-name">counter</span><span class="org-rainbow-delimiters-depth-2">(</span>cnt<span class="org-rainbow-delimiters-depth-2">){}</span>
+
+    <span class="org-type">void</span> <span class="org-keyword">operator</span><span class="org-function-name"><span class="org-rainbow-delimiters-depth-2">()</span></span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">int</span> <span class="org-variable-name">n</span><span class="org-rainbow-delimiters-depth-2">)</span>
+    <span class="org-rainbow-delimiters-depth-2">{</span>
+        <span class="org-constant">std</span>::printf<span class="org-rainbow-delimiters-depth-3">(</span><span class="org-string">"  [FUNCTOR ] n = %d  / counter = %d \n"</span>, n, counter++<span class="org-rainbow-delimiters-depth-3">)</span>;
+    <span class="org-rainbow-delimiters-depth-2">}</span>
+<span class="org-rainbow-delimiters-depth-1">}</span>;
+
+<span class="org-type">void</span> <span class="org-function-name">FunctionObject_adapter</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">int</span> <span class="org-variable-name">n</span>, <span class="org-type">void</span>* <span class="org-variable-name">context</span><span class="org-rainbow-delimiters-depth-1">)</span>
+<span class="org-rainbow-delimiters-depth-1">{</span>
+      assert<span class="org-rainbow-delimiters-depth-2">(</span>context != <span class="org-constant">nullptr</span><span class="org-rainbow-delimiters-depth-2">)</span>;
+      <span class="org-comment-delimiter">// </span><span class="org-comment">Note: C-style cast also works, but prefer C++-style cast.</span>
+      <span class="org-type">FunctionObject</span>* <span class="org-variable-name">pFunctor</span> = <span class="org-keyword">static_cast</span><span class="org-rainbow-delimiters-depth-2">&lt;</span><span class="org-type">FunctionObject</span>*<span class="org-rainbow-delimiters-depth-2">&gt;(</span>context<span class="org-rainbow-delimiters-depth-2">)</span>;
+
+      <span class="org-comment-delimiter">// </span><span class="org-comment">[Also works in this way =&gt;&gt;] pFunctor-&gt;operator()(n);</span>
+      <span class="org-rainbow-delimiters-depth-2">(</span>*pFunctor<span class="org-rainbow-delimiters-depth-2">)(</span>n<span class="org-rainbow-delimiters-depth-2">)</span>;
+<span class="org-rainbow-delimiters-depth-1">}</span>
+
+
+<span class="org-type">int</span> <span class="org-function-name">main</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">int</span> <span class="org-variable-name">argc</span>, <span class="org-type">char</span>** <span class="org-variable-name">argv</span><span class="org-rainbow-delimiters-depth-1">)</span>
+<span class="org-rainbow-delimiters-depth-1">{</span>
+      <span class="org-constant">std</span>::puts<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">" [INFO] Consumer started OK."</span><span class="org-rainbow-delimiters-depth-2">)</span>;
+
+      <span class="org-comment-delimiter">/* </span><span class="org-comment">EXPERIMENT 1 - Passing non-capturing lambda to C-function pointer callbacks without </span>
+<span class="org-comment">      * void context pointer. </span>
+<span class="org-comment">      */</span>
+      <span class="org-constant">std</span>::puts<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">"\n ===== [EXPERIMENT 1] Passing non-capturing lambdas ===============\n"</span><span class="org-rainbow-delimiters-depth-2">)</span>;
+      <span class="org-rainbow-delimiters-depth-2">{</span>     
+           <span class="org-comment-delimiter">/** </span><span class="org-comment">Non-capturing lambdas are converted to function pointers. */</span>
+           dotimes_version1<span class="org-rainbow-delimiters-depth-3">(</span>5, <span class="org-rainbow-delimiters-depth-4">[](</span><span class="org-type">int</span> <span class="org-variable-name">n</span><span class="org-rainbow-delimiters-depth-4">){</span>
+                   <span class="org-constant">std</span>::printf<span class="org-rainbow-delimiters-depth-5">(</span><span class="org-string">" [EXPERIMENT 1] n = %d \n"</span>, n<span class="org-rainbow-delimiters-depth-5">)</span>;
+           <span class="org-rainbow-delimiters-depth-4">}</span><span class="org-rainbow-delimiters-depth-3">)</span>;
+
+      <span class="org-rainbow-delimiters-depth-2">}</span>
+
+      <span class="org-comment-delimiter">/* </span><span class="org-comment">EXPERIMENT 2 - Passing capturing lambda to C-function pointer callbacks without</span>
+<span class="org-comment">       * void context pointer. </span>
+<span class="org-comment">       *</span>
+<span class="org-comment">       * This experiment fails as capturing lambdas cannot be converted to function-pointers. </span>
+<span class="org-comment">       */</span>
+      <span class="org-constant">std</span>::puts<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">"\n ===== [EXPERIMENT 2] Passing Capturing lambdas &lt;FAILURE&gt;  ========= \n"</span><span class="org-rainbow-delimiters-depth-2">)</span>;
+      <span class="org-rainbow-delimiters-depth-2">{</span>
+           <span class="org-type">int</span> <span class="org-variable-name">counter</span> = 10;
+           <span class="org-keyword">auto</span> <span class="org-variable-name">lamb</span> = <span class="org-rainbow-delimiters-depth-3">[</span>&amp;<span class="org-variable-name">counter</span><span class="org-rainbow-delimiters-depth-3">](</span><span class="org-type">int</span> <span class="org-variable-name">n</span><span class="org-rainbow-delimiters-depth-3">){</span> 
+                 <span class="org-constant">std</span>::printf<span class="org-rainbow-delimiters-depth-4">(</span><span class="org-string">"  [EXPERIMENT 2] n = %d  / counter = %d \n"</span>, n, counter++<span class="org-rainbow-delimiters-depth-4">)</span>;
+           <span class="org-rainbow-delimiters-depth-3">}</span>;
+
+          <span class="org-comment-delimiter">/*  </span><span class="org-comment">COMPILE-TIME-ERROR: Non-capturing lambdas cannot be passed to </span>
+<span class="org-comment">           *  to function-pointers !!!</span>
+<span class="org-comment">           *  Remove the next comment ('//') in order to see the compile-time error:</span>
+<span class="org-comment">           * </span>
+<span class="org-comment">           * Error: </span>
+<span class="org-comment">           * ---------------------------------------------------------------</span>
+<span class="org-comment">           *  </span>
+<span class="org-comment">           *  [build] cpp-lambda-c/consumer.cpp:30:3: error: no matching function for call to 'dotimes_version1'</span>
+<span class="org-comment">           *  [build]                 dotimes_version1(5, lamb);</span>
+<span class="org-comment">           *  [build]                 ^~~~~~~~~~~~~~~~</span>
+<span class="org-comment">           *  [build] consumer.cpp:7:17: note: candidate function not viable: no known conversion from '(lambda at /home/mxpkf8/temp-projects/cpp-lambda-c/consumer.cpp:26:15)' to 'callback_t' (aka 'void (*)(int)') for 2nd argument</span>
+<span class="org-comment">           *  [build] extern "C" void dotimes_version1(int size, callback_t fun);</span>
+<span class="org-comment">           *  [build]                 ^</span>
+<span class="org-comment">            ****************************************************************/</span>
+
+           <span class="org-comment-delimiter">// </span><span class="org-comment">Change from '0' to '1' to enable the compile-time error.</span>
+<span class="org-preprocessor">           #if</span> 0  
+             <span class="org-comment-delimiter">// </span><span class="org-comment">=&gt; Compile-time error! </span>
+             dotimes_version1<span class="org-rainbow-delimiters-depth-3">(</span>5, lamb<span class="org-rainbow-delimiters-depth-3">)</span>; 
+<span class="org-preprocessor">           #endif</span> 
+
+      <span class="org-rainbow-delimiters-depth-2">}</span>
+
+      <span class="org-comment-delimiter">/* </span><span class="org-comment">EXPERIMENT 3 - Passing capturing lambda to C-function pointer callbacks without</span>
+<span class="org-comment">       * void context pointer using a global-state workaround.</span>
+<span class="org-comment">       */</span>
+      <span class="org-constant">std</span>::puts<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">"\n ===== [EXPERIMENT 3] Passing Capturing lambdas - Workaround 1  =====\n"</span><span class="org-rainbow-delimiters-depth-2">)</span>;   
+      <span class="org-rainbow-delimiters-depth-2">{</span>
+           <span class="org-type">int</span> <span class="org-variable-name">counter</span> = 10;
+           <span class="org-keyword">auto</span> <span class="org-variable-name">lamb</span> = <span class="org-rainbow-delimiters-depth-3">[</span>&amp;<span class="org-variable-name">counter</span><span class="org-rainbow-delimiters-depth-3">](</span><span class="org-type">int</span> <span class="org-variable-name">n</span><span class="org-rainbow-delimiters-depth-3">){</span> 
+                   <span class="org-constant">std</span>::printf<span class="org-rainbow-delimiters-depth-4">(</span><span class="org-string">"  [EXPERIMENT 3] n = %d  / counter = %d \n"</span>, n, counter++<span class="org-rainbow-delimiters-depth-4">)</span>;
+           <span class="org-rainbow-delimiters-depth-3">}</span>;
+
+           <span class="org-constant">std</span>::puts<span class="org-rainbow-delimiters-depth-3">(</span><span class="org-string">"\n ---&gt;&gt; Passing C++ capturing lambda "</span><span class="org-rainbow-delimiters-depth-3">)</span>;
+           <span class="org-constant">Workaround1</span>::wrapper_to_dotimes_version1<span class="org-rainbow-delimiters-depth-3">(</span>5, lamb<span class="org-rainbow-delimiters-depth-3">)</span>;
+
+           <span class="org-constant">std</span>::puts<span class="org-rainbow-delimiters-depth-3">(</span><span class="org-string">"\n ---&gt;&gt; Passing function-object (aka C++ Functor) "</span><span class="org-rainbow-delimiters-depth-3">)</span>;
+           <span class="org-constant">Workaround1</span>::wrapper_to_dotimes_version1<span class="org-rainbow-delimiters-depth-3">(</span>5, FunctionObject<span class="org-rainbow-delimiters-depth-4">(</span>25<span class="org-rainbow-delimiters-depth-4">)</span><span class="org-rainbow-delimiters-depth-3">)</span>;
+      <span class="org-rainbow-delimiters-depth-2">}</span>
+
+      <span class="org-comment-delimiter">/* </span><span class="org-comment">EXPERIMENT 4 - Passing capturing lambda to C-function pointer callbacks with</span>
+<span class="org-comment">       * void context pointer. </span>
+<span class="org-comment">       */</span>
+      <span class="org-constant">std</span>::puts<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">"\n ===== [EXPERIMENT 4] Passing Functors to capturing lambda ==\n"</span><span class="org-rainbow-delimiters-depth-2">)</span>;   
+      <span class="org-rainbow-delimiters-depth-2">{</span>
+              <span class="org-constant">std</span>::puts<span class="org-rainbow-delimiters-depth-3">(</span><span class="org-string">"\n  ---&gt;&gt; Passing function-object (aka C++ Functor) [APPROACH 1] "</span><span class="org-rainbow-delimiters-depth-3">)</span>;
+              <span class="org-type">FunctionObject</span> <span class="org-variable-name">obj1</span><span class="org-rainbow-delimiters-depth-3">(</span>26<span class="org-rainbow-delimiters-depth-3">)</span>;
+              dotimes_version2<span class="org-rainbow-delimiters-depth-3">(</span>5, &amp;FunctionObject_adapter, &amp;obj1<span class="org-rainbow-delimiters-depth-3">)</span>;
+
+              <span class="org-comment-delimiter">// </span><span class="org-comment">Note: This lambda can only be passed due to it be non-capturing.</span>
+              <span class="org-keyword">auto</span> <span class="org-variable-name">adapter_for_FunctionObject</span> = <span class="org-rainbow-delimiters-depth-3">[](</span><span class="org-type">int</span> <span class="org-variable-name">n</span>, <span class="org-type">void</span>* <span class="org-variable-name">context</span><span class="org-rainbow-delimiters-depth-3">)</span>
+              <span class="org-rainbow-delimiters-depth-3">{</span>
+                      assert<span class="org-rainbow-delimiters-depth-4">(</span>context != <span class="org-constant">nullptr</span> &amp;&amp; <span class="org-string">"Context pointer should not be nullptr."</span><span class="org-rainbow-delimiters-depth-4">)</span>;           
+                      <span class="org-type">FunctionObject</span>* <span class="org-variable-name">pFunctor</span> = <span class="org-keyword">reinterpret_cast</span><span class="org-rainbow-delimiters-depth-4">&lt;</span><span class="org-type">FunctionObject</span>*<span class="org-rainbow-delimiters-depth-4">&gt;(</span>context<span class="org-rainbow-delimiters-depth-4">)</span>;
+                      pFunctor-&gt;<span class="org-keyword">operator</span><span class="org-rainbow-delimiters-depth-4">()(</span>n<span class="org-rainbow-delimiters-depth-4">)</span>;
+              <span class="org-rainbow-delimiters-depth-3">}</span>;
+
+              <span class="org-constant">std</span>::puts<span class="org-rainbow-delimiters-depth-3">(</span><span class="org-string">"\n   ---&gt;&gt; Passing function-object (aka C++ Functor) [APPROACH 2] "</span><span class="org-rainbow-delimiters-depth-3">)</span>;
+              <span class="org-type">FunctionObject</span> <span class="org-variable-name">obj2</span>;
+              dotimes_version2<span class="org-rainbow-delimiters-depth-3">(</span>5, adapter_for_FunctionObject, &amp;obj2<span class="org-rainbow-delimiters-depth-3">)</span>;
+      <span class="org-rainbow-delimiters-depth-2">}</span>
+
+      <span class="org-comment-delimiter">/* </span><span class="org-comment">EXPERIMENT 5 - Passing capturing lambda to C-function pointer callbacks with</span>
+<span class="org-comment">       * void context pointer. </span>
+<span class="org-comment">       */</span>
+      <span class="org-constant">std</span>::puts<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">"\n ===== [EXPERIMENT 5] Passing Capturing lambdas &lt;APPROACH 1&gt; ==\n"</span><span class="org-rainbow-delimiters-depth-2">)</span>; 
+      <span class="org-rainbow-delimiters-depth-2">{</span>                 
+           <span class="org-keyword">using</span> <span class="org-type">FunctionCallback2</span> = <span class="org-constant">std</span>::<span class="org-type">function</span><span class="org-rainbow-delimiters-depth-3">&lt;</span><span class="org-type">void</span> <span class="org-rainbow-delimiters-depth-4">(</span><span class="org-type">int</span> <span class="org-variable-name">size</span><span class="org-rainbow-delimiters-depth-4">)</span><span class="org-rainbow-delimiters-depth-3">&gt;</span>;
+
+           <span class="org-keyword">auto</span> <span class="org-variable-name">adpter_for_lambda</span> = <span class="org-rainbow-delimiters-depth-3">[](</span><span class="org-type">int</span> <span class="org-variable-name">n</span>, <span class="org-type">void</span>* <span class="org-variable-name">context</span><span class="org-rainbow-delimiters-depth-3">)</span> 
+           <span class="org-rainbow-delimiters-depth-3">{</span>
+                   assert<span class="org-rainbow-delimiters-depth-4">(</span>context != <span class="org-constant">nullptr</span> &amp;&amp; <span class="org-string">"Context pointer (state) should not be null."</span><span class="org-rainbow-delimiters-depth-4">)</span>;
+                   <span class="org-type">FunctionCallback2</span>* <span class="org-variable-name">pFunc</span> = <span class="org-keyword">reinterpret_cast</span><span class="org-rainbow-delimiters-depth-4">&lt;</span><span class="org-type">FunctionCallback2</span>*<span class="org-rainbow-delimiters-depth-4">&gt;(</span>context<span class="org-rainbow-delimiters-depth-4">)</span>;
+                   <span class="org-rainbow-delimiters-depth-4">(</span>*pFunc<span class="org-rainbow-delimiters-depth-4">)(</span>n<span class="org-rainbow-delimiters-depth-4">)</span>;
+           <span class="org-rainbow-delimiters-depth-3">}</span>;               
+
+           <span class="org-type">int</span> <span class="org-variable-name">counter</span> = -100;
+           <span class="org-keyword">auto</span> <span class="org-variable-name">callback_lambda</span> = <span class="org-rainbow-delimiters-depth-3">[</span>&amp;<span class="org-variable-name">counter</span><span class="org-rainbow-delimiters-depth-3">](</span><span class="org-type">int</span> <span class="org-variable-name">n</span><span class="org-rainbow-delimiters-depth-3">){</span> 
+                   <span class="org-constant">std</span>::printf<span class="org-rainbow-delimiters-depth-4">(</span><span class="org-string">"  [EXPERIMENT 5] n = %d  / counter = %d \n"</span>, n, counter++<span class="org-rainbow-delimiters-depth-4">)</span>;
+           <span class="org-rainbow-delimiters-depth-3">}</span>;
+           <span class="org-type">FunctionCallback2</span> <span class="org-variable-name">callback_object</span> = callback_lambda; 
+
+           <span class="org-constant">std</span>::puts<span class="org-rainbow-delimiters-depth-3">(</span><span class="org-string">"\n  ---&gt;&gt; Passing capturing lambda [APPROACH 1 - Type erasure] --- "</span><span class="org-rainbow-delimiters-depth-3">)</span>;
+           dotimes_version2<span class="org-rainbow-delimiters-depth-3">(</span>5, adpter_for_lambda, &amp;callback_object<span class="org-rainbow-delimiters-depth-3">)</span>;
+
+      <span class="org-rainbow-delimiters-depth-2">}</span>
+
+      <span class="org-constant">std</span>::puts<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">"\n\n [INFO] System shutdown gracefully Ok."</span><span class="org-rainbow-delimiters-depth-2">)</span>;
+      <span class="org-keyword">return</span> 0;
+<span class="org-rainbow-delimiters-depth-1">}</span>
+
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgaf5adb2" class="outline-4">
+<h4 id="orgaf5adb2"><span class="section-number-4">1.2.2</span> Building and running</h4>
+<div class="outline-text-4" id="text-1-2-2">
+<p>
+Donwload and build sources: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-comment-delimiter"># </span><span class="org-comment">Get sources </span>
+ $ &gt;&gt; cd /tmp &amp;&amp; git clone https://gist.github.com/7db3de56dea0c502c6f749293b5013ef callback &amp;&amp; <span class="org-builtin">cd</span> callback
+
+ <span class="org-comment-delimiter"># </span><span class="org-comment">Build </span>
+ $ &gt;&gt; cmake --config Debug -H. -B_build 
+ $ &gt;&gt; cmake --build _build --target 
+
+ <span class="org-comment-delimiter"># </span><span class="org-comment">Show _build directory </span>
+ $ &gt;&gt; ls _build/
+ CMakeCache.txt  CMakeFiles/  cmake_install.cmake  consumer*  libclib.so*  Makefile
+</pre>
+</div>
+
+<p>
+Run executable: 'consumer'
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">$ &gt;&gt; _build/consumer 
+[INFO] Consumer started OK.
+
+===== [EXPERIMENT 1] Passing non-capturing lambdas ===============
+
+[TRACE] &lt;ENTRY&gt; Called <span class="org-keyword">function</span>: dotimes_version1 
+[EXPERIMENT 1] n = 0 
+[EXPERIMENT 1] n = 1 
+[EXPERIMENT 1] n = 2 
+[EXPERIMENT 1] n = 3 
+[EXPERIMENT 1] n = 4 
+[TRACE] &lt;EXIT&gt; Called <span class="org-keyword">function</span>: dotimes_version1 
+
+===== [EXPERIMENT 2] Passing Capturing lambdas &lt;FAILURE&gt;  ========= 
+
+
+===== [EXPERIMENT 3] Passing Capturing lambdas - Workaround 1  =====
+
+
+---&gt;&gt; Passing C++ capturing lambda 
+[TRACE] &lt;ENTRY&gt; Called <span class="org-keyword">function</span>: dotimes_version1 
+ [EXPERIMENT 3] n = 0  / counter = 10 
+ [EXPERIMENT 3] n = 1  / counter = 11 
+ [EXPERIMENT 3] n = 2  / counter = 12 
+ [EXPERIMENT 3] n = 3  / counter = 13 
+ [EXPERIMENT 3] n = 4  / counter = 14 
+[TRACE] &lt;EXIT&gt; Called <span class="org-keyword">function</span>: dotimes_version1 
+
+---&gt;&gt; Passing function-object (aka C++ Functor) 
+[TRACE] &lt;ENTRY&gt; Called <span class="org-keyword">function</span>: dotimes_version1 
+ [FUNCTOR ] n = 0  / counter = 25 
+ [FUNCTOR ] n = 1  / counter = 26 
+ [FUNCTOR ] n = 2  / counter = 27 
+ [FUNCTOR ] n = 3  / counter = 28 
+ [FUNCTOR ] n = 4  / counter = 29 
+[TRACE] &lt;EXIT&gt; Called <span class="org-keyword">function</span>: dotimes_version1 
+
+===== [EXPERIMENT 4] Passing Functors to capturing lambda ==
+
+
+ ---&gt;&gt; Passing function-object (aka C++ Functor) [APPROACH 1] 
+[TRACE] &lt;ENTRY&gt; Called <span class="org-keyword">function</span>: dotimes_version2 
+ [FUNCTOR ] n = 0  / counter = 26 
+ [FUNCTOR ] n = 1  / counter = 27 
+ [FUNCTOR ] n = 2  / counter = 28 
+ [FUNCTOR ] n = 3  / counter = 29 
+ [FUNCTOR ] n = 4  / counter = 30 
+[TRACE] &lt;EXIT&gt; Called <span class="org-keyword">function</span>: dotimes_version2 
+
+  ---&gt;&gt; Passing function-object (aka C++ Functor) [APPROACH 2] 
+[TRACE] &lt;ENTRY&gt; Called <span class="org-keyword">function</span>: dotimes_version2 
+ [FUNCTOR ] n = 0  / counter = 10 
+ [FUNCTOR ] n = 1  / counter = 11 
+ [FUNCTOR ] n = 2  / counter = 12 
+ [FUNCTOR ] n = 3  / counter = 13 
+ [FUNCTOR ] n = 4  / counter = 14 
+[TRACE] &lt;EXIT&gt; Called <span class="org-keyword">function</span>: dotimes_version2 
+
+===== [EXPERIMENT 5] Passing Capturing lambdas &lt;APPROACH 1&gt; ==
+
+
+ ---&gt;&gt; Passing capturing lambda [APPROACH 1 - Type erasure] --- 
+[TRACE] &lt;ENTRY&gt; Called <span class="org-keyword">function</span>: dotimes_version2 
+ [EXPERIMENT 5] n = 0  / counter = -100 
+ [EXPERIMENT 5] n = 1  / counter = -99 
+ [EXPERIMENT 5] n = 2  / counter = -98 
+ [EXPERIMENT 5] n = 3  / counter = -97 
+ [EXPERIMENT 5] n = 4  / counter = -96 
+[TRACE] &lt;EXIT&gt; Called <span class="org-keyword">function</span>: dotimes_version2 
+
+
+[INFO] System shutdown gracefully Ok.
+
+</pre>
+</div>
+</div>
+</div>
+
+
+
+
+<div id="outline-container-orgd6c363a" class="outline-4">
+<h4 id="orgd6c363a"><span class="section-number-4">1.2.3</span> Analysis</h4>
+<div class="outline-text-4" id="text-1-2-3">
+<p>
+The goal of the application (consumer.cpp) is to call pass C++ lambdas
+and C++ callable objects (functors) as he following C-functions which
+takes C-function pointer callbacks:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-keyword">using</span> <span class="org-type">callback_t</span>         = <span class="org-type">void</span> <span class="org-rainbow-delimiters-depth-1">(</span>*<span class="org-rainbow-delimiters-depth-1">)</span> <span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">int</span> <span class="org-variable-name">n</span><span class="org-rainbow-delimiters-depth-1">)</span>;
+<span class="org-keyword">using</span> <span class="org-type">callback_closure_t</span> = <span class="org-type">void</span> <span class="org-rainbow-delimiters-depth-1">(</span>*<span class="org-rainbow-delimiters-depth-1">)</span> <span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">int</span> <span class="org-variable-name">n</span>, <span class="org-type">void</span>* <span class="org-variable-name">context</span><span class="org-rainbow-delimiters-depth-1">)</span>;
+
+<span class="org-comment-delimiter">// </span><span class="org-comment">Functions with C-linkage </span>
+<span class="org-preprocessor">#define</span> <span class="org-variable-name">EXTERN_C</span> <span class="org-keyword">extern</span> <span class="org-string">"C"</span>
+
+<span class="org-comment-delimiter">/** </span><span class="org-comment">Provided by the shared library (aka shared object on Unix-like systems) */</span>
+EXTERN_C <span class="org-type">void</span> <span class="org-function-name">dotimes_version1</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">int</span> <span class="org-variable-name">size</span>, <span class="org-type">callback_t</span> <span class="org-variable-name">fun</span><span class="org-rainbow-delimiters-depth-1">)</span>;
+EXTERN_C <span class="org-type">void</span> <span class="org-function-name">dotimes_version2</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">int</span> <span class="org-variable-name">size</span>, <span class="org-type">callback_closure_t</span> <span class="org-variable-name">fun</span>, <span class="org-type">void</span>* <span class="org-variable-name">context</span><span class="org-rainbow-delimiters-depth-1">)</span>;
+</pre>
+</div>
+
+
+<p>
+<b>Experiment 1:</b>
+</p>
+
+<ul class="org-ul">
+<li><span class="underline">Non-capturing</span> lambdas are converted to function-pointers when
+passed to C-function pointer callbacks.</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-comment-delimiter">/* </span><span class="org-comment">EXPERIMENT 1 - Passing non-capturing lambda to C-function pointer callbacks without </span>
+<span class="org-comment"> * void context pointer. </span>
+<span class="org-comment"> */</span>
+ <span class="org-constant">std</span>::puts<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-string">"\n ===== [EXPERIMENT 1] Passing non-capturing lambdas ===============\n"</span><span class="org-rainbow-delimiters-depth-1">)</span>;
+ <span class="org-rainbow-delimiters-depth-1">{</span>      
+      <span class="org-comment-delimiter">/** </span><span class="org-comment">Non-capturing lambdas are converted to function pointers. */</span>
+      dotimes_version1<span class="org-rainbow-delimiters-depth-2">(</span>5, <span class="org-rainbow-delimiters-depth-3">[](</span><span class="org-type">int</span> <span class="org-variable-name">n</span><span class="org-rainbow-delimiters-depth-3">){</span>
+              <span class="org-constant">std</span>::printf<span class="org-rainbow-delimiters-depth-4">(</span><span class="org-string">" [EXPERIMENT 1] n = %d \n"</span>, n<span class="org-rainbow-delimiters-depth-4">)</span>;
+      <span class="org-rainbow-delimiters-depth-3">}</span><span class="org-rainbow-delimiters-depth-2">)</span>;
+
+ <span class="org-rainbow-delimiters-depth-1">}</span>
+</pre>
+</div>
+
+<p>
+Program output: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">[INFO] Consumer started OK.
+
+===== [EXPERIMENT 1] Passing non-capturing lambdas ===============
+
+[TRACE] &lt;ENTRY&gt; Called <span class="org-keyword">function</span>: dotimes_version1 
+[EXPERIMENT 1] n = 0 
+[EXPERIMENT 1] n = 1 
+[EXPERIMENT 1] n = 2 
+[EXPERIMENT 1] n = 3 
+[EXPERIMENT 1] n = 4 
+[TRACE] &lt;EXIT&gt; Called <span class="org-keyword">function</span>: dotimes_version1 
+
+</pre>
+</div>
+
+<p>
+<b>Experiment 2:</b> [COMPILE-TIME ERROR]
+</p>
+
+<ul class="org-ul">
+<li>A a <span class="underline">capturing lambdas</span> cannot be converted into a function pointer,
+the following code causes a compile-time error if the "#if" is
+enabled as "#if 1".</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-function-name">std</span>::puts<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-string">"\n ===== [EXPERIMENT 2] Passing Capturing lambdas &lt;FAILURE&gt;  ========= \n"</span><span class="org-rainbow-delimiters-depth-1">)</span>;
+<span class="org-rainbow-delimiters-depth-1">{</span>
+     <span class="org-type">int</span> <span class="org-variable-name">counter</span> = 10;
+     <span class="org-keyword">auto</span> <span class="org-variable-name">lamb</span> = <span class="org-rainbow-delimiters-depth-2">[</span>&amp;<span class="org-variable-name">counter</span><span class="org-rainbow-delimiters-depth-2">](</span><span class="org-type">int</span> <span class="org-variable-name">n</span><span class="org-rainbow-delimiters-depth-2">){</span> 
+           <span class="org-constant">std</span>::printf<span class="org-rainbow-delimiters-depth-3">(</span><span class="org-string">"  [EXPERIMENT 2] n = %d  / counter = %d \n"</span>, n, counter++<span class="org-rainbow-delimiters-depth-3">)</span>;
+     <span class="org-rainbow-delimiters-depth-2">}</span>;
+
+     <span class="org-comment-delimiter">// </span><span class="org-comment">Change from '0' to '1' to enable the compile-time error.</span>
+<span class="org-preprocessor">     #if</span> 0  
+       <span class="org-comment-delimiter">// </span><span class="org-comment">=&gt; Compile-time error! </span>
+       dotimes_version1<span class="org-rainbow-delimiters-depth-2">(</span>5, lamb<span class="org-rainbow-delimiters-depth-2">)</span>; 
+<span class="org-preprocessor">     #endif</span> 
+
+<span class="org-rainbow-delimiters-depth-1">}</span>
+</pre>
+</div>
+
+<p>
+Compile-time error: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-rainbow-delimiters-depth-1">[</span><span class="org-constant">build</span><span class="org-rainbow-delimiters-depth-1">]</span> cpp-lambda-c/consumer.cpp:30:3: error: no matching function <span class="org-keyword">for</span> call to <span class="org-warning">'</span>dotimes_version1<span class="org-warning">'</span>
+<span class="org-rainbow-delimiters-depth-1">[</span>build<span class="org-rainbow-delimiters-depth-1">]</span>                 dotimes_version1<span class="org-rainbow-delimiters-depth-1">(</span>5, lamb<span class="org-rainbow-delimiters-depth-1">)</span>;
+<span class="org-rainbow-delimiters-depth-1">[</span><span class="org-constant">build</span><span class="org-rainbow-delimiters-depth-1">]</span>                 ^~~~~~~~~~~~~~~~
+<span class="org-rainbow-delimiters-depth-1">[</span><span class="org-constant">build</span><span class="org-rainbow-delimiters-depth-1">]</span> consumer.cpp:7:17: note: candidate function <span class="org-keyword">not</span> viable: no known conversion from <span class="org-warning">'</span>
+         <span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">lambda</span> <span class="org-variable-name">at</span> /consumer.cpp:26:15<span class="org-rainbow-delimiters-depth-1">)</span><span class="org-warning">'</span> to <span class="org-warning">'</span>callback_t<span class="org-warning">'</span> <span class="org-rainbow-delimiters-depth-1">(</span>aka <span class="org-warning">'</span><span class="org-type">void</span> <span class="org-rainbow-delimiters-depth-2">(</span>*<span class="org-rainbow-delimiters-depth-2">)(</span><span class="org-type">int</span><span class="org-rainbow-delimiters-depth-2">)</span><span class="org-warning">'</span><span class="org-rainbow-delimiters-depth-1">)</span> <span class="org-keyword">for</span> 2nd argument
+
+<span class="org-rainbow-delimiters-depth-1">[</span>build<span class="org-rainbow-delimiters-depth-1">]</span> <span class="org-keyword">extern</span> <span class="org-string">"C"</span> <span class="org-type">void</span> dotimes_version1<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">int</span> <span class="org-variable-name">size</span>, <span class="org-type">callback_t</span> <span class="org-variable-name">fun</span><span class="org-rainbow-delimiters-depth-1">)</span>;
+<span class="org-rainbow-delimiters-depth-1">[</span><span class="org-constant">build</span><span class="org-rainbow-delimiters-depth-1">]</span>                 ^
+</pre>
+</div>
+
+
+<p>
+<b>Experiment 3:</b> Workaround for passing capturing-lambdas to C-function  pointer callbacks. 
+</p>
+
+<ul class="org-ul">
+<li>Passing a capturing lambda to a C-function that takes a C function
+pointer callback, requires a workaround using global state. The
+shortcoming of this method is the lack of thread-safety due to the
+usage of global state. A thread-safe version of this workaround
+requires using locks, such as mutex, in order to avoid race
+condition undefined-behaviors. The most suitable solution to this
+issue is to redesign the function <span class="underline">dotimes_version1</span> by making it
+take an extra void pointer for passing the C function pointer
+state.</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-function-name">std</span>::puts<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-string">"\n ===== [EXPERIMENT 3] Passing Capturing lambdas - Workaround 1  =====\n"</span><span class="org-rainbow-delimiters-depth-1">)</span>; 
+<span class="org-rainbow-delimiters-depth-1">{</span>
+     <span class="org-type">int</span> <span class="org-variable-name">counter</span> = 10;
+     <span class="org-keyword">auto</span> <span class="org-variable-name">lamb</span> = <span class="org-rainbow-delimiters-depth-2">[</span>&amp;<span class="org-variable-name">counter</span><span class="org-rainbow-delimiters-depth-2">](</span><span class="org-type">int</span> <span class="org-variable-name">n</span><span class="org-rainbow-delimiters-depth-2">){</span> 
+         <span class="org-constant">std</span>::printf<span class="org-rainbow-delimiters-depth-3">(</span><span class="org-string">"  [EXPERIMENT 3] n = %d  / counter = %d \n"</span>, n, counter++<span class="org-rainbow-delimiters-depth-3">)</span>;
+     <span class="org-rainbow-delimiters-depth-2">}</span>;
+
+     <span class="org-constant">std</span>::puts<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">"\n ---&gt;&gt; Passing C++ capturing lambda "</span><span class="org-rainbow-delimiters-depth-2">)</span>;
+     <span class="org-constant">Workaround1</span>::wrapper_to_dotimes_version1<span class="org-rainbow-delimiters-depth-2">(</span>5, lamb<span class="org-rainbow-delimiters-depth-2">)</span>;
+
+     <span class="org-constant">std</span>::puts<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">"\n ---&gt;&gt; Passing function-object (aka C++ Functor) "</span><span class="org-rainbow-delimiters-depth-2">)</span>;
+     <span class="org-constant">Workaround1</span>::wrapper_to_dotimes_version1<span class="org-rainbow-delimiters-depth-2">(</span>5, FunctionObject<span class="org-rainbow-delimiters-depth-3">(</span>25<span class="org-rainbow-delimiters-depth-3">)</span><span class="org-rainbow-delimiters-depth-2">)</span>;
+<span class="org-rainbow-delimiters-depth-1">}</span>
+</pre>
+</div>
+
+<p>
+Output: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp">===== <span class="org-rainbow-delimiters-depth-1">[</span><span class="org-constant">EXPERIMENT</span> 3<span class="org-rainbow-delimiters-depth-1">]</span> Passing Capturing lambdas - Workaround 1  =====
+
+
+---&gt;&gt; Passing C++ capturing lambda 
+<span class="org-rainbow-delimiters-depth-1">[</span>TRACE<span class="org-rainbow-delimiters-depth-1">]</span> <span class="org-rainbow-delimiters-depth-1">&lt;</span>ENTRY<span class="org-rainbow-delimiters-depth-1">&gt;</span> Called function: dotimes_version1 
+ <span class="org-rainbow-delimiters-depth-1">[</span>EXPERIMENT 3<span class="org-rainbow-delimiters-depth-1">]</span> n = 0  / counter = 10 
+ <span class="org-rainbow-delimiters-depth-1">[</span>EXPERIMENT 3<span class="org-rainbow-delimiters-depth-1">]</span> n = 1  / counter = 11 
+ <span class="org-rainbow-delimiters-depth-1">[</span>EXPERIMENT 3<span class="org-rainbow-delimiters-depth-1">]</span> n = 2  / counter = 12 
+ <span class="org-rainbow-delimiters-depth-1">[</span>EXPERIMENT 3<span class="org-rainbow-delimiters-depth-1">]</span> n = 3  / counter = 13 
+ <span class="org-rainbow-delimiters-depth-1">[</span>EXPERIMENT 3<span class="org-rainbow-delimiters-depth-1">]</span> n = 4  / counter = 14 
+<span class="org-rainbow-delimiters-depth-1">[</span>TRACE<span class="org-rainbow-delimiters-depth-1">]</span> <span class="org-rainbow-delimiters-depth-1">&lt;</span>EXIT<span class="org-rainbow-delimiters-depth-1">&gt;</span> Called function: dotimes_version1 
+
+---&gt;&gt; Passing function-object <span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">aka</span> <span class="org-variable-name">C</span>++ Functor<span class="org-rainbow-delimiters-depth-1">)</span> 
+<span class="org-rainbow-delimiters-depth-1">[</span>TRACE<span class="org-rainbow-delimiters-depth-1">]</span> <span class="org-rainbow-delimiters-depth-1">&lt;</span>ENTRY<span class="org-rainbow-delimiters-depth-1">&gt;</span> Called function: dotimes_version1 
+ <span class="org-rainbow-delimiters-depth-1">[</span>FUNCTOR <span class="org-rainbow-delimiters-depth-1">]</span> n = 0  / counter = 25 
+ <span class="org-rainbow-delimiters-depth-1">[</span>FUNCTOR <span class="org-rainbow-delimiters-depth-1">]</span> n = 1  / counter = 26 
+ <span class="org-rainbow-delimiters-depth-1">[</span>FUNCTOR <span class="org-rainbow-delimiters-depth-1">]</span> n = 2  / counter = 27 
+ <span class="org-rainbow-delimiters-depth-1">[</span>FUNCTOR <span class="org-rainbow-delimiters-depth-1">]</span> n = 3  / counter = 28 
+ <span class="org-rainbow-delimiters-depth-1">[</span>FUNCTOR <span class="org-rainbow-delimiters-depth-1">]</span> n = 4  / counter = 29 
+<span class="org-rainbow-delimiters-depth-1">[</span>TRACE<span class="org-rainbow-delimiters-depth-1">]</span> <span class="org-rainbow-delimiters-depth-1">&lt;</span>EXIT<span class="org-rainbow-delimiters-depth-1">&gt;</span> Called function: dotimes_version1 
+
+</pre>
+</div>
+
+<p>
+Workaround code at to of file consumer.cpp: 
+</p>
+
+<ul class="org-ul">
+<li>The function <span class="underline">get__callback</span> returns a reference to the global state
+or global variable named callback whose lifetime is the same as
+the application lifetime. The global variable is encapsulated in
+this function for avoiding global-initialization-fiasco undefined
+behavior.</li>
+
+<li>The function <span class="underline">set_callback</span> sets the global variable (global state)
+encapsulated by the function <span class="underline">set_callback</span>.</li>
+
+<li>The function <span class="underline">wrapper_to_dotimes_version1</span> sets the callback global
+variable and calls the C-function dotimes_version1.</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-keyword">using</span> <span class="org-type">FunctionCallback1</span> = <span class="org-constant">std</span>::<span class="org-type">function</span><span class="org-rainbow-delimiters-depth-1">&lt;</span><span class="org-type">void</span> <span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">int</span> <span class="org-rainbow-delimiters-depth-2">)</span><span class="org-rainbow-delimiters-depth-1">&gt;</span>;
+
+
+<span class="org-keyword">namespace</span> <span class="org-constant">Workaround1</span> <span class="org-rainbow-delimiters-depth-1">{</span>
+   <span class="org-comment-delimiter">/* </span><span class="org-comment">This function encapsulates callback global variable </span>
+<span class="org-comment">   ** for avoiding the global-initialization fiasco. </span>
+<span class="org-comment">   *-----------------------------------------------------*/</span>
+   <span class="org-keyword">auto</span> <span class="org-function-name">get_callback</span><span class="org-rainbow-delimiters-depth-2">()</span> -&gt; <span class="org-type">FunctionCallback1</span>&amp;
+   <span class="org-rainbow-delimiters-depth-2">{</span>
+        <span class="org-comment-delimiter">// </span><span class="org-comment">Global variable, its lifetimes corresponds to the program lifetime.</span>
+        <span class="org-keyword">static</span> FunctionCallback1 callback;
+        <span class="org-keyword">return</span> callback;
+   <span class="org-rainbow-delimiters-depth-2">}</span>;
+
+   <span class="org-comment-delimiter">/** </span><span class="org-comment">Set global variable callback */</span>
+   <span class="org-keyword">auto</span> <span class="org-function-name">set_callback</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">FunctionCallback1</span> <span class="org-variable-name">func</span><span class="org-rainbow-delimiters-depth-2">)</span> -&gt; <span class="org-type">void</span> 
+   <span class="org-rainbow-delimiters-depth-2">{</span>
+        <span class="org-keyword">auto</span>&amp; <span class="org-variable-name">callback</span> = get_callback<span class="org-rainbow-delimiters-depth-3">()</span>;
+        callback = func;
+   <span class="org-rainbow-delimiters-depth-2">}</span>
+
+   <span class="org-type">void</span> <span class="org-function-name">workaround1_callback_adapter</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">int</span> <span class="org-variable-name">n</span><span class="org-rainbow-delimiters-depth-2">)</span>
+   <span class="org-rainbow-delimiters-depth-2">{</span>
+        get_callback<span class="org-rainbow-delimiters-depth-3">()(</span>n<span class="org-rainbow-delimiters-depth-3">)</span>;
+   <span class="org-rainbow-delimiters-depth-2">}</span>
+
+   <span class="org-comment-delimiter">/* </span><span class="org-comment">Disadvantage: This solution is not thread-safe and requires locks </span>
+<span class="org-comment">   *  to protect the callback global state. Only one callback can be </span>
+<span class="org-comment">   *  passed per thread.  </span>
+<span class="org-comment">   */</span>
+   <span class="org-type">void</span> <span class="org-function-name">wrapper_to_dotimes_version1</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">int</span> <span class="org-variable-name">size</span>, <span class="org-type">FunctionCallback1</span> <span class="org-variable-name">func</span><span class="org-rainbow-delimiters-depth-2">)</span>
+   <span class="org-rainbow-delimiters-depth-2">{</span>
+         set_callback<span class="org-rainbow-delimiters-depth-3">(</span>func<span class="org-rainbow-delimiters-depth-3">)</span>;
+         dotimes_version1<span class="org-rainbow-delimiters-depth-3">(</span>size, &amp;workaround1_callback_adapter<span class="org-rainbow-delimiters-depth-3">)</span>;
+   <span class="org-rainbow-delimiters-depth-2">}</span>
+
+<span class="org-rainbow-delimiters-depth-1">}</span>
+</pre>
+</div>
+
+<p>
+<b>Experiment 4:</b> Passing functors to function-pointer arguments.
+</p>
+
+<ul class="org-ul">
+<li>Selected code before main function.</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-keyword">using</span> <span class="org-type">callback_closure_t</span> = <span class="org-type">void</span> <span class="org-rainbow-delimiters-depth-1">(</span>*<span class="org-rainbow-delimiters-depth-1">)</span> <span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">int</span> <span class="org-variable-name">n</span>, <span class="org-type">void</span>* <span class="org-variable-name">context</span><span class="org-rainbow-delimiters-depth-1">)</span>;
+
+<span class="org-comment-delimiter">// </span><span class="org-comment">Provided by the shared library (clib)</span>
+EXTERN_C <span class="org-type">void</span> <span class="org-function-name">dotimes_version2</span><span class="org-rainbow-delimiters-depth-1">(</span> <span class="org-type">int</span> <span class="org-variable-name">size</span>
+                                <span class="org-comment-delimiter">// </span><span class="org-comment">C-function pointer argument </span>
+                               , <span class="org-type">callback_closure_t</span> <span class="org-variable-name">fun</span>
+
+                                <span class="org-comment-delimiter">// </span><span class="org-comment">void-pointer (context pointer) </span>
+                                <span class="org-comment-delimiter">// </span><span class="org-comment">Extra argument for passing state </span>
+                                <span class="org-comment-delimiter">// </span><span class="org-comment">to the callback function-pointer.</span>
+                               , <span class="org-type">void</span>* <span class="org-variable-name">context</span>
+                              <span class="org-rainbow-delimiters-depth-1">)</span>;
+
+
+<span class="org-keyword">struct</span> <span class="org-type">FunctionObject</span> 
+<span class="org-rainbow-delimiters-depth-1">{</span>   
+    <span class="org-type">int</span> <span class="org-variable-name">counter</span> = 10;
+
+    <span class="org-function-name">FunctionObject</span><span class="org-rainbow-delimiters-depth-2">(){</span> <span class="org-rainbow-delimiters-depth-2">}</span>
+    <span class="org-function-name">FunctionObject</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">int</span> <span class="org-variable-name">cnt</span><span class="org-rainbow-delimiters-depth-2">)</span>: <span class="org-function-name">counter</span><span class="org-rainbow-delimiters-depth-2">(</span>cnt<span class="org-rainbow-delimiters-depth-2">){}</span>
+
+    <span class="org-type">void</span> <span class="org-keyword">operator</span><span class="org-function-name"><span class="org-rainbow-delimiters-depth-2">()</span></span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">int</span> <span class="org-variable-name">n</span><span class="org-rainbow-delimiters-depth-2">)</span>
+    <span class="org-rainbow-delimiters-depth-2">{</span>
+        <span class="org-constant">std</span>::printf<span class="org-rainbow-delimiters-depth-3">(</span><span class="org-string">"  [FUNCTOR ] n = %d  / counter = %d \n"</span>, n, counter++<span class="org-rainbow-delimiters-depth-3">)</span>;
+    <span class="org-rainbow-delimiters-depth-2">}</span>
+<span class="org-rainbow-delimiters-depth-1">}</span>;
+
+<span class="org-type">void</span> <span class="org-function-name">FunctionObject_adapter</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">int</span> <span class="org-variable-name">n</span>, <span class="org-type">void</span>* <span class="org-variable-name">context</span><span class="org-rainbow-delimiters-depth-1">)</span>
+<span class="org-rainbow-delimiters-depth-1">{</span>
+     assert<span class="org-rainbow-delimiters-depth-2">(</span>context != <span class="org-constant">nullptr</span><span class="org-rainbow-delimiters-depth-2">)</span>;
+    <span class="org-comment-delimiter">// </span><span class="org-comment">Note: C-style cast also works, but prefer C++-style cast.</span>
+    <span class="org-type">FunctionObject</span>* <span class="org-variable-name">pFunctor</span> = <span class="org-keyword">static_cast</span><span class="org-rainbow-delimiters-depth-2">&lt;</span><span class="org-type">FunctionObject</span>*<span class="org-rainbow-delimiters-depth-2">&gt;(</span>context<span class="org-rainbow-delimiters-depth-2">)</span>;
+
+    <span class="org-comment-delimiter">// </span><span class="org-comment">[Also works in this way =&gt;&gt;] pFunctor-&gt;operator()(n);</span>
+    <span class="org-rainbow-delimiters-depth-2">(</span>*pFunctor<span class="org-rainbow-delimiters-depth-2">)(</span>n<span class="org-rainbow-delimiters-depth-2">)</span>;
+<span class="org-rainbow-delimiters-depth-1">}</span>
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>Often C-functions that takes a function pointer callback provide
+an extra void-pointer parameter for passing a pointer to the
+function-pointer context or state. If a function takes this extra
+parameter, passing lambdas or functors becomes easier. The
+following code takes advantage of this extra void pointer for
+passing the function FunctionObject to the C function
+<span class="underline">dotimes_version2</span>.</li>
+</ul>
+
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-function-name">std</span>::puts<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-string">"\n ===== [EXPERIMENT 4] Passing Functors to capturing lambda ==\n"</span><span class="org-rainbow-delimiters-depth-1">)</span>; 
+<span class="org-rainbow-delimiters-depth-1">{</span>
+    <span class="org-constant">std</span>::puts<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">"\n  ---&gt;&gt; Passing function-object (aka C++ Functor) [APPROACH 1] "</span><span class="org-rainbow-delimiters-depth-2">)</span>;
+    <span class="org-type">FunctionObject</span> <span class="org-variable-name">obj1</span><span class="org-rainbow-delimiters-depth-2">(</span>26<span class="org-rainbow-delimiters-depth-2">)</span>;
+    dotimes_version2<span class="org-rainbow-delimiters-depth-2">(</span>5, &amp;FunctionObject_adapter, &amp;obj1<span class="org-rainbow-delimiters-depth-2">)</span>;
+
+    <span class="org-comment-delimiter">// </span><span class="org-comment">Note: This lambda can only be passed due to it be non-capturing.</span>
+    <span class="org-keyword">auto</span> <span class="org-variable-name">adapter_for_FunctionObject</span> = <span class="org-rainbow-delimiters-depth-2">[](</span><span class="org-type">int</span> <span class="org-variable-name">n</span>, <span class="org-type">void</span>* <span class="org-variable-name">context</span><span class="org-rainbow-delimiters-depth-2">)</span>
+    <span class="org-rainbow-delimiters-depth-2">{</span>
+        assert<span class="org-rainbow-delimiters-depth-3">(</span>context != <span class="org-constant">nullptr</span> &amp;&amp; <span class="org-string">"Context pointer should not be nullptr."</span><span class="org-rainbow-delimiters-depth-3">)</span>;         
+        <span class="org-type">FunctionObject</span>* <span class="org-variable-name">pFunctor</span> = <span class="org-keyword">reinterpret_cast</span><span class="org-rainbow-delimiters-depth-3">&lt;</span><span class="org-type">FunctionObject</span>*<span class="org-rainbow-delimiters-depth-3">&gt;(</span>context<span class="org-rainbow-delimiters-depth-3">)</span>;
+        pFunctor-&gt;<span class="org-keyword">operator</span><span class="org-rainbow-delimiters-depth-3">()(</span>n<span class="org-rainbow-delimiters-depth-3">)</span>;
+    <span class="org-rainbow-delimiters-depth-2">}</span>;
+
+    <span class="org-constant">std</span>::puts<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">"\n   ---&gt;&gt; Passing function-object (aka C++ Functor) [APPROACH 2] "</span><span class="org-rainbow-delimiters-depth-2">)</span>;
+    <span class="org-type">FunctionObject</span> <span class="org-variable-name">obj2</span>;
+    dotimes_version2<span class="org-rainbow-delimiters-depth-2">(</span>5, adapter_for_FunctionObject, &amp;obj2<span class="org-rainbow-delimiters-depth-2">)</span>;
+<span class="org-rainbow-delimiters-depth-1">}</span>
+</pre>
+</div>
+
+<p>
+Output: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">===== [EXPERIMENT 4] Passing Functors to capturing lambda ==
+
+
+ ---&gt;&gt; Passing function-object (aka C++ Functor) [APPROACH 1] 
+[TRACE] &lt;ENTRY&gt; Called <span class="org-keyword">function</span>: dotimes_version2 
+ [FUNCTOR ] n = 0  / counter = 26 
+ [FUNCTOR ] n = 1  / counter = 27 
+ [FUNCTOR ] n = 2  / counter = 28 
+ [FUNCTOR ] n = 3  / counter = 29 
+ [FUNCTOR ] n = 4  / counter = 30 
+[TRACE] &lt;EXIT&gt; Called <span class="org-keyword">function</span>: dotimes_version2 
+
+  ---&gt;&gt; Passing function-object (aka C++ Functor) [APPROACH 2] 
+[TRACE] &lt;ENTRY&gt; Called <span class="org-keyword">function</span>: dotimes_version2 
+ [FUNCTOR ] n = 0  / counter = 10 
+ [FUNCTOR ] n = 1  / counter = 11 
+ [FUNCTOR ] n = 2  / counter = 12 
+ [FUNCTOR ] n = 3  / counter = 13 
+ [FUNCTOR ] n = 4  / counter = 14 
+[TRACE] &lt;EXIT&gt; Called <span class="org-keyword">function</span>: dotimes_version2 
+</pre>
+</div>
+
+<p>
+<b>Experiment 5:</b> Passing capturing-lambdas to function-pointer arguments.
+</p>
+
+<ul class="org-ul">
+<li>This code is similar to the one from experiment 4. It passes
+capturing lambda to the C function <span class="underline">dotimes_version2</span> using the
+extra void pointer (context) of this function.</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-comment-delimiter">/* </span><span class="org-comment">EXPERIMENT 5 - Passing capturing lambda to C-function pointer callbacks with</span>
+<span class="org-comment"> * void context pointer. </span>
+<span class="org-comment"> */</span>
+<span class="org-function-name">std</span>::puts<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-string">"\n ===== [EXPERIMENT 5] Passing Capturing lambdas &lt;APPROACH 1&gt; ==\n"</span><span class="org-rainbow-delimiters-depth-1">)</span>;   
+<span class="org-rainbow-delimiters-depth-1">{</span>                   
+     <span class="org-keyword">using</span> <span class="org-type">FunctionCallback2</span> = <span class="org-constant">std</span>::<span class="org-type">function</span><span class="org-rainbow-delimiters-depth-2">&lt;</span><span class="org-type">void</span> <span class="org-rainbow-delimiters-depth-3">(</span><span class="org-type">int</span> <span class="org-variable-name">size</span><span class="org-rainbow-delimiters-depth-3">)</span><span class="org-rainbow-delimiters-depth-2">&gt;</span>;
+
+     <span class="org-keyword">auto</span> <span class="org-variable-name">adpter_for_lambda</span> = <span class="org-rainbow-delimiters-depth-2">[](</span><span class="org-type">int</span> <span class="org-variable-name">n</span>, <span class="org-type">void</span>* <span class="org-variable-name">context</span><span class="org-rainbow-delimiters-depth-2">)</span> 
+     <span class="org-rainbow-delimiters-depth-2">{</span>
+             assert<span class="org-rainbow-delimiters-depth-3">(</span>context != <span class="org-constant">nullptr</span> &amp;&amp; <span class="org-string">"Context pointer (state) should not be null."</span><span class="org-rainbow-delimiters-depth-3">)</span>;
+             <span class="org-type">FunctionCallback2</span>* <span class="org-variable-name">pFunc</span> = <span class="org-keyword">reinterpret_cast</span><span class="org-rainbow-delimiters-depth-3">&lt;</span><span class="org-type">FunctionCallback2</span>*<span class="org-rainbow-delimiters-depth-3">&gt;(</span>context<span class="org-rainbow-delimiters-depth-3">)</span>;
+             <span class="org-rainbow-delimiters-depth-3">(</span>*pFunc<span class="org-rainbow-delimiters-depth-3">)(</span>n<span class="org-rainbow-delimiters-depth-3">)</span>;
+     <span class="org-rainbow-delimiters-depth-2">}</span>;             
+
+     <span class="org-type">int</span> <span class="org-variable-name">counter</span> = -100;
+     <span class="org-keyword">auto</span> <span class="org-variable-name">callback_lambda</span> = <span class="org-rainbow-delimiters-depth-2">[</span>&amp;<span class="org-variable-name">counter</span><span class="org-rainbow-delimiters-depth-2">](</span><span class="org-type">int</span> <span class="org-variable-name">n</span><span class="org-rainbow-delimiters-depth-2">){</span> 
+             <span class="org-constant">std</span>::printf<span class="org-rainbow-delimiters-depth-3">(</span><span class="org-string">"  [EXPERIMENT 5] n = %d  / counter = %d \n"</span>, n, counter++<span class="org-rainbow-delimiters-depth-3">)</span>;
+     <span class="org-rainbow-delimiters-depth-2">}</span>;
+     <span class="org-type">FunctionCallback2</span> <span class="org-variable-name">callback_object</span> = callback_lambda; 
+
+     <span class="org-constant">std</span>::puts<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">"\n  ---&gt;&gt; Passing capturing lambda [APPROACH 1 - Type erasure] --- "</span><span class="org-rainbow-delimiters-depth-2">)</span>;
+     dotimes_version2<span class="org-rainbow-delimiters-depth-2">(</span>5, adpter_for_lambda, &amp;callback_object<span class="org-rainbow-delimiters-depth-2">)</span>;
+
+<span class="org-rainbow-delimiters-depth-1">}</span>
+</pre>
+</div>
+
+<p>
+Output: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">===== [EXPERIMENT 5] Passing Capturing lambdas &lt;APPROACH 1&gt; ==
+
+
+ ---&gt;&gt; Passing capturing lambda [APPROACH 1 - Type erasure] --- 
+[TRACE] &lt;ENTRY&gt; Called <span class="org-keyword">function</span>: dotimes_version2 
+ [EXPERIMENT 5] n = 0  / counter = -100 
+ [EXPERIMENT 5] n = 1  / counter = -99 
+ [EXPERIMENT 5] n = 2  / counter = -98 
+ [EXPERIMENT 5] n = 3  / counter = -97 
+ [EXPERIMENT 5] n = 4  / counter = -96 
+[TRACE] &lt;EXIT&gt; Called <span class="org-keyword">function</span>: dotimes_version2 
+
+
+[INFO] System shutdown gracefully Ok.
+
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div id="postamble" class="status">
+<p class="date">Created: 2020-07-29 Wed 17:32</p>
+<p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
+</div>
+</body>
+</html>
