@@ -1758,7 +1758,7 @@ Running a container of this docker image:
 #+BEGIN_SRC sh 
    $ docker run -it --rm -v $(pwd):/cwd -w /cwd -e UID=$(id -u) -e GID=$(id -g) musl-builder 
    /cwd $ cmake --config Debug -H. -B_build-musl -DCMAKE_EXE_LINKER_FLAGS="-static -Os"
-   /cwd # cmake --build _build-musl --target 
+   /cwd $ cmake --build _build-musl --target 
 #+END_SRC
 
 Exiting from the container and check the executable:
@@ -2853,6 +2853,367 @@ Trace system-calls with _strace_ application:
   close(3)                                = 0
   exit_group(0)                           = ?
   +++ exited with 0 +++
+#+END_SRC
+** Information about file permissions, owner and group - fstat and stat syscalls 
+*** Overview 
+
+The following family of common UNIX functions allows obtaining
+information about file permissions, owner, group and stick bits,
+namely, set-uid and set-gid special bits. 
+
+#+BEGIN_SRC cpp 
+ #include <sys/stat.h>
+
+ // Obtain permission and file information from file path 
+ int stat(const char * path, struct stat* sb);
+
+ // Obtain permission and file information from file path 
+ int lstat(const char* path, struct stat* sb);
+
+ // Obtain permission and file information from file-descriptor 
+ int fstat(int fd, struct stat *sb);
+
+ int fstatat(int fd, const char* path, struct stat *sb, int flag);
+#+END_SRC
+
+Fstat manpage: 
+
+#+BEGIN_SRC cpp 
+     struct stat {
+         dev_t     st_dev;         /* ID of device containing file */
+         ino_t     st_ino;         /* Inode number */
+         mode_t    st_mode;        /* File type and mode */
+         nlink_t   st_nlink;       /* Number of hard links */
+         uid_t     st_uid;         /* User ID of owner */
+         gid_t     st_gid;         /* Group ID of owner */
+         dev_t     st_rdev;        /* Device ID (if special file) */
+         off_t     st_size;        /* Total size, in bytes */
+         blksize_t st_blksize;     /* Block size for filesystem I/O */
+         blkcnt_t  st_blocks;      /* Number of 512B blocks allocated */
+
+         /* Since Linux 2.6, the kernel supports nanosecond
+            precision for the following timestamp fields.
+            For the details before Linux 2.6, see NOTES. */
+
+         struct timespec st_atim;  /* Time of last access */
+         struct timespec st_mtim;  /* Time of last modification */
+         struct timespec st_ctim;  /* Time of last status change */
+
+     #define st_atime st_atim.tv_sec      /* Backward compatibility */
+     #define st_mtime st_mtim.tv_sec
+     #define st_ctime st_ctim.tv_sec
+     };
+#+END_SRC
+
+See also: 
+
+  + [[https://www.liquidweb.com/kb/how-do-i-set-up-setuid-setgid-and-sticky-bits-on-linux/][How Do I Set Up Setuid, Setgid, and Sticky Bits on Linux? | Liquid Web]]
+
+Documentation: 
+
+  + [[https://linux.die.net/man/2/fstat][Linux Manpage - fstat]]
+
+  + [[https://www.freebsd.org/cgi/man.cgi?query=stat&sektion=2][FreeBSD sytem calls - stat, lstat, fstat - Get file status]]
+
+  + [[https://man7.org/linux/man-pages/man3/getgrgid.3p.html][Linux Manpage - getgrgid()]] - Query /etc/group database 
+
+  + [[https://www.freebsd.org/cgi/man.cgi?query=getgrgid][FreeBSD - getgrid()]] - Query /etc/group database.
+
+  + [[https://pubs.opengroup.org/onlinepubs/009695399/functions/getpwuid.html][OpenGroup - Unix Specification  - getpwuid()]] 
+*** Sample code 
+
+ *File:* file-info.cpp 
+
+#+BEGIN_SRC cpp 
+  #include <iostream> 
+  #include <string> 
+  #include <functional>
+  #include <cstring> 
+
+  // -- Unix-specific Headers -------//
+  #include <fcntl.h>
+  #include <sys/types.h>
+  #include <sys/stat.h>
+  #include <unistd.h>
+
+  #include <pwd.h>
+  #include <grp.h>
+
+
+  std::string 
+  get_descriptor_type(struct stat const& fs)
+  {
+      int ftype = fs.st_mode & S_IFMT;
+      if(ftype == S_IFDIR)  return "Directory";
+      if(ftype == S_IFREG)  return "Regular file";
+      if(ftype == S_IFLNK)  return "Symbolic link";
+      if(ftype == S_IFBLK)  return "Block device file";
+      if(ftype == S_IFCHR)  return "Character device file";    
+      if(ftype == S_IFIFO)  return "FIFO or pipe"; 
+      if(ftype == S_IFSOCK) return "Socket";
+      return "Unknown";    
+  }; 
+
+  int main(int argc, char** argv)
+  {
+      if(argc != 2) {
+          std::printf(" Usage: %s <FILE> \n", argv[0]);
+          return 0;
+      }
+
+      struct stat fs; 
+      struct passwd* fs_user = nullptr; 
+      struct group*  fs_group = nullptr;
+
+
+      //int fd = open(argv[1], O_RDONLY);
+    
+      if( ::stat(argv[1], &fs ) == -1) {
+          std::fprintf(stderr, "Error: unable to open file => error = %s \n", strerror(errno) );
+          return -1;
+      }
+
+      if( ( fs_user = ::getpwuid(fs.st_uid)) == nullptr )
+      {
+          std::fprintf(stderr, " Error: unable to get owner information \n");
+          return -1;
+      }
+
+      if( ( fs_group = ::getgrgid(fs.st_gid)) == nullptr )
+      {
+          std::fprintf(stderr, " Error: unable to get group information \n");
+          return -1;
+      }
+
+
+      // Print boolean as 'true' or 'false'
+      std::cout << std::boolalpha;
+      std::cout << "  [*]  File size in bytes: " << fs.st_size << '\n';
+      std::cout << "  [*]  File size in Kilo bytes: " << static_cast<double>(fs.st_size) / 1024 << '\n';
+      std::cout << "  [*]  File size in Mega bytes: " << static_cast<double>(fs.st_size) / (1024 * 1024) << '\n';
+      std::cout << "  [*]           File type: " << get_descriptor_type(fs) << '\n';
+
+      std::cout << "\n TEST FILE TYPE \n";
+      std::cout << "  [*] ?      Is regular file =>> " << static_cast<bool>( S_ISREG(fs.st_mode) ) << '\n';
+      std::cout << "  [*] ?         Is directory =>> " << static_cast<bool>( S_ISDIR(fs.st_mode) ) << '\n';
+      std::cout << "  [*] ?     Is symbolic link =>> " << static_cast<bool>( S_ISLNK(fs.st_mode) ) << '\n';
+      std::cout << "  [*] ?     Is block device  =>> " << static_cast<bool>( S_ISBLK(fs.st_mode) ) << '\n';
+      std::cout << "  [*] ? Is character device  =>> " << static_cast<bool>( S_ISCHR(fs.st_mode) ) << '\n';
+
+      std::cout << "\n ACCESS TIME \n";
+      std::cout << "  [*] Time =>   last change: " << ctime(&fs.st_ctime);
+      std::cout << "  [*] Time =>   last access: " << ctime(&fs.st_atime);
+      std::cout << "  [*] Time => last modified: " << ctime(&fs.st_mtime);
+
+      std::cout <<  "\n OWNER and GROUP \n";
+      std::cout << "  [*] Owner: uid = " << fs.st_uid << " ;  user = " << fs_user->pw_name  << '\n';
+      std::cout << "  [*] Group: gid = " << fs.st_gid << " ; group = " << fs_group->gr_name  << '\n';
+
+      std::cout << "\n FILE PERMISSIONS \n";
+      std::cout << "  =>>  Stick Bits: " << (fs.st_mode & S_ISUID ? "suid" : "-") 
+                << "  "                  << (fs.st_mode & S_ISGID ? "sgid" : "-")
+                << '\n';
+      std::cout << "  =>>  Owner: " << (fs.st_mode & S_IRUSR  ? "r" : "-")   // File is readable   (can be read)
+                << " "         << (fs.st_mode & S_IWUSR  ? "w" : "-")        // File is writeable  (can be written)
+                << " "         << (fs.st_mode & S_IXUSR  ? "x" : "-")        // File is executable (can be executed - execv syscall)
+                << '\n';
+      std::cout << "  =>>  Group: " << (fs.st_mode & S_IRGRP  ? "r" : "-")  
+                << " "            << (fs.st_mode & S_IWGRP  ? "w" : "-")  
+                << " "            << (fs.st_mode & S_IXGRP  ? "x" : "-")
+                << '\n';
+      std::cout << "  =>> Others: " << (fs.st_mode & S_IROTH  ? "r" : "-")  
+                << " "             << (fs.st_mode & S_IWOTH  ? "w" : "-")  
+                << " "             << (fs.st_mode & S_IXOTH  ? "x" : "-")
+                << '\n';    
+      std::cout << " \n- Note: (r - read) ; (w - write); (x - execute) ; (suid - set-UID bit set) ; (sgid - set-GID bit set) \n";
+
+      return 0;
+  }
+#+END_SRC
+
+Building: 
+
+#+BEGIN_SRC sh 
+  # Build using GNU GCC (G++) compiler 
+  $ g++ file-info.cpp -o file-info -std=c++1z -g -Wall -Wextra
+
+  # Build using LLVM/Clang compiler 
+  $ clang++ file-info.cpp -o file-info -std=c++1z -g -Wall -Wextra
+#+END_SRC
+
+Running:
+
+  + Inspect directory /etc  
+
+#+BEGIN_SRC sh 
+  $ ./file-info /etc
+    [*]  File size in bytes: 12288
+    [*]  File size in Kilo bytes: 12
+    [*]  File size in Mega bytes: 0.0117188
+    [*]           File type: Directory
+
+   TEST FILE TYPE 
+    [*] ?      Is regular file =>> false
+    [*] ?         Is directory =>> true
+    [*] ?     Is symbolic link =>> false
+    [*] ?     Is block device  =>> false
+    [*] ? Is character device  =>> false
+
+   ACCESS TIME 
+    [*] Time =>   last change: Sun Aug  2 05:19:31 2020
+    [*] Time =>   last access: Wed Aug  5 04:50:20 2020
+    [*] Time => last modified: Sun Aug  2 05:19:31 2020
+
+   OWNER and GROUP 
+    [*] Owner: uid = 0 ;  user = root
+    [*] Group: gid = 0 ; group = root
+
+   FILE PERMISSIONS 
+    =>>  Stick Bits: -  -
+    =>>  Owner: r w x
+    =>>  Group: r - x
+    =>> Others: r - x
+
+  - Note: (r - read) ; (w - write); (x - execute) ; (suid - set-UID bit set) ; (sgid - set-GID bit set) 
+#+END_SRC
+
+ + Inspect executable file: /bin/sudo 
+
+#+BEGIN_SRC sh 
+  $ ./file-info /bin/sudo
+    [*]  File size in bytes: 182456
+    [*]  File size in Kilo bytes: 178.18
+    [*]  File size in Mega bytes: 0.174004
+    [*]           File type: Regular file
+
+   TEST FILE TYPE 
+    [*] ?      Is regular file =>> true
+    [*] ?         Is directory =>> false
+    [*] ?     Is symbolic link =>> false
+    [*] ?     Is block device  =>> false
+    [*] ? Is character device  =>> false
+
+   ACCESS TIME 
+    [*] Time =>   last change: Tue May 12 01:52:08 2020
+    [*] Time =>   last access: Sun Aug  2 05:20:57 2020
+    [*] Time => last modified: Fri Mar 27 05:50:36 2020
+
+   OWNER and GROUP 
+    [*] Owner: uid = 0 ;  user = root
+    [*] Group: gid = 0 ; group = root
+
+   FILE PERMISSIONS 
+    =>>  Stick Bits: suid  -
+    =>>  Owner: - - x
+    =>>  Group: - - x
+    =>> Others: - - x
+
+  - Note: (r - read) ; (w - write); (x - execute) ; (suid - set-UID bit set) ; (sgid - set-GID bit set) 
+#+END_SRC
+
+ + Inspect regular file: ~/bin/fserver.jsh
+
+#+BEGIN_SRC sh 
+   $ ./file-info ~/bin/fserver.jsh 
+     [*]  File size in bytes: 9968346
+     [*]  File size in Kilo bytes: 9734.71
+     [*]  File size in Mega bytes: 9.50656
+     [*]           File type: Regular file
+
+    TEST FILE TYPE 
+     [*] ?      Is regular file =>> true
+     [*] ?         Is directory =>> false
+     [*] ?     Is symbolic link =>> false
+     [*] ?     Is block device  =>> false
+     [*] ? Is character device  =>> false
+
+    ACCESS TIME 
+     [*] Time =>   last change: Tue May 12 12:35:32 2020
+     [*] Time =>   last access: Tue Aug  4 03:21:06 2020
+     [*] Time => last modified: Mon May 11 22:52:14 2020
+
+    OWNER and GROUP 
+     [*] Owner: uid = 1000 ;  user = myuser 
+     [*] Group: gid = 1000 ; group = myuser 
+
+    FILE PERMISSIONS 
+     =>>  Stick Bits: -  -
+     =>>  Owner: r w x
+     =>>  Group: r w -
+     =>> Others: r - -
+
+   - Note: (r - read) ; (w - write); (x - execute) ; (suid - set-UID bit set) ; (sgid - set-GID bit set) 
+#+END_SRC
+
+ + Inspect block _device file_ /dev/sda that represets the main disk
+   partition. 
+
+#+BEGIN_SRC sh 
+  $ ./file-info /dev/sda
+    [*]  File size in bytes: 0
+    [*]  File size in Kilo bytes: 0
+    [*]  File size in Mega bytes: 0
+    [*]           File type: Block device file
+
+   TEST FILE TYPE 
+    [*] ?      Is regular file =>> false
+    [*] ?         Is directory =>> false
+    [*] ?     Is symbolic link =>> false
+    [*] ?     Is block device  =>> true
+    [*] ? Is character device  =>> false
+
+   ACCESS TIME 
+    [*] Time =>   last change: Wed Jul  8 13:48:48 2020
+    [*] Time =>   last access: Wed Jul  8 13:49:09 2020
+    [*] Time => last modified: Wed Jul  8 13:48:48 2020
+
+   OWNER and GROUP 
+    [*] Owner: uid = 0 ;  user = root
+    [*] Group: gid = 6 ; group = disk
+
+   FILE PERMISSIONS 
+    =>>  Stick Bits: -  -
+    =>>  Owner: r w -
+    =>>  Group: r w -
+    =>> Others: - - -
+
+  - Note: (r - read) ; (w - write); (x - execute) ; (suid - set-UID bit set) ; (sgid - set-GID bit set) 
+
+#+END_SRC
+
+ + Inspect character _device file_  /dev/mem that represents the
+   physical memory (RAM memory). 
+
+#+BEGIN_SRC sh 
+   $ ./file-info /dev/mem
+     [*]  File size in bytes: 0
+     [*]  File size in Kilo bytes: 0
+     [*]  File size in Mega bytes: 0
+     [*]           File type: Character device file
+
+    TEST FILE TYPE 
+     [*] ?      Is regular file =>> false
+     [*] ?         Is directory =>> false
+     [*] ?     Is symbolic link =>> false
+     [*] ?     Is block device  =>> false
+     [*] ? Is character device  =>> true
+
+    ACCESS TIME 
+     [*] Time =>   last change: Wed Jul  8 13:48:49 2020
+     [*] Time =>   last access: Wed Jul  8 13:48:49 2020
+     [*] Time => last modified: Wed Jul  8 13:48:49 2020
+
+    OWNER and GROUP 
+     [*] Owner: uid = 0 ;  user = root
+     [*] Group: gid = 9 ; group = kmem
+
+    FILE PERMISSIONS 
+     =>>  Stick Bits: -  -
+     =>>  Owner: r w -
+     =>>  Group: r - -
+     =>> Others: - - -
+
+   - Note: (r - read) ; (w - write); (x - execute) ; (suid - set-UID bit set) ; (sgid - set-GID bit set) 
 #+END_SRC
 ** Information about current process 
 
@@ -5351,7 +5712,6 @@ Functions for dealing with network address:
    }
    #define h_addr h_addr_list[0] /* for backward compatibility */
 #+END_SRC
-
 
 
 *** Simple TCP/IP socket echo server 
