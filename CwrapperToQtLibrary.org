@@ -351,7 +351,7 @@ D Language:
 
   + [[https://dlang.org/spec/cpp_interface.html][Interfacing to C++ - D Programming Language]]
 
-*** Files
+*** Project Files
 
   + GIST with all sources:
     + https://gist.github.com/a59d0f1b17d286dad19842932c931e92
@@ -1179,8 +1179,7 @@ File: d_client.d (Dlang / D-language client code)
   }
 #+END_SRC
 
-*** Building and running
-**** Building the shared library for C-wrapper 
+*** Building the shared library for C-wrapper 
 
 Fetch the sources:
 
@@ -1215,33 +1214,59 @@ Show symbols exported by the C-wrapper shared library:
   + Note: On windows, the equivalent tool is _dumpbin_ and on MacOSX,
     the equivalent tool is _otool_.
 
-#+BEGIN_SRC sh
-   $ nm build/client1
-   0000000000401155 t .annobin__dl_relocate_static_pie.end
-   0000000000401150 t .annobin__dl_relocate_static_pie.start
-   000000000040114f t .annobin_init.c
-   000000000040114f t .annobin_init.c_end
-   0000000000401120 t .annobin_init.c_end.exit
-     ... ...  ... ...  ... ...  ... ...  ... ...
-     ... ...  ... ...  ... ...  ... ...  ... ...
-                    U printf@@GLIBC_2.2.5
-                    U puts@@GLIBC_2.2.5
-                    U qt_app_exec
-                    U qt_app_new2
-                    U qt_button_onClicked
-                    U qt_layout_new
-                    U qt_msgbox_info
-                    U qt_QFormLayout_addWidgetAndLabel
-                    U qt_QLineEdit_onTextChanged
-                    U qt_QLineEdit_text
-                    U qt_qobject_del
-                    U qt_qobject_print
-                    U qt_widget_new
-                    U qt_widget_setText
-      ... ... ... ... ... ...
-    ... ... ... ... ... ...
+#+BEGIN_SRC sh 
+   $ nm -D build/libqtwrapper.so 
+     ... ... ... ... ... ... ... 
+     ... ... ... ... ... ... ... 
+   0000000000012d9d T qt_QFormLayout_addRowItem
+   0000000000012d0c T qt_QFormLayout_addWidgetAndLabel
+   000000000001315a T qt_QLineEdit_onTextChanged
+   0000000000013284 T qt_QLineEdit_text
+   0000000000012741 T qt_qobject_ClassName
+   000000000001271a T qt_qobject_del
+   000000000001276a T qt_qobject_dumpObjectInfo
+   0000000000012785 T qt_qobject_dumpObjectTree
+   00000000000127a0 T qt_qobject_print
+                    U qt_version_tag
+   0000000000012a47 T qt_widget_new
+   0000000000012fbb T qt_widget_setText
+   0000000000012fa0 T qt_widget_show
+   0000000000012b51 T qt_window_main
+                    U strlen
+                    U _Unwind_Resume
+   00000000000157a8 W _Z12qobject_castIP11QMessageBoxET_P7QObject
+   00000000000157cc W _Z12qobject_castIP15QAbstractButtonET_P7QObject
+   000000000001573c W _Z12qobject_castIP6QLabelET_P7QObject
+   0000000000015760 W _Z12qobject_castIP9QLineEditET_P7QObject
+     ... ... ... ... ... ... ... ... 
+     ... ... ... ... ... ... ... ... 
 #+END_SRC
-**** Run C-client code executable 
+
+Show exported symbols demangling (aka decoding) C++ mangled symbols: 
+
+#+BEGIN_SRC sh 
+    $ >> nm -D build/libqtwrapper.so | c++filt
+    ... ... ... ... ... 
+    ... ... ... ... ... 
+   000000000001276a T qt_qobject_dumpObjectInfo
+   0000000000012785 T qt_qobject_dumpObjectTree
+   00000000000127a0 T qt_qobject_print
+                    U qt_version_tag
+   0000000000012a47 T qt_widget_new
+   0000000000012fbb T qt_widget_setText
+   0000000000012fa0 T qt_widget_show
+   0000000000012b51 T qt_window_main
+                    U strlen
+                    U _Unwind_Resume
+   00000000000157a8 W QMessageBox* qobject_cast<QMessageBox*>(QObject*)
+   00000000000157cc W QAbstractButton* qobject_cast<QAbstractButton*>(QObject*)
+   000000000001573c W QLabel* qobject_cast<QLabel*>(QObject*)
+   0000000000015760 W QLineEdit* qobject_cast<QLineEdit*>(QObject*)
+      ... ... ... ... ... 
+    ... ... ... ... ... 
+#+END_SRC
+
+*** Running C-client code executable 
 
 Run executable: 
 
@@ -1259,7 +1284,7 @@ Run executable:
 User Interface Screenshot: 
 
 [[file:images/cwrapper-qt5-1.png][file:images/cwrapper-qt5-1.png]] 
-**** Run Julia Client Code (loader.jl)
+*** Running Julia Client Code (loader.jl)
 
 Run julia script / attempt 1 -> error: 
 
@@ -1273,6 +1298,7 @@ Run julia script / attempt 1 -> error:
 #+END_SRC
 
 Run julia script / attempt 2 -> works: 
+
   + Note: LD_LIBRARY_PATH only works on Linux. The equivalent of this
     variable for windows is the _PATH_ environment variable and for
     MacOSX, the equivalent is _DYLD_LIBRARY_PATH_.
@@ -1299,6 +1325,14 @@ Run julia script / attempt 2 -> works:
    --------------------------------- 
    ... ... ... ... 
 #+END_SRC
+
+The previous Julia script could also be run in the following way. The
+advantage of this method is that, the variable LD_LIBRARY_PATH is only
+set for the command: '$ julia loader.jl'. 
+
+#+BEGIN_SRC sh 
+   $ env LD_LIBRARY_PATH=build:$LD_LIBRARY_PATH julia loade.jl 
+#+END_SRC 
 
 The library can be consumed without setting the environment variable
 LD_LIBRARY_PATH on Linux by moving the library file to /usr/lib,
@@ -1329,7 +1363,7 @@ LD_LIBRARY_PATH on Linux by moving the library file to /usr/lib,
 User Interface Screenshot: 
 
 [[file:images/cwrapper-qt5-2.png][file:images/cwrapper-qt5-2.png]]
-**** Run D-lang Client Code: d_client.d
+*** Running D-lang Client Code: d_client.d
 
 Run file d_client.d as a script: 
 
