@@ -190,7 +190,7 @@ def cleanHtmlFiles() =
 def compileFile(file: java.io.File, destDirectory: String, renameToIndex: Boolean = false) = {
   val input = new SFile(file.getPath())
   val out1 = input.changeExt("html")
-  val out2: File = if(!(renameToIndex && input.getName() == "README.org"))
+  val out2: File = if(!(renameToIndex && input.getName() == "INDEX.org"))
     out1.changeParent(destDirectory)
   else
     new java.io.File(destDirectory, "index.html")
@@ -217,7 +217,7 @@ args.toList match{
   case List("-make", "all") => {
     // Compile README.org to README.html and then rename to index.html
     compileDirectory(".", "dist/")
-    compileFile(F.file("README.org"), "dist/", true)
+    compileFile(F.file("INDEX.org"), "dist/", true)
     // compileDirectory("clojure", "dist/clojure")
     // compileDirectory("ocaml",   "dist/ocaml")
     // compileDirectory("scheme",  "dist/scheme")
