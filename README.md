@@ -1,5 +1,4 @@
-<!--<a href="https://tracking.gitads.io/?repo=C-Cpp-Notes"> <img src="https://images.gitads.io/C-Cpp-Notes" alt="GitAds"/> </a>-->
-
+<a href="https://tracking.gitads.io/?repo=C-Cpp-Notes"><img src="https://images.gitads.io/C-Cpp-Notes" alt="GitAds"/></a>
 
 # C++ Papyrus - C++ Annotations about Modern C++
 
