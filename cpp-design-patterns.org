@@ -1911,6 +1911,721 @@ Running:  ([[file:src/design-patterns/composite1.cpp][file:src/design-patterns/c
     [TRACE] Destroy group - id = << groupA
     [TRACE] Destroy group - id = << GroupB
 #+END_SRC
+** Chain of Responsibility 
+*** Overview 
+
+The Chain-of-responsibility design pattern is a behavioral design
+pattern, introduced by the GOF book, which allows decoupling the
+sender of a request object from the objects that handle the
+request. In this pattern, _request_ objects, also called _commands_ or
+_events_, are passed through a chain of _handler objects_ that process a
+request or forward it to the next handler in the chain without the
+sender know which handler will process the request. 
+
+ + Note: GOF means (Gang-of-Four Book) - _Elements of Reusable_
+   _Object-Oriented Software_ - Eric Gamma et al.
+
+ + Note: The _request_ is also referred by some sources as _command_ or
+   _event_. 
+
+
+Possible use-cases: 
+
+  + Request processing
+
+  + Event handling
+
+  + Error handling 
+
+  + Data validation
+
+  + Replace nested if-else statements allowing this piece code to be
+    extended without modifying it. (Open-close - OOP -
+    Object-Oriented-Programming principle from SOLID).
+
+Intent, according to GOF book - Elements of Reusable Object-Oriented
+Software:
+
+#+BEGIN_QUOTE
+  Avoid coupling the sender of a request to its receiver by giving
+  more than one object a chance to handle the request. Chain the
+  receiving objects and pass the request along the chain until an
+  object handles it. 
+#+END_QUOTE
+
+Further Reading: 
+
+  + [[https://en.m.wikipedia.org/wiki/Chain-of-responsibility_pattern][Chain of responsiblity design pattern - Wikipedia]]
+
+  + [[https://codenuclear.com/chain-of-responsibility-design-pattern-in-java/][Chain of responsiblity design pattern in Java - Code Nuclear]]
+
+  + [[https://sii.pl/blog/chain-of-responsibility-an-elegant-way-to-handle-complex-validation/][Chain of responsiblity - An Elegant Way ot handle complex validation]]
+
+  + [[https://blog.ploeh.dk/2019/07/22/chain-of-responsibility-as-catamorphisms/][Chain of Responsility as catamorphisms]] (Mark Seemann)
+
+  + [[https://blogs.sap.com/2020/02/26/abap-with-coffee-and-chain-of-responsibilitycor-oo-pattern/][ABAP with Coffee and Chain of Responsibility(CoR) OO Pattern]] - SAP
+    company (Sreejith Ramachandran)
+
+  + [[https://www.codeproject.com/Articles/1047753/Using-Chain-Of-Responsibility-Instead-of-if-else-S][Using Chain Of Responsibility Instead of if/else Statement]] (Fitim Skenderi)
+
+*** Http Request handling - Implementation 1 
+
+The following code simulates a http server that receives a http
+requests and sends a response which depends on the http request. This
+hypothetical http server has the following routes: 
+ 
+  + '/' or '' for ~http://www.mysite.com/~ (GET http method)
+
+  + '/download' for ~http://www.mysite.com/download~ (GET http method)
+
+  + '/upload' for  ~http://www.mysite.com/upload~ (POST http method)
+
+  + Any other path (aka resource) that does not exist.  For
+    ~http://www.mysite.com/do-not-exist~ (GET http method) => Returns
+    404 not found http response.
+
+
+All this code is available at GIST: 
+
+  + GIST: https://gist.github.com/b915ecb586be56802bf221a24936a654
+
+File: _chain-of-responsibility1.cpp_ 
+
+#+BEGIN_SRC cpp 
+   #include <iostream>
+   #include <string> 
+
+   enum class HttpMethod {
+       GET, POST, DELETE, PUT, HEAD, PATCH, UKNOWN_METHOD
+   };
+
+   struct HttpRequest {
+        std::string  path    = "/";
+        HttpMethod   method  = HttpMethod::GET;
+        std::string  payload = "";
+        // Missing - http headers ---- //
+
+        bool isGET()    const { return method == HttpMethod::GET;    }
+        bool isPOST()   const { return method == HttpMethod::POST;   }
+        bool isDELETE() const { return method == HttpMethod::DELETE; }
+   };
+
+   /** Process server Http GET request and returns a response. */
+   void dispatch_request(HttpRequest const& req)
+   {
+      // Http route:  http://www.mysite.com/
+      if(req.isGET() && ( req.path == "/" || req.path == ""))
+      {
+          std::printf(" => Serve index page, web site homepage \n");
+
+      // Http route:  http://www.mysite.com/download 
+      } else if( req.isGET() && req.path == "/download" ) 
+      {
+           std::printf(" => Serve http://www.mysite.com/dowload page. ");
+
+       // Http route:  http://www.mysite.com/upload 
+       } else if( req.isPOST() && req.path == "/upload") 
+       {
+          std::printf(" => Upload document to web server \n");
+
+        // Http route:  http://www.mysite.com/<error-failure>
+        } else {
+            std::printf(" => Error: 404 - Not Found resource: '%s' \n", req.path.c_str());
+        }
+   }
+
+
+   int main(int argc, char** argv)
+   {
+       auto req1 = HttpRequest{ "/", HttpMethod::GET, "" };
+       dispatch_request(req1);
+
+       auto req2 = HttpRequest{ "/error/resource", HttpMethod::GET, "" };
+       dispatch_request(req2); 
+
+       auto req3 = HttpRequest{ "/upload", HttpMethod::POST, "file data" };
+       dispatch_request(req3);
+
+
+       return 0;
+   }
+#+END_SRC
+
+Compiling: 
+
+#+BEGIN_SRC sh 
+  $ g++ chain-of-responsibility1.cpp -o cor1 -std=c++1z -Wall -Wextra
+
+  $ ./cor1 
+   => Serve index page, web site homepage 
+   => Error: 404 - Not Found resource: '/error/resource' 
+   => Upload document to web server   
+#+END_SRC
+
+Some drawbacks of the previous code are: adding new http routes or resources,
+requires modification of the _dispatch_request()_ function which
+violates the _open-close_ principle of object-oriented programming which
+states that the code should be open for extension but closed to
+modification. 
+*** Http Request handling - Implementation 2 (old c++ style) 
+
+This implementation of the chain-of-responsibility design pattern is
+similar to the one presented by the GOF book. A handler object checks
+whether the request can be handled, otherwise the handler forwards the
+request to next handler in the chain. In this particular case, the
+request is a _http request_ and the handler is an object that checks if
+it can serve the http request by sending a _http response_ back to the
+client side (request sender). Otherwise, the current handler forwards the
+request to the next http handler in the chain until the last handler
+is reached. 
+
+The advantage of this implementation using the chain-of-responsibility
+design pattern over the previous one using nested if else is that new
+http handlers (http routes or http resources) can be added without
+changing the server code. 
+
+Note: This implementation was designed in old C++ style (C++98)
+without using smart pointers. 
+
+File: _chain-of-responbility2.cpp_ 
+
+#+BEGIN_SRC cpp 
+   #include <iostream>
+   #include <string> 
+
+   enum class HttpMethod {
+      GET, POST, DELETE, PUT, HEAD
+   };
+
+   /** Request object - encapsulates a http request */
+   struct HttpRequest {
+       std::string  path    = "/";
+       HttpMethod   method  = HttpMethod::GET;
+       std::string  payload = "";
+       // Missing - http headers implementation ---- //
+
+       bool isGET()    const { return method == HttpMethod::GET;    }
+       bool isPOST()   const { return method == HttpMethod::POST;   }
+       bool isDELETE() const { return method == HttpMethod::DELETE; }
+   };
+
+   /** Interface class for generic node of chain of responsibility */
+   class IHttpHandler {
+   public:
+       virtual void handle(const HttpRequest& req) = 0;
+       virtual void set_next(IHttpHandler* next) = 0;
+       virtual ~IHttpHandler() = default; 
+   };
+
+   class BasicHttpHandler: public IHttpHandler {
+   protected:
+      /** Note: the keyword 'protected' allows derived classes
+       *  (aka subclasses) to access the 'm_next' pointer. But 
+       *  this keyword forbids any external code from accessing 
+       *  the pointer m_next.
+       */
+      IHttpHandler* m_next = nullptr;
+
+   public:
+       BasicHttpHandler(IHttpHandler* next = nullptr)
+        : m_next(next){ }
+
+
+       virtual ~BasicHttpHandler() {
+          delete m_next;
+          m_next = nullptr;
+       }
+
+       /** Set next request in the chain */
+       void set_next(IHttpHandler* next)
+       {
+          m_next = next;
+       }
+
+   };
+
+   class HttpGetHandler: public BasicHttpHandler {
+      std::string m_path; 
+   public:
+
+       HttpGetHandler(std::string path): m_path(path){ }
+
+       void handle(const HttpRequest& req) override
+       {
+           // Checks whether this handler object can process the request. 
+           if(req.method == HttpMethod::GET && m_path == req.path) {
+                   std::printf( " [RESPONSE] <HttpGetHandler> Return Html and http response with " 
+                                "status code 200 for resource: %s \n", m_path.c_str());
+           } else {
+                   // If the request cannot be handle, this hanlder forwards the request to 
+                   // the next handler in the chain. 
+                   m_next->handle(req); 
+           }
+       }
+
+   };
+
+   class HttpUploadHandler: public BasicHttpHandler {
+
+       void handle(const HttpRequest& req) override
+       {
+          if( req.method == HttpMethod::POST && req.path == "/upload" ) 
+               std::printf( " [RESPONSE] <HttpUploadHandler> Uploading data: '%s' \n"
+                            , req.payload.c_str());
+          else 
+               m_next->handle(req); 
+       }
+
+   };
+
+   class HttpError404Handler: public BasicHttpHandler {	
+       void handle(const HttpRequest& req) override
+       {
+           std::printf(" [RESPONSE] <HttpError404Handler>" 
+                       " Error 404 Not found resource: %s \n", req.path.c_str());
+       }
+
+   };
+
+   struct HttpServer 
+   {
+       // First handler in the chain 
+       IHttpHandler* m_hnd; 
+
+       HttpServer() {
+           IHttpHandler* hnd_index =  new HttpGetHandler("/");
+
+           IHttpHandler* hnd_download = new HttpGetHandler("/download");
+           hnd_index->set_next(hnd_download);
+
+           IHttpHandler* hnd_upload = new HttpUploadHandler();
+           hnd_download->set_next(hnd_upload);
+
+           IHttpHandler* hnd_error = new HttpError404Handler(); 
+           hnd_upload->set_next(hnd_error);
+
+           m_hnd = hnd_index;		
+       }
+
+       ~HttpServer() {
+            delete m_hnd; 
+            m_hnd = nullptr;
+       }
+
+       void dispatch_request(const HttpRequest& req)
+       {
+            std::printf("\n [TRACE] Process request => path = %s \n", req.path.c_str());
+            m_hnd->handle(req);
+            std::printf(" ---------------------------------------\n");
+       }
+   };
+
+
+   int main(int argc, char** argv)
+   {
+       HttpServer server;
+
+       auto req1 = HttpRequest{ "/", HttpMethod::GET, "" };
+       server.dispatch_request(req1); 
+
+       auto req2 = HttpRequest{ "/error/resource", HttpMethod::GET, "" };
+       server.dispatch_request(req2); 	
+
+       auto req3 = HttpRequest{ "/upload", HttpMethod::POST, "file data" };
+       server.dispatch_request(req3); 	
+
+
+       return 0;
+   }
+
+#+END_SRC
+
+Build and running: 
+
+#+BEGIN_SRC sh 
+  $ g++  chain-of-responsibility2.cpp -o cor2 -std=c++1z -Wall -Wextra
+  
+  $ ./cor2 
+
+   [TRACE] Process request => path = / 
+   [RESPONSE] <HttpGetHandler> Return Html and http response with status code 200 for resource: / 
+   ---------------------------------------
+
+   [TRACE] Process request => path = /error/resource 
+   [RESPONSE] <HttpError404Handler> Error 404 Not found resource: /error/resource 
+   ---------------------------------------
+
+   [TRACE] Process request => path = /upload 
+   [RESPONSE] <HttpUploadHandler> Uploading data: 'file data' 
+   ---------------------------------------  
+#+END_SRC
+
+*** Http Request handling - Implementation 3 ((modern c++ style) 
+
+This implementation is similar to the implementation 2, but the
+advantage of the current approach is the usage of smart pointers and
+less code repetition. 
+
+File: _chain-of-responsibility3.cpp_ 
+
+#+BEGIN_SRC cpp 
+   #include <iostream>
+   #include <string> 
+   #include <memory>
+
+   enum class HttpMethod {
+      GET, POST, DELETE, PUT, HEAD
+   };
+
+   /** Request object - encapsulates a http request */
+   struct HttpRequest {
+       std::string  path    = "/";
+       HttpMethod   method  = HttpMethod::GET;
+       std::string  payload = "";
+       // Missing - http headers implementation ---- //
+
+       bool isGET()    const { return method == HttpMethod::GET;    }
+       bool isPOST()   const { return method == HttpMethod::POST;   }
+       bool isDELETE() const { return method == HttpMethod::DELETE; }
+   };
+
+   /** Interface class for generic node of chain of responsibility */
+   class IHttpHandler {
+   public:
+       /** Predicate that checks whether request can be handled */
+       virtual bool can_handle(const HttpRequest& req) = 0;
+
+       /** Process (aka handle) request */
+       virtual void do_handle(const HttpRequest& req) = 0;
+
+       virtual void handle(const HttpRequest& req) = 0;
+
+       ~IHttpHandler() = default; 
+   };
+
+   class BasicHttpHandler: public IHttpHandler {
+         std::shared_ptr<IHttpHandler> m_next;
+
+   public:
+       BasicHttpHandler(std::shared_ptr<IHttpHandler> next = nullptr)
+          : m_next(next){ }
+
+       virtual ~BasicHttpHandler() = default;
+
+       void set_next(std::shared_ptr<IHttpHandler> next)
+       {
+           m_next = next;
+       }
+
+       /** Note: The keyword 'final' causes compile-time error if this 
+        * method is overriden by any class derived from this one. 
+        */
+       void handle(const HttpRequest& req) final 
+       {
+           if(this->can_handle(req)) 
+             this->do_handle(req);
+           else if(m_next != nullptr)
+              m_next->handle(req);
+           else 
+              throw std::runtime_error(" There is no handle for this request.");
+       }
+   };
+
+   class HttpGetHandler: public BasicHttpHandler {
+        std::string m_path; 
+   public:
+       HttpGetHandler(std::string path): m_path(path){ }
+
+       bool can_handle(const HttpRequest& req) override
+       {
+            return req.method == HttpMethod::GET && m_path == req.path;
+       }
+
+       void do_handle(const HttpRequest& req) override
+       {
+
+           std::printf( " [RESPONSE] <HttpGetHandler> Return Html and http response with " 
+                                    "status code 200 for resource: %s \n", m_path.c_str());
+       }
+
+   };
+
+   class HttpUploadHandler: public BasicHttpHandler {
+
+        bool can_handle(const HttpRequest& req) override
+        {
+             return req.method == HttpMethod::POST && req.path == "/upload";
+        }
+
+        void do_handle(const HttpRequest& req) override
+        {
+              std::printf( " [RESPONSE] <HttpUploadHandler> Uploading data: '%s' \n"
+                          , req.payload.c_str());
+        }
+   };
+
+   class HttpError404Handler: public BasicHttpHandler {
+       bool can_handle(const HttpRequest& req) override
+       {
+           return true; 
+       }
+
+       void do_handle(const HttpRequest& req) override
+       {
+           std::printf(" [RESPONSE] <HttpError404Handler>" 
+                      " Error 404 Not found resource: %s \n", req.path.c_str());
+       }
+
+   };
+
+   struct HttpServer 
+   {
+       std::shared_ptr<IHttpHandler> m_hnd; 
+
+       HttpServer() {
+              auto hnd_index = std::make_shared<HttpGetHandler>("/");
+
+              auto hnd_download = std::make_shared<HttpGetHandler>("/download");
+              hnd_index->set_next(hnd_download);
+
+              auto hnd_upload = std::make_shared<HttpUploadHandler>();
+              hnd_download->set_next(hnd_upload);
+
+              auto hnd_error = std::make_shared<HttpError404Handler>(); 
+              hnd_upload->set_next(hnd_error);
+
+              m_hnd = hnd_index;		
+      }
+
+       void dispatch_request(const HttpRequest& req)
+       {
+            std::printf("\n [TRACE] Process request => path = %s \n", req.path.c_str());
+            m_hnd->handle(req);
+            std::printf(" ---------------------------------------\n");
+       }
+   };
+
+
+   int main(int argc, char** argv)
+   {
+        HttpServer server;
+
+        auto req1 = HttpRequest{ "/", HttpMethod::GET, "" };
+        server.dispatch_request(req1); 
+
+        auto req2 = HttpRequest{ "/error/resource", HttpMethod::GET, "" };
+        server.dispatch_request(req2); 	
+
+        auto req3 = HttpRequest{ "/upload", HttpMethod::POST, "file data" };
+        server.dispatch_request(req3); 	
+
+
+        return 0;
+   }
+
+#+END_SRC
+
+Compiling and running: 
+
+#+BEGIN_SRC sh 
+   $ g++  chain-of-responsibility3.cpp -o cor3 -std=c++1z -Wall -Wextra
+ 
+   $ ./cor3
+
+    [TRACE] Process request => path = / 
+    [RESPONSE] <HttpGetHandler> Return Html and http response with status code 200 for resource: / 
+    ---------------------------------------
+
+    [TRACE] Process request => path = /error/resource 
+    [RESPONSE] <HttpError404Handler> Error 404 Not found resource: /error/resource 
+    ---------------------------------------
+
+    [TRACE] Process request => path = /upload 
+    [RESPONSE] <HttpUploadHandler> Uploading data: 'file data' 
+    ---------------------------------------
+#+END_SRC
+
+*** Http Request handling - Implementation 4 ((modern c++ style + functional) 
+
+This implementation of chain-of-responsibility design pattern replaces
+the linked list of http handlers by an array of handlers. Another
+modification is the introduction of the class AdapterHandler which
+allows creating http handlers (http routes) using C++ lambdas which
+makes possible to create new http handlers without creating new
+classes. Thus, the class AdapterHandler makes this code more
+functional-programming friendly. 
+
+File: _chain-of-responsibility4.cpp_. 
+
+#+BEGIN_SRC cpp 
+    #include <iostream>
+    #include <string>
+    #include <vector>  
+    #include <memory>
+
+    enum class HttpMethod {
+       GET, POST, DELETE, PUT, HEAD
+    };
+
+    /** Request object - encapsulates a http request */
+    struct HttpRequest {
+         std::string  path    = "/";
+         HttpMethod   method  = HttpMethod::GET;
+         std::string  payload = "";
+         // Missing - http headers implementation ---- //
+
+         bool isGET()    const { return method == HttpMethod::GET;    }
+         bool isPOST()   const { return method == HttpMethod::POST;   }
+         bool isDELETE() const { return method == HttpMethod::DELETE; }
+    };
+
+    /** Interface class for generic node of chain of responsibility */
+    class IHttpHandler {
+    public:
+        /** Predicate that checks whether request can be handled */
+        virtual bool can_handle(const HttpRequest& req) = 0;
+
+        /** Process (aka handle) http request and returns http response. */
+        virtual void handle(const HttpRequest& req) = 0;
+
+        ~IHttpHandler() = default; 
+    };
+
+    class HttpGetHandler: public IHttpHandler {
+        std::string m_path; 
+    public:
+        HttpGetHandler(std::string path): m_path(path){ }
+
+        bool can_handle(const HttpRequest& req) override
+        {
+            return req.method == HttpMethod::GET && m_path == req.path;
+        }
+
+        void handle(const HttpRequest& req) override
+        {
+            std::printf( " [RESPONSE] <HttpGetHandler> Return Html and http response with " 
+                         "status code 200 for resource: %s \n", m_path.c_str());
+        }
+
+    };
+
+    /* This class allows creating http handlers (transaction handlers)
+     * using C++ lambdas. 
+     */
+    template<typename predicate_t, typename action_t>
+    class AdapterHandler: public IHttpHandler 
+    {
+      predicate_t m_predicate; 
+      action_t    m_action;
+      public:
+
+      AdapterHandler(predicate_t predicate, action_t action)
+        :  m_predicate(predicate), m_action(action) { }
+
+      bool can_handle(const HttpRequest& req) override
+      {
+          return m_predicate(req);
+      }
+
+      void handle(const HttpRequest& req) override
+      {
+         return m_action(req);
+      }
+
+    };
+
+
+    struct HttpServer 
+    {
+          std::vector<std::shared_ptr<IHttpHandler>> m_handlers; 
+
+          HttpServer() {
+                 addHandler(std::make_shared<HttpGetHandler>("/"));
+                 addHandler(std::make_shared<HttpGetHandler>("/download"));
+
+                 addLambdaHandler(
+                   [](const HttpRequest& req)
+                   { 
+                       return req.method == HttpMethod::POST && req.path == "/upload";     
+                   }
+                  ,[](const HttpRequest& req)
+                   { 
+                           std::printf( " [RESPONSE] <HttpUploadHandler> Uploading data: '%s' \n"
+                                       , req.payload.c_str());        
+                    }
+                 );
+
+                addLambdaHandler(
+                    [](const HttpRequest& req){ return true; }
+                   ,[](const HttpRequest& req){ 
+                                   std::printf(" [RESPONSE] <HttpError404Handler>" 
+                                               " Error 404 Not found resource: %s \n", req.path.c_str());
+                   }
+                );
+        }
+
+        void addHandler(std::shared_ptr<IHttpHandler> hnd)
+        {
+            m_handlers.push_back(hnd);
+        }
+
+       template<typename predicate_t, typename action_t>
+       void addLambdaHandler(predicate_t pred, action_t action)
+       {
+         using T = AdapterHandler<predicate_t, action_t>;
+         auto hnd = std::make_shared<T>(pred, action);
+         m_handlers.push_back( hnd );
+       }
+
+       void dispatch_request(const HttpRequest& req)
+       {
+          std::printf("\n [TRACE] Process request => path = %s \n", req.path.c_str());
+          for(const auto& hnd: m_handlers) 
+            if(hnd->can_handle(req)) {
+                hnd->handle(req); 
+                return;
+            }
+
+         std::printf(" ---------------------------------------\n");
+      }
+    };
+
+
+    int main(int argc, char** argv)
+    {
+        HttpServer server;
+
+        auto req1 = HttpRequest{ "/", HttpMethod::GET, "" };
+        server.dispatch_request(req1); 
+
+        auto req2 = HttpRequest{ "/error/resource", HttpMethod::GET, "" };
+        server.dispatch_request(req2); 	
+
+        auto req3 = HttpRequest{ "/upload", HttpMethod::POST, "file data" };
+        server.dispatch_request(req3); 	
+
+        return 0;
+    }
+#+END_SRC 
+
+Build and running: 
+
+#+BEGIN_SRC sh 
+   $ g++ chain-of-responsibility4.cpp -o cor4 -std=c++1z -Wall -Wextra
+
+   $ ./cor4
+
+    [TRACE] Process request => path = / 
+    [RESPONSE] <HttpGetHandler> Return Html and http response with status code 200 for resource: / 
+
+    [TRACE] Process request => path = /error/resource 
+    [RESPONSE] <HttpError404Handler> Error 404 Not found resource: /error/resource 
+
+    [TRACE] Process request => path = /upload 
+    [RESPONSE] <HttpUploadHandler> Uploading data: 'file data'
+#+END_SRC
+
+
 ** Visitor 
 *** Overview 
 
