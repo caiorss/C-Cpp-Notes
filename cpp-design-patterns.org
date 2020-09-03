@@ -2065,7 +2065,7 @@ Observer Pattern Variants.
   + [[https://www.developer.com/java/data/understanding-java-observable-and-javafx-observable.html][Understanding Java Observable and JavaFX Observable - Developer.com]]
 
   + [[https://dzone.com/articles/javafx-collections-observablelist-and-observablema][JavaFX Collection's ObservableList and ObservableMap - DZone]]
-*** Example 1 - Classical Implementation 
+*** Implementation 1 - Classical Implementation 
 
 This implementation is based on classical observer-design pattern and
 defines two interfaces IObservable, which all observable objects
@@ -2295,7 +2295,191 @@ Building and running:
 GUI Screenshot: 
 
 [[file:images/observer-desing-pattern1.png][file:images/observer-desing-pattern1.png]]
+*** Implementation 2 - Using Callbacks 
 
+In this implementation, the observer object is replaced by a
+std::function<> callback which makes the code more loose coupled as
+any objects from any class and lambdas can be used as observers. 
+
+GIST: 
+
+ + https://gist.github.com/ff0cb5ac26bba23fc4c17c8bb8df070d
+
+File: _CMakeLists.txt_ 
+
+#+BEGIN_SRC cmake 
+     cmake_minimum_required(VERSION 3.9)
+     project(observer-design-pattern2)
+
+     #====== Global Configurations ==================#
+
+     set(CMAKE_CXX_STANDARD 17)
+     set(CMAKE_VERBOSE_MAKEFILE ON)
+     set(CMAKE_INCLUDE_CURRENT_DIR ON)
+     set(CMAKE_AUTOUIC ON)
+     set(CMAKE_AUTOMOC ON)
+     set(CMAKE_AUTORCC ON)
+     set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+     find_package(Qt5 COMPONENTS Core Widgets REQUIRED)
+
+     #=============== Target Configurations ============#
+
+     add_executable( observer2 observer-pattern2.cpp )
+     target_link_libraries( observer2 Qt5::Core Qt5::Gui Qt5::Widgets)
+#+END_SRC
+
+File: _observer-pattern2.cpp_ 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <iomanip>
+  #include <functional> 
+
+  #include <QtWidgets>
+  #include <QApplication>
+  #include <QSysInfo>
+
+  using ObserverCallback = std::function<void (void* sender)>;
+
+  struct IObservable 
+  {
+      /** Subscribe to observable notifications */
+      virtual void addObserver(ObserverCallback obs) = 0;
+
+      /** Notify all observers */
+      virtual void notify() = 0; 
+      virtual     ~IObservable() = default;
+  };
+
+  class Observable: public IObservable 
+  {
+      void* m_sender = nullptr;
+      std::vector<ObserverCallback> m_observers{};
+    
+  public:
+
+      Observable(){ }
+      Observable(void* sender): m_sender(sender){ }
+    
+      void addObserver(ObserverCallback callback) override 
+      {
+          m_observers.push_back(callback);
+          callback(m_sender);
+      }
+
+      /** Notify all observers */
+      void notify() override  
+      {
+          for(const auto callback: m_observers){ callback(m_sender); }
+      }    
+  };
+
+  class CounterModel
+  {
+      int m_counter{0};
+      Observable m_obs{this};
+  public: 
+      void increment() { m_counter += 1; m_obs.notify(); }
+      void decrement() { m_counter -= 1; m_obs.notify(); }
+      int  get() const { return m_counter; }
+
+      void onCounterChanged(ObserverCallback callback)
+      {
+          m_obs.addObserver(callback);
+      }
+  };
+
+  class FormView {
+      QWidget      m_win{};
+      QFormLayout* m_form;
+      QPushButton* m_btn_increment;
+      QPushButton* m_btn_decrement;
+      QLabel*      m_label;
+
+      CounterModel& m_model;
+  public:
+
+      FormView(CounterModel& model): m_model(model)
+      {
+          m_win.setWindowTitle("Form View");
+          m_form = new QFormLayout(&m_win);
+          m_btn_increment = new QPushButton("[+]");
+          m_btn_decrement = new QPushButton("[-]");
+          m_label         = new QLabel("0");
+
+          m_form->addRow("Increment",     m_btn_increment);
+          m_form->addRow("Decrement",     m_btn_decrement);
+          m_form->addRow("Counter value", m_label);
+
+          m_win.show(); 
+
+          /** ------ Setup event handlers ------------------- **/
+
+          QObject::connect(m_btn_decrement, &QPushButton::clicked, 
+              [self = this]{ 
+                  self->m_model.decrement();
+              });
+        
+          QObject::connect(m_btn_increment, &QPushButton::clicked, 
+              [this](){ 
+                  m_model.increment(); 
+              });
+      }
+
+      void update(void* sender)  
+      {
+          int cnt = reinterpret_cast<CounterModel*>(sender)->get();
+          m_label->setText(QString::number(cnt)); 
+          std::cout << " [QT GUI] Counter state changed to = " << cnt << '\n';
+      }
+  };
+
+  class LabelView
+  {
+      QLabel m_label;
+  public:
+      LabelView() 
+      {   
+          m_label.setWindowTitle("Label View");
+          m_label.resize(400, 300);
+          m_label.show();
+      }
+
+      void notify(void* sender)
+      {
+          int cnt = reinterpret_cast<CounterModel*>(sender)->get();
+          m_label.setText(" [LABEL Observer] Counter value = " + QString::number(cnt));
+      }
+
+  };
+
+
+  int main(int argc, char** argv)
+  {
+      QApplication app(argc, argv);
+
+      CounterModel model;     
+    
+      model.onCounterChanged([](void* sender){
+          int cnt = static_cast<CounterModel*>(sender)->get();
+          std::cout << " [CONSOLE VIEW] Counter state changed to = " << cnt << '\n';
+      });
+
+      FormView   observerB{model};
+      LabelView  observerC{};
+
+      model.onCounterChanged([&](void* sender){
+          observerB.update(sender);
+      });
+    
+      model.onCounterChanged([&](void* sender){ 
+          observerC.notify(sender); 
+      });
+
+      return app.exec();
+  }
+#+END_SRC
 ** Chain of Responsibility 
 *** Overview 
 
