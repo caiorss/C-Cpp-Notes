@@ -1000,9 +1000,10 @@ Mac OSX:
 #+END_SRC
 ** Widely used functions for strings and buffers in low level codes 
 
-This section provides a review and a recapitulation of the most widely
-used C functions in low level code bases and legacy C codes. Those
-functions are in the header <string.h> for C or <cstring> for C++.
+This section provides a recapitulation of the most widely used C
+functions in low level code bases and legacy C codes. Those functions
+are in the header <string.h> for C or <cstring> for C++.
+
 
   + _strlen()_ => Get length of null-terminated character array.
     + Docs: $ man strlen 
@@ -1064,6 +1065,86 @@ functions are in the header <string.h> for C or <cstring> for C++.
 
     root [7] strcmp(s1, s4)
     (int) 0
+#+END_SRC
+
+  + _strcasecmp()_ => Compare two string ignoring case sensitivity. This
+    function returns 0 if the string arguments are equal. Othewise, it
+    returns anything other than 0. 
+
+#+BEGIN_SRC cpp 
+    int strcasecmp(const char *string1, const char *string2);
+
+    // ---- USAGE ------------------------------------------// 
+
+    if( strcasecmp(stringA, stringB) == 0 )
+       printf(" Strings are equal Ok. \n");
+    else 
+       printf(" Strings are not equal. \n");
+
+    // ----- CERN's ROOT REPL session ----------------------// 
+
+    // Strings not equal 
+    root [21] strcasecmp("app", "Application")
+    (int) -108
+
+    // Strings are equal 
+    root [22] strcasecmp("application", "Application")
+    (int) 0
+
+    root [23] strcasecmp("AppLiCatION", "Application")
+    (int) 0
+    root [24] 
+#+END_SRC
+
+  + _sprintf()_ => Print string to a buffer. (Headers: <cstdio> in C++ or
+    <stdio.h> in C). Note: this function is vulnerable to buffer
+    overflow, if the data copied to the buffer is larger than its
+    size. 
+
+#+BEGIN_SRC cpp 
+   int sprintf(char *str, const char *format, ...);
+
+   // ---- CERN's ROOT REPL session ----------------------// 
+
+   root [1] char buffer[300];
+   root [2] memset(buffer, 0x00, 300)
+
+   root [4] sprintf(buffer, "The root of %d is equal to %f", 2, 2.0);
+
+   root [5] buffer
+   (char [300]) "The root of 2 is equal to 2.000000\0\0\0\0\0\0\0\.... ... \0"
+
+   root [7] std::cout << " buffer = <" << buffer << ">" << '\n';
+   buffer = <The root of 2 is equal to 2.000000>
+#+END_SRC
+
+  + _snprintf()_ => Print string to a buffer limiting the number of
+    characters that are copied to the buffer. The limitation of the
+    number characters copied helps protecting against buffer overflow
+    vulnerabilities. 
+
+#+BEGIN_SRC cpp 
+   int snprintf(char *str, size_t size, const char *format, ...);
+
+   // ---- CERN's ROOT REPL session ----------------------------//
+   root [0] char buf[200];
+   root [1] memset(buf, '\0', 200); // Initialize buffer
+
+   root [6] snprintf(buf, 10, "The square root of %f is equal to %.3f ", 10.0, sqrt(10.0));
+   root [7] 
+   root [7] buf
+   (char [200]) "The squar\0\0\0\0\0... ...\0\0\0"
+
+   root [8] snprintf(buf, 25, "The square root of %f is equal to %.3f ", 10.0, sqrt(10.0));
+   root [9] 
+   root [9] buf
+   (char [200]) "The square root of 10.00\0\0\0...\0\0"
+
+
+   root [10] snprintf(buf, 125, "The square root of %f is equal to %.3f ", 10.0, sqrt(10.0));
+   root [11] 
+   root [11] buf
+   (char [200]) "The square root of 10.000000 is equal to 3.162 \0\0\0..\0\0"
 #+END_SRC
 
   + _strcpy()_ => Copy string 'src' parameter (null-terminated array of
