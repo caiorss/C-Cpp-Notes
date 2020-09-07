@@ -1794,6 +1794,137 @@ Attempt to run from MX-Linux 19.2 (Older GLIBC)
    adjtime                           "/etc/adjtime"
    alsa                              "/etc/alsa"
 #+END_SRC
+*** Portable binary using Golang 
+
+Applications built with GO programming language are not affect by
+GLIBC compatibility problems since the GO compiler implementation
+performs system calls without relying on the GLIBC. This feature
+allows deploying GO binaries in any Linux distribution without
+worrying about GLIBC binary compatibility. 
+
+ *Demonstration* 
+
+File: _goapp.go_ 
+
+#+BEGIN_SRC c++ 
+  package main 
+
+  import (
+      "fmt"
+      "io/ioutil"
+      "net/http"
+      _ "bufio"
+      _ "log"
+  )
+
+  func main() {
+    
+      fmt.Println(" => Started Ok")
+    
+      // ------- List root directory ---------//
+      fmt.Println(" ---- List Root Directory ------")
+    
+      // No error handler for the sake of breviety. 
+      files, _ := ioutil.ReadDir("/")
+    
+      for _, fn := range files { 
+          fmt.Println(" => " + fn.Name() )         
+      } 
+    
+      // ---- Http Request ------------------// 
+      fmt.Println(" ------- Http Request -------------")
+      resp, _ := http.Get("https://www.httpbin.org/get")
+      body, _ := ioutil.ReadAll(resp.Body)
+      fmt.Println(string(body))
+  }
+#+END_SRC
+
+Compile sample GO application: 
+
+#+BEGIN_SRC sh
+   # Compiled  
+   $ go build goapp.go    
+
+   # Remove debug symbols 
+   $ strip goapp 
+
+   # Get file size in megabytes    
+   $ >> du -h goapp
+   4.9M    goapp
+
+   # Check binary 
+   $ >> file goapp
+   goapp: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked, interpreter 
+   /lib64/ld-linux-x86-64.so.2, 
+   Go BuildID=rXh5UDymAYyqH6QHp4N5/KktyZonaNBes2MLq_8eV/4lmCJtW64uAqpYg_AIb_/5S4-otZPFzRnjGyq3bBL
+  , not stripped
+
+  # Check shared libraries dependencies 
+   $ >> ldd goapp
+          linux-vdso.so.1 (0x00007ffee9b99000)
+          libpthread.so.0 => /lib64/libpthread.so.0 (0x00007fc87c0c6000)
+          libc.so.6 => /lib64/libc.so.6 (0x00007fc87befc000)
+          /lib64/ld-linux-x86-64.so.2 (0x00007fc87c10d000)
+#+END_SRC 
+
+Run application in Fedora 32 distribution (Newer version of GLIBC): 
+
+#+BEGIN_SRC sh 
+    $ >> ./goapp 
+    => Started Ok
+    ---- List Root Directory ------
+    => .autorelabel
+    => bin
+    => boot
+    => dev
+    => etc
+    ... ... ... ... ... ... ... ... ... 
+    ... ... ... ... ... ... ... ... ... 
+    => usr
+    => var
+    ------- Http Request -------------
+   {
+     "args": {}, 
+     "headers": {
+       "Accept-Encoding": "gzip", 
+       "Host": "www.httpbin.org", 
+       "User-Agent": "Go-http-client/2.0", 
+       "X-Amzn-Trace-Id": "Root=2-5f5650e9-4830a22ac821b598c22defbc"
+     }, 
+     "url": "https://www.httpbin.org/get"
+   }
+#+END_SRC
+
+Run application in MX-Linux distribution, based on Debian (Older version of GLIBC):
+
+#+BEGIN_SRC sh 
+  $ ./goapp
+   => Started Ok
+   ---- List Root Directory ------
+   => .cache
+   => .config
+   => .fehbg
+   => bin
+   => boot
+   ... ... ... ... .... ... ... ... ... .... ... 
+   ... ... ... ... .... ... ... ... ... .... ... 
+   => var
+   => vmlinuz
+   ------- Http Request -------------
+  {
+    "args": {}, 
+    "headers": {
+      "Accept-Encoding": "gzip", 
+      "Host": "www.httpbin.org", 
+      "User-Agent": "Go-http-client/2.0", 
+      "X-Amzn-Trace-Id": "Root=1-5f56523a-6cfd5015acb4421e26947afe"
+    }, 
+    "url": "https://www.httpbin.org/get"
+  }
+
+#+END_SRC
+
+
 ** Creating command line applications with CLI11 C++ Library
 *** Overview 
 
@@ -2854,7 +2985,7 @@ Trace system-calls with _strace_ application:
   exit_group(0)                           = ?
   +++ exited with 0 +++
 #+END_SRC
-** Process Inputs, Outputs and States 
+** Process Inputs, Outputs and States and PROCFS on Linux 
 
 Any process may have the following inputs, outputs and states: 
 
