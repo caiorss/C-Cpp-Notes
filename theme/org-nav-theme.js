@@ -130,9 +130,90 @@ class LocalStorageString {
        this.notify();
     }
 
-
 };
 
+class LocalStorageList {
+
+    constructor(name, value, options) {
+        this.name         = name;
+        this.defaut_value = value;
+        this.options      = options;
+        this.observers    = [];
+
+    }
+
+    add_observer(observer_function)
+    {
+        this.observers.push(observer_function);
+    }
+
+    notify(){
+        for(let callback of this.observers) callback(this);
+    };
+
+
+    get(){
+        var result = localStorage.getItem(this.name);
+        console.assert( result != "undefined"  );
+        if(result == null || result == "undefined") { 
+            return this.defaut_value; 
+        }
+        return result;
+    };
+
+    getSelectedValue() {
+        var index = this.get();
+        var opt   = this.options[index];
+        console.log(` Index = ${index} ; opt = ${opt} `);
+        return opt["value"];
+    }
+    
+    set(value){ 
+       if(value == this.get()) { return; }
+       localStorage.setItem(this.name, value);
+       this.notify();
+    }
+
+    bind_list(list_like_widget)
+    {
+        var selectbox = document.querySelector(list_like_widget);
+        console.assert(selectbox, "selectbox not supposed to be null");
+        
+        console.log(" this.options = ", this.options);
+
+        for(let row in this.options) {
+            var opt   = document.createElement("option");
+            console.log(" row = ", row);
+            opt.text  = this.options[row]["text"];
+            opt.value = this.options[row]["value"];
+            selectbox.add(opt, -1);
+        }
+
+        selectbox.selectedIndex = this.get();
+
+        var self = this;
+
+        selectbox.addEventListener("change", () => {
+            console.log(" Self = ", self);
+            self.set( selectbox.selectedIndex );
+        });
+
+        this.add_observer(sender => {
+            var index = sender.get();
+            selectbox.selectedIndex = index;
+        });
+
+        this.notify();
+    }
+
+    bind_list_when_loaded(list_like_widget)
+    {
+        let self = this;
+        document.addEventListener("DOMContentLoaded", () => { 
+            self.bind_list(list_like_widget);
+        }, false);
+    }
+};
 
 function set_light_theme()
 {
@@ -177,44 +258,59 @@ storage_theme.add_observer( sender => {
     }
 });
 
-const storage_code_font_size = new LocalStorageString("code-font-size", "8pt");
+const storage_code_font_size = new LocalStorageList("code-font-size", 0, 
+     [ 
+        {text: "8pt",  value: "8pt"  }
+      , {text: "10pt", value: "10pt" }
+      , {text: "12pt", value: "12pt" }
+    ]);
 
-storage_code_font_size.add_observer(sender => {
-    var font_size = sender.get(); 
+// storage_code_font_size.bind_list_when_loaded("#selector-font-code");
+
+storage_code_font_size.add_observer( sender => { 
+    var font_size = sender.getSelectedValue(); 
     document.documentElement.style.setProperty('--font-source-size', font_size);
-
-    
-    const fonts_index = {"8pt": 0, "10pt": 1, "12pt": 2};
-    var selector = document.querySelector("#selector-font-code");
-    selector.selectedIndex = fonts_index[font_size];
 });
 
-const storage_text_font_size = new LocalStorageString("text-font-size", "10pt"); 
+const storage_text_font_size = new LocalStorageList("text-font-size", 0, 
+    [
+        {text: "8pt",  value: "8pt"  }
+      , {text: "10pt", value: "10pt" }
+      , {text: "12pt", value: "12pt" }
+      , {text: "14pt", value: "14pt" }
+    ]); 
 
-storage_text_font_size.add_observer(sender => {
-    var font_size = sender.get(); 
+storage_text_font_size.add_observer( sender => {
+    var font_size = sender.getSelectedValue();     
     document.documentElement.style.setProperty('--text-font-size', font_size);
-    
-    const fonts_index = {"8pt": 0, "10pt": 1, "12pt": 2, "14pt": 3};
-    var selector = document.querySelector("#selector-font-text");
-    selector.selectedIndex = fonts_index[font_size];
 });
 
 const id_selector_content_font = "selector-content-font";
-const storage_content_font = new LocalStorageString("content-font", "spectral"); 
+
+
+const storage_content_font = new LocalStorageList("content-font", 0, 
+    [
+          {text: "spectral",  value: "spectral"}
+        , {text: "arial",     value: "arial"   }
+        , {text: "monospace", value: "monospace"   }
+    ]); 
 
 storage_content_font.add_observer(sender => {
-    let font = sender.get(); 
+    let font = sender.getSelectedValue(); 
     document.documentElement.style.setProperty('--content-font', font);
-    
-    const fonts_index = {"spectral": 0, "arial": 1, "monospace": 2};
-    var selector = document.querySelector("#" + id_selector_content_font);
-    selector.selectedIndex = fonts_index[font];
 });
 
+const storage_code_font_type = new LocalStorageList("code-font-type", 0, 
+    [
+          {text: "monospace", value: "monospace"    }
+        , {text: "Iosevka",   value: "code-Iosevka" }
+        , {text: "arial",     value: "arial"        }
+    ]);
 
-
-
+storage_code_font_type.add_observer( sender => {
+    let font = sender.getSelectedValue();
+    document.documentElement.style.setProperty('--font-source-code', font);
+});
 
 function startControlPanel(isMobile) {
     var toc = document.querySelector("#table-of-contents");
@@ -264,36 +360,35 @@ function startControlPanel(isMobile) {
             <tr> 
                 <th class="row-label">Text's font size</th>
                 <th class="row-item"> 
-                    <select id="selector-font-text" title="Select code block font size">
-                        <option value="8pt">8pt</option>
-                        <option value="10pt">10pt</option>
-                        <option value="12pt">12pt</option>           
-                        <option value="14pt">14pt</option>                       
+                    <select id="selector-font-text" title="Select code block font size">                   
                     </select>
                 </th> 
             </tr> 
-
+            
             <tr> 
                 <th class="row-label">Source code's font size</th>
                 <th class="row-item"> 
-                    <select id="selector-font-code" title="Select code block font size">
-                        <option value="8pt">8pt</option>
-                        <option value="10pt">10pt</option>           
-                        <option value="12pt">12pt</option>                       
+                    <select id="selector-font-code" title="Select code block font size">                    
                     </select>
                 </th> 
             </tr> 
-
+            
             <tr> 
                 <th class="row-label">Content font type</th>
                 <th class="row-item"> 
-                    <select id="${id_selector_content_font}" title="Select font for content">
-                        <option value="spectral">Spectral</option>
-                        <option value="arial">Arial</option>           
-                        <option value="monospace">Monospace</option>                       
+                    <select id="${id_selector_content_font}" title="Select font for content">                    
                     </select>
                 </th> 
             </tr>             
+
+
+            <tr> 
+                <th class="row-label">Code font type</th>
+                <th class="row-item"> 
+                    <select id="selector-font-code-type" title="Select code font type">                    
+                    </select>
+                </th> 
+            </tr>  
 
         </table>
 
@@ -313,22 +408,6 @@ function startControlPanel(isMobile) {
         // alert(" Theme changed Ok to " + sender.value);
     });
 
-    dialog.querySelector("#selector-font-code").addEventListener("change", () => { 
-        var sender = dialog.querySelector("#selector-font-code");
-        storage_code_font_size.set(sender.value);
-    });
-
-    dialog.querySelector("#selector-font-text").addEventListener("change", () => { 
-         var sender = dialog.querySelector("#selector-font-text");
-         storage_text_font_size.set(sender.value);
-    });
-
-    dialog.querySelector("#" + id_selector_content_font).addEventListener("change", () => {
-        var sender = dialog.querySelector("#" + id_selector_content_font);
-        storage_content_font.set(sender.value);
-    });
- 
-
     elem.querySelector("#btn-config").addEventListener("click", () => {
         dialog.showModal();
     });
@@ -342,12 +421,7 @@ function startControlPanel(isMobile) {
         elem.scrollTop = 0;
 
         var doc = document.documentElement || document;
-        doc.scrollTop = 0;
-
-   /*      var doc = document.documentElement || document;
-        doc.scrollTop = 0;
-
-        window.scrollTo(0, 0); */
+        doc.scrollTop = 0;ssssssssssssssssssssss
     });
 
     elem.querySelector("#btn-bottom").addEventListener("click", () => {
@@ -432,10 +506,18 @@ var init = function(){
         console.log("Control panel style = ", ctpanel.style);
     }
 
+    storage_code_font_size.bind_list("#selector-font-code");
+    storage_text_font_size.bind_list("#selector-font-text");
+    storage_code_font_type.bind_list("#selector-font-code-type");
+  
+   // storage_code_font_size.notify();
+
     storage_theme.notify();
-    storage_code_font_size.notify();
+    
     storage_text_font_size.notify();
     storage_content_font.notify();
+
+    storage_content_font.bind_list("#" + id_selector_content_font);
         
   /*   var dom_content = document.querySelector("#content");
     dom_content.classList.toggle("theme-light-content");     */
