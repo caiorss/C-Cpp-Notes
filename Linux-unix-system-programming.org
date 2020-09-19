@@ -2005,7 +2005,6 @@ Run application in MX-Linux distribution, based on Debian (Older version of GLIB
 
 #+END_SRC
 
-
 ** Creating command line applications with CLI11 C++ Library
 *** Overview 
 
@@ -4558,6 +4557,462 @@ Building and running:
    [INFO] Shutdown gracefully. Ok. 
 
 #+END_SRC
+** Library calls hooking/interception with LD_PRELOAD 
+*** Overview 
+
+The dynamic linker of many Unix-like operating systems, including
+Linux-based ones and BSD variants, provide a LD_PRELOAD mechanism,
+which allows intercepting and overriding (aka hooking) library calls
+performed by applications withou any source code modification. A
+library call can be overriden by setting the LD_PRELOAD environment
+variable with a colon (':') separated list containing full paths of
+shared libraries containing symbols with the same name as the
+overriden functions.
+
+Some use-cases of this feature are: 
+
+  + Override library calls and modify the behavior of library calls.
+  + Performance analysis.
+  + Instrument library calls. 
+  + Log library-calls
+  + Trace memory allocation by overrading calloc, malloc and free
+    functions. 
+  + Patch executables without any source code modification or
+    recompilation.
+
+Notes and limitations: 
+
+  * The dynamic linker LD_PRELOAD feature do not intercept kernel's
+    system-calls, it can only intercept library calls (aka function
+    calls) or GlibC (GNU C library) or any other CRT (C - Runtime
+    Library) wrappers for _system calls_, informally called
+    _syscalls_.
+
+  * LD_PRELOAD trick cannot intercept functions of executables owned
+    by root and with SETUID bit set. 
+
+*** Sample code and experiment 
+
+All sources available at GIST: 
+
+  + GIST: https://gist.github.com/751fad7bf7707949e824ed2c19a73752
+
+File: _build.sh_ (Build script)
+
+#+BEGIN_SRC sh  
+   #!/usr/bin/env sh
+
+   # Build unix/Linux executable
+   gcc unix-executable.c -o unix-executable.bin
+
+   # Build Linux shared library: hook-files-a.so
+   gcc hook-files-a.c -o hook-files-a.so -fpic -shared -ldl -Wall
+
+   # Build Linux shared library: hook-files-b.so
+   g++ hook-files-b.cpp -o hook-files-b.so -fpic -Wall -shared -ldl
+#+END_SRC
+
+
+File: _hook-files-a.c_  / C-version  (Shared library, aka shared object, hook-files-a.so)
+
+#+BEGIN_SRC cpp   
+  #define _GNU_SOURCE // Enables RTLD_NEXT constant.
+
+  #include <stdio.h>
+  #include <assert.h>
+  #include <stdint.h>  
+
+  // ----- Unix-specific headers ------- //
+  #include <dlfcn.h>
+
+  // Annotation for internal symbols not visible outside
+  // this compilation unit (static storage class).
+  #define HIDDEN static 
+
+  // Anotation for calling function whenever the shared library
+  // is loaded by some process. Note: this is a specific GNU 
+  // language extension. 
+  #define ON_LIBRARY_LOADED __attribute__((constructor))
+
+  typedef uint32_t pid_t;
+  typedef uint32_t mode_t;
+
+  extern  pid_t getpid(void);
+
+  __attribute__((constructor)) static 
+  void init_library1()
+  {
+    fprintf(stderr, " [INFO] init_library1() / Library loaded Ok. \n");
+  }
+
+  HIDDEN ON_LIBRARY_LOADED 
+  void init_library2()
+  {
+    fprintf(stderr, " [INFO] init_library2() / Library loaded Ok. \n");
+  }
+
+  /** Intercepts (aka hooks) and overrides open() function 
+   ,*  from libC (GLIBC) that encapsulates open() system-call 
+   ,*  (aka syscall).
+   ,*---------------------------------------------------------*/
+  int open(const char* pathname, int flags, mode_t mode)
+  {
+     // Type alias for function pointer with same
+     // signature as the open() function. 
+     typedef int (* open_t) (  const char* pathname
+                             , int         flags
+                             , mode_t      mode);
+  
+     // Load old symbol of original C function that was overriden
+     open_t open_real = (open_t) dlsym(RTLD_NEXT, "open");
+
+     // Sanity checking => calls abort() if symbol is not found.
+     assert( open_real );
+   
+     // Log intercepted functional call
+     // pid =>> Process ID of process that loaded this
+     // shared library. 
+     fprintf( stderr
+              , " [TRACE] pid = %d / open() ->> File = %s \n"
+              , getpid(), pathname);
+
+     // Pass control back to intercepted (hooked) function. 
+     return open_real(pathname, flags, mode);
+  }
+
+
+  FILE* fopen64(const char* filename, const char* type)
+  {
+        typedef FILE* (* fopen64_t) (  const char* filename
+                                     , const char* type);
+
+        fopen64_t old_fun = (fopen64_t) dlsym(RTLD_NEXT, "fopen64");
+        assert( old_fun != NULL);
+
+        fprintf( stderr
+                 , " [TRACE] pid = %d / fopen64() ->> File = %s \n"
+                 , getpid(), filename);     
+    
+        return old_fun(filename, type);
+  }
+#+END_SRC
+
+
+File: _hook-files-b.cpp_  / C++-version  (Shared library /hook-files-b.so/ )
+
+#+BEGIN_SRC cpp  
+  #include <iostream>
+  #include <cassert>
+  // Equivalent to C-header <stdint.h> std::uint32_t ... and so on.
+  #include <cstdint>  
+
+  // ----- Unix-specific headers ------- //
+
+  #include <dlfcn.h>
+
+  // Annotqtion for defining functions with C-linkage
+  // that must conform to C ABI and calling conventions.
+  #define EXTERN_C extern "C"
+
+  // Annotation for internal symbols not visible outside
+  // this compilation unit (static storage class).
+  #define HIDDEN static 
+
+  // Anotation for calling function whenever the shared library
+  // is loaded by some process. Note: this is a specific GNU 
+  // language extension. 
+  #define ON_LIBRARY_LOADED __attribute__((constructor))
+
+  // This symbol will be resolved at linking-time by the Linker 
+  extern "C" pid_t getpid(void);
+
+
+  __attribute__((constructor)) static 
+  void init_library1()
+  {
+    fprintf( stderr," [INFO] init_library1() / Library loaded Ok. \n");
+  }
+
+  HIDDEN ON_LIBRARY_LOADED 
+  void init_library2()
+  {
+    fprintf( stderr, " [INFO] init_library2() / Library loaded Ok. \n");
+  }
+
+  /** Intercepts (aka hooks) and overrides open() function 
+   ,*  from libC (GLIBC) that encapsulates open() system-call 
+   ,*  (aka syscall).
+   ,*---------------------------------------------------------*/
+  EXTERN_C
+  int open(const char* pathname, int flags, mode_t mode)
+  {
+     // Type alias for function pointer with same
+     // signature as the open() function. 
+     using open_t = int (*) (  const char* pathname
+                             , int         flags
+                             , mode_t      mode);
+  
+     // Load old symbol of original C function that was overriden
+     open_t open_real = (open_t) dlsym(RTLD_NEXT, "open");
+
+     // Sanity checking => calls abort() if symbol is not found.
+     assert( open_real != nullptr);
+   
+     // Log intercepted functional call
+     // pid =>> Process ID of process that loaded this
+     // shared library. 
+     std::fprintf( stderr
+                  , " [TRACE] pid = %d / open() ->> File = %s \n"
+                  , getpid(), pathname);
+
+     // Pass control back to intercepted (hooked) function. 
+     return open_real(pathname, flags, mode);
+  }
+
+  EXTERN_C
+  FILE* fopen64(const char* filename, const char* type)
+  {
+      using fopen64_real = FILE* (*) ( const char* filename
+                                     , const char* type);
+
+      auto old_fun = (fopen64_real) dlsym(RTLD_NEXT, "fopen64");
+      assert( old_fun != nullptr);
+
+       std::fprintf( stderr
+                  , " [TRACE] pid = %d / fopen64() ->> File = %s \n"
+                  , getpid(), filename);     
+    
+      return old_fun(filename, type);
+  }
+#+END_SRC
+
+Building executable and shared libraries (aka shared objects - 'unix
+terminology'):
+
+#+BEGIN_SRC sh 
+    $ >> git clone https://gist.github.com/751fad7bf7707949e824ed2c19a73752 api-hooking && cd api-hooking 
+    $ >> sh build.sh
+
+    $ ls
+    build.sh  hook-files-a.c  hook-files-b.cpp  unix-executable.c
+
+    # Check generated object-codes:
+    #------------------------------------------------------------------#
+    $ >> file hook-files-a.so 
+    hook-files-a.so: ELF 64-bit LSB shared object, x86-64, version 1 (SYSV) ... ...
+
+    $ >> file hook-files-b.so
+    hook-files-b.so: ELF 64-bit LSB shared object, x86-64, version 1 (SYSV) ... ...
+
+    $ >> file unix-executable.bin 
+    unix-executable.bin: ELF 64-bit LSB executable, x86-64, ... ... ...
+#+END_SRC
+
+Running executable _unix-executable.bin_ 
+
+#+BEGIN_SRC sh 
+    $ >> ./unix-executable.bin  
+   unix-executable.bin: unix-executable.c:8: main: Assertion `argc == 2 && "Missing file argument"' failed.
+   fish: “./unix-executable.bin” terminated by signal SIGABRT (Abort)
+
+   $ >> ./unix-executable.bin /proc/devices 
+   [LINE] 1 = Character devices:
+    [LINE] 2 =   1 mem
+    [LINE] 3 =   4 /dev/vc/0
+    [LINE] 4 =   4 tty
+   ... ... ... ... ... 
+   ... ... ... ... ... 
+    [LINE] 67 = 253 device-mapper
+    [LINE] 68 = 254 mdp
+    [LINE] 69 = 259 blkext
+#+END_SRC
+
+Intercepting library-call (ak function) _fopen64()_ using LD_PRELOAD.
+
+#+BEGIN_SRC sh 
+   # Using hook-files-a.so (C version)
+   #-------------------------------------------------
+   $ >> env LD_PRELOAD=$PWD/hook-files-a.so ./unix-executable.bin /proc/devices 
+   [INFO] init_library1() / Library loaded Ok. 
+   [INFO] init_library2() / Library loaded Ok. 
+   [TRACE] pid = 231690 / fopen64() ->> File = /proc/devices 
+   [LINE] 1 = Character devices:
+    [LINE] 2 =   1 mem
+    [LINE] 3 =   4 /dev/vc/0
+    [LINE] 4 =   4 tty
+    [LINE] 5 =   4 ttyS
+    [LINE] 6 =   5 /dev/tty
+    [LINE] 7 =   5 /dev/console
+    ... ... ... ... 
+   ... ... ... ... ... 
+
+   # Using hook-files-b.so (C++ version)
+   #-------------------------------------------------
+   $ >> env LD_PRELOAD=$PWD/hook-files-b.so ./unix-executable.bin /proc/devices
+   [INFO] init_library1() / Library loaded Ok. 
+   [INFO] init_library2() / Library loaded Ok. 
+   [TRACE] pid = 231790 / fopen64() ->> File = /proc/devices 
+   [LINE] 1 = Character devices:
+    [LINE] 2 =   1 mem
+    [LINE] 3 =   4 /dev/vc/0
+    [LINE] 4 =   4 tty
+    [LINE] 5 =   4 ttyS
+    [LINE] 6 =   5 /dev/tty
+    [LINE] 7 =   5 /dev/console
+   ... ...  ... ...  ... ...  ... ...  ... ... 
+   ... ...  ... ...  ... ...  ... ...  ... ... 
+#+END_SRC
+
+Intercepting library-call (ak function) _fopen64()_ using LD_PRELOAD,
+but discarding _stdout_ (standard console output) by redirecting it to
+/dev/null in order to only display the _stderr_ logged by the
+replacement functions. 
+
+#+BEGIN_SRC sh 
+   # C version 
+   $ >> env LD_PRELOAD=$PWD/hook-files-a.so ./unix-executable.bin /proc/devices > /dev/null
+   [INFO] init_library1() / Library loaded Ok. 
+   [INFO] init_library2() / Library loaded Ok. 
+   [TRACE] pid = 231957 / fopen64() ->> File = /proc/devices 
+
+   # C+++ version 
+   $ >> env LD_PRELOAD=$PWD/hook-files-b.so ./unix-executable.bin /proc/devices > /dev/null
+   [INFO] init_library1() / Library loaded Ok. 
+   [INFO] init_library2() / Library loaded Ok. 
+   [TRACE] pid = 231994 / fopen64() ->> File = /proc/devices 
+#+END_SRC
+
+Tracing library calls with _ltrace_ utility: 
+
+#+BEGIN_SRC sh  
+    $ >> ltrace ./unix-executable.bin /proc/devices
+   fopen64("/proc/devices", "r")                         = 0x19722a0
+   getline(0x7fff02a9a640, 0x7fff02a9a638, 0x19722a0, 0x7fff02a9a638) = 19
+   fprintf(0x7f50e3769500, " [LINE] %d = %s ", 1, "Character devices:\n" [LINE] 1 = Character devices:
+   ) = 32
+   getline(0x7fff02a9a640, 0x7fff02a9a638, 0x19722a0, 0x7fff02a9a638) = 8
+   fprintf(0x7f50e3769500, " [LINE] %d = %s ", 2, "  1 mem\n"  [LINE] 2 =   1 mem
+   ) = 21
+   getline(0x7fff02a9a640, 0x7fff02a9a638, 0x19722a0, 0x7fff02a9a638) = 14
+   fprintf(0x7f50e3769500, " [LINE] %d = %s ", 3, "  4 /dev/vc/0\n"  [LINE] 3 =   4 /dev/vc/0
+   ) = 27
+   getline(0x7fff02a9a640, 0x7fff02a9a638, 0x19722a0, 0x7fff02a9a638) = 8
+   fprintf(0x7f50e3769500, " [LINE] %d = %s ", 4, "  4 tty\n"  [LINE] 4 =   4 tty
+     ... ... ...   ... ... ...   ... ... ...   ... ... ...   ... ... ...   ... ... ... 
+     ... ... ...   ... ... ...   ... ... ...   ... ... ...   ... ... ...   ... ... ... 
+   getline(0x7fff02a9a640, 0x7fff02a9a638, 0x19722a0, 0x7fff02a9a638) = -1
+   free(0x1972480)                                       = <void>
+   fclose(0x19722a0)                                     = 0
+    +++ exited (status 0) +++
+#+END_SRC
+
+Tracing system-calls calls with _strace_ utility: 
+
+#+BEGIN_SRC 
+  $ >> strace ./unix-executable.bin /proc/devices
+
+  execve("./unix-executable.bin", ["./unix-executable.bin", "/proc/devices"], 0x7ffc6f5c0ba8 /* 83 vars */) = 0
+   ... ... ... ...  ... ... ... ... ... ... ... ... 
+   ... ... ... ...  ... ... ... ... ... ... ... ... 
+
+  openat(AT_FDCWD, "/proc/devices", O_RDONLY) = 3
+  fstat(3, {st_mode=S_IFREG|0444, st_size=0, ...}) = 0
+  read(3, "Character devices:\n  1 mem\n  4 /"..., 1024) = 694
+  fstat(1, {st_mode=S_IFCHR|0620, st_rdev=makedev(0x88, 0xa), ...}) = 0
+  write(1, " [LINE] 1 = Character devices:\n", 31 [LINE] 1 = Character devices:
+  ) = 31
+  write(1, "  [LINE] 2 =   1 mem\n", 21  [LINE] 2 =   1 mem
+  )  = 21
+  write(1, "  [LINE] 3 =   4 /dev/vc/0\n", 27  [LINE] 3 =   4 /dev/vc/0
+  ) = 27
+  write(1, "  [LINE] 4 =   4 tty\n", 21  [LINE] 4 =   4 tty
+  )  = 21
+   ... ... ...  ... ... ...  ... ... ...  ... ... ...  ... ... ... 
+   ... ... ...  ... ... ...  ... ... ...  ... ... ...  ... ... ... 
+#+END_SRC
+
+Determining files opened by /uptime/ executable. 
+
+#+BEGIN_SRC sh  
+    $ which uptime
+    /usr/bin/uptime
+
+    $ file $(which uptime)
+    /usr/bin/uptime: ELF 64-bit LSB shared object, x86-64, ... ... 
+
+   # Indicates how long the machine is running: 
+   $ >> uptime 
+   15:45:45 up 3 days, 19:39,  1 user,  load average: 0.32, 0.59, 0.58
+
+   # Run 1 
+   $ >> env LD_PRELOAD=$PWD/hook-files-b.so uptime
+   [INFO] init_library1() / Library loaded Ok. 
+   [INFO] init_library2() / Library loaded Ok. 
+   [TRACE] pid = 232426 / open() ->> File = /proc/uptime 
+   [TRACE] pid = 232426 / open() ->> File = /proc/loadavg 
+   15:46:39 up 3 days, 19:40,  1 user,  load average: 0.55, 0.61, 0.59
+
+   # Run 2 - Discard stdout, preserving only stderr 
+   $ >> env LD_PRELOAD=$PWD/hook-files-b.so uptime > /dev/null
+   [INFO] init_library1() / Library loaded Ok. 
+   [INFO] init_library2() / Library loaded Ok. 
+   [TRACE] pid = 232456 / open() ->> File = /proc/uptime 
+   [TRACE] pid = 232456 / open() ->> File = /proc/loadavg 
+
+   $ >> cat /proc/uptime 
+   330114.72 1249234.16
+
+   $ >> cat /proc/loadavg 
+   0.40 0.55 0.57 1/1838 232504
+#+END_SRC
+
+Determining files opened by /free/ executable which indicates the amount
+of free RAM memory in megabytes in the current machine:
+
+#+BEGIN_SRC sh  
+   $ free -m
+                 total        used        free      shared  buff/cache   available
+   Mem:          15897        6603        2236        1768        7057        7378
+   Swap:             0           0           0
+
+   # Intercept library calls 
+   #--------------------------------------------------------------------
+   $ >> env LD_PRELOAD=$PWD/hook-files-b.so free -m
+    [INFO] init_library1() / Library loaded Ok. 
+    [INFO] init_library2() / Library loaded Ok. 
+    [TRACE] pid = 232965 / open() ->> File = /proc/meminfo 
+                 total        used        free      shared  buff/cache   available
+   Mem:          15897        6601        2238        1768        7058        7380
+   Swap:             0           0           0
+
+   # Intercept library calls and discard stdout
+   # , keeping only stderr (standard error output)
+   #--------------------------------------------------------------------
+    $ >> env LD_PRELOAD=$PWD/hook-files-b.so free -m > /dev/null 
+    [INFO] init_library1() / Library loaded Ok. 
+    [INFO] init_library2() / Library loaded Ok. 
+    [TRACE] pid = 233016 / open() ->> File = /proc/meminfo
+
+   # Inspect file /proc/meminfo 
+   #--------------------------------------------------------------------
+    $ >> cat /proc/meminfo 
+   MemTotal:       16279408 kB
+   MemFree:         2271428 kB
+   MemAvailable:    7552036 kB
+   Buffers:         1178620 kB
+    ... ... ... ... ... ... 
+    ... ... ... ... ... ... 
+   HugePages_Surp:        0
+   Hugepagesize:       2048 kB
+   Hugetlb:               0 kB
+   DirectMap4k:      604380 kB
+   DirectMap2M:    12916736 kB
+   DirectMap1G:     4194304 kB
+
+#+END_SRC
+
+
+
 ** Launching processes with exec and fork system-call wrappers 
 
 This code demonstrates the usage of exec and fork system-calls wrapper
