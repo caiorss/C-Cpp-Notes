@@ -15,7 +15,7 @@ interface. A solution for this issue is to create a C wrapper for the
 C++ library using _opaque pointer_, _incomplete types_ and _extern C_
 annotation.
 
-** Example 1: Calling C++ from C
+** Calling C++ from C
 
 This section presents how to call a statically linked C++ cod from C.
 
@@ -306,14 +306,15 @@ Program output:
    [TRACE] Object deleted OK
 #+END_SRC
 
-** Example 2: Calling Qt5 Widgets library from C, Julia and D-lang
+** Calling Qt5 Widgets library from C, Julia, D-lang and Lisp
 *** Overview
 
 This sample code provides a C wrapper to the QT5 Widgets GUI
 library. This C-wrapper allows calling Qt5 from C, Julia language and
 also D-language.
 
- *See:*
+
+ *Documentation of features used in this experiment*
 
 QT5 Documentation for widgets classes used in the sample code: 
 
@@ -717,8 +718,10 @@ File: qtwrapper.h (header for the C-wrapper or C-interface)
                                  , void (* callback) (void* ctx, QLineEdit* self) );
 #+END_SRC
 
-*** Building the shared  
+*** Building the wrapper file. 
 
+Note: this code was compiled and tested on a Linux - Fedora 32, 64
+bits machine which contains pre-installed Qt5 libraries.
 
 Fetch the sources:
 
@@ -807,7 +810,7 @@ Show exported symbols demangling (aka decoding) C++ mangled symbols:
 
 *** C client code
 
-File: client1.c (C-client code)
+File: _client1.c_ (C-client code)
 
 #+BEGIN_SRC cpp
   #include <stdio.h>
@@ -926,12 +929,13 @@ Run executable:
 
 User Interface Screenshot: 
 
+#+CAPTION: User interface for C client code. 
 [[file:images/cwrapper-qt5-1.png][file:images/cwrapper-qt5-1.png]] 
 *** Julia Client Code (loader.jl)
 
-File: loader.jl (Julia language client code)
+File: _loader.jl_ (Julia language client code)
 
-#+BEGIN_SRC julia
+#+BEGIN_SRC julia 
   #!/usr/bin/env julia
 
   # Refers to file libqexport.so
@@ -1229,14 +1233,13 @@ LD_LIBRARY_PATH on Linux by moving the library file to /usr/lib,
 
 User Interface Screenshot: 
 
+#+CAPTION: User interface for Julia language client code. 
 [[file:images/cwrapper-qt5-2.png][file:images/cwrapper-qt5-2.png]]
-*** D language - D-lang Client Code: d_client.d
+*** D language - D-lang Client Code
 
-
-File: d_client.d (Dlang / D-language client code)
+File: _d_client.d_ (Dlang / D-language client code)
 
 #+BEGIN_SRC cpp
-
   import core.stdc.stdio;
   import std.range: empty;
   import str = std.string;
@@ -1398,6 +1401,176 @@ Build and run executable:
 
 User Interface Screenshot: 
 
+#+CAPTION: User interface for Dlang (D Language)
 [[file:images/cwrapper-qt5-3.png][file:images/cwrapper-qt5-3.png]]
 
+*** Common Lisp client code 
 
+This common lisp client code, more specifically Stell Bank Common Lisp
+(SBCL), loads the shared library _libqtwrapper.so_ by using CFFI
+foreign-function interface library.
+
+Procedure for install SBCL on Fedora 32 and dependencies:
+
+#+BEGIN_SRC sh 
+  # Fedora as root 
+  $ dnf install sbcl 
+
+  # Download and install quicklisp 
+  $ >> curl -O -L http://beta.quicklisp.org/quicklisp.lisp 
+  $ >> rlwrap sbcl --load quicklisp.lisp 
+
+  # Run sbcl and install quicklisp
+  $ >> rlwrap sbcl --load quicklisp.lisp
+  ,* (quicklisp-quickstart:install)
+  ,* (ql:add-to-init-file)
+
+  # Install CFFI 
+  ,* (ql:quickload "cffi")
+
+  # Quit SBCL repl 
+  ,* (quit)
+#+END_SRC
+
+File: _sbcl_client.lisp_ 
+
+#+BEGIN_SRC lisp 
+  ;; ---- Experimental binding to Qt5 GUI Framework ----------;;
+  ;;
+  (require :cffi)
+
+  (cffi:define-foreign-library qtw (:unix "libqtwrapper.so" ))
+  (cffi:use-foreign-library qtw )
+
+  ;; ------- Define bindings ---------------------------..
+
+  (cffi:defcfun "qt_app_new2"   :pointer)
+  (cffi:defcfun "qt_widget_new"  :pointer (parent :pointer) (type :int))
+
+  ;; Signature: void qt_widget_show(QWidget* self)
+  (cffi:defcfun "qt_widget_show" :void    (self :pointer))
+
+  ;; Signature: int qt_app_exec(QApplication* self)
+  (cffi:defcfun "qt_app_exec" :int (self :pointer))
+
+  ;; Signature: void qt_qobject_del(QObject* self)
+  (cffi:defcfun "qt_qobject_del" :void (self :pointer))
+
+  ;; Signature: void qt_widget_setText(QWidget* self, const char* text)
+  (cffi:defcfun "qt_widget_setText" :void (self :pointer) (text :string))
+
+  ;; Signature: QLayout* qt_layout_new(QWidget* parent, int type)
+  (cffi:defcfun "qt_layout_new" :pointer (self :pointer) (type :int))
+
+  ;; Signature: QObject* qt_QFormLayout_addWidgetAndLabel(
+  ;;                            QFormLayout* self
+  ;;                          , int type, const char* label)
+  (cffi:defcfun "qt_QFormLayout_addWidgetAndLabel"
+                 :pointer (self :pointer) (type :int))
+
+  ;; Callback 
+  ;; ---------------------------------------------------
+  ;; Signature:
+  ;; -----------------------------------------------------
+  ;; void qt_button_onClicked( 
+  ;;                QAbstractButton* self
+  ;;               , void* ctx
+  ;;               , void (* callback) (void* self) )
+  (cffi:defcfun "qt_button_onClicked"
+                 :void (self :pointer) (ctx :pointer) (callback :pointer))
+
+  ;; Signature: void qt_msgbox_info( QWidget* parent
+  ;;                                , const char* title
+  ;;                                , const char* text )
+  (cffi:defcfun "qt_msgbox_info"
+                 :void (parent :pointer) (title :string) (text :string))
+
+  (defvar WIDGET-WINDOW-MAIN 2)
+  (defvar WIDGET-BUTTON      3)
+  (defvar WIDGET-LINE-EDIT   5)
+  (defvar LAYOUT-QFORM       3)
+
+  ;; ----- Define variables --------------------------- ;;
+  ;;
+
+  ;; This function must always be called
+  ;; before creating any widget.
+  (defvar qapp   (qt-app-new2))
+
+  ;; Create main window 
+  (defvar window (qt-widget-new (cffi:null-pointer) WIDGET-WINDOW-MAIN))
+
+  (cffi:with-foreign-string (title "My LISP QT Window")
+                            (qt-widget-settext window title))
+
+  (defvar form (qt-layout-new window LAYOUT-QFORM))
+
+  ;; Note: Common Lisp is case insensitive 
+  (defvar button     (qt-QFormLayout-addWidgetAndLabel form WIDGET-BUTTON))
+  (defvar line-edit  (qt-QFormLayout-addWidgetAndLabel form WIDGET-LINE-EDIT))
+
+  ;; Set button label 
+  (cffi:with-foreign-string (title "click me")
+                            (qt-widget-settext button title))
+
+  (defvar counter 0)
+
+  ;; Define button callback
+  ;; void (* callback) (void* self) )
+  (cffi:defcallback button-callback
+               ;; Return type of callback
+               :void               
+               ;; List containing callback arguments
+               ( (ctx :pointer) )  
+               ;; Function main body 
+               (progn
+                 ;; Increment counter
+                 (setf counter (+ counter 1))
+
+                 (cffi:with-foreign-string
+                        (text (format nil "counter set to ~a" counter ))
+                        (qt-widget-settext button text))
+
+                 (cffi:with-foreign-string
+                     (title "User notification")
+                     (cffi:with-foreign-string
+                        (text "Counter clicked")
+                        (qt-msgbox-info window title text)))
+
+                 (print (format t "Counter set to = ~D \n" counter))
+
+                 ))
+                ;; --- End of button callback() ----- ;;
+
+  (qt-button-onClicked button (cffi:null-pointer)
+                              (cffi:callback button-callback))
+
+  ;; Run QT event loop and blocks current thread. 
+  (qt-app-exec qapp)
+
+  ;; Dispose C++ objects calling destructors 
+  (qt-qobject-del window)
+  (qt-qobject-del qapp)
+#+END_SRC
+
+Run Common Lisp Client Code: 
+
+#+BEGIN_SRC sh 
+    $ >> export LD_LIBRARY_PATH=$PWD/build
+
+    $ >> sbcl --load sbcl_client.lisp
+   This is SBCL 2.0.1-1.fc32, an implementation of ANSI Common Lisp.
+   More information about SBCL is available at <http://www.sbcl.org/>.
+
+   SBCL is free software, provided as is, with absolutely no warranty.
+   It is mostly in the public domain; some portions are provided under
+   BSD-style licenses.  See the CREDITS and COPYING files in the
+   distribution for more information.
+    [TRACE] Create QAppliction Object Ok
+    ... ... ... ... ...  
+#+END_SRC
+
+User interface screenshot: 
+
+#+CAPTION: User interface for Common Lisp (SBCL) client code. 
+[[file:images/cwrapper-qt5-4.png][file:images/cwrapper-qt5-4.png]]
