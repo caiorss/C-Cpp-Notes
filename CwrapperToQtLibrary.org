@@ -351,7 +351,7 @@ D Language:
 
   + [[https://dlang.org/spec/cpp_interface.html][Interfacing to C++ - D Programming Language]]
 
-*** Project Files
+*** Wrapper Files 
 
   + GIST with all sources:
     + https://gist.github.com/a59d0f1b17d286dad19842932c931e92
@@ -390,6 +390,7 @@ File: CMakeLists.txt
 #+END_SRC
 
 File: qtwrapper.cpp
+
   + C-wrapper or C-interface to QT5
 
 #+BEGIN_SRC cpp
@@ -716,6 +717,96 @@ File: qtwrapper.h (header for the C-wrapper or C-interface)
                                  , void (* callback) (void* ctx, QLineEdit* self) );
 #+END_SRC
 
+*** Building the shared  
+
+
+Fetch the sources:
+
+#+BEGIN_SRC sh
+  $ git clone https://gist.github.com/a59d0f1b17d286dad19842932c931e92 qt5-cwrapper
+  $ cd qt5-cwrapper
+
+  $ ls
+  client1.c  CMakeLists.txt  d_client.d  loader.jl  qtwrapper.cpp  qtwrapper.h
+#+END_SRC
+
+Build the project: (Note: Tested on Linux Fedora-32 64 bits x86-64)
+
+#+BEGIN_SRC sh
+  $ cmake --config Debug -H. -Bbuild
+  $ cmake --build build --target
+#+END_SRC
+
+Check binaries:
+
+#+BEGIN_SRC sh
+  $ file build/client1
+  build/client1: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2
+  , BuildID[sha1]=122650693cf9845a35afeb76bced113f3d92ed1a, for GNU/Linux 3.2.0, not stripped
+
+  $ file build/libqtwrapper.so
+  build/libqtwrapper.so: ELF 64-bit LSB shared object, x86-64, version 1 (GNU/Linux), statically linked
+  , BuildID[sha1]=47381d2f687f8cb5f6bf80be737c0baa2b0e2cb1, not stripped
+#+END_SRC
+
+Show symbols exported by the C-wrapper shared library:
+  + Note: On windows, the equivalent tool is _dumpbin_ and on MacOSX,
+    the equivalent tool is _otool_.
+
+#+BEGIN_SRC sh 
+   $ nm -D build/libqtwrapper.so 
+     ... ... ... ... ... ... ... 
+     ... ... ... ... ... ... ... 
+   0000000000012d9d T qt_QFormLayout_addRowItem
+   0000000000012d0c T qt_QFormLayout_addWidgetAndLabel
+   000000000001315a T qt_QLineEdit_onTextChanged
+   0000000000013284 T qt_QLineEdit_text
+   0000000000012741 T qt_qobject_ClassName
+   000000000001271a T qt_qobject_del
+   000000000001276a T qt_qobject_dumpObjectInfo
+   0000000000012785 T qt_qobject_dumpObjectTree
+   00000000000127a0 T qt_qobject_print
+                    U qt_version_tag
+   0000000000012a47 T qt_widget_new
+   0000000000012fbb T qt_widget_setText
+   0000000000012fa0 T qt_widget_show
+   0000000000012b51 T qt_window_main
+                    U strlen
+                    U _Unwind_Resume
+   00000000000157a8 W _Z12qobject_castIP11QMessageBoxET_P7QObject
+   00000000000157cc W _Z12qobject_castIP15QAbstractButtonET_P7QObject
+   000000000001573c W _Z12qobject_castIP6QLabelET_P7QObject
+   0000000000015760 W _Z12qobject_castIP9QLineEditET_P7QObject
+     ... ... ... ... ... ... ... ... 
+     ... ... ... ... ... ... ... ... 
+#+END_SRC
+
+Show exported symbols demangling (aka decoding) C++ mangled symbols: 
+
+#+BEGIN_SRC sh 
+    $ >> nm -D build/libqtwrapper.so | c++filt
+    ... ... ... ... ... 
+    ... ... ... ... ... 
+   000000000001276a T qt_qobject_dumpObjectInfo
+   0000000000012785 T qt_qobject_dumpObjectTree
+   00000000000127a0 T qt_qobject_print
+                    U qt_version_tag
+   0000000000012a47 T qt_widget_new
+   0000000000012fbb T qt_widget_setText
+   0000000000012fa0 T qt_widget_show
+   0000000000012b51 T qt_window_main
+                    U strlen
+                    U _Unwind_Resume
+   00000000000157a8 W QMessageBox* qobject_cast<QMessageBox*>(QObject*)
+   00000000000157cc W QAbstractButton* qobject_cast<QAbstractButton*>(QObject*)
+   000000000001573c W QLabel* qobject_cast<QLabel*>(QObject*)
+   0000000000015760 W QLineEdit* qobject_cast<QLineEdit*>(QObject*)
+      ... ... ... ... ... 
+    ... ... ... ... ... 
+#+END_SRC
+
+*** C client code
+
 File: client1.c (C-client code)
 
 #+BEGIN_SRC cpp
@@ -819,6 +910,24 @@ File: client1.c (C-client code)
       return 0;
   }
 #+END_SRC
+
+Run executable: 
+
+#+BEGIN_SRC sh
+  $ build/client1
+   [TRACE] Create QAppliction Object Ok
+   [LineEdit Callback] Text changed to h 
+   [LineEdit Callback] Text changed to h 
+   [LineEdit Callback] Text changed to h 
+   [LineEdit Callback] Text changed to h 
+   ...  ...  ...  ...  ...  ... 
+   ...  ...  ...  ...  ...  ...  ... 
+#+END_SRC
+
+User Interface Screenshot: 
+
+[[file:images/cwrapper-qt5-1.png][file:images/cwrapper-qt5-1.png]] 
+*** Julia Client Code (loader.jl)
 
 File: loader.jl (Julia language client code)
 
@@ -1044,6 +1153,86 @@ File: loader.jl (Julia language client code)
   demo_qt_gui_form()
 #+END_SRC
 
+Run julia script / attempt 1 -> error: 
+
+#+BEGIN_SRC sh 
+   $ julia loader.jl 
+   ERROR: LoadError: could not load library "libqtwrapper"
+   libqtwrapper.so: cannot open shared object file: No such file or directory
+   Stacktrace:
+   ... ... .... ... ... 
+   ... ... ... ... ... 
+#+END_SRC
+
+Run julia script / attempt 2 -> works: 
+
+  + Note: LD_LIBRARY_PATH only works on Linux. The equivalent of this
+    variable for windows is the _PATH_ environment variable and for
+    MacOSX, the equivalent is _DYLD_LIBRARY_PATH_.
+  + The _libqtwrapper.so_ shared library can be installed on Linux, by
+    moving the library file to /lib directory.
+
+#+BEGIN_SRC sh 
+     $ export LD_LIBRARY_PATH=build:$LD_LIBRARY_PATH
+
+     $ julia loader.jl 
+   [TRACE] Create QAppliction Object Ok
+   [INFO] class of form object    = QFormLayout
+   [INFO] class of btn_run object = QPushButton
+   [INFO] class of entry1 object  = QDoubleSpinBox
+   [INFO] class of entry2 object  = QDoubleSpinBox
+   speed = 1.0 ; accel = 0.0
+   [JULIA] Result = 4.51
+   --------------------------------- 
+   speed = 2.0 ; accel = 0.0
+   [JULIA] Result = 9.02
+   --------------------------------- 
+   speed = 3.0 ; accel = 0.0
+   [JULIA] Result = 13.53
+   --------------------------------- 
+   ... ... ... ... 
+#+END_SRC
+
+The previous Julia script could also be run in the following way. The
+advantage of this method is that, the variable LD_LIBRARY_PATH is only
+set for the command: '$ julia loader.jl'. 
+
+#+BEGIN_SRC sh 
+   $ env LD_LIBRARY_PATH=build:$LD_LIBRARY_PATH julia loade.jl 
+#+END_SRC 
+
+The library can be consumed without setting the environment variable
+LD_LIBRARY_PATH on Linux by moving the library file to /usr/lib,
+/usr/local/lib or /lib. 
+
+#+BEGIN_SRC sh 
+   # Install shared library to /usr/local/lib
+   $ sudo cp -v build/libqtwrapper.so /usr/lib 
+
+   # Update library cache 
+   $ sudo ldconfig -v
+
+   # Run the Julia script 
+   $ julia loader.jl 
+    [TRACE] Create QAppliction Object Ok
+   libGL error: MESA-LOADER: failed to open iris (search paths /usr/lib64/dri)
+   libGL error: failed to load driver: iris
+   libGL error: MESA-LOADER: failed to open iris (search paths /usr/lib64/dri)
+   libGL error: failed to load driver: iris
+   libGL error: MESA-LOADER: failed to open swrast (search paths /usr/lib64/dri)
+   libGL error: failed to load driver: swrast
+    [INFO] class of form object    = QFormLayout
+    [INFO] class of btn_run object = QPushButton
+   ... .... .... 
+   ... .... .... 
+ #+END_SRC
+
+User Interface Screenshot: 
+
+[[file:images/cwrapper-qt5-2.png][file:images/cwrapper-qt5-2.png]]
+*** D language - D-lang Client Code: d_client.d
+
+
 File: d_client.d (Dlang / D-language client code)
 
 #+BEGIN_SRC cpp
@@ -1179,191 +1368,6 @@ File: d_client.d (Dlang / D-language client code)
   }
 #+END_SRC
 
-*** Building the shared library for C-wrapper 
-
-Fetch the sources:
-
-#+BEGIN_SRC sh
-  $ git clone https://gist.github.com/a59d0f1b17d286dad19842932c931e92 qt5-cwrapper
-  $ cd qt5-cwrapper
-
-  $ ls
-  client1.c  CMakeLists.txt  d_client.d  loader.jl  qtwrapper.cpp  qtwrapper.h
-#+END_SRC
-
-Build the project: (Note: Tested on Linux Fedora-32 64 bits x86-64)
-
-#+BEGIN_SRC sh
-  $ cmake --config Debug -H. -Bbuild
-  $ cmake --build build --target
-#+END_SRC
-
-Check binaries:
-
-#+BEGIN_SRC sh
-  $ file build/client1
-  build/client1: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2
-  , BuildID[sha1]=122650693cf9845a35afeb76bced113f3d92ed1a, for GNU/Linux 3.2.0, not stripped
-
-  $ file build/libqtwrapper.so
-  build/libqtwrapper.so: ELF 64-bit LSB shared object, x86-64, version 1 (GNU/Linux), statically linked
-  , BuildID[sha1]=47381d2f687f8cb5f6bf80be737c0baa2b0e2cb1, not stripped
-#+END_SRC
-
-Show symbols exported by the C-wrapper shared library:
-  + Note: On windows, the equivalent tool is _dumpbin_ and on MacOSX,
-    the equivalent tool is _otool_.
-
-#+BEGIN_SRC sh 
-   $ nm -D build/libqtwrapper.so 
-     ... ... ... ... ... ... ... 
-     ... ... ... ... ... ... ... 
-   0000000000012d9d T qt_QFormLayout_addRowItem
-   0000000000012d0c T qt_QFormLayout_addWidgetAndLabel
-   000000000001315a T qt_QLineEdit_onTextChanged
-   0000000000013284 T qt_QLineEdit_text
-   0000000000012741 T qt_qobject_ClassName
-   000000000001271a T qt_qobject_del
-   000000000001276a T qt_qobject_dumpObjectInfo
-   0000000000012785 T qt_qobject_dumpObjectTree
-   00000000000127a0 T qt_qobject_print
-                    U qt_version_tag
-   0000000000012a47 T qt_widget_new
-   0000000000012fbb T qt_widget_setText
-   0000000000012fa0 T qt_widget_show
-   0000000000012b51 T qt_window_main
-                    U strlen
-                    U _Unwind_Resume
-   00000000000157a8 W _Z12qobject_castIP11QMessageBoxET_P7QObject
-   00000000000157cc W _Z12qobject_castIP15QAbstractButtonET_P7QObject
-   000000000001573c W _Z12qobject_castIP6QLabelET_P7QObject
-   0000000000015760 W _Z12qobject_castIP9QLineEditET_P7QObject
-     ... ... ... ... ... ... ... ... 
-     ... ... ... ... ... ... ... ... 
-#+END_SRC
-
-Show exported symbols demangling (aka decoding) C++ mangled symbols: 
-
-#+BEGIN_SRC sh 
-    $ >> nm -D build/libqtwrapper.so | c++filt
-    ... ... ... ... ... 
-    ... ... ... ... ... 
-   000000000001276a T qt_qobject_dumpObjectInfo
-   0000000000012785 T qt_qobject_dumpObjectTree
-   00000000000127a0 T qt_qobject_print
-                    U qt_version_tag
-   0000000000012a47 T qt_widget_new
-   0000000000012fbb T qt_widget_setText
-   0000000000012fa0 T qt_widget_show
-   0000000000012b51 T qt_window_main
-                    U strlen
-                    U _Unwind_Resume
-   00000000000157a8 W QMessageBox* qobject_cast<QMessageBox*>(QObject*)
-   00000000000157cc W QAbstractButton* qobject_cast<QAbstractButton*>(QObject*)
-   000000000001573c W QLabel* qobject_cast<QLabel*>(QObject*)
-   0000000000015760 W QLineEdit* qobject_cast<QLineEdit*>(QObject*)
-      ... ... ... ... ... 
-    ... ... ... ... ... 
-#+END_SRC
-
-*** Running C-client code executable 
-
-Run executable: 
-
-#+BEGIN_SRC sh
-  $ build/client1
-   [TRACE] Create QAppliction Object Ok
-   [LineEdit Callback] Text changed to h 
-   [LineEdit Callback] Text changed to h 
-   [LineEdit Callback] Text changed to h 
-   [LineEdit Callback] Text changed to h 
-   ...  ...  ...  ...  ...  ... 
-   ...  ...  ...  ...  ...  ...  ... 
-#+END_SRC
-
-User Interface Screenshot: 
-
-[[file:images/cwrapper-qt5-1.png][file:images/cwrapper-qt5-1.png]] 
-*** Running Julia Client Code (loader.jl)
-
-Run julia script / attempt 1 -> error: 
-
-#+BEGIN_SRC sh 
-   $ julia loader.jl 
-   ERROR: LoadError: could not load library "libqtwrapper"
-   libqtwrapper.so: cannot open shared object file: No such file or directory
-   Stacktrace:
-   ... ... .... ... ... 
-   ... ... ... ... ... 
-#+END_SRC
-
-Run julia script / attempt 2 -> works: 
-
-  + Note: LD_LIBRARY_PATH only works on Linux. The equivalent of this
-    variable for windows is the _PATH_ environment variable and for
-    MacOSX, the equivalent is _DYLD_LIBRARY_PATH_.
-  + The _libqtwrapper.so_ shared library can be installed on Linux, by
-    moving the library file to /lib directory.
-
-#+BEGIN_SRC sh 
-     $ export LD_LIBRARY_PATH=build:$LD_LIBRARY_PATH
-
-     $ julia loader.jl 
-   [TRACE] Create QAppliction Object Ok
-   [INFO] class of form object    = QFormLayout
-   [INFO] class of btn_run object = QPushButton
-   [INFO] class of entry1 object  = QDoubleSpinBox
-   [INFO] class of entry2 object  = QDoubleSpinBox
-   speed = 1.0 ; accel = 0.0
-   [JULIA] Result = 4.51
-   --------------------------------- 
-   speed = 2.0 ; accel = 0.0
-   [JULIA] Result = 9.02
-   --------------------------------- 
-   speed = 3.0 ; accel = 0.0
-   [JULIA] Result = 13.53
-   --------------------------------- 
-   ... ... ... ... 
-#+END_SRC
-
-The previous Julia script could also be run in the following way. The
-advantage of this method is that, the variable LD_LIBRARY_PATH is only
-set for the command: '$ julia loader.jl'. 
-
-#+BEGIN_SRC sh 
-   $ env LD_LIBRARY_PATH=build:$LD_LIBRARY_PATH julia loade.jl 
-#+END_SRC 
-
-The library can be consumed without setting the environment variable
-LD_LIBRARY_PATH on Linux by moving the library file to /usr/lib,
-/usr/local/lib or /lib. 
-
-#+BEGIN_SRC sh 
-   # Install shared library to /usr/local/lib
-   $ sudo cp -v build/libqtwrapper.so /usr/lib 
-
-   # Update library cache 
-   $ sudo ldconfig -v
-
-   # Run the Julia script 
-   $ julia loader.jl 
-    [TRACE] Create QAppliction Object Ok
-   libGL error: MESA-LOADER: failed to open iris (search paths /usr/lib64/dri)
-   libGL error: failed to load driver: iris
-   libGL error: MESA-LOADER: failed to open iris (search paths /usr/lib64/dri)
-   libGL error: failed to load driver: iris
-   libGL error: MESA-LOADER: failed to open swrast (search paths /usr/lib64/dri)
-   libGL error: failed to load driver: swrast
-    [INFO] class of form object    = QFormLayout
-    [INFO] class of btn_run object = QPushButton
-   ... .... .... 
-   ... .... .... 
- #+END_SRC
-
-User Interface Screenshot: 
-
-[[file:images/cwrapper-qt5-2.png][file:images/cwrapper-qt5-2.png]]
-*** Running D-lang Client Code: d_client.d
 
 Run file d_client.d as a script: 
 
