@@ -352,12 +352,31 @@ D Language:
 
   + [[https://dlang.org/spec/cpp_interface.html][Interfacing to C++ - D Programming Language]]
 
+Lisp - SBCL (Steel Bank Common Lisp): 
+
+  + http://www.sbcl.org/ - Steel Bank Common Lisp
+
+  + [[https://linux.die.net/man/1/sbcl#:~:text=To%20run%20SBCL%2C%20type%20%22sbcl,wait%20for%20your%20next%20input.&text=Most%20people%20like%20to%20run%20SBCL%20as%20a%20subprocess%20under%20Emacs.][sbcl(1): Steel Bank Common Lisp - Linux man page]]
+
+  + [[https://common-lisp.net/~loliveira/tmp/old/cffi-newtypes/cffi-manual.html][CFFI User Manual]]
+
+  + [[https://z0ltan.wordpress.com/2016/09/16/interop-mini-series-calling-c-and-c-code-from-common-lisp-using-cffi-part-1/][Interop mini-series – Calling C and C++ code Lisp using CFFI (Part 1)]]
+
+  + [[https://gist.github.com/lamberta/212533/c4ac72b6606666ace8d35ada018614cbb1d273d6][use C shared lib with cffi · GitHub]]
+
+  + [[https://gist.github.com/lagagain/df1b97eb08e57c2759c950efc3a2c7dd][[practice] [Common Lisp] hello CFFI (Common Lisp + C) · GitHub]]
+
+  + [[https://www.xach.com/lisp/buildapp/][Buildapp - Create executables with SBCL or CCL]]
+
+
 *** Wrapper Files 
 
   + GIST with all sources:
     + https://gist.github.com/a59d0f1b17d286dad19842932c931e92
 
-File: CMakeLists.txt
+ *Source code for C-wrapper* 
+
+File: _CMakeLists.txt_
 
 #+BEGIN_SRC cmake
    cmake_minimum_required(VERSION 3.9)
@@ -390,11 +409,11 @@ File: CMakeLists.txt
 
 #+END_SRC
 
-File: qtwrapper.cpp
+File: _qtwrapper.cpp_
 
-  + C-wrapper or C-interface to QT5
+  + C-wrapper or C-interface for QT5 C++ GUI library 
 
-#+BEGIN_SRC cpp
+#+BEGIN_SRC cpp 
   #include <QtWidgets>
   #include <QApplication>
   #include <QtUiTools/QtUiTools>
@@ -402,44 +421,44 @@ File: qtwrapper.cpp
   #include <QtConcurrent/QtConcurrent>
 
   #include <functional>
-  #include <iostream>
+  #include <iostream> 
   #include <fstream>
   #include <string>
-  #include <map>
+  #include <map> 
 
-  /** extern "C" =>  Remove C++ name mangling and makes the function
-   ,* compatible with C. It enforces C linkage to the annotated symbol.
+  /** extern "C" =>  Remove C++ name mangling and makes the function 
+   ,* compatible with C. It enforces C linkage to the annotated symbol. 
    ,**-----------------------------------------------------------------*/
   #define EXPORT_C extern "C"
 
   /** Delete any instance of a derived class of QObject
    ,* Note: It can be used for deleting instances QWidget, QApplication or QLayout.
    ,*/
-  EXPORT_C
+  EXPORT_C 
   void qt_qobject_del(QObject* self)
   {
       delete self;
   }
 
-  EXPORT_C
+  EXPORT_C 
   const char* qt_qobject_ClassName(QObject* self)
   {
       return self->metaObject()->className();
   }
 
-  EXPORT_C
+  EXPORT_C 
   void qt_qobject_dumpObjectInfo(QObject* self)
   {
       self->dumpObjectInfo();
   }
 
-  EXPORT_C
+  EXPORT_C 
   void qt_qobject_dumpObjectTree(QObject* self)
   {
-      self->dumpObjectTree();
+      self->dumpObjectTree(); 
   }
 
-  EXPORT_C
+  EXPORT_C 
   void qt_qobject_print(QObject* self)
   {
       qDebug() << " [QOBjec] " << self;
@@ -463,11 +482,11 @@ File: qtwrapper.cpp
       db[type] = [](QWidget* parent){ return new (std::nothrow) T(parent); };
   }
 
-  // Create an object of a QWidget given class, given its name
-  EXPORT_C
+  // Create an object of a QWidget given class, given its name 
+  EXPORT_C 
   QWidget* qt_widget_new(QWidget* parent, int type)
   {
-      // 'static' => Initialize static object only once.
+      // 'static' => Initialize static object only once. 
       static const CtorDatabase ctordb = []{
           auto db = CtorDatabase{};
           register_ctor<QWidget>(db,        (int) WidgetType::Window);
@@ -475,42 +494,42 @@ File: qtwrapper.cpp
           register_ctor<QLabel>(db,         (int) WidgetType::QLabel);
           register_ctor<QLineEdit>(db,      (int) WidgetType::QLineEdit);
           register_ctor<QDoubleSpinBox>(db, (int) WidgetType::QDoubleSpinBox);
-
+        
           db[(int) WidgetType::Window_main] = [](QWidget* parent){
-              QWidget* w = new QWidget(parent);
-              w->resize(500, 400);
+              QWidget* w = new (std::nothrow) QWidget(parent);
+              w->resize(500, 400);        
               w->setWindowTitle("MainWindow");
               w->show();
               return w;
           };
           return db;
       }();
-
+   
       if(auto it = ctordb.find(type); it != ctordb.end())
-      {  return it->second(parent);  }
+      {  return it->second(parent);  }    
       return nullptr;
   }
 
-  EXPORT_C
+  EXPORT_C 
   QWidget* qt_window_main()
   {
-      QWidget* w = new QWidget(nullptr);
-      w->resize(500, 400);
+      QWidget* w = new (std::nothrow) QWidget{};
+      w->resize(500, 400);        
       w->setWindowTitle("MainWindow");
       w->show();
-      return w;
+      return w; 
   }
 
-  EXPORT_C
+  EXPORT_C 
   QLayout* qt_layout_new(QWidget* parent, int type)
   {
-      if(type == 1) return new QVBoxLayout(parent);
-      if(type == 2) return new QHBoxLayout(parent);
-      if(type == 3) return new QFormLayout(parent);
+      if(type == 1) return new (std::nothrow) QVBoxLayout(parent);    
+      if(type == 2) return new (std::nothrow) QHBoxLayout(parent);    
+      if(type == 3) return new (std::nothrow) QFormLayout(parent);
       return nullptr;
   }
 
-  EXPORT_C
+  EXPORT_C 
   QObject* qt_QFormLayout_addWidgetAndLabel(QFormLayout* self, int type, const char* label)
   {
       QWidget* wdg = qt_widget_new(nullptr, type);
@@ -519,14 +538,14 @@ File: qtwrapper.cpp
       return wdg;
   }
 
-  EXPORT_C
+  EXPORT_C 
   void qt_QFormLayout_addRowItem(QFormLayout* self, QWidget* field)
   {
       self->addRow(field);
   }
 
 
-  EXPORT_C
+  EXPORT_C 
   QLabel* qt_QFormLayout_addLabel1(QFormLayout* self, const char* label_text)
   {
       auto btn = new QLabel(label_text);
@@ -535,23 +554,23 @@ File: qtwrapper.cpp
   }
 
 
-  EXPORT_C
-  QApplication* qt_app_new(int argc, char** argv)
+  EXPORT_C 
+  QApplication* qt_app_new(int argc, char** argv)   
   {
       std::cout << " [TRACE] Create QAppliction Object Ok" << std::endl;
       return new QApplication(argc, argv);
   }
 
-  EXPORT_C
-  QApplication* qt_app_new2()
+  EXPORT_C 
+  QApplication* qt_app_new2()   
   {
       std::cout << " [TRACE] Create QAppliction Object Ok" << std::endl;
       static int   argc = 1;
-      static const char* argv [] = { "dummy_app" };
+      static const char* argv [] = { "dummy_app" };    
       return new QApplication(argc, (char**) argv);
   }
 
-  EXPORT_C
+  EXPORT_C 
   int qt_app_exec(QApplication* self)
   {
       return self->exec();
@@ -559,7 +578,7 @@ File: qtwrapper.cpp
 
   // -------- Wrappers for QWidget Class ------------------//
 
-  EXPORT_C
+  EXPORT_C 
   void qt_widget_show(QWidget* self)
   {
       self->show();
@@ -569,37 +588,37 @@ File: qtwrapper.cpp
   static bool set_text(QWidget* self, const char* text)
   {
       auto obj = qobject_cast<T>(self);
-      // Early return on Error.
-      if(obj == nullptr ){ return false;  }
+      // Early return on Error. 
+      if(obj == nullptr ){ return false;  }    
       obj->setText(text);
       return true;
   }
 
-  EXPORT_C
+  EXPORT_C 
   void qt_widget_setText(QWidget* self, const char* text)
-  {
+  {        
       if( set_text<QLabel*>(self, text))           return;
       if( set_text<QLineEdit*>(self, text))        return;
-      if( set_text<QTextEdit*>(self, text))        return;
-      if( set_text<QMessageBox*>(self, text))      return;
-      if( set_text<QAbstractButton*>(self, text) ) return;
+      if( set_text<QTextEdit*>(self, text))        return; 
+      if( set_text<QMessageBox*>(self, text))      return; 
+      if( set_text<QAbstractButton*>(self, text) ) return;    
       // logger().log() << " [TRACE] Called function " << __FUNCTION__ << std::endl;
-      self->setWindowTitle(text);
+      self->setWindowTitle(text);  
   }
 
 
   // -------- Wrappers for QPushButton Class ------------------//
 
-  // Install event handler (callback) for button clicked event
+  // Install event handler (callback) for button clicked event 
   EXPORT_C
-  void qt_button_onClicked(  // Pointer to button
+  void qt_button_onClicked(  // Pointer to button 
                              QAbstractButton* self
-                             // Context of the callback. Note: C does not support closures
-                             // or stateful function pointer. All data needs to be passed
+                             // Context of the callback. Note: C does not support closures 
+                             // or stateful function pointer. All data needs to be passed 
                              // as arguments
                            , void* ctx
-                             // Pointer to callback function pointer.
-                           , void (* callback) (void* self) )
+                             // Pointer to callback function pointer. 
+                           , void (* callback) (void* ctx) )
   {
       QObject::connect(self, &QPushButton::clicked, [=]{
           callback(ctx);
@@ -607,7 +626,7 @@ File: qtwrapper.cpp
   }
 
 
-  // Install event handler for
+  // Install event handler for 
   EXPORT_C
   void qt_QLineEdit_onTextChanged(  QLineEdit* self
                                   , void* ctx
@@ -619,7 +638,7 @@ File: qtwrapper.cpp
   }
 
 
-  EXPORT_C
+  EXPORT_C 
   void qt_msgbox_info(QWidget* parent, const char* title, const char* text)
   {
       QMessageBox::information(parent, title, text);
@@ -632,20 +651,20 @@ File: qtwrapper.cpp
       return self->text().toLocal8Bit().constData();
   }
 
-  EXPORT_C
+  EXPORT_C 
   double qt_QDoubleSpinBox_value(QDoubleSpinBox* self)
   {
       return self->value();
   }
 
-  EXPORT_C
+  EXPORT_C 
   void qt_QDoubleSpinBox_setValue(QDoubleSpinBox* self, double value)
   {
       self->setValue(value);
   }
 
-  EXPORT_C
-  void qt_QDoubleSpinBox_onValueChanged(
+  EXPORT_C 
+  void qt_QDoubleSpinBox_onValueChanged( 
        QDoubleSpinBox* self
      , void* ctx
      , void (* callback)(void* ctx) )
@@ -656,7 +675,7 @@ File: qtwrapper.cpp
   }
 #+END_SRC
 
-File: qtwrapper.h (header for the C-wrapper or C-interface)
+File: _qtwrapper.h_ (header for the C-wrapper or C-interface)
 
 #+BEGIN_SRC cpp
   // Non standard directive, but supported by most compiler to includer the
@@ -717,6 +736,30 @@ File: qtwrapper.h (header for the C-wrapper or C-interface)
                                  , void* ctx
                                  , void (* callback) (void* ctx, QLineEdit* self) );
 #+END_SRC
+
+
+  *Considerations:*
+   
+  1. _(extern "C")_ enforces C linkage, in other words, the function with
+     this annotation must have a C compatible signature and use C
+     compatible types. 
+
+  2. The C++ operator _new_ throws exception when there is not enough
+     memory, it throws std::bad_alloc. As C does not support
+     exceptions, it is necessary to use the operator _new (std::nothrow)_ that 
+     returns null pointer instead of throwing an exception.
+
+  3. Due to the lack of C support for exceptions, any exception throw
+     in the functions annotated with extern "C" should be returned as
+     as an additional function parameter. Moreover, C++ exceptions are
+     from different compilers may not even be compatible due to the
+     lack of standard C++ ABI. 
+
+  4. As C functions does not support closures, they cannot keep state,
+     therefore it is necessary to add an extra void pointer parameter
+     (void*) in the function pointers arguments and in the functions
+     that takes them as parameters such as, _qt_button_onClicked()_. This additional (void*) pointer
+     allows the caller to pass and keep state.
 
 *** Building the wrapper file. 
 
