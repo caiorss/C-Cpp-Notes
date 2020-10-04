@@ -262,10 +262,9 @@ systems, but they still have the following features in common:
         (X-Windows System).
 
     + Linux Device Files not associated to hardware:
-      + /dev/kmsg
-        + => text file containing kernel messages. The tool 'dmesg'
-          which shows the kernel messages reads them from the file
-          /dev/kmsg.
+      + _/dev/kmsg_ 
+        + => charavter device file containing kernel messages. The
+          file is read by the command line tool '$ dmesg'. 
       + /dev/stdout => Console stdout 
       + /dev/stdin  => Console stdin 
       + /dev/stderr => Console stderr 
@@ -1477,7 +1476,7 @@ are in the header <string.h> for C or <cstring> for C++.
    (char [50]) "control system Modelica / state space mo\0\0\0\0\0\0\0\0"
 #+END_SRC
 
-** Creating Portable Binaries for Linux / GLIBC hell 
+** Creating Portable Binaries for Linux / GLIBC Dependency Hell 
 *** Overview 
 
 One of the greatest challenges of Linux desktop is building and
@@ -2003,6 +2002,348 @@ Run application in MX-Linux distribution, based on Debian (Older version of GLIB
     "url": "https://www.httpbin.org/get"
   }
 
+#+END_SRC
+
+** Fully Statically linked executables for embedded Linux systems
+*** Overview 
+
+This sections presents a procedure for cross-compiling a fully
+statically linked executable, without any dependency, that can be
+deployed on any ARMV7-based Embedded Linux system, including
+Beaglebone Black development board and Android (Armv7 based
+processor).
+
+This procedure uses  [[https://hub.docker.com/layers/muslcc/i686/arm-linux-musleabi/images/sha256-818ac763b91e0112f7a38e34949c69a91d24852dc794372e905c70bb48370d0b?context=explore][muslcc/i686:arm-linux-musleabi]] docker image
+which contains a cross-compiling toolchain capable of compiling
+C or C++ applications for Linux kernel running on Armv7 based
+processors. This toolchain also uses Musl libC, instead of glibC (GNU
+C runtime library). Musl allows building fully statically applications
+that does not rely on any system dependency. As a result,
+applications, built with  Musl, can be run on any Linux
+distribution without being affected by GNU GlibC mismatch problems which
+arises when an application or object-code, that was built linked
+against an newer version of GlibC, is run on a system using an older
+version of GlibC resulting in a runtime linking error.
+
+All files are available at: 
+
+  + https://gist.github.com/b411be3b2a4364c7d4de18edd37da6a3
+
+References and reading: 
+
+  + https://hub.docker.com/r/muslcc/i686/tags 
+
+  + More toolchains at: https://elinux.org/Toolchains
+
+  + [[https://cmake.org/pipermail/cmake/2011-October/046743.html][[CMake] Fwd: Save stripped debugging information]]
+
+  + [[https://stackoverflow.com/questions/6687630/how-to-remove-unused-c-c-symbols-with-gcc-and-ld][How to remove unused C/C++ symbols with GCC and ld? - Stack Overflow]]
+
+  + [[https://ownyourbits.com/2018/06/13/transparently-running-binaries-from-any-architecture-in-linux-with-qemu-and-binfmt_misc/][Transparently running binaries from any architecture in Linux with QEMU and binfmt_misc – Own your bits]]
+
+*** Project Files
+ 
+File: _Makefile_ 
+
+  + Makefile for running project commands and documenting the building
+    process. 
+
+#+BEGIN_SRC sh 
+  DOCKER_COMMAND=docker run -e UID=$(shell id -u) -e GID=$(shell id -g) --volume=$(shell pwd):/cwd  --workdir=/cwd musl-armv7
+
+  # Builds docker image: musl-armv7
+  docker:
+          docker build -f Dockerfile.docker -t musl-armv7 .
+
+  # Build testing application 
+  build:
+          ${DOCKER_COMMAND} cmake -H. -B_build-armv7 -DCMAKE_BUILD_TYPE=Debug
+          ${DOCKER_COMMAND} cmake --build _build-armv7 --target 
+
+  clean:
+          rm -rf -v _build-armv7
+#+END_SRC
+
+File: _CMakeLists.txt_ 
+
+#+BEGIN_SRC sh  
+  cmake_minimum_required(VERSION 3.9)
+  project(embedded-linux-armv7)
+
+  set(CMAKE_CXX_STANDARD 17)     
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+
+  #====== Global compiler and linker settings ======#
+
+  # (-static)           => Fully statically link Musl-LibC
+  # (-Wl,--gc-sections) => Remove unused code
+  #                        (requires: -fdata-sections and -ffunction-sections)
+  set(CMAKE_EXE_LINKER_FLAGS "-static -Wl,--gc-sections")
+
+  # Separate data and code sections in order to reduce binary size. 
+  add_definitions( -fdata-sections -ffunction-sections )
+
+  # Copy target executable, for instance my-exe to my-exe.debug 
+  # and strip debugging symbols from my-exe.
+  # 
+  # Reference: https://cmake.org/pipermail/cmake/2011-October/046743.html
+  macro(STRIP_DEBUG_SYMBOLS target)
+    ADD_CUSTOM_COMMAND(TARGET ${target} POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${target}> ${CMAKE_BINARY_DIR}/${target}.debug
+      COMMAND ${CMAKE_STRIP} -g $<TARGET_FILE:${target}>
+    )
+  endmacro()
+
+  #========== Targets Configurations ============#
+
+          add_executable( app portable-app.cpp )
+   target_link_libraries( app stdc++fs)
+     STRIP_DEBUG_SYMBOLS( app )
+
+#+END_SRC
+
+File: _portable-app.cpp_ 
+
+#+BEGIN_SRC cpp 
+   #include <iostream>
+   #include <string>
+   #include <algorithm>
+   #include <iomanip>
+   #include <filesystem>
+   #include <fstream> 
+   #include <cassert> 
+
+   namespace fs = std::filesystem;
+
+   int main(int argc, char** argv)
+   {
+
+     assert( argc >= 2 && "Supposed to have at least one arguments");
+     std::cout << std::boolalpha;
+     std::string command = argv[1];
+
+     if(command == "version")
+     { 
+         auto ifs = std::ifstream("/proc/version");
+         assert( ifs.good() && "File supposed to exist" );  
+         std::cout << ifs.rdbuf();
+         return EXIT_SUCCESS;
+     }
+
+     std::cout << "\n ===== Listing directory /etc =====" << std::endl;
+
+     if(command == "list")
+     {
+         // Show first 10 files of directory /etc 
+       auto iter = fs::directory_iterator(argv[2]);
+
+       std::for_each(fs::begin(iter), fs::end(iter)
+                    ,[](auto p){
+                      auto path = p.path();
+                      std::cout << std::left
+                                << std::setw(0) << path.filename().string()
+                                << " " << std::setw(35)
+                                << std::right << std::setw(40) << path
+                                << std::endl;				
+                    });    
+       return EXIT_FAILURE;    
+     }
+
+     return EXIT_SUCCESS;
+   }
+#+END_SRC
+
+*** Building and running 
+
+ *STEP 1:* Downloading the source code. 
+
+#+BEGIN_SRC sh 
+  $ git clone https://gist.github.com/b411be3b2a4364c7d4de18edd37da6a3 musl-armv7 && cd musl-armv7
+#+END_SRC
+
+ *STEP 2:* Building the docker image: 
+
+#+BEGIN_SRC sh 
+  $ docker build -f Dockerfile.docker -t musl-armv7 .
+
+  Sending build context to Docker daemon  7.168kB
+  Step 1/2 : FROM muslcc/i686:armv7l-linux-musleabihf
+   ---> 4141d3dcca3f
+  Step 2/2 : RUN  apk add make cmake
+   ---> Using cache
+   ---> c18ba0aa2335
+  Successfully built c18ba0aa2335
+  Successfully tagged musl-armv7:latest
+#+END_SRC
+
+ *STEP 3:* Cross-compile the sample application: 
+
+Cross-compiling from command line: 
+
+#+BEGIN_SRC sh 
+  # Run the docker shell (sh)
+  $ docker run --interactive --tty -e UID=$(id -u) -e GID=$(id -g) --volume=$(pwd):/cwd  --workdir=/cwd musl-armv7
+  /cwd # 
+  
+  # Build the application 
+  /cwd $ cmake -H. -B_build-armv7 -DCMAKE_BUILD_TYPE=Debug
+  /cwd $ cmake --build _build-armv7 --target
+
+  # Exit the docker shell 
+  /cwd $ cmake --build _build-armv7 --target
+#+END_SRC
+
+Cross-compile in a single step using the helper Makefile: 
+
+#+BEGIN_SRC sh  
+  $ make build 
+#+END_SRC 
+
+Check the compiled executables: 
+
+#+BEGIN_SRC sh 
+  $ ls _build-armv7/
+  CMakeFiles/  app*  app.debug*  CMakeCache.txt  cmake_install.cmake  Makefile
+
+  # Version with debug symbols 
+  $ file _build-armv7/app
+  _build-armv7/app: ELF 32-bit LSB executable, ARM, EABI5 version 1 (SYSV), statically linked, not stripped
+
+  $ du -h _build-armv7/app
+  736K	_build-armv7/app
+  736K	total
+
+  # Version without debugging symbols 
+  $ file _build-armv7/app.debug 
+  _build-armv7/app.debug: ELF 32-bit LSB executable, ARM, EABI5 version 1 (SYSV)
+  , statically linked, with debug_info, not stripped
+
+  $ du -h _build-armv7/app.debug 
+  9.4M	_build-armv7/app.debug
+  9.4M	total
+#+END_SRC
+
+ *STEP 4:* Attempt to run the built executable on different machines.
+
+Attempt to run the previous executables on the host machine (x86-64
+processor - 64 bits):
+
+#+BEGIN_SRC sh 
+  $ _build-armv7/app
+  bash: _build-armv7/app: cannot execute binary file: Exec format error
+
+  $ _build-armv7/app.debug 
+  bash: _build-armv7/app.debug: cannot execute binary file: Exec format error
+#+END_SRC
+
+Run ARMv7 Linux binary on a x86-64 host machine using [[https://www.qemu.org/][QEMU]] emulator: [[https://ownyourbits.com/2018/06/13/transparently-running-binaries-from-any-architecture-in-linux-with-qemu-and-binfmt_misc/][(OwnYourBits)]]
+
+#+BEGIN_SRC sh 
+   # Install Fedora Packages 
+   $ sudo dnf install -y qemu-user.x86_64 qemu-user-static.x86_64
+
+   # Run the Armv7 binary using QEMU-user 
+   $ qemu-arm ./_build-armv7/app version 
+   Linux version 5.8.4-200.fc32.x86_64 (mockbuild@bkernel01.iad2.fedoraproject.org) ... ... 
+
+   $ qemu-arm ./_build-armv7/app list /
+
+    ===== Listing directory /etc =====
+   srv                                   "/srv"
+   sys                                   "/sys"
+   opt                                   "/opt"
+   run                                   "/run"
+   media                                 "/media"
+   bin                                   "/bin"
+   .autorelabel                          "/.autorelabel"
+   root                                  "/root"
+   var                                   "/var"
+   etc                                   "/etc"
+   tmp                                   "/tmp"
+#+END_SRC
+
+Run application in _Beaglebone Black_ (Armv7) embedded linux development
+board, similar to Raspberry-Pi, but with more IO ports, peripherals
+and ADC analog-to-digital converters: 
+
+#+BEGIN_SRC sh 
+  debian@beaglebone:~$ file app
+  app: ELF 32-bit LSB executable, ARM, EABI5 version 1 (SYSV), statically linked, not stripped
+
+  debian@beaglebone:~$ du -h app
+  736K	app
+
+  debian@beaglebone:~$ file app
+  app: ELF 32-bit LSB executable, ARM, EABI5 version 1 (SYSV), statically linked, not stripped
+  debian@beaglebone:~$ 
+
+  debian@beaglebone:~$ ./app 
+  Assertion failed: argc >= 2 && "Supposed to have at least one arguments" (/cwd/portable-app.cpp: main: 14)
+  Aborted
+  debian@beaglebone:~$ 
+
+  debian@beaglebone:~$ ./app version 
+  Linux version 4.14.71-ti-r80 (root@b2-am57xx-beagle-x15-2gb) (gcc version 6.3.0 20170516 (Debian 6.3.0-18+deb9u1)) #1 SMP PREEMPT Fri Oct 5 23:50:11 UTC 2018
+  debian@beaglebone:~$ 
+
+  debian@beaglebone:~$ ./app list /
+
+   ===== Listing directory /etc =====
+  sys                                   "/sys"
+  opt                                   "/opt"
+  sbin                                  "/sbin"
+  home                                  "/home"
+  dev                                   "/dev"
+  nfs-uEnv.txt                          "/nfs-uEnv.txt"
+  usr                                   "/usr"
+  bin                                   "/bin"
+  etc                                   "/etc"
+  proc                                  "/proc"
+  boot                                  "/boot"
+   ... ... ...  ... ... ...  ... ... ... 
+   ... ... ...  ... ... ...  ... ... ... 
+
+#+END_SRC
+
+Run in Android Armv-7 phone via [[https://developer.android.com/studio/command-line/adb][ADB]] (Android Debug Bridge): 
+
+#+BEGIN_SRC sh 
+  # Transver application to phone via ADB 
+   $ adb push _build-armv7/app.debug /data/local/tmp 
+  _build-armv7/app.debug: 1 file pushed. 11.1 MB/s (9793936 bytes in 0.842s)
+
+  # Enter ADB shell and run the application. 
+   $ >> adb shell 
+  bali:/ $ cd /data/local/tmp
+
+  bali:/data/local/tmp $ file app.debug                                                                                                       
+  app.debug: ELF executable, 32-bit LSB arm, static, not stripped
+
+  bali:/data/local/tmp $ du -h app.debug
+  9.3M	app.debug
+
+  134|bali:/data/local/tmp $ ./app.debug version                                                                                              
+  Linux version 4.4.146+ (jenkins@jenkins-bali-wxg)  ... ... 
+  bali:/data/local/tmp $ 
+
+
+  1|bali:/data/local/tmp $ ./app.debug list /dev                                                                                              
+
+   ===== Listing directory /etc =====
+  wmtWifi                           "/dev/wmtWifi"
+  stpgps                            "/dev/stpgps"
+  fm                                "/dev/fm"
+  stpbt                             "/dev/stpbt"
+  stpwmt                            "/dev/stpwmt"
+  wmtdetect                         "/dev/wmtdetect"
+  radio                             "/dev/radio"
+  ttyGS3                            "/dev/ttyGS3"
+  ttyGS2                            "/dev/ttyGS2"
+  ttyGS1                            "/dev/ttyGS1"
+  ttyGS0                            "/dev/ttyGS0"
+  mtp_usb                           "/dev/mtp_usb"
+  usb_accessory                     "/dev/usb_accessory"
+   ... ... ...  ... ... ...  ... ... ...  ... ... ... 
 #+END_SRC
 
 ** Creating command line applications with CLI11 C++ Library
