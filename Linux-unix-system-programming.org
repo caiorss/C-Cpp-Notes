@@ -3135,6 +3135,528 @@ Run _ls_ subcommand:
 
 
 #+END_SRC
+** System information via virtual file systems 
+*** Overview 
+
+The Linux kernel provides two official APIs (Application Programming
+Interfaces) for user-space applications. The system-calls, that are
+stable and well documented and often made available via GLIBC (GNU C
+library). And VSF - virtual file system, which are in-memory pseudo
+file systems which allow user-space applications to retrieve system
+information; tune kernel runtime parameters and control device drivers
+by reading and writing VSF files. 
+
+The following code demonstrates, retrives several system information
+by reading files in Linux's /proc (procfs) and /sys (sysfs) virtual
+file systems.
+
+ *Useful files in procfs or (/proc) file system* 
+
+Some files that contains useful system information are: 
+
+  + */proc/version*
+    + => Linux Kernel Version 
+
+  + */proc/cpuinfo*
+    + => Contains information about current CPU, such as vendor;
+      architecture; supported vector (SIMD) extensions; number of
+      cores and so on.
+
+  + */proc/mounts* (command: $ mounts )
+    + => Lists all mount points and mounted file systems.
+
+  + */proc/partitions*
+    + => Contain all system partitons (sda, sda1, ..., sda[N])
+
+  + */proc/filesystems*
+    + => Lists all supported file system types by the current kernel.
+
+  + */proc/modules* (command: $ lsmod)
+    + => Contains listing of all kernel modules loaded by the
+      kernel. The CLI tool _lsmod_ uses this file to display the loaded
+      modules. 
+
+  + */proc/meminfo* (command: $ free -m)
+    + => Contains information about current memory.
+
+  + */proc/uptime* (command: $ uptime)
+    + => Stores the CPU uptime, how long the machine is running since
+      boot time.
+
+  + */proc/loadvg* (command: $ uptime)
+    + => Shows system load average.
+    + See:
+
+  + */proc/sys/kernel/* (Directory) - The tool [[https://wiki.archlinux.org/index.php/sysctl][sysctl]], for tweaking
+    Kernel parameters, manipulates the file in this directory.
+ 
+    + => This directory contains, several files which allows tuning
+      kernel parameters at runtime, by just reading or writing to
+      those files. 
+
+  + */proc/sys/kernel/hostname*
+    + => Contains current machine hostname, that can be changed by
+      writiing to this file.
+
+  + */proc/sys/kernel/ostype*
+    + => Operating system type, always set to "Linux".
+
+  + */proc/sys/kernel/osrelease*
+    + => Linux kernel version. 
+
+  + */proc/sys/kernel/sysrq*
+    + => If this file is set to '1', it allows using the magic SysRQ
+      key makes possible to kill hogging processes when the machine
+      hangs or freeze due to high memory usage.
+
+  *Further Reading* 
+
+General: 
+
+  + [[https://man7.org/linux/man-pages/man5/proc.5.html][proc(5) - Linux manual page]] - PROCFS - pseudo file sytem. 
+
+  + [[https://web.mit.edu/rhel-doc/5/RHEL-5-manual/Deployment_Guide-en-US/s1-proc-directories.html][3.3. Directories within /proc/]]
+
+  + [[https://source.android.com/devices/architecture/kernel/reqs-interfaces][Interface Requirements  |  Android Open Source Project]]
+
+  + [[https://wiki.gentoo.org/wiki/Procfs][procfs - Gentoo Wiki]]
+
+  + [[http://0pointer.de/blog/projects/ids.html][On IDs]] (Forensic information from Linux machines)
+
+Kernel Runtime Settings (/proc/sys/kernel) and sysctl tool:
+
+  + [[http://www.linux-admins.net/2010/09/all-you-need-to-know-about-procsys.html][Linux Administration: All you need to know about /proc/sys to manipulate a running kernel]]
+
+  + [[https://linuxreviews.org/Kernel_panic][Kernel panic - LinuxReviews]]
+
+  + [[https://www.thegeekdiary.com/how-to-use-sysrq-tool-in-centos-rhel/][How to use Magic SysRq tool in CentOS / RHEL – The Geek Diary]]
+
+  + [[https://wiki.archlinux.org/index.php/sysctl][sysctl - ArchWiki]] (Manipulates kernel parameters at runtime - directory: /proc/sys/kernel)
+
+  + [[https://linux-audit.com/linux-hardening-with-sysctl/][Linux hardening with sysctl settings - Linux Audit]]
+
+Linux Load Average (/proc/loadavg)
+
+  + [[http://www.brendangregg.com/blog/2017-08-08/linux-load-averages.html][Linux Load Averages: Solving the Mystery]] (Brendan Gregg)
+
+  + [[https://stackoverflow.com/questions/11987495/linux-proc-loadavg][linux /proc/loadavg - Stack Overflow]] (How to interpret the file
+    /proc/loadavg)
+
+  + [[https://docs.fedoraproject.org/en-US/Fedora/17/html/System_Administrators_Guide/s2-proc-loadavg.html][E.2.15.  /proc/loadavg]]
+
+*** Sample Code 
+
+Code available at: 
+
+  + https://gist.github.com/2527d1402ea1469f67fba9ab172f05e5
+
+File: _linux-info.cpp_ 
+
+#+BEGIN_SRC cpp 
+  /* Summary: Gets Linux runtime information from VSF virtual file system. 
+   ,*
+   ,*/
+  #include <iostream>
+  #include <fstream> 
+  #include <sstream>
+  #include <string> 
+  #include <iomanip>  // std::seprecision, std::fixed 
+
+  // See: https://man7.org/linux/man-pages/man2/sysinfo.2.html
+  #include <sys/sysinfo.h>
+
+  void        get_memory_info();
+  void        show_sysinfo1();
+  void        show_uptime();
+  void        show_mount_points();
+  void 		show_kernel_runtime_config();
+  std::string readFile(std::string const& file);
+
+  int main(int argc, char** argv)
+  {
+        if(argc < 2){
+            std::cerr << " [ERROR] Usage: $ " << argv[0] << " <COMMAND> " << '\n';
+            return EXIT_FAILURE;
+        }
+
+        auto command = std::string{ argv[1] };
+
+        if(command == "version"){
+             std::cout << "===== Kernel Version ====================================" << '\n';
+             auto version = readFile("/proc/version");
+             std::cout << " System version = " << version << '\n';
+             return EXIT_SUCCESS;
+        }
+
+        if(command == "memory")
+        {
+             std::cout << " ==== Memory (Reported by command $ free -m ) ========" << '\n';
+             get_memory_info();
+             return EXIT_SUCCESS;
+         }
+
+        // Using the header: <sys/sysinfo.h>  
+        // Note: this information is reported by the command $ free -m 
+        if(command == "sysinfo1")
+        {
+             std::cout << " ===== System Info 1 (Reported by $ free -m and $ uptime ) === " << '\n';
+             show_sysinfo1();
+             return EXIT_SUCCESS;
+        }
+
+        if(command == "uptime")
+        {
+             std::cout << "===== System uptime since boot (Reported by $ uptime) ====" << '\n';
+             show_uptime();
+             return EXIT_SUCCESS;
+        }
+
+        if(command == "load-avg")
+        {
+             std::cout << " ==== System Load Average ================================" << '\n';
+             auto loadavg = readFile("/proc/loadavg");
+             std::cout << "Load average = " << loadavg << '\n';	
+             return EXIT_SUCCESS;
+        }
+
+        if(command == "mount")
+        {
+             std::cout << " ====== System mount points ( Reported by command $ mount ) ===== " << '\n';
+             show_mount_points();
+             return EXIT_SUCCESS;
+        }
+
+        if(command == "sysctl")
+        {
+             std::cout << " ===== Kernel Runtime Information (Reported by $ sysctl ) ======= " << '\n';
+             show_kernel_runtime_config();
+             return EXIT_SUCCESS;
+        }
+
+        if(command == "dmesg")
+        {
+             std::cout << " ===== Kernel debug message (Reported by $ dmesg ) ==========" << '\n';
+             auto ifs = std::ifstream("/dev/kmsg");
+             std::string line;
+             while( std::getline(ifs, line) ){
+                     std::cout << line << '\n';
+             }
+        }
+
+        if(command == "cpuinfo")
+        {
+             std::cout << "======= CPU Information =====================================" << '\n';
+
+             auto ifs = std::ifstream("/proc/cpuinfo");
+             std::string line;
+             while( std::getline(ifs, line) ){
+                     std::cout << line << '\n';
+             }		
+        }
+
+        return EXIT_SUCCESS;
+  }
+
+  void get_memory_info()
+  {
+       constexpr const char* meminfo_file = "/proc/meminfo";
+       // factor = 1 Gigabytes = 1024 * 1024 kbytes 
+       constexpr double factor = 1024 * 1024;
+
+       auto ifs = std::ifstream{meminfo_file};
+       if(!ifs.good()){
+               throw std::runtime_error("Error: unable to memory-info file.");
+       }
+       std::string line, label;
+       std::uint64_t value; 
+       while( std::getline(ifs, line) )
+       {		
+            std::stringstream ss{line};	
+            ss >> label >> value;
+
+            if(label == "MemTotal:")
+                    std::cout << "     Total memory (Gb) = " << (value / factor) << '\n';
+
+            if(label == "MemAvailable:")		
+                    std::cout << " Memory Available (Gb) = " << (value / factor) << '\n';
+       }
+  }
+
+  void show_sysinfo1()
+  {
+       struct sysinfo info;
+       ::sysinfo(&info);
+
+       // 1 Gigabyte = 1024 megabytes = 1024 * 1024 kbytes = 1024 * 1024 * 1024 bytes;
+       constexpr double factor = 1024 * 1024 * 1024;
+       constexpr std::uint64_t one_day_to_seconds = 24 * 60 * 60;
+
+       std::cout << " [*] System uptime since boot (seconds) = " << info.uptime << '\n'
+                         << " [*] System uptime since boot    (days) = " << info.uptime    / one_day_to_seconds << '\n'
+                         << " [*]              Total RAM memory (Gb) = " << info.totalram  / factor << '\n'
+                         << " [*]              Free  RAM memory (Gb) = " << info.freeram   / factor << '\n'
+                         << " [*]                    Total SWAP (Gb) = " << info.totalswap / factor << '\n'				  
+                         << " [*]                     Free SWAP (Gb) = " << info.freeswap  / factor << '\n'				  				  
+                         << " [*]        Number of processes running = " << info.procs << '\n'
+                         << '\n';
+  }
+
+  // Reported by command $ uptime 
+  void show_uptime()
+  {	
+       auto ifs = std::ifstream("/proc/uptime");
+       if( !ifs.good() ){ throw std::runtime_error("Error: unable to open uptime file "); }
+       double seconds;
+       ifs >> seconds; 
+       uint64_t factor = 24 * 60 * 60;
+       std::cout << "   Uptime in hours = " << seconds / ( 60 * 60) << '\n';
+       std::cout << "    Uptime in days = " << seconds / factor << '\n';
+  }
+
+
+  void show_kernel_runtime_config()
+  {
+      auto show_field= [](std::string const& label, std::string const& file)
+      {
+           std::cout << " [*] " 
+                     << std::setw(40) << std::right << (label + " => ")
+                     << std::setw(50) << std::left  << readFile(file)
+                     << '\n';
+      };
+
+      std::cout << '\n';
+      show_field("Machine Hostname",                "/proc/sys/kernel/hostname");
+      show_field("Kernel Version",                  "/proc/sys/kernel/osrelease");	
+      show_field("Os type",                         "/proc/sys/kernel/ostype");
+      show_field("Boot unique ID identifier",       "/proc/sys/kernel/random/boot_id");
+      show_field("Date which kernel was compiled",  "/proc/sys/kernel/version");
+      show_field("Sysrq enabled (Emergency keys)",  "/proc/sys/kernel/sysrq");
+      show_field("Max number of Cgroups namespaces", "/proc/sys/user/max_cgroup_namespaces");
+      show_field("Max number of Mount namespaces",   "/proc/sys/user/max_net_namespaces");
+  }
+
+
+  void show_network_interfaces()
+  {
+      throw std::runtime_error("Error: not implemented yet.");
+  }
+
+  // Show mounted file systems, but ignore 'cgroup', 'overlay', 'fusectl'   
+  void show_mount_points()
+  {
+       auto ifs = std::ifstream("/proc/mounts");
+       if(!ifs){ 
+               throw std::runtime_error("Error: unable to open file /proc/mounts"); 
+       }
+       std::cout << '\n';
+       std::cout << "    " 
+                 << std::setw(20) << std::left << "File system" 
+                 << std::setw(20) << std::left << "Type"
+                 << std::setw(10) << std::left << "Mount point"
+                 << '\n';
+
+       std::cout << "    " 
+                 << std::setw(20) << std::left << "------------" 
+                 << std::setw(20) << std::left << "----"
+                 << std::setw(10) << std::left << "-----------"
+                 << '\n';
+
+       std::string line, fsystem, type, mount_directory;	
+
+       while( std::getline(ifs, line) )
+       {
+          auto ss = std::stringstream(line);
+          ss >> fsystem >> mount_directory >> type;
+          if( type != "cgroup" && type != "overlay" && type != "cgroup2")
+          {
+              std::cout << "   " 
+                        << std::setw(20) << std::left << fsystem 
+                        << std::setw(20) << std::left << type 
+                        << std::setw(10) << std::left << mount_directory 
+                        << '\n';
+          }
+       }
+  }
+
+  // Requires: <string>, <stream>, <sstream>
+  std::string readFile(std::string const& file) 
+  {
+      std::ifstream is(file);
+      if( !is.good() ){
+          throw std::runtime_error("Error: stream has errors.");
+      }
+      std::stringstream ss;
+      ss << is.rdbuf();	
+          std::string m;
+          // Remove ending line character '\n' or '\r\n'.
+          std::getline(ss, m);
+      return m;
+  } 
+
+#+END_SRC
+
+*** Running 
+
+ *Building:*
+
+#+BEGIN_SRC sh  
+  $ g++ linux-info.cpp -o linux-info -std=c++1z -Wall -Wextra -g
+#+END_SRC
+
+  *Running*  (Tested on Linux distribution [[https://pop.system76.com/][PopOS]] Live CD running in a virtual machine)
+
+Get Kernel Version: 
+
+#+BEGIN_SRC sh 
+   $ >> ./linux-info 
+   [ERROR] Usage: $ ./linux-info <COMMAND> 
+
+   $ >> ./linux-info version # Get Kernel version
+  ===== Kernel Version ====================================
+   System version = Linux version 5.4.0-7634-generic (buildd@lcy01-amd64-003) (gcc version 9.3.0 (Ubuntu 9.3.0-10ubuntu2)) #38~1591219791~20.04~6b1c5de-Ubuntu SMP Thu Jun 4 02:56:10 UTC 2
+   $ >> 
+#+END_SRC 
+
+Get RAM memory available (equivalent to $ free -m)
+
+#+BEGIN_SRC sh 
+   $ >> ./linux-info memory # RAM memory 
+   ==== Memory (Reported by command $ free -m ) ========
+       Total memory (Gb) = 1.9175
+   Memory Available (Gb) = 1.01926
+#+END_SRC
+
+System uptime and RAM memory available: 
+
+#+BEGIN_SRC sh 
+   $ >> ./linux-info sysinfo1 
+   ===== System Info 1 (Reported by $ free -m and $ uptime ) === 
+   [*] System uptime since boot (seconds) = 760
+   [*] System uptime since boot    (days) = 0
+   [*]              Total RAM memory (Gb) = 1.9175
+   [*]              Free  RAM memory (Gb) = 0.20657
+   [*]                    Total SWAP (Gb) = 0
+   [*]                     Free SWAP (Gb) = 0
+   [*]        Number of processes running = 444
+#+END_SRC
+
+Load average: 
+
+#+BEGIN_SRC sh 
+   $ >> ./linux-info load-avg
+   ==== System Load Average ================================
+  Load average = 0.27 0.28 0.28 4/443 2532
+
+#+END_SRC
+
+Mounted file systems (file: /proc/mounts)
+
+#+BEGIN_SRC sh 
+   $ >> ./linux-info mount 
+   ====== System mount points ( Reported by command $ mount ) ===== 
+
+      File system         Type                Mount point
+      ------------        ----                -----------
+     sysfs               sysfs               /sys      
+     proc                proc                /proc     
+     udev                devtmpfs            /dev      
+     devpts              devpts              /dev/pts  
+     tmpfs               tmpfs               /run      
+     /dev/sr0            iso9660             /cdrom    
+     /dev/loop0          squashfs            /rofs     
+     securityfs          securityfs          /sys/kernel/security
+     tmpfs               tmpfs               /dev/shm  
+     tmpfs               tmpfs               /run/lock 
+
+    ...  ...  ...  ...  ...  ...  ...  ...  ...  ... 
+    ...  ...  ...  ...  ...  ...  ...  ...  ...  ... 
+
+     debugfs             debugfs             /sys/kernel/debug
+     tracefs             tracefs             /sys/kernel/tracing
+     fusectl             fusectl             /sys/fs/fuse/connections
+     configfs            configfs            /sys/kernel/config
+     tmpfs               tmpfs               /tmp      
+     tmpfs               tmpfs               /run/user/999
+     gvfsd-fuse          fuse.gvfsd-fuse     /run/user/999/gvfs
+     /dev/fuse           fuse                /run/user/999/doc
+     /dev/fuse           fuse                /root/.cache/doc
+     gvfsd-fuse          fuse.gvfsd-fuse     /root/.cache/gvfs
+     binfmt_misc         binfmt_misc         /proc/sys/fs/binfmt_misc
+#+END_SRC
+
+Kernel runtime information (directory _/proc/sys/kernel_)
+
+#+BEGIN_SRC sh 
+    $ >> ./linux-info sysctl # Show some kernel runtime options
+    ===== Kernel Runtime Information (Reported by $ sysctl ) ======= 
+
+    [*]                     Machine Hostname => pop-os                                            
+    [*]                       Kernel Version => 5.4.0-7634-generic                                
+    [*]                              Os type => Linux                                             
+    [*]            Boot unique ID identifier => 756989d9-f596-4e4f-ac50-d5c3026d041a              
+    [*]       Date which kernel was compiled => #38~1591219791~20.04~6b1c5de-Ubuntu SMP Thu Jun 4 02:56:10 UTC 2
+    [*]       Sysrq enabled (Emergency keys) => 176                                               
+    [*]     Max number of Cgroups namespaces => 7490                                              
+    [*]       Max number of Mount namespaces => 7490                                              
+#+END_SRC
+
+Kernel messages (file: _/dev/kmsg_)
+
+#+BEGIN_SRC sh 
+    $ >> ./linux-info dmesg
+
+    ===== Kernel debug message (Reported by $ dmesg ) ==========
+   5,0,0,-;Linux version 5.4.0-7634-generic (buildd@lcy01-amd64-003) (gcc version 9.3.0 (Ubuntu 9.3.0-10ubuntu2)) #38~1591219791~20.04~6b1c5de-Ubuntu SMP Thu Jun 4 02:56:10 UTC 2 (Ubuntu 5.4.0-7634.38~1591219791~20.04~6b1c5de-generic 5.4.41)
+   6,1,0,-;Command line: BOOT_IMAGE=/casper_pop-os_20.04_amd64_intel_debug_19/vmlinuz.efi initrd=/casper_pop-os_20.04_amd64_intel_debug_19/initrd.gz boot=casper live-media-path=/casper_pop-os_20.04_amd64_intel_debug_19 hostname=pop-os username=pop-os noprompt  ---
+   6,2,0,-;KERNEL supported cpus:
+   6,3,0,-;  Intel GenuineIntel
+     ....   ....   ....   ....   ....   ....   .... 
+     ....   ....   ....   ....   ....   ....   .... 
+
+    DEVICE=+hdaudio:hdaudioC0D0
+   6,649,16644546,-;snd_hda_codec_generic hdaudioC0D0:    inputs:
+    SUBSYSTEM=hdaudio
+    DEVICE=+hdaudio:hdaudioC0D0
+   7,650,25338660,-;rfkill: input handler disabled
+   5,651,40422354,-;random: crng init done
+   5,652,40422357,-;random: 7 urandom warning(s) missed due to ratelimiting
+#+END_SRC
+
+ *Testing with Fedora 32 x86-64 (64 bits)* 
+
+Get mount points (file: _/proc/mounts_)
+
+#+BEGIN_SRC sh 
+  $ ./linux-info mount
+   ====== System mount points ( Reported by command $ mount ) ===== 
+
+      File system         Type                Mount point
+      ------------        ----                -----------
+     sysfs               sysfs               /sys      
+     proc                proc                /proc     
+     devtmpfs            devtmpfs            /dev      
+     securityfs          securityfs          /sys/kernel/security
+     tmpfs               tmpfs               /dev/shm  
+     devpts              devpts              /dev/pts  
+     tmpfs               tmpfs               /run      
+     tmpfs               tmpfs               /sys/fs/cgroup
+     pstore              pstore              /sys/fs/pstore
+     efivarfs            efivarfs            /sys/firmware/efi/efivars
+     none                bpf                 /sys/fs/bpf
+     configfs            configfs            /sys/kernel/config
+     /dev/sda3           ext4                /         
+     systemd-1           autofs              /proc/sys/fs/binfmt_misc
+     tmpfs               tmpfs               /tmp      
+     fusectl             fusectl             /sys/fs/fuse/connections
+     /dev/sda1           vfat                /boot/efi 
+     sunrpc              rpc_pipefs          /var/lib/nfs/rpc_pipefs
+     tmpfs               tmpfs               /run/user/42
+     tmpfs               tmpfs               /run/user/1000
+     gvfsd-fuse          fuse.gvfsd-fuse     /run/user/1000/gvfs
+     nsfs                nsfs                /run/docker/netns/77290c7a4863
+     binfmt_misc         binfmt_misc         /proc/sys/fs/binfmt_misc
+#+END_SRC
+
 ** Low level IO functions overview 
 
 C-Library functions which encapsulates file-related systems calls.
