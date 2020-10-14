@@ -3657,6 +3657,354 @@ Get mount points (file: _/proc/mounts_)
      binfmt_misc         binfmt_misc         /proc/sys/fs/binfmt_misc
 #+END_SRC
 
+** Disk Space Usage on Linux and BSD-variants
+
+The following code gets the disk space usage on Linux-derived
+operating systems by iterating over the file _/proc/mounts_ for
+determining mounted file systems and then uses the _statfs()_ function
+for getting disk usage information from each file system mount
+point. Unlike, Linux On BSD variants such, as FreeBSD, OpenBSD and
+Mac-OSX, there is no PROCFS virtual file system. On those operating
+systems, the information about disk space usage can be obtained in a
+single step by using the function [[https://www.freebsd.org/cgi/man.cgi?query=getmntinfo&manpath=FreeBSD+12.1-RELEASE+and+Ports][getmntinfo()]].
+
+ *Functions used* 
+
+   + Documentation: $ man statfs
+   + The functions _statfs_ and _fstatfs_ provide information about
+     mounted file systems. The parameter buf, must be allocated by the
+     caller. When the function fails, it returns (-1).
+
+#+BEGIN_SRC cpp  
+   #include <sys/vfs.h>    /* or <sys/statfs.h> */
+
+   int statfs(const char *path, struct statfs *buf);
+   int fstatfs(int fd, struct statfs *buf);
+
+   struct statfs {
+       __fsword_t f_type;    /* Type of filesystem (see below) */
+       __fsword_t f_bsize;   /* Optimal transfer block size */
+       fsblkcnt_t f_blocks;  /* Total data blocks in filesystem */
+       fsblkcnt_t f_bfree;   /* Free blocks in filesystem */
+       fsblkcnt_t f_bavail;  /* Free blocks available to
+                                unprivileged user */
+       fsfilcnt_t f_files;   /* Total file nodes in filesystem */
+       fsfilcnt_t f_ffree;   /* Free file nodes in filesystem */
+       fsid_t     f_fsid;    /* Filesystem ID */
+       __fsword_t f_namelen; /* Maximum length of filenames */
+       __fsword_t f_frsize;  /* Fragment size (since Linux 2.6) */
+       __fsword_t f_flags;   /* Mount flags of filesystem
+                                (since Linux 2.6.36) */
+       __fsword_t f_spare[xxx];
+                       /* Padding bytes reserved for future use */
+   };
+#+END_SRC
+
+ *Sample Code* 
+
+File: _df-size.cpp_ 
+
+#+BEGIN_SRC cpp  
+   // ----- Get Disk Space Usage -------------// 
+
+   #include <iostream>
+   #include <vector>
+   #include <string>
+   #include <algorithm>
+   #include <functional>
+   #include <iomanip>
+   #include <fstream>
+   #include <cmath> 
+
+   // ------ Unix Headers ----//
+   #include <unistd.h>
+   #include <sys/vfs.h>    /* Get statfs() */
+   #include <limits.h>
+   #include <sys/types.h>
+   #include <sys/stat.h>
+   #include <cstring>
+
+   struct mount_point
+   {
+       // File System 
+       std::string fsystem; 
+       // Mounting directroy 
+       std::string mount_directory;
+       // File system type 
+       std::string type;
+   };
+
+   template<typename MountpointConsumer> 
+   void iterate_mount_points(MountpointConsumer&& consumer);
+
+   auto read_symlink(std::string const& path) -> std::string ;
+
+   int main(int argc, char** argv)
+   {
+
+      iterate_mount_points([](mount_point const& mnt)
+      {
+          struct statfs fs;
+          const char* mount_dir = mnt.mount_directory.c_str();
+
+          // =>>> List of file system that will be ignored. 
+          // 'static' keyworkd =>  Variable allocated only once, when 
+          // this function is called for the first time. 
+          static const auto ignored_fsystem = std::vector<std::string>{
+                "cgroup", "cgroup2", "proc", "sysfs", "tmpfs", "devtmpfs"
+              , "configfs", "bpf", "mqueue", "hugetlbfs", "tracefs"
+              , "fuse.gvfsd-fuse", "rpc_pipefs", "debugfs"
+              , "overlay", "securityfs", "devpts", "pstore", "efivarfs"
+              , "autofs", "binfmt_misc", "tmpfs", "fusectl", "nsfs"
+              , "selinuxfs", "functionfs"
+           };
+
+          // Ignore the following types of file-system, mostly VSF (Virtual File Systems)
+          // or in-memory file systems.
+          auto iter = std::find(ignored_fsystem.cbegin(), ignored_fsystem.cend(), mnt.type );
+          if( iter != ignored_fsystem.end() ) { return; }
+
+          if( statfs(mount_dir, &fs) == -1 )
+          {
+              std::cerr << " [ERROR] Unable to get file system statistics for: " 
+                        << " Mount point => " << mnt.mount_directory 
+                        << " / " << mnt.fsystem.c_str() 
+                        << '\n';
+              return;
+          }
+
+          const size_t block_size = fs.f_bsize;
+
+           // Total disk space in Gigabytes 
+          const double total_space = static_cast<double>(fs.f_blocks) * block_size / (1024 * 1024 * 1024);
+          // Free disk space in Gigabytes 
+          const double available_space = static_cast<double>(fs.f_bavail) * block_size / (1024 * 1024 * 1024);
+          // Disk space usage in Gigabytes 
+          const double used_space = total_space - available_space;
+
+          // Disk space usage in percent (%) 
+          const double used_space_pct = (1.0 - available_space / total_space) * 100.0;
+
+          auto fsystem_abspath = read_symlink(mnt.fsystem);
+
+          std::cout << "      File System: " << fsystem_abspath      << '\n'
+                    << "             Type: " << mnt.type             << '\n'       
+                    << "      Mount Point: " << mnt.mount_directory  << '\n';
+           if(total_space > 1.0)
+           {
+               std::cout << " Total space (Gb): " << total_space            << '\n'
+                         << "  Free space (Gb): " << available_space        << '\n'
+                         << "  Used space (Gb): " << used_space             << '\n'                      
+                         << "   Used space (%): " << used_space_pct <<  "%" << '\n'
+                         << '\n';
+           } else {
+               std::cout << "  Free space (Mb): " << available_space * 1024  << '\n'
+                         << " Total space (Mb): " << total_space * 1024      << '\n'
+                         << "  Used space (Gb): " << used_space * 1024       << '\n'                                            
+                         << "   Used space (%): " << used_space_pct << "%"   << '\n'
+                         << '\n';
+
+           }
+      });
+
+           return 0;
+   }
+
+
+   // ----------------------------------------------------------------------//
+
+   template<typename MountpointConsumer> 
+   void iterate_mount_points(MountpointConsumer&& consumer)
+   {
+       auto ifs = std::ifstream("/proc/mounts");
+       if(!ifs) throw std::runtime_error("Error: unable to open file /proc/mounts");     
+       std::string line, fsystem, mount_directory, type; 
+
+       while( std::getline(ifs, line) )
+       {
+           auto ss = std::stringstream(line);
+           ss >> fsystem >> mount_directory >> type;
+           consumer( mount_point{ fsystem, mount_directory, type } );
+           //if( type != "cgroup" && type != "overlay" && type != "cgroup2")        
+       }
+   }
+
+   // Get absolute path to file or symbolic link 
+   auto read_symlink(std::string const& path) -> std::string 
+   {
+       // Create a buffer with size PATH_MAX + 1 filled with 0 ('\0'), null characters
+       std::string buffer(PATH_MAX, 0);
+       // ssize_t readlink(const char *pathname, char *buf, size_t bufsiz);
+       ssize_t nread = ::readlink(path.c_str(), &buffer[0], PATH_MAX);
+       if(nread == -1){ return path; }
+       buffer.resize(nread);
+       return buffer;
+   }
+
+#+END_SRC
+
+ *Building and Running on Fedora Linux 32 x86-64* 
+
+#+BEGIN_SRC sh 
+    $ >> g++ df-size.cpp -o df-size.bin -std=c++1z -Wall -Wextra -g 
+
+    $ >> ./df-size.bin 
+         File System: /dev/sda3
+                Type: ext4
+         Mount Point: /
+    Total space (Gb): 49.06
+     Free space (Gb): 23.9494
+     Used space (Gb): 25.1106
+      Used space (%): 51.1835%
+
+         File System: /dev/sda4
+                Type: ext4
+         Mount Point: /home
+    Total space (Gb): 846.607
+     Free space (Gb): 510.182
+     Used space (Gb): 336.424
+      Used space (%): 39.738%
+
+         File System: /dev/sda1
+                Type: vfat
+         Mount Point: /boot/efi
+     Free space (Mb): 279.422
+    Total space (Mb): 299.82
+     Used space (Gb): 20.3984
+      Used space (%): 6.80355%
+#+END_SRC
+
+Disk space via (df) command line tool: 
+
+#+BEGIN_SRC sh 
+   $ >> df -h 
+  Filesystem      Size  Used Avail Use% Mounted on
+  devtmpfs        7.8G     0  7.8G   0% /dev
+  tmpfs           7.8G  315M  7.5G   4% /dev/shm
+  tmpfs           7.8G  2.1M  7.8G   1% /run
+  tmpfs           7.8G     0  7.8G   0% /sys/fs/cgroup
+  /dev/sda3        50G   23G   24G  49% /
+  tmpfs           7.8G   11M  7.8G   1% /tmp
+  /dev/sda4       847G  294G  511G  37% /home
+  /dev/sda1       300M   21M  280M   7% /boot/efi
+  tmpfs           1.6G   16K  1.6G   1% /run/user/42
+  tmpfs           1.6G   80K  1.6G   1% /run/user/1000
+#+END_SRC
+
+ *Cross-compiling to Linux Armv7 and run on Android via ADB*
+
+Building: 
+
+#+BEGIN_SRC sh 
+   $ export DOCKER_COMMAND="docker run -e UID=$(id -u) -e GID=$(id -g) --volume=$PWD:/cwd --workdir=/cwd muslcc/i686:armv7l-linux-musleabihf "
+   $ $DOCKER_COMMAND g++ df-size.cpp -o df-size.armv7 -std=c++1z -static -Wall -Wextra
+   $ $DOCKER_COMMAND strip df-size.armv7 
+
+   $ file df-size.armv7 
+   df-size.armv7: ELF 32-bit LSB executable, ARM, EABI5 version 1 (SYSV), statically linked, stripped
+
+   $ du -h df-size.armv7 
+   820K	df-size.armv7
+   820K	total
+#+END_SRC
+
+Transfer executable to Android: 
+
+#+BEGIN_SRC sh 
+   $ adb push df-size.armv7 /data/local/tmp
+   df-size.armv7: 1 file pushed. 12.1 MB/s (839348 bytes in 0.066s)
+#+END_SRC
+
+Running on Android vai adb shell: 
+
+#+BEGIN_SRC sh 
+   $ adb shell
+   bali:/ $ 
+   bali:/ $ cd /data/local/tmp
+   bali:/data/local/tmp $ 
+
+   # Confirm disk space usage metrics 
+   bali:/data/local/tmp $ df -h
+   Filesystem            Size  Used Avail Use% Mounted on
+   /dev/root             2.6G  2.2G  450M  84% /
+   tmpfs                 931M  1.3M  930M   1% /dev
+   tmpfs                 931M     0  931M   0% /mnt
+   /dev/block/dm-1       1.4G  207M  1.2G  15% /vendor
+   /dev/block/mmcblk0p39  23G   12G   11G  53% /data
+   /dev/block/mmcblk0p38 402M  6.4M  383M   2% /cache
+   /data/media            23G   12G   11G  53% /storage/emulated
+
+   # Run application 
+   bali:/data/local/tmp $ ./df-size.armv7  2> /dev/null                                                         
+         File System: /dev/root
+                Type: ext4
+         Mount Point: /
+    Total space (Gb): 2.66402
+     Free space (Gb): 0.439049
+     Used space (Gb): 2.22497
+      Used space (%): 83.5193%
+
+         File System: /dev/block/dm-1
+                Type: ext4
+         Mount Point: /vendor
+    Total space (Gb): 1.45304
+     Free space (Gb): 1.23495
+     Used space (Gb): 0.218094
+      Used space (%): 15.0094%
+
+         File System: /dev/block/mmcblk0p39
+                Type: f2fs
+         Mount Point: /data
+    Total space (Gb): 23.4941
+     Free space (Gb): 11.2018
+     Used space (Gb): 12.2923
+      Used space (%): 52.3209%
+
+         File System: /dev/block/mmcblk0p38
+                Type: ext4
+         Mount Point: /cache
+     Free space (Mb): 383.078
+    Total space (Mb): 402.445
+     Used space (Gb): 19.3672
+      Used space (%): 4.81238%
+
+         File System: /dev/block/mmcblk0p35
+                Type: ext4
+         Mount Point: /product
+     Free space (Mb): 444.348
+    Total space (Mb): 476.59
+     Used space (Gb): 32.2422
+      Used space (%): 6.76519%
+
+         File System: /data/media
+                Type: sdcardfs
+         Mount Point: /storage/emulated
+    Total space (Gb): 23.4941
+     Free space (Gb): 11.2018
+     Used space (Gb): 12.2923
+      Used space (%): 52.3209%
+#+END_SRC
+
+ *Further Reading* 
+
+  + [[https://pubs.opengroup.org/onlinepubs/009695399/functions/statvfs.html][Unix OpenGroup - fstatvfs]]
+
+  + [[https://utcc.utoronto.ca/~cks/space/blog/unix/StatfsPeculiarities][Chris's Wiki - blog/unix/StatfsPeculiarities]]
+
+  + [[https://ownyourbits.com/2018/05/02/understanding-disk-usage-in-linux/][Understanding disk usage in Linux – Own your bits]]
+
+  + [[https://ownyourbits.com/2018/05/02/understanding-disk-usage-in-linux/][Understanding disk usage in Linux – Own your bits]] (Web Archive)
+
+  + [[https://unix.stackexchange.com/questions/429155/how-is-free-disk-space-on-ext4-calculated][filesystems - How is free disk space on ext4 calculated? - Unix & Linux Stack Exchange]]
+
+  + [[https://stackoverflow.com/questions/3899894/how-to-obtain-total-available-disk-space-in-posix-systems][c++ - How to obtain total available disk space in Posix systems? - Stack Overflow]]
+
+  + [[https://www.freebsd.org/cgi/man.cgi?query=getmntinfo&manpath=FreeBSD+12.1-RELEASE+and+Ports][FreeBSD Docs / getmntinfo()]] => get information about mounted file systems
+
+  + [[https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man3/getmntinfo.3.html][MacOSX / getmntinfo()]]
+
+  + [[http://www.edenwaith.com/blog/index.php?p=67][Edenwaith : Blog - Calculating Free Space on macOS]]
+
 ** Low level IO functions overview 
 
 C-Library functions which encapsulates file-related systems calls.
