@@ -9453,3 +9453,974 @@ Running: (Client 2 netcat from terminal 3)
   ^C
 
 #+END_SRC
+** X11 - X Windows System
+*** Overview 
+
+Most Unix-like operating systems, including Linux and BSD variants,
+except Apple's MacOSX, use X-Windows System, also called *X11*, which
+is a _network-transparent_ window system developed at project Athena
+(MIT) in 1984 and nowadays it is led by the [[https://www.x.org/wiki/][X.Org]] foundation. 
+
+The _server_ or _display server_ (XServer) draws windows and widgets on
+the human operator display and receives input events from mouse and
+keyboard on behalf of one or more local or remote client applications
+(XClients). This architechture enables network transparency, which is
+the ability to operate either locally or over network. A client
+appplication communicates with the XServer by using the X Windows
+System (X11) network protocol via unix socket if the client
+application is running on the user machine or via TCP/IP sockets if
+the client application is running on a remote server.
+
+ *Main parts:*
+
+  * _X Server_ (Server-side, User's Monitor/Screen)
+    + => Runs on the user (human operator) machine, draws windows and
+      widgets for _x-clients_.
+
+  * _X Client_ => Application running on user machine or remote server.
+    + => Initiates the connection and makes network requests to the
+      server, which draws the application's widgets. 
+
+  * _X11 - Network Protocol_
+    * => Techinical specification or _technical_ _standard_ about how
+      x-server and x-clients should communicate.
+
+The X-Client (local or remote application) can communicate with the
+X-Server by using:
+  
+  + Direct X11 protocol network requests via TCP/IP socket or Unix-sockets. 
+
+  + [[https://www.x.org/releases/X11R7.7/doc/libX11/libX11/libX11.html][XLib]] C Library => Encapsulates the X11 network protocol.
+
+  + [[https://xcb.freedesktop.org/][XCb]] C Library => (Lower level than XLib) Similar to XLib, but has
+    a smaller footprint and lower latency, better suport for thread.
+
+ *Notes and considerations:*
+
+  * Unlike on Windows and Mac-OSX, the graphics interface is not part
+    of neither Linux kernel nor BSD-variants' kernels. The ability to
+    run headless, without any graphics, makes Linux-based operating
+    systems suitable for network server and embedded systems where a
+    built-in GUI could cause higher overhead. 
+
+  * X11 protocol does not specify styling, widgets (menu, buttons and
+    so on). Those features are provided by [[https://en.wikipedia.org/wiki/Comparison_of_X_window_managers][window managers]] and GUI
+    Graphical User Interface toolkits such as, [[https://en.wikipedia.org/wiki/GTK][GTK]],  [[https://en.wikipedia.org/wiki/Qt_(software)][Qt]], [[https://en.wikipedia.org/wiki/Motif_(software)][Motif]], [[https://en.wikipedia.org/wiki/FLTK][FLTK]], 
+    and [[https://en.wikipedia.org/wiki/Swing_(Java)][Java Swing]] (Java Only). 
+
+  * X11 is not widely used on Embedded Linux systems as it is on Linux
+    desktop systems. Instead many embedded linux operate directly on
+    top of [[https://developer.toradex.com/knowledge-base/framebuffer-linux][Framebuffer]]. The following approaches can be used for
+    creating graphical user interfaces on top of framebuffer: in-house
+    libraries, EGL (Embedded OpenGL), SDL or [[https://doc.qt.io/qt-5/embedded-linux.html][Qt toolkit]] on top of
+    frambebuffer.
+
+  * Although _Android_ operating system is based on Linux kernel, unlike
+    the desktop GNU/Linux distribution counterparts, Android user
+    interface is built directly on top of framebuffer.
+
+  * It is not worth developing any application on top of the X-Windows
+    System Protocol as it is low level, lacks widget abstractions and
+    may eventually be phased out by major Linux Desktop distribution
+    and replaced by [[https://en.wikipedia.org/wiki/Wayland_(display_server_protocol)][Wayland]]. A better approach is to use higher level
+    libraries such as Qt Widgets, Qt QML, KDE Libraries (Qt variants),
+    Gtk or Java Swing as any application built on top of those
+    libraries will be able to work in any system using _Wayland_. 
+
+  * Despite being network transparent, X11 protocol is unsafe for
+    usage over the network dut to the protocol be unencrypted which
+    makes it vulnerable to MITM, snooping, spoofing and so on. A
+    workaround for safer usage over the network is to use X11 via SSH
+    forwarding.
+*** Further reading and references 
+**** X-Windows System
+
+   * *Documentation for the X Window System* - Version 11 Release 7.7
+     (X11R7.7) [MUST-READ]
+     * <https://www.x.org/releases/X11R7.7/doc/>
+
+   * *X Window System Protocol* - X consortium Standard. [MUST-READ]
+     + <https://www.x.org/releases/X11R7.7/doc/xproto/x11protocol.html>
+     + Summary: Formal specification of X-Windows System Network Protocol.
+
+   * *X WINDOW SYSTEM PROTOCOL, VERSION 11* - Alpha Update - April 1987
+     + <https://tools.ietf.org/html/rfc1013>
+
+   * *X Window System core protocol*
+     + <https://en.wikipedia.org/wiki/X_Window_System_core_protocol>
+     + "The X Window System core protocol[1][2][3] is the base
+       protocol of the X Window System, which is a networked windowing
+       system for bitmap displays used to build graphical user
+       interfaces on Unix, Unix-like, and other operating systems. The
+       X Window System is based on a client–server model: a single
+       server controls the input/output hardware, such as the screen,
+       the keyboard, and the mouse; all application programs act as
+       clients, interacting with the user and with the other clients
+       via the server. .."
+
+   * *Telnet Forwarding of X Window System Session Data*
+     * <https://tools.ietf.org/html/draft-altman-telnet-fwdx-01>
+
+   * *Xming X Server for Windows*
+     * <http://www.straightrunning.com/XmingNotes/>
+     * Summary: X Server implementation for Microsft Windows NT
+       operating system which allows using remote Linux or BSD
+       graphical applications via X11 X Windows System network
+       protocol.
+
+   * *XWindows Utility Description*
+     * <https://www.distributednetworks.com/redhat-linux-admin/module2/xwindows-utility-description.php>
+
+   * *X Server Source Code* / Gitlab
+     + <https://gitlab.freedesktop.org/xorg/xserver>
+     + "The X server accepts requests from client applications to
+       create windows, which are (normally rectangular) "virtual
+       screens" that the client program can draw into. Windows are
+       then composed on the actual screen by the X server (or by a
+       separate composite manager) as directed by the window manager,
+       which usually communicates with the user via graphical controls
+       such as buttons and draggable titlebars and borders." 
+
+   * *The XFree86 - Project Inc* - Major implementation of XServer for X11
+     + <https://www.xfree86.org/>
+     + "The XFree86 Project, Inc is a global volunteer organization
+       which produces XFree86®, the freely redistributable open-source
+       implementation of the X Window System continuously
+       since 1992. XFree86 runs primarily on UNIX® and UNIX-like
+       operating systems like Linux, all of the BSD variants, Sun
+       Solaris both native 32 and 64 bit support, Solaris x86, Mac OS
+       X (via Darwin) as well as other platforms like OS/2 and
+       Cygwin. What XFree86 does, is provide a client/server interface
+       between the display hardware (those physical things like the
+       mouse, keyboard, and video displays) and the desktop
+       environment, (this is typically called a window manager as it
+       deals with how X is displayed i.e. the overall appearance). Yet
+       X it goes beyond that and also gives the infrastructure and a
+       standardized application interface (API). All of this which
+       makes XFree86 platform-independent, network-transparent and
+       fully extensible. In short, XFree86 is the premier open source
+       X11-based desktop infrastructure.  
+
+   * *Athena Widget Set - C Language Interface* (libXaw Version 1.0.13) - X Consortium Standard
+     + <https://www.x.org/releases/current/doc/libXaw/libXaw.html>
+     + "The X Toolkit is made up of two distinct pieces, the Xt
+       Intrinsics and a widget set. The Athena widget set is a sample
+       implementation of a widget set built upon the Intrinsics. In
+       the X Toolkit, a widget is the combination of an X window or
+       subwindow and its associated input and output
+       semantics. Because the Intrinsics provide the same basic
+       functionality to all widget sets it may be possible to use
+       widgets from the Athena widget set with other widget sets based
+       upon the Intrinsics. Since widget sets may also implement
+       private protocols, all functionality may not be available when
+       mixing and matching widget sets. For information about the
+       Intrinsics, see the X Toolkit Intrinsics - C Language
+       Interface. The Athena widget set is a library package layered
+       on top of the Intrinsics and Xlib that provides a set of user
+       interface tools sufficient to build a wide variety of
+       applications. This layer extends the basic abstractions
+       provided by X and provides the next layer of functionality
+       primarily by supplying a cohesive set of sample
+       widgets. Although the Intrinsics are a Consortium standard,
+       there is no standard widget set."
+**** X Windows System Client Libraries
+
+  * *Xlib - C Language X Interface* - X Consortium Standard
+    + <https://www.x.org/releases/X11R7.7/doc/libX11/libX11/libX11.html>
+
+  * *XCB X11 Client C Library* - Freedeskop foundation
+    + <https://xcb.freedesktop.org/>
+
+**** X11 - X Windows System Concepts
+
+  + *Window manager* - Arch Linux Wiki
+    + <https://wiki.archlinux.org/index.php/window_manager>
+    + Summary: Outlines several possible window systems for X Windows
+      Systems, such as 2bwm, 9wm, compiz, blackbox, i3, awesome,
+      qtile, xmonad ...
+
+**** Wayland 
+
+Note: Eventually may replace X Windows System. 
+
+  + *Wayland v/s Xorg : How Are They Similar & How Are They Different*
+    + <https://www.secjuice.com/wayland-vs-xorg/>
+
+  + *Wayland (display server protocol)*
+    + <https://en.wikipedia.org/wiki/Wayland_(display_server_protocol)>
+
+**** Low Level Graphics Stack - kernel and embedded Linux systems 
+
+  * *Linux Graphics Demystified* - Martin Fiedler - Dream Chip Techonologies GMHB
+    + <https://keyj.emphy.de/files/linuxgraphics_en.pdf>
+    + <https://web.archive.org/web/20200426101542/https://keyj.emphy.de/files/linuxgraphics_en.pdf>
+    + Summary: Explains about Linux low level graphics stack,
+      including framebuffer, X-Server.
+
+  * *Linux Framebuffer* ( /dev/fb0 )
+    + <https://en.wikipedia.org/wiki/Linux_framebuffer>
+    + "The Linux framebuffer (fbdev) is a graphic hardware-independent
+      abstraction layer to show graphics on a computer monitor,
+      typically on the system console.[1] It allows direct access to
+      the framebuffer (the part of a computer's video memory
+      containing a current video frame) using only the Linux kernel's
+      own basic facilities and its device file system interface." 
+
+  * *Linux Framebuffer* - Nicolas Caramelli
+    + <https://github.com/caramelli/higfxback/wiki/Linux-Framebuffer>
+    + Summary: Detailed explanation about Linux kernel framebuffer
+      infrastructure.
+
+  * *Frmebuffer (Linux)* - Toradex Developer resources
+    * <https://developer.toradex.com/knowledge-base/framebuffer-linux>
+    * "The framebuffer (fbdev) is a character device providing access
+      to graphics hardware. Beside the framebuffer, other interfaces
+      exist to access graphics hardware such as the DRI (direct
+      rendering interface) or proprietary interfaces (NVIDIA
+      drivers). Typically, the framebuffer doesn't support any 2D/3D
+      hardware acceleration. ..."
+
+  * *DRI - Direct Rendering Infrastructure*
+    + <https://en.wikipedia.org/wiki/Direct_Rendering_Infrastructure>
+    + "The Direct Rendering Infrastructure (DRI) is a framework for
+      allowing direct access to graphics hardware under the X Window
+      System in a safe, efficient way.[6] The main use of DRI is to
+      provide hardware acceleration for the Mesa implementation of
+      OpenGL. DRI has also been adapted to provide OpenGL acceleration
+      on a framebuffer console without a display server running. ..."
+
+  * *Mesa 3D and Direct Rendering Infrastructure wiki*
+    * <https://dri.freedesktop.org/wiki/>
+    * "The Direct Rendering Infrastructure, also known as the DRI, is
+      a framework for allowing direct access to graphics hardware
+      under the X Window System in a safe and efficient manner. It
+      includes changes to the X server, to several client libraries,
+      and to the kernel (DRM, Direct Rendering Manager). The most
+      important use for the DRI is to create fast OpenGL
+      implementations providing hardware acceleration for
+      Mesa. Several 3D accelerated drivers have been written to the
+      DRI specification, including drivers for chipsets produced by
+      3DFX, AMD (formerly ATI), Intel and Matrox."
+
+  * *Linux GPU Driver Developer's Guide*
+    + <https://01.org/linuxgraphics/gfx-docs/drm/gpu/index.html>
+    + "The Linux DRM layer contains code intended to support the needs
+      of complex graphics devices, usually containing programmable
+      pipelines well suited to 3D graphics acceleration. Graphics
+      drivers in the kernel may make use of DRM functions to make
+      tasks like memory management, interrupt handling and DMA easier,
+      and provide a uniform interface to applications. A note on
+      versions: this guide covers features found in the DRM tree,
+      including the TTM memory manager, output configuration and mode
+      setting, and the new vblank internals, in addition to all the
+      regular features found in current kernels."
+
+  * *Displaying and Rendering Graphics with Linux Training* - Bootlin
+    * <https://bootlin.com/doc/training/graphics/graphics-slides.pdf>
+    * <https://web.archive.org/web/20201018160609/https://bootlin.com/doc/training/graphics/graphics-slides.pdf>
+
+  * *Inside Linux - graphics Understanding the components, upgrading drivers, and advanced use cases* - Intel
+    * <https://www.intel.com/content/dam/www/public/us/en/documents/white-papers/inside-linux-graphics-paper.pdf>
+
+  * *EGL (API)* - Embedded OpenGL
+    * <https://en.wikipedia.org/wiki/EGL_(API)>
+
+  * *Qt for Embedded Linux* (Also covers Qt directly on top of Framebuffer device)
+    * <https://doc.qt.io/qt-5/embedded-linux.html#linuxfb>
+
+  * *The Virtual Framebuffer* - Qt Company
+    * <https://doc.qt.io/archives/qt-4.8//qvfb.html>
+    * "Qt for Embedded Linux applications write directly to the
+      framebuffer, eliminating the need for the X Window System and
+      saving memory. For development and debugging purposes, a virtual
+      framebuffer can be used, allowing Qt for Embedded Linux programs
+      to be developed on a desktop machine, without switching between
+      consoles and X11."
+
+  * *Writing to the Framebuffer* - Seena Burns
+    * <http://seenaburns.com/2018/04/04/writing-to-the-framebuffer/>
+
+  * *Writing to the Framebuffer* (Forum Discussion)
+    * <https://news.ycombinator.com/item?id=16755552>
+
+  * *The DRM/KMS subsystem from a newbie’s point of view* - Boris Brezilion 
+    * <https://events.static.linuxfound.org/sites/events/files/slides/brezillon-drm-kms.pdf>
+    * <https://web.archive.org/web/20191031122549/https://events.static.linuxfound.org/sites/events/files/slides/brezillon-drm-kms.pdf>
+
+  * *DRM Driver Development For Embedded Systems* - Inki Dae, Software Platform Lab - Samsung
+    + <https://elinux.org/images/7/71/Elce11_dae.pdf> 
+    + <https://web.archive.org/web/20201018154836/https://elinux.org/images/7/71/Elce11_dae.pdf>
+
+  * *drm - Direct Rendering Manager (DRI kernel support)* - Device Drivers Manual (NetBSD)
+    * <https://www.daemon-systems.org/man/drm.4.html>
+
+  * *CS574 presentation: Linux OpenGL drivers: Direct Rendering  Infrastructure*
+    + <https://www.cs.nmsu.edu/~joshagam/archive/cs574/3-dri.html>
+
+  * *Platform specifics: Linux* - OpenGL - Kronos Group
+    * <https://www.khronos.org/opengl/wiki/Platform_specifics:_Linux>
+    * "This Section explains how to install Drivers to make OpenGL
+      Programs run under Linux and how to use different
+      Libraries/Toolkits to create Opengl Programs. Mesa is an
+      open-source OpenGL implementation, continually updated to
+      support the latest OpenGL specification. Direct Rendering
+      Infrastructure, also known as the DRI, is a framework for
+      allowing direct access to graphics hardware under the X Window
+      System in a safe and efficient manner."
+
+  * *DRM(Direct Rendering Manager) of Tizen Kernel*
+    + <https://download.tizen.org/misc/media/conference2012/wednesday/ballroom-c/2012-05-09-1330-1410-the_drm_%28direct_rendering_manager%29_of_tizen_kernel.pdf>
+    + <https://web.archive.org/web/20161109195212/http://download.tizen.org/misc/media/conference2012/wednesday/ballroom-c/2012-05-09-1330-1410-the_drm_(direct_rendering_manager)_of_tizen_kernel.pdf>
+
+  * *Direct Rendering Infrastructure: Architecture* - José Manual Rios Fonseca
+    + <https://paginas.fe.up.pt/~mei04010/dri-architecture.pdf>
+*** X11 Uitilities 
+
+The following X11 utilities are widely used on many Linux
+distributions: 
+
+
+Authentication and authorization: 
+
+  * [[https://wiki.archlinux.org/index.php/Xinit][xinit]] - Program that allows starting Xorg (X Server) manually from
+    command line.
+
+  * [[https://linux.die.net/man/1/xauth][xauth]] - Display X server authorization information.
+
+  * [[https://wiki.archlinux.org/index.php/Xhost][xhost]] - Arch wiki: "The xhost program is used to add and delete
+    host names or user names to the list allowed to make connections
+    to the X server. In the case of hosts, this provides a rudimentary
+    form of privacy control and security. It is only sufficient for a
+    workstation (single user) environment, although it does limit the
+    worst abuses. Environments which require more sophisticated
+    measures should implement the user-based mechanism or use the
+    hooks in the protocol for passing other authentication data to the
+    server." 
+
+Monitor Configuration: 
+
+  * [[https://wiki.archlinux.org/index.php/xrandr][xrandr]] - utility for configuring screen/monitor orientation,
+    resolution, dual monitor and so on. By default, it shows the
+    current displays resoultions.
+
+General Utilities: 
+
+  * [[https://en.wikipedia.org/wiki/Xterm][xterm]] - Reference implementation for X11 terminal emulators.
+
+  * [[https://en.wikipedia.org/wiki/Xkill][xkill]] - command line application that allows forcefully
+    terminating any graphical program by calling $ xkill from command
+    line and clicking at the window whose process will be terminated.
+
+  * [[https://linux.die.net/man/1/cxdg-open][xdg-open]] - Open file or directory from command line with default
+    system application. For instance, $ xdg-open file.xls, where
+    file.xls is a Excel spreadsheet, opens the file with Libreoffice,
+    if this application is available in the sytem.
+
+  * [[https://linux.die.net/man/1/xclip][xclip]] - Allows copying stdin contents to clipboard and pasting
+    contents from clibpboard to stdout.
+
+X11 Preference and configuration: 
+
+  * [[https://linux.die.net/man/1/xset][xet]] - X-Server user preference.
+
+  * [[https://linux.die.net/man/1/xmodmap][xmodmap]] - Modify keymaps and pointer buttons mapping in X Windows System X11.
+
+  * [[https://linux.die.net/man/1/setxkbmap][setxkbmap]] - Modify Keyboard - allows changing the keyboard to
+    English, Portuguese, Greek, Cyrillic and so on.
+
+  * [[https://linux.die.net/man/1/xinput][xinput]] - Configure and test X input devices such as keyboard,
+    mouse, touchpad and etc.
+
+  * [[https://www.x.org/releases/X11R7.7/doc/man/man1/xev.1.xhtml][xev]] (X event monitor) "Xev creates a window and then asks the X server to send it
+    events whenever anything happens to the window (such as it being
+    moved, resized, typed in, clicked in, etc.). You can also attach
+    it to an existing window. It is useful for seeing what causes
+    events to occur and to display the information that they contain;
+    it is essentially a debugging and development tool, and should not
+    be needed in normal usage."
+    * Source code: https://gitlab.freedesktop.org/xorg/app/xev
+    * See also:
+      * [[http://www.rahul.net/kenton/events.html][X Application Software Engineering: Debugging X Input Events]]
+
+  * [[https://linux.die.net/man/1/xwininfo][xwinfo]] - Utility for getting display information about windows. It
+    provides a cursor that shows information about any window that
+    user clicks at.
+
+  * [[https://linux.die.net/man/1/xsetroot][xsetroot]] - Root window parametter settings.
+
+  * [[https://linux.die.net/man/1/xprop][xprop]] - Similar to xwinfo, but displays font property.
+
+  * [[https://linux.die.net/man/1/xvinfo][xvinfo]] - Display capabilities of video adapters.
+
+  * [[https://linux.die.net/man/1/xdriinfo][xdriinfo]] - Get confituration of DRI (direct rendering interface)
+    device drivers.
+
+X11 protocol message tracing/monitor tools (Note: most non-standard
+tools, non commonly available in most distros.)
+
+  + [[https://gitlab.freedesktop.org/xorg/app/xscope][xscope]] - "XSCOPE is a program to monitor the connections between
+    the X11 window server and a client program.  xscope runs as a
+    separate process.  By adjusting the host and/or display number
+    that a X11 client attaches to, the client is attached to xscope
+    instead of X11.  xscope attaches to X11 as if it were the client.
+    All bytes from the client are sent to xscope which passes them on
+    to X11; All bytes from X11 are sent to xscope which sends them on
+    to the client.  xscope is transparent to the client and X11.". 
+
+
+  + [[https://x11vis.org/][x11vis]] - "x11vis aims to be a useful tool for debugging X11
+    clients. Its main focus is on being as visual and interactive as
+    possible. Replacing X11 atom, window, font or pixmap IDs with
+    human readable names is the most basic functionality. Contrary to
+    other tools like xtrace, x11vis will display human readable IDs on
+    all requests, no matter at which point in time the information
+    gets available. To help you cope with lots of data, x11vis
+    displays only the most important information by default,
+    automatically folds sequences of boring requests, allows you to
+    filter by packet type or client and provides so-called markers
+    between you can navigate. Also, instead of just assigning a number
+    to each connection, x11vis displays the command line with which
+    that client was started. To learn more, please see the manual.".
+
+  + [[https://sourceforge.net/projects/xmon/][xmon]] - "A monitor for the X Window System core protocol. Xmon
+    monitors the messages sent between an X11 server and a number of
+    X11 clients and displays the contents of the messages in an
+    interactively selectable level of detail."
+
+  + [[https://www.chiark.greenend.org.uk/~sgtatham/xtruss/][xtruss]] - Tool for tracing/monitoring X11 network protocol. 
+
+  + [[https://www.wireshark.org/][Wireshark]] - Tool that allows debugging and tracing any network
+    protocol and also allows inspecting USB protocol. (Note:
+    scriptable in Lua programming language.)
+
+Animation: 
+
+  * [[https://www.x.org/archive/X11R6.8.1/doc/xclock.1.html][xclock]] - Clock animation.
+
+  * [[https://www.x.org/releases/X11R7.5/doc/man/man1/xeyes.1.html][xeyes]] - Eye animation that follows the mouse pointer.
+
+  * [[https://linux.die.net/man/1/xlogo][xlogo]] - X windows System "X" logo picture.
+
+*** X11 programming via Xlib 
+
+This sample Xlib applications draw a window with a rectangle and a
+string. Note: Xlib lacks widgets. 
+
+Code available at: 
+
+  + https://gist.github.com/f7f0b892011ad987bfed531336dbae89
+
+File: _CMakeLists.txt_ 
+
+#+BEGIN_SRC cmake 
+   cmake_minimum_required(VERSION 3.9)
+   project(Simple_Cmake_Project)
+
+   #========== Global Configurations =============#
+   #----------------------------------------------#
+
+   set(CMAKE_CXX_STANDARD 17)     
+   set(CMAKE_VERBOSE_MAKEFILE ON)
+
+   find_package(X11 REQUIRED)
+
+   #========== Targets Configurations ============#
+
+          add_executable( xlib-demo xlib-demo.cpp )
+   target_link_libraries( xlib-demo ${X11_LIBRARIES} )
+
+   # add_executable(app2 application2.cpp)
+#+END_SRC
+
+File: _xlib-demo.cpp_ 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string> 
+  #include <cstring>
+  #include <cassert> 
+
+  #include <X11/Xlib.h>
+  #include <cstdlib>
+
+  void abort_on_failure(bool predicate, const char* message = "Abort runtime.")
+  {
+      if(predicate) return;
+      std::fprintf(stderr, " [ABORT] %s", message);
+      abort();
+  }
+
+  int main(int argc, char** argv)
+  {
+      /** If the value passed to XOpenDisplay is null, the XClient (Xlib) attempts 
+       ,* to connect to the display server designated by the environment variable  
+       ,* $DISPLAY, which is often set to the :1.0 or the local machine. 
+       ,*------------------------------------------------------------------------*/
+      Display* dpy = XOpenDisplay(nullptr);
+      abort_on_failure(dpy != nullptr, "Cannot open display.");
+
+      /** ----- Query Information about display server ------------------------*/
+
+      int version = XProtocolVersion(dpy);
+      std::cout << " [INFO] X11 protocol version = " << version << '\n';
+
+      const char* vendor = XServerVendor(dpy);
+      std::cout << " [INFO] X11 XServer vendor = " << vendor << '\n';
+
+      const char* disp_str = XDisplayString(dpy);
+      std::cout << " [INFO] X11 Display string = " << disp_str << '\n';
+
+      int n_screen = XScreenCount(dpy);
+      std::cout << " [INFO] Number of screens = " << n_screen << '\n';
+
+      /** ----- Draw Screen ------------------------------------------------*/
+
+      int screen = DefaultScreen(dpy);
+
+      Window wnd = XCreateSimpleWindow(
+                       dpy                         // Display 
+                     , RootWindow(dpy, screen)     // Parent Window 
+                     , 10, 20                      // Position (x - horizontal, y - vertical) from top-left corner 
+                     , 400, 500                    // Dimensions (width, height)
+                     , 1                           // Border width 
+                     , BlackPixel(dpy, screen)     // Border 
+                     , WhitePixel(dpy, screen)     // Background color 
+                     );
+
+      /* Casting void means that the return value (type int) is being ignored. */
+      (void) XStoreName(dpy, wnd, "X Windows-System X11");
+      // Makes window visible 
+      XMapWindow(dpy, wnd);
+      XFlush(dpy);
+
+      XEvent event;
+
+      // Select events that the application is interested in. 
+      // Only those events will notify the application. (XClient)
+      auto mask  =   ExposureMask        
+                  | ButtonPressMask     // Event: mouse button press
+                  | KeyPressMask        // Event: key press (keyboard)
+                  | KeyReleaseMask      // Event: key release (keyboard)
+                  //| PointerMotionMask   // Event: Mouse Move
+                  ;
+      XSelectInput(dpy, wnd, mask);
+
+      // Process window close event in X11 event loop for(;;)
+      Atom wnd_del = XInternAtom(dpy, "WM_DELETE_WINDOW", 0);
+      XSetWMProtocols(dpy, wnd, &wnd_del, 1);
+
+      const char* message = "Draw some string on X11 - X windows system.";
+
+      /* ------- X11 (X Windows System) - Event loop ------------ */
+
+      for(;;)
+      {
+           std::fprintf(stderr, "\n [TRACE] Waiting event. \n");;
+
+           // Get next X11 event 		
+           XNextEvent(dpy, &event);
+
+           if(event.type == ClientMessage){
+                   fprintf(stderr, " [Event] User closed window. => Shutdown \n");
+                   break;
+           }
+
+           if(event.type == Expose)    
+                   fprintf(stderr,  " [Event] Expose event. \n");
+
+           if(event.type == KeyPress)    
+                   fprintf(stderr,  " [Event] Key pressed. \n");
+
+           if(event.type == ButtonPress) 
+                   fprintf(stderr,  " [Event] Mouse button pressed. \n");
+
+           if(event.type == PointerMotionMask) 
+                   fprintf(stderr,  " [Event] Mouse button pressed. \n");		
+
+           // X11 Graphics context, useful for drawing 
+           GC gctx = DefaultGC(dpy, screen);
+
+           XFillRectangle( dpy, wnd, gctx
+                          , 20, 50    // (x, y) position from top-left corner origin 
+                          , 100, 200  // width and height 
+                          );
+
+           GC gctx2 = DefaultGC(dpy, screen);					   
+
+           XDrawString(  dpy     // Pointer to display object 
+                        , wnd     // Pointer to window 
+                        , gctx    // Graphics context 
+                        , 90, 300 // (x, y) Position where string will be drawn (from top-left corner)
+                        , message
+                        , strlen(message) ); 
+
+      } // ----- End of event loop -------- // 
+
+      fprintf(stderr, " [TRACE] User closed window. Shutdown application. Ok \n");
+
+      XDestroyWindow(dpy, wnd);
+
+      // Always close display 
+      XCloseDisplay(dpy);
+
+      return 0;
+  }
+#+END_SRC
+
+Building: 
+
+#+BEGIN_SRC sh 
+    $ >> git clone https://gist.github.com/f7f0b892011ad987bfed531336dbae89
+
+File: _CMakeLists.txt_ 
+
+#+BEGIN_SRC cmake 
+   cmake_minimum_required(VERSION 3.9)
+   project(Simple_Cmake_Project)
+
+   #========== Global Configurations =============#
+   #----------------------------------------------#
+
+   set(CMAKE_CXX_STANDARD 17)     
+   set(CMAKE_VERBOSE_MAKEFILE ON)
+
+   find_package(X11 REQUIRED)
+
+   #========== Targets Configurations ============#
+
+          add_executable( xlib-demo xlib-demo.cpp )
+   target_link_libraries( xlib-demo ${X11_LIBRARIES} )
+
+   # add_executable(app2 application2.cpp)
+#+END_SRC
+
+File: _xlib-demo.cpp_ 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string> 
+  #include <cstring>
+  #include <cassert> 
+
+  #include <X11/Xlib.h>
+  #include <cstdlib>
+
+  void abort_on_failure(bool predicate, const char* message = "Abort runtime.")
+  {
+      if(predicate) return;
+      std::fprintf(stderr, " [ABORT] %s", message);
+      abort();
+  }
+
+  int main(int argc, char** argv)
+  {
+      /** If the value passed to XOpenDisplay is null, the XClient (Xlib) attempts 
+       ,* to connect to the display server designated by the environment variable  
+       ,* $DISPLAY, which is often set to the :1.0 or the local machine. 
+       ,*------------------------------------------------------------------------*/
+      Display* dpy = XOpenDisplay(nullptr);
+      abort_on_failure(dpy != nullptr, "Cannot open display.");
+
+      /** ----- Query Information about display server ------------------------*/
+
+      int version = XProtocolVersion(dpy);
+      std::cout << " [INFO] X11 protocol version = " << version << '\n';
+
+      const char* vendor = XServerVendor(dpy);
+      std::cout << " [INFO] X11 XServer vendor = " << vendor << '\n';
+
+      const char* disp_str = XDisplayString(dpy);
+      std::cout << " [INFO] X11 Display string = " << disp_str << '\n';
+
+      int n_screen = XScreenCount(dpy);
+      std::cout << " [INFO] Number of screens = " << n_screen << '\n';
+
+      /** ----- Draw Screen ------------------------------------------------*/
+
+      int screen = DefaultScreen(dpy);
+
+      Window wnd = XCreateSimpleWindow(
+                       dpy                         // Display 
+                     , RootWindow(dpy, screen)     // Parent Window 
+                     , 10, 20                      // Position (x - horizontal, y - vertical) from top-left corner 
+                     , 400, 500                    // Dimensions (width, height)
+                     , 1                           // Border width 
+                     , BlackPixel(dpy, screen)     // Border 
+                     , WhitePixel(dpy, screen)     // Background color 
+                     );
+
+      /* Casting void means that the return value (type int) is being ignored. */
+      (void) XStoreName(dpy, wnd, "X Windows-System X11");
+      // Makes window visible 
+      XMapWindow(dpy, wnd);
+      XFlush(dpy);
+
+      XEvent event;
+
+      // Select events that the application is interested in. 
+      // Only those events will notify the application. (XClient)
+      auto mask  =   ExposureMask        
+                  | ButtonPressMask     // Event: mouse button press
+                  | KeyPressMask        // Event: key press (keyboard)
+                  | KeyReleaseMask      // Event: key release (keyboard)
+                  //| PointerMotionMask   // Event: Mouse Move
+                  ;
+      XSelectInput(dpy, wnd, mask);
+
+      // Process window close event in X11 event loop for(;;)
+      Atom wnd_del = XInternAtom(dpy, "WM_DELETE_WINDOW", 0);
+      XSetWMProtocols(dpy, wnd, &wnd_del, 1);
+
+      const char* message = "Draw some string on X11 - X windows system.";
+
+      /* ------- X11 (X Windows System) - Event loop ------------ */
+
+      for(;;)
+      {
+           std::fprintf(stderr, "\n [TRACE] Waiting event. \n");;
+
+           // Get next X11 event 		
+           XNextEvent(dpy, &event);
+
+           if(event.type == ClientMessage){
+                   fprintf(stderr, " [Event] User closed window. => Shutdown \n");
+                   break;
+           }
+
+           if(event.type == Expose)    
+                   fprintf(stderr,  " [Event] Expose event. \n");
+
+           if(event.type == KeyPress)    
+                   fprintf(stderr,  " [Event] Key pressed. \n");
+
+           if(event.type == ButtonPress) 
+                   fprintf(stderr,  " [Event] Mouse button pressed. \n");
+
+           if(event.type == PointerMotionMask) 
+                   fprintf(stderr,  " [Event] Mouse button pressed. \n");		
+
+           // X11 Graphics context, useful for drawing 
+           GC gctx = DefaultGC(dpy, screen);
+
+           XFillRectangle( dpy, wnd, gctx
+                          , 20, 50    // (x, y) position from top-left corner origin 
+                          , 100, 200  // width and height 
+                          );
+
+           GC gctx2 = DefaultGC(dpy, screen);					   
+
+           XDrawString(  dpy     // Pointer to display object 
+                        , wnd     // Pointer to window 
+                        , gctx    // Graphics context 
+                        , 90, 300 // (x, y) Position where string will be drawn (from top-left corner)
+                        , message
+                        , strlen(message) ); 
+
+      } // ----- End of event loop -------- // 
+
+      fprintf(stderr, " [TRACE] User closed window. Shutdown application. Ok \n");
+
+      XDestroyWindow(dpy, wnd);
+
+      // Always close display 
+      XCloseDisplay(dpy);
+
+      return 0;
+  }
+#+END_SRC
+
+Building: 
+
+#+BEGIN_SRC sh 
+    $ >> git clone https://gist.github.com/f7f0b892011ad987bfed531336dbae89
+
+File: _CMakeLists.txt_ 
+
+#+BEGIN_SRC cmake 
+   cmake_minimum_required(VERSION 3.9)
+   project(Simple_Cmake_Project)
+
+   #========== Global Configurations =============#
+   #----------------------------------------------#
+
+   set(CMAKE_CXX_STANDARD 17)     
+   set(CMAKE_VERBOSE_MAKEFILE ON)
+
+   find_package(X11 REQUIRED)
+
+   #========== Targets Configurations ============#
+
+          add_executable( xlib-demo xlib-demo.cpp )
+   target_link_libraries( xlib-demo ${X11_LIBRARIES} )
+
+   # add_executable(app2 application2.cpp)
+#+END_SRC
+
+File: _xlib-demo.cpp_ 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string> 
+  #include <cstring>
+  #include <cassert> 
+
+  #include <X11/Xlib.h>
+  #include <cstdlib>
+
+  void abort_on_failure(bool predicate, const char* message = "Abort runtime.")
+  {
+      if(predicate) return;
+      std::fprintf(stderr, " [ABORT] %s", message);
+      abort();
+  }
+
+  int main(int argc, char** argv)
+  {
+      /** If the value passed to XOpenDisplay is null, the XClient (Xlib) attempts 
+       ,* to connect to the display server designated by the environment variable  
+       ,* $DISPLAY, which is often set to the :1.0 or the local machine. 
+       ,*------------------------------------------------------------------------*/
+      Display* dpy = XOpenDisplay(nullptr);
+      abort_on_failure(dpy != nullptr, "Cannot open display.");
+
+      /** ----- Query Information about display server ------------------------*/
+
+      int version = XProtocolVersion(dpy);
+      std::cout << " [INFO] X11 protocol version = " << version << '\n';
+
+      const char* vendor = XServerVendor(dpy);
+      std::cout << " [INFO] X11 XServer vendor = " << vendor << '\n';
+
+      const char* disp_str = XDisplayString(dpy);
+      std::cout << " [INFO] X11 Display string = " << disp_str << '\n';
+
+      int n_screen = XScreenCount(dpy);
+      std::cout << " [INFO] Number of screens = " << n_screen << '\n';
+
+      /** ----- Draw Screen ------------------------------------------------*/
+
+      int screen = DefaultScreen(dpy);
+
+      Window wnd = XCreateSimpleWindow(
+                       dpy                         // Display 
+                     , RootWindow(dpy, screen)     // Parent Window 
+                     , 10, 20                      // Position (x - horizontal, y - vertical) from top-left corner 
+                     , 400, 500                    // Dimensions (width, height)
+                     , 1                           // Border width 
+                     , BlackPixel(dpy, screen)     // Border 
+                     , WhitePixel(dpy, screen)     // Background color 
+                     );
+
+      /* Casting void means that the return value (type int) is being ignored. */
+      (void) XStoreName(dpy, wnd, "X Windows-System X11");
+      // Makes window visible 
+      XMapWindow(dpy, wnd);
+      XFlush(dpy);
+
+      XEvent event;
+
+      // Select events that the application is interested in. 
+      // Only those events will notify the application. (XClient)
+      auto mask  =   ExposureMask        
+                  | ButtonPressMask     // Event: mouse button press
+                  | KeyPressMask        // Event: key press (keyboard)
+                  | KeyReleaseMask      // Event: key release (keyboard)
+                  //| PointerMotionMask   // Event: Mouse Move
+                  ;
+      XSelectInput(dpy, wnd, mask);
+
+      // Process window close event in X11 event loop for(;;)
+      Atom wnd_del = XInternAtom(dpy, "WM_DELETE_WINDOW", 0);
+      XSetWMProtocols(dpy, wnd, &wnd_del, 1);
+
+      const char* message = "Draw some string on X11 - X windows system.";
+
+      /* ------- X11 (X Windows System) - Event loop ------------ */
+
+      for(;;)
+      {
+           std::fprintf(stderr, "\n [TRACE] Waiting event. \n");;
+
+           // Get next X11 event 		
+           XNextEvent(dpy, &event);
+
+           if(event.type == ClientMessage){
+                   fprintf(stderr, " [Event] User closed window. => Shutdown \n");
+                   break;
+           }
+
+           if(event.type == Expose)    
+                   fprintf(stderr,  " [Event] Expose event. \n");
+
+           if(event.type == KeyPress)    
+                   fprintf(stderr,  " [Event] Key pressed. \n");
+
+           if(event.type == ButtonPress) 
+                   fprintf(stderr,  " [Event] Mouse button pressed. \n");
+
+           if(event.type == PointerMotionMask) 
+                   fprintf(stderr,  " [Event] Mouse button pressed. \n");		
+
+           // X11 Graphics context, useful for drawing 
+           GC gctx = DefaultGC(dpy, screen);
+
+           XFillRectangle( dpy, wnd, gctx
+                          , 20, 50    // (x, y) position from top-left corner origin 
+                          , 100, 200  // width and height 
+                          );
+
+           GC gctx2 = DefaultGC(dpy, screen);					   
+
+           XDrawString(  dpy     // Pointer to display object 
+                        , wnd     // Pointer to window 
+                        , gctx    // Graphics context 
+                        , 90, 300 // (x, y) Position where string will be drawn (from top-left corner)
+                        , message
+                        , strlen(message) ); 
+
+      } // ----- End of event loop -------- // 
+
+      fprintf(stderr, " [TRACE] User closed window. Shutdown application. Ok \n");
+
+      XDestroyWindow(dpy, wnd);
+
+      // Always close display 
+      XCloseDisplay(dpy);
+
+      return 0;
+  }
+#+END_SRC
+
+Building: 
+
+#+BEGIN_SRC sh 
+    $ git clone https://gist.github.com/f7f0b892011ad987bfed531336dbae89 temp && cd temp 
+    $ cmake -H. -B_build -DCMAKE_BUILD_TYPE=Debug -G Ninja
+    $ cmake --build _build --target 
+   [2/2] Linking CXX executable xlib-demo
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC sh 
+   $ >> _build/xlib-demo 
+   [INFO] X11 protocol version = 11
+   [INFO] X11 XServer vendor = Fedora Project
+   [INFO] X11 Display string = :1.0
+   [INFO] Number of screens = 1
+
+   [TRACE] Waiting event. 
+   [Event] Expose event. 
+
+   [TRACE] Waiting event. 
+
+   [TRACE] Waiting event. 
+   [Event] Mouse button pressed. 
+   ... ...     ... ...     ... ...     ... ...    
+   ... ...     ... ...     ... ...    
+#+END_SRC
+
+User Interface Screenshot: 
+
+#+CAPTION: Xlib GUI User Interface. 
+[[file:images/x11-gui-sample1.png][file:images/x11-gui-sample1.png]]
