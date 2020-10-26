@@ -9606,6 +9606,13 @@ X-Server by using:
     makes it vulnerable to MITM, snooping, spoofing and so on. A
     workaround for safer usage over the network is to use X11 via SSH
     forwarding.
+
+ *See also:* 
+ 
+   + [[https://docstore.mik.ua/orelly/unix3/upt/ch35_08.htm][The DISPLAY Environment Variable (Unix Power Tools, 3rd Edition)]]
+
+   + [[https://askubuntu.com/questions/432255/what-is-the-display-environment-variable][xorg - What is the $DISPLAY environment variable? - Ask Ubuntu]]
+
 *** X11 Utilities 
 
 The following X11 utilities are widely used on many Linux
@@ -9644,11 +9651,14 @@ Monitor Configuration:
     thus this utility must be installed from source. 
 
 
-Window and Desktop Automation: 
+Window manipulation and Desktop Automation: 
 
   * [[https://www.semicomplete.com/projects/xdotool/][xdotool]] - Utility application for manipulating and automating x11
     windows, similar to Microsft Windows' [[https://www.autohotkey.com/][Autohotkey]] tool for desktop
     automation.
+
+  * [[http://tripie.sweb.cz/utils/wmctrl/][wmctrl]] - A command line tool to interact with an EWMH/NetWM
+    compatible X Window Manager.
 
   * [[https://github.com/ReimuNotMoe/ydotool][ydotool]] - Similar to xdotool, but for Wayland.
 
@@ -9759,7 +9769,7 @@ Animation:
 
   * [[https://linux.die.net/man/1/xlogo][xlogo]] - X windows System "X" logo picture.
 
-*** X11 Window via Xlib 
+*** Sample X11 Window via Xlib 
 
 This sample Xlib applications draw a window with a rectangle and a
 string. Note: Xlib lacks widgets. 
@@ -9958,6 +9968,448 @@ User Interface Screenshot:
 
 #+CAPTION: Xlib GUI User Interface. 
 [[file:images/x11-gui-sample1.png][file:images/x11-gui-sample1.png]]
+*** Query X11 information via Xlib 
+
+The following sample application uses Xlib for querying X11 windows,
+window information and terminating the Window process. 
+
+Documentation of relevant functions and further reading: 
+
+  + [[https://www.x.org/releases/X11R7.7/doc/libX11/libX11/libX11.html][Xlib - C Language X Interface]]
+
+  + [[https://www.remlab.net/op/xlib.shtml][Remlab: I hate Xlib and so should you]]
+
+  + [[https://stackoverflow.com/questions/15692275/how-to-kill-a-process-tree-programmatically-on-linux-using-c/15692619][How to kill a process tree programmatically on Linux using C ]]
+
+  + [[https://tronche.com/gui/x/xlib/display/XCloseDisplay.html][Xlib Programming Manual: Closing the Display]]
+
+  + [[https://tronche.com/gui/x/xlib/window-information/XQueryTree.html][Xlib Programming Manual: XQueryTree]]
+
+  + [[https://tronche.com/gui/x/xlib/ICC/client-to-window-manager/XFetchName.html][Xlib Programming Manual: XFetchName]]
+
+  + [[https://tronche.com/gui/x/xlib/window-information/XGetWindowAttributes.html][Xlib Programming Manual: XGetWindowAttributes]]
+
+ 
+  *Files* 
+
+All files available at: 
+  + https://gist.github.com/639df76864d014ead12936fbd361be73 
+
+File: _CMakeLists.txt_ 
+
+#+BEGIN_SRC cmake 
+   cmake_minimum_required(VERSION 3.9)
+   project(X11-Xtoll-Project)
+
+   #========== Global Configurations =============#
+   #----------------------------------------------#
+
+   set(CMAKE_CXX_STANDARD 17)     
+   set(CMAKE_VERBOSE_MAKEFILE ON)
+
+   find_package(X11 REQUIRED)
+
+   #========== Targets Configurations ============#
+
+          add_executable( x11-tool x11-tool.cpp )
+   target_link_libraries( x11-tool ${X11_LIBRARIES} )
+#+END_SRC
+
+File: _x11-tool.cpp_ 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string> 
+  #include <cstring>
+  #include <cassert> 
+
+  // ------ Unix Headers (needed by read_symlink) ------// 
+  #include <unistd.h>
+  #include <limits.h>
+  #include <sys/types.h>
+  #include <signal.h>
+
+  // ------ X11 Headers  ------//
+  #include <X11/Xlib.h>
+  #include <X11/Xatom.h>
+
+  #include <cstdlib>
+
+  std::string  read_symlink      (std::string const& path);
+  int          x11_get_property_int32(const char* property_name, Display* dpy, Window root_window);
+  std::string  x11_get_property_str  (const char* property_name, Display* dpy, Window root_window);
+
+  template<typename Window_Consumer>
+  void x11_iterate_child_windows(  Display* dpy
+                                 , Window root_window
+                                 , Window_Consumer&& consumer);
+
+
+  std::string  x11_window_name(Display* dpy, Window wnd);
+  int          x11_window_get_pid(Display* dpy, Window wnd);
+  bool         x11_show_window_attributes(Display* dpy, Window wnd);
+  void         x11_show_window_properties(Display* dpy, Window wnd);
+
+  int main(int argc, char** argv)
+  {
+      // Print booleans as 'true' or 'false' instead of 1 or 0
+      std::cout << std::boolalpha;
+
+      Display* dpy = XOpenDisplay(nullptr);    
+      // Placeholder for future error checking in non-prototype code. 
+      assert( dpy != nullptr && "Cannot open display" );
+
+      const char* disp_str = XDisplayString(dpy);
+      assert( disp_str != nullptr && "Failed to get display string" );
+          std::cout << " [INFO] X11 Display string = " << disp_str << '\n';
+
+      // Get root window 
+      Window root = DefaultRootWindow(dpy);
+      //assert( root != nullptr && "Failed to get root window");
+    
+      if(argc < 2){
+          std::cerr << " [USAGE] $ " << argv[0] << " <COMMAND> " << '\n';
+          return EXIT_FAILURE;
+      }
+
+      auto command = std::string{argv[1]};
+
+      // List all windows and their window ids (unique identifiers)
+      if(command == "list")
+      {
+          x11_iterate_child_windows(dpy, root,[](Display* dpy, Window wnd, int index)
+          {
+              if( !x11_show_window_attributes(dpy, wnd)) { return; }
+              x11_show_window_properties(dpy, wnd);  
+          });    
+          return EXIT_SUCCESS;
+      }
+
+      if(command == "winfo")
+      {
+          // WARNING: Throws std::invalid_argument exception on parsing failure.
+          int window_id = std::stoi(argv[2]);
+          x11_show_window_attributes(dpy, window_id);
+          x11_show_window_properties(dpy, window_id);
+          return EXIT_SUCCESS;
+      }
+
+      // Kill window given its unique identifier (window id)
+      if(command == "kill")
+      {
+          // WARNING: Throws std::invalid_argument exception on parsing failure.
+          int window_id = std::stoi(argv[2]);
+          // Attempt to get window process ID 
+          int pid = x11_window_get_pid(dpy, window_id);
+          if(pid < 0){
+              std::cerr << " [ERROR] Unable to determine window process ID" << '\n';
+              return EXIT_FAILURE;
+          }
+          std::cout << " Kill process with PID = " << pid << '\n';
+          // Force process termination 
+          kill(pid, SIGTERM);
+          kill(pid, SIGKILL);
+          return EXIT_SUCCESS;
+      }
+
+      XCloseDisplay(dpy);
+      return 0;
+  }
+
+  /*================================================================*\
+   ,*             I M P L E M E N T A T I O N S                      *
+   ,*================================================================*/
+
+  // Get absolute path to file or symbolic link 
+  // Requires: #<unistd.h>, <limits.h>
+  std::string 
+  read_symlink(std::string const& path)
+  {
+      // Create a buffer with size PATH_MAX + 1 filled with 0 ('\0'), null characters
+      std::string buffer(PATH_MAX, 0);
+      // ssize_t readlink(const char *pathname, char *buf, size_t bufsiz);
+      ssize_t nread = ::readlink(path.c_str(), &buffer[0], PATH_MAX);
+      if(nread == -1){ throw std::runtime_error("Error: unable to read symbolic link"); }
+      buffer.resize(nread);
+      return buffer;
+  }
+
+
+  int 
+  x11_get_property_int32(const char* property_name, Display* dpy, Window root_window)
+  {
+      Atom p = XInternAtom(dpy, property_name, false);
+      Atom actual_type;
+      int format;
+      unsigned long num_items, bytes_after;
+      unsigned char* data = nullptr;
+
+      int status = XGetWindowProperty(  dpy, root_window, p, 0L, 1024L
+                                      , false,   XA_CARDINAL, &actual_type                                         
+                                      , &format, &num_items, &bytes_after                                 
+                                      , &data 
+                                      );
+                    
+      if( status != 0 || num_items < 1) 
+      {
+          //throw std::runtime_error("Error: failed to get property");        
+          return -1;
+      }
+      int value =   data[0] | (data[1] << 8) 
+                  | (data[2] << 16) | (data[3] << 24);
+      XFree(data);
+      return value;
+  }
+
+  std::string 
+  x11_get_property_str(const char* property_name, Display* dpy, Window root_window)
+  {
+      Atom p = XInternAtom(dpy, property_name, false);
+      Atom actual_type;
+      int format;
+      unsigned long num_items, bytes_after;
+      unsigned char* data = nullptr;
+
+      int status = XGetWindowProperty(  dpy, root_window, p, 0L, 1024L
+                                      , false,   XA_STRING, &actual_type                                         
+                                      , &format, &num_items, &bytes_after                                 
+                                      , &data 
+                                      );
+                    
+      if( status != 0 || num_items < 1) 
+      {
+          //throw std::runtime_error("Error: failed to get property");        
+          return "<NONE>";
+      }
+      std::string value(data, data + num_items);
+      XFree(data);
+      return value;
+  }
+
+  template<typename Window_Consumer>
+  void x11_iterate_child_windows( Display*          dpy
+                                 ,Window            root_window
+                                 ,Window_Consumer&& consumer)
+  {
+     // ----- Return parameters of function XQueryTree() -------//
+      // Note: the memory is allocated and owned by the calling code.
+      //       function.
+      // Note: '{}' curly brackets gurantees default initialization as 'nullptr'
+      Window root_return{};
+      Window parent_return{};
+      // List of childre window to be returned 
+      Window* children_return{};
+      // Number of children windows 
+      unsigned int nchildren_return{};
+
+      int result =  XQueryTree( 
+                      dpy                // Display 
+                    , root_window        // Root window
+                    , &root_return       // Root window return 
+                    , &parent_return     // Return paramameter for pointer to parent window 
+                    , &children_return   // List of children to be returned 
+                    , &nchildren_return  // Number of children elements in (children_return )
+                  ) ;
+
+      assert( result != 0 && "Failed to query windows");
+
+      std::cout << " [INFO] Number of children  windows = " << nchildren_return << '\n';
+
+      for(auto n = 0; n < nchildren_return; n++ )
+      {
+          consumer(dpy, children_return[n], n);
+      }
+
+      // Dispose, release memory allocated for children windows return 
+      XFree(children_return);
+  }
+
+
+  // Get Window name 
+  std::string 
+  x11_window_name(Display* dpy, Window wnd)
+  {
+      char* window_name;
+    
+      if( !XFetchName(dpy, wnd, &window_name) )
+      { return ""; }
+
+      auto output = std::string{window_name};
+      XFree(window_name);
+      return output;
+  }
+
+  // Note: It only works for X-client applications running on local machine.
+  int x11_window_get_pid(Display* dpy, Window wnd)
+  {
+      return x11_get_property_int32("_NET_WM_PID", dpy, wnd);
+  }
+
+  bool x11_show_window_attributes(Display* dpy, Window wnd)
+  {
+      XWindowAttributes attr;
+
+      if( !XGetWindowAttributes(dpy, wnd, &attr) )
+      {
+          std::fprintf(stderr, "Error, failed to get window (wnd = %zu) attribute \n"
+                              , wnd);
+          //exit(EXIT_FAILURE);
+          return false;
+      }  
+
+      auto window_name = x11_window_name(dpy, wnd);
+      if(window_name == ""){ return false; }
+
+      auto is_visible = attr.map_state == IsViewable;
+      std::cout << "\n\n [INFO] " 
+                  << " ; window_id = " << wnd 
+                  << " ; Visible = " << is_visible  
+                  << " ; Width  = "  << attr.width 
+                  << " ; Height = "  << attr.height                 
+                  << '\n';  
+      std::cout << " => Window Name = " << window_name << '\n';
+
+      return true;
+  }
+
+  void x11_show_window_properties(Display* dpy, Window wnd)
+  {
+      int pid = x11_get_property_int32("_NET_WM_PID", dpy, wnd);
+
+      std::cout << " => Window PID (Process ID) = "        
+                  << pid 
+                  << '\n';
+      try
+      {
+          auto path_to_executable_procfs = std::string("/proc/") + std::to_string(pid) + "/exe";            
+          std::cout << " => Window program (executable) = " 
+                    << read_symlink(path_to_executable_procfs) << '\n';            
+      } catch(const std::exception& ex)
+      {
+          std::cerr << " [ERROR] " <<  ex.what() << '\n';
+      }
+    
+      std::cout << " => WM_NAME = " 
+                  << x11_get_property_str("WM_NAME", dpy, wnd) 
+                  << '\n';
+
+      std::cout << " => WM_CLASS = " 
+                  << x11_get_property_str("WM_CLASS", dpy, wnd) 
+                  << '\n';
+
+      std::cout << " => WM_COMMAND = " 
+                  << x11_get_property_str("WM_COMMAND", dpy, wnd) 
+                  << '\n';                  
+
+      // Hostname of machine where the window application is located. 
+      // A window may belong to an application (X-client) running in a 
+      // remote machine.
+      std::cout << " => WM_CLIENT_MACHINE = " 
+                  << x11_get_property_str("WM_CLIENT_MACHINE", dpy, wnd) 
+                  << '\n';
+  }
+#+END_SRC
+
+ *Building:* 
+
+#+BEGIN_SRC sh  
+  $ git clone https://gist.github.com/639df76864d014ead12936fbd361be73 gist && cd gist 
+  $ cmake -H. -B_build -DCMAKE_BUILD_TYPE=Debug 
+  $ cmake --build _build --target 
+
+  $ >> _build/x11-tool 
+  [INFO] X11 Display string = :1.0
+  [USAGE] $ _build/x11-tool <COMMAND> 
+#+END_SRC
+
+List Windows: 
+
+#+BEGIN_SRC sh 
+   $ >> _build/x11-tool list
+   [INFO] X11 Display string = :1.0
+   [INFO] Number of children  windows = 116
+
+
+   [INFO]  ; window_id = 2097153 ; Visible = false ; Width  = 10 ; Height = 10
+   => Window Name = xfce4-session
+   => Window PID (Process ID) = 1715
+   => Window program (executable) = /usr/bin/xfce4-session
+   => WM_NAME = xfce4-session
+   => WM_CLASS = xfce4-sessionXfce4-session
+   => WM_COMMAND = xfce4-session
+   => WM_CLIENT_MACHINE = localhost.localdomain
+
+    ... ....   ... ....   ... .... 
+    ... ....   ... ....   ... .... 
+
+   [INFO]  ; window_id = 69206017 ; Visible = false ; Width  = 10 ; Height = 10
+   => Window Name = Terminal
+   => Window PID (Process ID) = 778969
+   => Window program (executable) = /usr/libexec/gnome-terminal-server
+   => WM_NAME = Terminal
+   => WM_CLASS = gnome-terminal-serverGnome-terminal-server
+   => WM_COMMAND = gnome-terminal-server
+   => WM_CLIENT_MACHINE = localhost.localdomain
+
+
+   [INFO]  ; window_id = 69206018 ; Visible = false ; Width  = 10 ; Height = 10
+   => Window Name = Terminal
+   => Window PID (Process ID) = 778969
+   => Window program (executable) = /usr/libexec/gnome-terminal-server
+   => WM_NAME = Terminal
+   => WM_CLASS = <NONE>
+   => WM_COMMAND = <NONE>
+   => WM_CLIENT_MACHINE = localhost.localdomain
+#+END_SRC
+
+List information for a single window: 
+
+#+BEGIN_SRC sh 
+   $ >> _build/x11-tool winfo 69206017 
+   [INFO] X11 Display string = :1.0
+
+
+   [INFO]  ; window_id = 69206017 ; Visible = false ; Width  = 10 ; Height = 10
+   => Window Name = Terminal
+   => Window PID (Process ID) = 778969
+   => Window program (executable) = /usr/libexec/gnome-terminal-server
+   => WM_NAME = Terminal
+   => WM_CLASS = gnome-terminal-serverGnome-terminal-server
+   => WM_COMMAND = gnome-terminal-server
+   => WM_CLIENT_MACHINE = localhost.localdomain
+#+END_SRC
+
+Check information via _xprop_ x11 utility tools: 
+
+#+BEGIN_SRC sh 
+   $ >> xprop -id 69206017 
+  WM_CLASS(STRING) = "gnome-terminal-server", "Gnome-terminal-server"
+  WM_COMMAND(STRING) = { "gnome-terminal-server" }
+  WM_CLIENT_LEADER(WINDOW): window id # 0x4200001
+  _NET_WM_PID(CARDINAL) = 778969
+  WM_LOCALE_NAME(STRING) = "en_US.UTF-8"
+  WM_CLIENT_MACHINE(STRING) = "localhost.localdomain"
+  WM_NORMAL_HINTS(WM_SIZE_HINTS):
+                  program specified size: 10 by 10
+  WM_PROTOCOLS(ATOM): protocols  WM_DELETE_WINDOW, WM_TAKE_FOCUS, _NET_WM_PING
+  WM_ICON_NAME(STRING) = "Terminal"
+  _NET_WM_ICON_NAME(UTF8_STRING) = "Terminal"
+  WM_NAME(STRING) = "Terminal"
+  _NET_WM_NAME(UTF8_STRING) = "Terminal"
+
+  # Get the executable that created this window 
+   $ >> readlink -f /proc/778969/exe 
+  /usr/libexec/gnome-terminal-server
+#+END_SRC
+
+Terminate process that created the previous window: 
+
+#+BEGIN_SRC sh 
+   $ >> _build/x11-tool kill 69206017 
+   [INFO] X11 Display string = :1.0
+   Kill process with PID = 778969
+#+END_SRC
+
 *** Further reading and references 
 
  *X11 Windows System Client Libraries*
@@ -10205,4 +10657,23 @@ User Interface Screenshot:
 
   + *Wayland (display server protocol)*
     + <https://en.wikipedia.org/wiki/Wayland_(display_server_protocol)>
+
+  + Book: *The Wayland Protocol*
+    + <https://wayland-book.com/introduction.html>
+    + "Wayland is the next-generation display server for Unix-like
+      systems, designed and built by the alumni of the venerable Xorg
+      server, and is the best way to get your application windows onto
+      your user's screens. Readers who have worked with X11 in the
+      past will be pleasantly surprised by Wayland's improvements, and
+      those who are new to graphics on Unix will find it a flexible
+      and powerful system for building graphical applications and
+      desktops. This book will help you establish a firm understanding
+      of the concepts, design, and implementation of Wayland, and
+      equip you with the tools to build your own Wayland client and
+      server applications. Over the course of your reading, we'll
+      build a mental model of Wayland and establish the rationale that
+      went into its design. Within these pages you should find many
+      "aha!" moments as the intuitive design choices of Wayland become
+      clear, which should help to keep the pages turning. Welcome to
+      the future of open source graphics!"
 
