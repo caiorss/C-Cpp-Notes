@@ -7554,6 +7554,305 @@ Running:
     [6] path => /boot/initramfs-5.6.6-300.fc32.x86_64.img
      ... ... ...     ... ... ...     ... ... ...     ... ... ...     
 #+END_SRC
+** Monitor file system changes with Inotify API
+*** Overview 
+
+Inotify is an exclusive Linux kernel API for file monitoring, which
+allows watching file system changes events such as file copy, moving,
+creation, renaming and deletion without any wasteful and inefficient
+polling. BSD-variants, such as MacOSX and FreeBSD use the [[https://www.freebsd.org/cgi/man.cgi?kqueue][kqueue]] API. 
+
+Inotify API limitations: 
+
+  + Cannot monitor network mounted file systems.
+
+  + Unable to watch /proc (PROCFS) virtual file systems (VSF)
+
+  + Cannot monitor sub-directories. It is necessary to add new Inotify
+    watch instances for every sub-directory to be monitored.
+
+Some use-cases of file system monitoring via Inotify API are:
+
+  + File system automation 
+
+  + Building system automation
+
+  + Automatic recompilation whenever a dependency changes
+
+  + Reloading application if some configuration file changes.
+
+  + Reloading of game asset if some file change.
+
+  + Executing some action, command or process when a file system event happens.
+
+
+ *Functions and Structures* 
+ 
+Headers: 
+
+  + <sys/inotify.h> - See manpage: ( [[https://manpages.ubuntu.com/manpages/xenial/man7/inotify.7.html][Ubuntu Inotify Manpage]] )
+
+Functions: 
+
+  + _inotify_init()_ => Returns a file descriptor (numerical value) for
+    an _inotify_ instance. On failure, returns -1 and sets the /errno/
+    thread-local-storage global variable.
+
+#+BEGIN_SRC cpp 
+   int inotify_init(void) 
+   int inotify_init1(int flags);
+#+END_SRC
+
+  + _inotify_watch_add()_ => Add new file system watch.
+    + Parameters:
+      + fd       => File descriptor of inotify instance, created with
+        _inotify_init_ function. 
+      + pathname => Path to directory or file what will be monitored.
+      + mask     => bitwise mask of flags that selects the types of
+        events that will be monitored.
+      + RETURN => Returns (-1) on failure and any other value when the
+        operation is successful.
+
+#+BEGIN_SRC cpp 
+   int inotify_add_watch(int fd, const char* pathname, uint32_t mask);
+#+END_SRC
+
+  + _inotify_rm_watch()_ => Removes file system watch.
+    + Parameters:
+      + fd => Inotify file descritor created with inotify_init() function.
+      + wd => Watch file descriptor created with inotify_watch_add.
+
+#+BEGIN_SRC cpp 
+  int inotify_rm_watch(int fd, int wd);
+#+END_SRC
+
+Structure: 
+
+#+BEGIN_SRC cpp 
+   struct inotify_event {
+       int      wd;       /* Watch (watcher file descriptor) descriptor */
+       uint32_t mask;     /* Mask of events */
+       uint32_t cookie;   /* Unique cookie associating related
+                             events (for rename(2)) */
+       uint32_t len;      /* Size of name field => File or directory name. */
+       char     name[];   /* Optional null-terminated name */
+   };
+#+END_SRC
+
+ *References* 
+
+  * /inotify(7) - Linux man page/
+    + <https://linux.die.net/man/7/inotify>
+
+  * /Ubuntu Manpage - inotify - monitoring filesystem events/
+    + <https://manpages.ubuntu.com/manpages/xenial/man7/inotify.7.html>
+
+  * /inotify - a powerful yet simple file change notification system/
+    * <https://www.kernel.org/doc/Documentation/filesystems/inotify.txt>
+
+  * /Inotify: Efficient, Real-Time Linux File System Event Monitoring/
+    + <https://www.infoq.com/articles/inotify-linux-file-system-event-monitoring/>
+
+  * /Filesystem notification, part 1: An overview of dnotify and inotify/
+    + <https://lwn.net/Articles/604686/>
+
+  * /What is the proper way to use inotify?/
+    + <https://stackoverflow.com/questions/4062806> 
+*** Sample code 
+
+All files available at: 
+
+  + https://gist.github.com/6e3fc8a39a3a6089ad7002738e4d509a 
+
+ 
+  *Files* 
+
+File: _inotify-test.cpp_ 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string> 
+  #include <cstring>  // strerror()
+  #include <memory>
+  #include <cassert>
+  #include <map>
+
+  // ---- Unix-specific headers ----------//
+  #include <unistd.h>
+  #include <limits.h>
+
+  // ---- Linux-specific headers --------//
+  #include <sys/inotify.h>
+
+  constexpr int FAILURE = -1;
+
+  void exit_on_failure(int fd, const char* error_message)
+  {
+      if(fd != FAILURE){ return; }
+      int err = errno;
+      std::fprintf( stderr, " [ERROR] %s ; errno = %d ; errno-msg = %s \n"
+                    , error_message, err, strerror(err));
+      // Execute exit system call and terminate this process.
+      exit(1);
+  }
+
+  int main(int argc, char** argv)
+  {
+
+      // Create inotify instance, returning file descriptor 
+      int fd_inotify = ::inotify_init();
+      exit_on_failure(fd_inotify, "Cannot create Inotify instance");
+
+      using WatcheFileDescriptor = int;
+      using DirectoryPath       = std::string;
+      auto watch_table          = std::map<WatcheFileDescriptor, DirectoryPath>{};
+
+      if(argc < 2){
+          std::fprintf(stderr, " [ERROR] Requires one or more directories to be watched. \n");
+          return EXIT_FAILURE;
+      }
+
+      for(int i = 1; i < argc; i++)
+      {
+          const char* directory = argv[i];
+        
+          // Create watch instance, returning a file descriptor for the watcher 
+          int fd_watch = inotify_add_watch(fd_inotify, directory, IN_ALL_EVENTS);
+          // Error checking 
+          std::string error_msg = std::string("Cannot create watcher for this directory: ") + directory;
+          exit_on_failure(fd_watch, error_msg.c_str());
+          watch_table[fd_watch] = directory; 
+
+          std::fprintf( stdout, " [INFO] Watching directory => wd = %d ; directory = %s \n"
+                      , fd_watch, directory);
+      }
+
+      // Maximum number of events 
+      constexpr size_t MAX_EVENTS = 1024;
+      // Size of data structure inotify_event in bytes 
+      constexpr size_t EVENT_SIZE = sizeof(struct inotify_event);
+      // Lenght of buffer for events storage in bytes 
+      constexpr size_t BUFFER_LENGTH = MAX_EVENTS * ( EVENT_SIZE + NAME_MAX + 1 );
+      std::uint8_t     buffer[BUFFER_LENGTH];
+
+      // -------------- Inotify event loop ----------------//
+      for(;;)
+      {
+          // std::fprintf(stderr, " [INFO] Waiting for Inotify event \n");        
+          // nn_read => signed number of bytes read from the file descriptor
+          //            It is (-1) in the case of errrors.
+          ssize_t nn_read = read(fd_inotify, buffer, BUFFER_LENGTH);
+          assert(nn_read != -1 && "Placeholder for future error handling.");        
+          ssize_t offset = 0;
+
+          // Iterate over all events 
+          while( offset < nn_read )
+          {
+              auto event = reinterpret_cast<inotify_event*>(buffer + offset);        
+              auto directory = watch_table[event->wd];
+
+              // Create file
+              if(event->mask & IN_CREATE &&  !(event->mask & IN_ISDIR) )
+                  std::fprintf(stdout
+                              , " [INFO] CREATE file event => (file = %s ) ; (dir = %s) \n"
+                              , event->name, directory.c_str());
+
+              // Create directory event 
+              if(event->mask & IN_CREATE && event->mask & IN_ISDIR )
+                  std::fprintf( stdout
+                              , " [INFO] CREATE directory  event => (file = %s ) ; (dir = %s)  \n"
+                              , event->name, directory.c_str());
+
+              // Delete file or directory event. 
+              if(event->mask & IN_DELETE)
+                  std::fprintf( stdout, " [INFO] DELETE file event  => (file = %s ) ; (dir = %s)  \n"
+                              , event->name, directory.c_str());
+
+              // Modify file 
+              if( event->mask & IN_MODIFY  && !(event->mask & IN_ISDIR) )
+                  std::fprintf( stdout
+                              , " [INFO] MODIFY file event   => (file = %s ) ; (dir = %s) \n"
+                              , event->name, directory.c_str());
+
+              // Event happens when file system is unmounted. 
+              if(event->mask & IN_IGNORED)
+                  std::fprintf( stdout
+                              , " [INFO] IGNRED file monitor removed or file system unmounted => dir = %s \n"
+                              , directory.c_str());
+
+              offset = offset + EVENT_SIZE + event->len;
+          }
+        
+      } // --------- End of Inotify event loop() --------------//
+
+      //free(event);
+      std::fprintf(stdout, " [INFO] Terminate application gracefully \n\n");
+      close(fd_inotify);
+      return 0;
+  }
+#+END_SRC
+
+ *Building:* 
+
+#+BEGIN_SRC sh 
+    $ git clone https://gist.github.com/6e3fc8a39a3a6089ad7002738e4d509a inotify-gist && cd inotify-gist 
+    $ g++ inotify-test.cpp -o inotify-test.bin -std=c++1z -Wall -Wextra -g
+
+    $ file inotify-test.bin 
+    inotify-test.bin: ELF 64-bit LSB executable, x86-64, version 1 (GNU/Linux), .... ...
+#+END_SRC
+
+ *Running:* 
+
+Run the following command from terminal emulator 1:
+
+#+BEGIN_SRC sh 
+  $ ./inotify-test.bin /tmp/testing  ~/Downloads 
+   [INFO] Watching directory => wd = 1 ; directory = /tmp/testing 
+   [INFO] Watching directory => wd = 2 ; directory = /home/unixuser/Downloads 
+
+   [INFO] CREATE file event => (file = file1.txt ) ; (dir = /tmp/testing) 
+   [INFO] CREATE file event => (file = file2.txt ) ; (dir = /tmp/testing) 
+   [INFO] CREATE file event => (file = file3.txt ) ; (dir = /tmp/testing) 
+   [INFO] CREATE file event => (file = file4.txt ) ; (dir = /tmp/testing) 
+   [INFO] DELETE file event  => (file = file1.txt ) ; (dir = /tmp/testing)  
+   [INFO] CREATE file event => (file = testing-files1.txt ) ; (dir = /home/unixuser/Downloads) 
+   [INFO] CREATE file event => (file = testing-files2.txt ) ; (dir = /home/unixuser/Downloads) 
+   [INFO] CREATE file event => (file = testing-files3.txt ) ; (dir = /home/unixuser/Downloads) 
+   [INFO] CREATE file event => (file = testing-files4.txt ) ; (dir = /home/unixuser/Downloads) 
+   [INFO] DELETE file event  => (file = file2.txt ) ; (dir = /tmp/testing)  
+   [INFO] DELETE file event  => (file = file3.txt ) ; (dir = /tmp/testing)  
+   [INFO] DELETE file event  => (file = file4.txt ) ; (dir = /tmp/testing)  
+   [INFO] MODIFY file event   => (file = testing-files1.txt ) ; (dir = /home/unixuser/Downloads) 
+   [INFO] MODIFY file event   => (file = testing-files2.txt ) ; (dir = /home/unixuser/Downloads) 
+   [INFO] MODIFY file event   => (file = testing-files2.txt ) ; (dir = /home/unixuser/Downloads) 
+#+END_SRC
+
+Manipulate the watched directories from terminal emulator 2: 
+
+#+BEGIN_SRC sh 
+   $ mkdir -p /tmp/testing & cd /tmp/testing 
+
+   $ >> touch file1.txt file2.txt file3.txt file4.txt
+
+   $ >> rm -rf file1.txt 
+
+   $ >> touch ~/Downloads/testing-files{1, 2, 3, 4}.txt 
+
+   $ >> rm -rf -v *.txt  
+   removed 'file2.txt'
+   removed 'file3.txt'
+   removed 'file4.txt'
+
+   $ >> echo "change file" >> ~/Downloads/testing-files1.txt 
+
+   $ >> echo "change file" >> ~/Downloads/testing-files2.txt
+
+   $ >> echo "change file" >> ~/Downloads/testing-files2.txt
+#+END_SRC
+
+
+
 ** Memory Mapped Files - mmap 
 *** Overview 
 
