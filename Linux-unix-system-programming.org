@@ -7485,7 +7485,6 @@ Manipulate the watched directories from terminal emulator 2:
    $ >> echo "change file" >> ~/Downloads/testing-files2.txt
 #+END_SRC
 
-
 ** Memory Mapped Files - mmap 
 *** Overview 
 
@@ -8229,6 +8228,381 @@ Running:
                Machine = 0x8664 
     Number of sections = 7 
 #+END_SRC
+** POSIX Shared Memory 
+*** Overview 
+
+POSIX (Portable Operarting System Interface) shared memory is a IPC
+inter-process communication API which allows multiple processes to
+share the same physical memory segment and transfer data without any
+copying overhead, unlike pipes, message queues, TCP/IP sockets, UDP/IP
+sockets or unix domain sockets. 
+
+ *Unix Shared Memory APIs* 
+
+Unix-based operating systems, including Linux, BSD variants and MacOSX
+have the following APIs for shared memory. 
+
+   * MMAP - Memory Mapped Files (mmap)
+     * Functions: mmap(), ftruncate(), munmap()
+
+   * System V shared memory API
+     * Functions: shmget(), shmat(), ftok()
+
+   * Posix Shared Memory _shm_  (similar to mmap)
+     * Functions: shm_open(), ftruncate(), mmap().
+
+On Linux, the POSIX shared memory is implemented as
+/dev/shm/<SHARED-MEMORY-NAME> memory mapped file which is an ordinary
+file created in the /dev/shm pseudo file system, that only exists in
+the volatile RAM memory. Regardless of the shared memory API, they are
+prone to race-condition problems if two processes attempt to write to
+the memory simultaneously which can lead to data corruption and
+unpredictable behavior. As a result, locks, semaphores and other
+mutual-exclusion concurrency primitives are necessary to synchronize
+the access to the shared memory in order to avoid race conditions and
+data corruption. 
+
+ *Limitations and potential problems* 
+
+The following limitation for objects allocation are noteworthy: 
+
+  + Objects allocated in the shared memory should be contiguous and
+    have any internal indirection or any internal pointer, in other
+    words, they should be _POD_ types, plain-old-data.
+
+  + It is not possible to allocate objects containing STL containers
+    without special allocators.
+
+  + It is also not possible to allocate polymorphic objects, objects
+    implemeting some C++ interface class with virtual member
+    functions. 
+
+ *Headers* 
+
+  + #include <sys/mman.h>
+  + #include <sys/types.h>
+  + #include <sys/stat.h>
+  + #include <fcntl.h>
+  + #include <unistd.h>
+
+ *Functions* 
+
+#+BEGIN_SRC cpp 
+   // Open or create a new shared memory segment 
+   int shm_open(const char* name, int oflag, mode_t mode);
+
+   // Remove shared memory segment 
+   int shm_unlink(const char* name);
+  
+   // Truncate or resize file to specific lenght 
+   int ftruncate(int fd, off_t length);
+
+    // Map a file to current process address space 
+    void *mmap(  void*  addr    // Process virtual address where the file will be mapped 
+               , size_t length  // Length in bytes of the file mapping 
+               , int    prot    // Protection flags 
+               , int    flags   // Read-Write type of access 
+               , int    fd      // File descriptor to be mapped 
+               , off_t  offset  // Offset from beginning of file to be mapped. 
+             );
+
+   // Unmap file mapping from current 
+   int munmap(void* addr, size_t length);
+#+END_SRC
+
+
+ *Documentation and Further Reading* 
+
+  + [[https://www.man7.org/linux/man-pages/man3/shm_open.3.html][shm_open(3) - Linux manual page]]
+
+  + [[https://man7.org/linux/man-pages/man2/mmap.2.html][mmap(2) - Linux manual page]]
+
+  + [[https://www.man7.org/linux/man-pages/man2/ftruncate.2.html][ftruncate(2) - Linux manual page]]
+
+  + [[https://datacadamia.com/os/linux/shared_memory][Linux - Shared Memory (SHM) (/dev/shm)]]
+
+  + [[https://wiki.c2.com/?VirtualFunctionsAndSharedMemory][Virtual Functions And Shared Memory]] - C2 Wiki
+
+  + [[https://northstar-www.dartmouth.edu/doc/idl/html_6.2/SHMMAP.html][SHMMAP]] - Dartmouth
+
+  + [[https://users.cs.cf.ac.uk/Dave.Marshall/C/node27.html][IPC:Shared Memory]] 
+
+
+
+*** Sample Code 
+
+This sample code aims to experiment POSIX shared memory
+subsystem. This sample program has two functionalities, a server
+functionality, which allocates an object in the shared memory and a
+client functionality which loads and modifies the object allocated in
+the shared memory segment.
+
+Sources available at: 
+ + https://gist.github.com/d5f8db63803859f6182e271e026498e3
+
+File: _shmem1.cpp_ 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+  #include <cassert>
+  #include <cstring>
+
+  // ----- Unix and Posix headers ---//
+  #include <unistd.h>
+  #include <sys/types.h> 
+
+  #include <sys/mman.h>
+  #include <sys/stat.h>
+  #include <fcntl.h>
+
+  // Implementation of object allocated in Shared memory 
+  struct Object
+  {
+      int    x = 0;
+      double y = 26.2124214;
+      char   dataset[400] = "Hello world";
+
+      Object(){
+          std::cout << " [TRACE] Object created Ok \n" << '\n';
+      }
+
+      void set_x(int x)      { this->x = x; }
+      void set_y(double y)  { this->y = y; }
+
+      void set_str(const char* value)  
+      {
+          mempcpy(dataset, value, 200);
+      }
+
+      void show() const  
+      {
+          std::cout << " [TRACE] Shared memory object =>> "
+                    << " ; x = "    << x 
+                    << " ; y = "    << y 
+                    << " ; str =  " << dataset 
+                    << '\n';
+      }
+  };
+
+  constexpr int         FAILURE            = -1;
+  constexpr size_t      STORAGE_SIZE       = sizeof(Object);
+  constexpr const char* shared_memory_name = "/shared-data";
+
+  // Provides shared memory object.
+  void server_side(const char* shm_name);
+  // Consumes shared memory object.
+  void client_side(const char* shm_name);
+
+  int main(int argc, char** argv)
+  {
+      std::cout << " [INFO] Process Unique Identifier PID = " << ::getpid() << '\n';
+      std::cout << " [INFO] Storage size in bytes = " << STORAGE_SIZE << '\n';
+
+      if(argc < 2){
+          std::cerr << " [ERROR] Expected command argument. " << '\n';
+          return EXIT_FAILURE;
+      }
+      auto command = std::string{argv[1]};
+
+      if(command == "server" ){ server_side(shared_memory_name);  }
+      if(command == "client" ){ client_side(shared_memory_name);  }
+
+          return 0;
+  }
+
+  // ========= I M P L E M E N  T A T I O N S =================//
+
+  void server_side(const char* shm_name)
+  {
+
+      // Remove shared memory segment if it already exists.
+      ::shm_unlink(shm_name);
+
+      // Attempt to create shared  memory segment
+      // On Linux this segment corresponds to the file: '/dev/shm/<SHM-NAME>'
+      int fd = shm_open(  shm_name
+                        , O_CREAT | O_EXCL | O_RDWR
+                        , S_IRUSR | S_IWUSR
+                        );
+
+      // assert => Placeholder for future error handling
+      assert( fd != FAILURE && "Failed to create shared memory segment" );
+
+      // Resize shared memory segment
+      assert( ::ftruncate(fd, STORAGE_SIZE) != FAILURE );
+
+      // Map shared memory segment into process address space
+      void* pmap = ::mmap( nullptr                  // Most of the time set to nullptr 
+                         , STORAGE_SIZE          // Size of memory mapping
+                         , PROT_READ | PROT_WRITE   // Allows reading and writing operations
+                         , MAP_SHARED               // This flag makes this segment visible by other processes.
+                         , fd                       // File descriptor
+                         , 0x00                     // Offset from beggining of file
+                         );
+
+      if(pmap == MAP_FAILED){ perror("mmap"); exit(EXIT_FAILURE);  }
+
+      // Allocate object in shared memory segment
+      // using placement 'new operator'
+      Object* pObj = new (pmap) Object;
+      assert( pObj != nullptr );
+
+      std::cout << " [BEFORE] Before typing RETURN " << '\n';
+      pObj->show();
+
+      std::cout << "\n\n Type return to exit" << '\n';
+      std::getchar();
+
+      std::cout << " [BEFORE] After typing RETURN " << '\n';
+      pObj->show();
+
+      // Mmap cleanup procedure 
+      assert( ::munmap(pmap, STORAGE_SIZE) != FAILURE );
+
+      // Remove shared memory segment 
+      ::shm_unlink(shm_name);
+  }
+
+  void client_side(const char* shm_name)
+  {
+      // Attempt to create shared  memory segment
+      int fd = ::shm_open( shm_name,  O_RDWR, 0);
+
+      // assert => Placeholder for future error handling
+      assert( fd != - 1 && "Failed to open shared memory segment" );
+
+      // Map shared memory segment into process address space
+      void* pmap = ::mmap( nullptr                  // Most of the time to NULL or nullptr 
+                         , sizeof STORAGE_SIZE      // Size of memory mapping
+                         , PROT_READ | PROT_WRITE   // Allows reading and writing operations
+                         , MAP_SHARED               // This flag makes this segment visible by other processes.
+                         , fd                       // File descriptor
+                         , 0x00                     // Offset from beggining of file
+                         );
+
+      if(pmap == MAP_FAILED){ perror("mmap"); exit(EXIT_FAILURE);  }
+
+      /* Load object from shared memory knowing only its interface 
+       ,* (pointer to interface class), without knowing its exact 
+       ,* implementation or type. 
+       ,*/
+      Object* pObj = reinterpret_cast<Object*>(pmap);
+      std::cout << " Previous object value " << '\n';
+      pObj->show();
+
+      int x; 
+      double y; 
+      std::string str;
+      std::cout << "Enter x, y and str: ";
+
+      std::cin >> x >> y >> str;
+      pObj->set_x(x);
+      pObj->set_y(y);
+      pObj->set_str(str.c_str());
+      pObj->show();
+
+      // assert( ::munmap(pmap, STORAGE_SIZE) != FAILURE );
+  }   
+#+END_SRC
+
+Building: 
+
+#+BEGIN_SRC sh 
+   $ >> g++ shmem1.cpp -o shmem1.bin -std=c++1z -g -O0 -Wall -Wextra -lrt
+#+END_SRC
+
+Run as a server in terminal 1: 
+
+#+BEGIN_SRC sh 
+ $ >> ./shmem1.bin server 
+ [INFO] Process Unique Identifier PID = 81749
+ [INFO] Storage size in bytes = 416
+ [TRACE] Object created Ok 
+
+ [BEFORE] Before typing RETURN 
+ [TRACE] Shared memory object =>>  ; x = 0 ; y = 26.2124 ; str =  Hello world
+
+
+ Type return to exit
+
+ [BEFORE] After typing RETURN 
+ [TRACE] Shared memory object =>>  ; x = 26234 ; y = 3.15156 ; str =  cpp-shared-memory-allocation-shared-object
+#+END_SRC
+
+Run as a client in terminal 2: 
+
+#+BEGIN_SRC sh 
+   $ >> ./shmem1.bin client 
+   [INFO] Process Unique Identifier PID = 81777
+   [INFO] Storage size in bytes = 416
+   Previous object value 
+   [TRACE] Shared memory object =>>  ; x = 0 ; y = 26.2124 ; str =  Hello world
+  Enter x, y and str: 20 -90.25122 hello-world-cpp1z
+   [TRACE] Shared memory object =>>  ; x = 20 ; y = -90.2512 ; str =  hello-world-cpp1z
+
+   $ >> ./shmem1.bin client
+   [INFO] Process Unique Identifier PID = 81811
+   [INFO] Storage size in bytes = 416
+   Previous object value 
+   [TRACE] Shared memory object =>>  ; x = 20 ; y = -90.2512 ; str =  hello-world-cpp1z
+  Enter x, y and str: 26234 3.15156324 cpp-shared-memory-allocation-shared-object
+   [TRACE] Shared memory object =>>  ; x = 26234 ; y = 3.15156 ; str =  cpp-shared-memory-allocation-shared-object
+
+   $ >> ./shmem1.bin client
+   [INFO] Process Unique Identifier PID = 81837
+   [INFO] Storage size in bytes = 416
+   Previous object value 
+   [TRACE] Shared memory object =>>  ; x = 26234 ; y = 3.15156 ; str =  cpp-shared-memory-allocation-shared-object
+  Enter x, y and str: ^C⏎     
+#+END_SRC
+
+While the server is running, the following command outputs can be
+observed: 
+
+#+BEGIN_SRC sh 
+     $ >> ls /dev/shm/shared-data
+    /dev/shm/shared-data
+
+     $ >> file /dev/shm/shared-data
+    /dev/shm/shared-data: data
+
+     $ >> cat /dev/shm/shared-data 
+    zf=���f6	@cpp-shared-memory-allocation-shared-object1�y-allocation-s��⏎ 
+ 
+    # ---- Process mappings -------------------------// 
+
+     $ >> pmap 81749
+    81749:   ./shmem1.bin server
+    0000000000400000      8K r---- shmem1.bin
+    0000000000402000      4K r-x-- shmem1.bin
+    0000000000403000      4K r---- shmem1.bin
+    0000000000404000      4K r---- shmem1.bin
+     .... ...  .... ...  .... ...  .... ...  .... ... 
+     .... ...  .... ...  .... ...  .... ... 
+    00007faddd82f000     32K r---- ld-2.31.so
+    00007faddd837000      4K rw-s- shared-data
+    00007faddd838000      4K r---- ld-2.31.so
+    00007faddd839000      4K rw--- ld-2.31.so
+    00007faddd83a000      4K rw---   [ anon ]
+    00007ffe9af95000    136K rw---   [ stack ]
+    00007ffe9afc0000     16K r----   [ anon ]
+    00007ffe9afc4000      8K r-x--   [ anon ]
+    ffffffffff600000      4K r-x--   [ anon ]
+     total             5944K
+#+END_SRC
+
+Attempt to run application in client mode after the server process
+is terminated. 
+
+#+BEGIN_SRC sh 
+   $ >> ./shmem1.bin client
+   [INFO] Process Unique Identifier PID = 82176
+   [INFO] Storage size in bytes = 416
+  shmem1.bin: shmem1.cpp:128: void client_side(const char*): Assertion `fd != - 1 && "Failed to open shared memory segment"' failed.
+  fish: “./shmem1.bin client” terminated by signal SIGABRT (Abort)
+#+END_SRC
+
 ** Sockets - TCP/IP and Unix Domain Sockets 
 *** Overview 
 
@@ -8424,7 +8798,6 @@ Functions for dealing with network address:
    }
    #define h_addr h_addr_list[0] /* for backward compatibility */
 #+END_SRC
-
 
 *** Simple TCP/IP socket echo server 
 
