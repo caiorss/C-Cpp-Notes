@@ -1628,7 +1628,7 @@ APIS.
 Note: As most of those APIs are not standardized. In order to ensure
 code portability, it is better to use C++ libraries that encapsulates
 multiplexed IO (Input/Output) APIs rather than use them directly. Some
-of those libraries are: Boost.ASIO (C++); 
+of those libraries are: Boost.ASIO (C++ library) and LibUV (C library).
 
 Standardized APIs:
 
@@ -9387,7 +9387,7 @@ Check unix-socket file:
   srwxrwxr-x 1 mxpkf8 mxpkf8 0 Jul  2 01:22 /tmp/unix-socket-file=
 #+END_SRC
 
-** Sockets with IO Multiplexing [DRAFT]
+** Sockets with Multiplexed IO APIs (poll, epoll) [DRAFT]
 *** Overview 
 
 A recurrent need in network socket programming is to handle multiple
@@ -9417,15 +9417,10 @@ issue, such as:
      * Reuse a set of pre-existing threads for managing each
        connection and avoid the overhead of creating and destroying too
        many threads.
-     * Drawbacks: It only works for non-long running client socket
-       connections such as HTTP connections that are closed as soon as
-       possible. The drawback of this method is that it assumption that
-       any task submited to thread pool will finish as soon as possible
-       and not block the worker thread, otherwise, it will be
-       unusable. The asummption implies that the connection should be
-       closed as fast as possible, which means that the thread-pool
-       approach is only suitable for HTTP servers which usually close
-       the client socket connection after every request.
+     * Drawbacks: Long running connections should have a timeout in
+       order to not block a thread pool and make it unable to server
+       the remaining client socket requests. This method is less
+       scalable than multiplexed IO. 
 
    * _Multiplexed IO_ [BEST]
      * Many operating systems provide multiplexed IO facilities, such
@@ -9447,6 +9442,10 @@ issue, such as:
        iterating over the data structure returned by the IO
        multiplexing function which contains the file descriptors
        events.
+
+     * Note: It is possible to run multiple multiplexed-IO event loops
+       in different threads for increasing responsiveness and
+       scalability.  
 
      * Drawbacks:
        * Event-driven with possible callback hell which can be avoided
@@ -10246,7 +10245,7 @@ General Utilities:
 
 X11 Preference and configuration: 
 
-  * [[https://linux.die.net/man/1/xset][xet]] - X-Server user preference.
+  * [[https://linux.die.net/man/1/xset][xset]] - X-Server user preference.
 
   * [[https://linux.die.net/man/1/xmodmap][xmodmap]] - Modify keymaps and pointer buttons mapping in X Windows System X11.
 
