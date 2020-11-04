@@ -4410,7 +4410,7 @@ Running on Android vai adb shell:
 
   + [[http://www.edenwaith.com/blog/index.php?p=67][Edenwaith : Blog - Calculating Free Space on macOS]]
 
-** Low level IO functions overview 
+** Low level IO sycalls overview 
 
 C-Library functions which encapsulates file-related systems calls.
 
@@ -4469,6 +4469,124 @@ Headers:
 
 #+BEGIN_SRC cpp 
   ssize_t write(int fd, const void *buf, size_t count);
+#+END_SRC
+** Low level IO - read() syscall 
+
+ *Summary:*
+
+   + Read data from file descriptor to a buffer. Where buffer a
+     pointer to any storage location within the process virtual
+     memory. The 'buffer' argument can be a pointer to any POD type
+     plain-old data, which continuous allocated in the memory, without
+     any internal pointer.
+
+  * This system call can be used with any type of file descriptors,
+    namely: ordinary file descriptors; standard input from terminal,
+    stdin (character device); sockets; unix domain sockets; anonymous
+    pipes; named pipes; character device files, which often represent
+    hardware; and block devices which represent mounted file systems.
+
+#+BEGIN_SRC cpp 
+   #include <unistd.h> 
+
+   ssize_t read(int fd, void* buffer, size_t len);
+
+   ssize_t read(  int    fd     // => File descriptor          
+                , void*  buf    // => Pointer to buffer 
+                                //   It can be a pointer to any POD type, plain-old data.
+                                //   without any internal pointers.                                  
+                , size_t len    // => Buffer size or length in bytes.
+              );
+#+END_SRC
+
+ *Possible Return Values*   
+
+The system call wrapper function read() can return the following
+results:
+
+    1. Number of bytes read, which may be less or equal to the buffer
+       size. The bytes read are stored in the buffer.
+
+    2. Return value: (0) indicating EOF (End-Of-File) - there is nor
+       more bytes to be read.
+
+    3. Return value: (-1) and _errno_ set to _EINTR_ indicating that
+       before any byte was read, a signal was set to the current
+       process. In this case, read() can be called again.
+
+    4. Return value: (-1) and _errno_ set to _EAGAIN_ with a file descriptor in
+       non-blocking mode. This case indicates that a read operation on
+       the file descriptor would block the current thread while there
+       is no data available. 
+
+    5. Return value: (-1) in the case of failure, in this case, the
+       thread-local storage variable _errno_ is set.
+
+ *Semantics of read()*
+
+   * Ordinary file descriptor
+     * A call to read() never blocks the current thread and returns 0
+       indicating (EOF) when the end of file is reached.
+
+   * STDIN_FILENO (value 0) file descriptor, which represents the
+     console/terminal input.
+     * A call to read() blocks the current
+       thread while there is no bytes to be read and returns (0)
+       indicating EOF when the user types the (CTRL D) sequence. 
+
+   * Sockets file descriptors in blocking mode (default):
+     * A call to read blocks the curren thread while there is no bytes
+       available in the kernel-side buffer. When a read() call returns
+       0, it indicates that no more bytes can be read as the other
+       side (client or server) has closed the connection and  by
+       using close() or shutdown() calls.  
+
+   *Handling partial-reads* 
+
+The following algorithm reads all bytes until the buffer is filled for
+handling _partial reads_ which can happen with socket file descriptors
+in blocking mode. Example about partial read: The server-side socket
+sends 1000 bytes, then the client-side socket counterpart performs a
+read(fd_server, buffer, 1000) call. The number of bytes returned on
+the first call may be less than the buffer size, for instance it could
+be 200. Then the client-side socket would have to continue to read all
+bytes until the buffer is filled. 
+
+#+BEGIN_SRC cpp 
+   //----------------------------------------//
+   //  Inputs                                //
+   //----------------------------------------//
+
+   // Buffer length in bytes 
+   const size_t buffer_len = 400;
+   char  buffer[buffer_len];
+  
+   //----------------------------------------//
+   //  Algorithm                             //
+   //----------------------------------------//
+
+   // Pre-condition 
+   assert( bufffer_len <= SSIZE_MAX  );
+   size_t  len  = buffer_len;
+   ssize_t nr   = -1;
+   char*   pbuf = buffer; 
+
+   while(  // Stop iterations when buffer is filled.
+           len != 0  
+           // Stop interations when 'nr' is EOF, there is no more bytes left 
+           // or the socket connection has been closed. 
+           && ( nr = read(fd, pbuf, len) ) != 0 ) 
+  {
+       if(ret == -1 && errno == EINTR){ continue; } 
+       if(ret == -1) { 
+           perror(" An error has happened, check ERRNO variable. \n");
+           break;
+       }
+
+       len  = len - nr; 
+       pbuf = pbuf + nr;
+   }
+
 #+END_SRC
 
 ** Low level IO - open(), read(), write() syscall functions
