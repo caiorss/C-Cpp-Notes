@@ -9910,6 +9910,547 @@ See:
 
   + [[https://medium.com/@copyconstruct/the-method-to-epolls-madness-d9d2d6378642][The method to epoll’s madness. My previous post covered the… | by Cindy Sridharan | Medium]] 
 
+*** Poll()  multiplexed IO API 
+
+Poll is a standardized multiplexing IO API common to a wide variety of
+Unix-like operating systems, including Linux-based operating systems,
+BSD variants and MacOSX. Poll() API is able to monitor multiple
+file descriptors in a single thread without any wasteful polling. The
+API blocks the current thread for a certain amount of time and
+returns until any monitored file descriptor is ready for read or
+write IO operations. 
+
+Observations: 
+
+  * Multiplexed IO is often also called (there is no a standard terminology yet):
+    + multiplexed IO (Input/Output)
+    + asynchronous IO
+    + async IO 
+    + event-driven IO
+    + event-based IO 
+    + non-blocking IO (although, it really do blocks the current thread.)
+
+  * Poll() is able to monitor:
+    + Standard terminal IO file descriptors (STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO)
+    + socket file descriptors
+    + terminal file descriptors 
+    + anonymous pipes
+    + named pipes
+    + character device files 
+
+  * Poll() is not able to monitor file descriptor for _regular_
+    _files_. In this case, the poll() should be used alongside _inotify_
+    (Linux-only).
+
+ *Comparison with Epoll* 
+
+  + The Poll() API is less scalable and less efficient than the
+    Epoll() API since that, the Poll API requires client code
+    iterating over all monitored file descriptors in order to find
+    which ones are ready for IO operation. Despite Poll() API
+    shortcomings, the advantage of this API over its comparison
+    counterpat is the higher availability on a broad range of
+    Unix-like operating systems such as MacOSX, BSD variants, QNX and
+    so on. While Epoll API is only available on Linux kernel.
+
+ *Header* 
+
+ + #include <poll.h>
+
+ *Functions* 
+
+  + poll() => Blocks the current thread for a certain amount time
+    until one or more file descriptor is ready for IO operations. If
+    the timeout parameter is (-1), the calling thread is blocked
+    indefinitely until some IO event happens. 
+
+#+BEGIN_SRC cpp 
+   int poll(struct pollfd *fds, nfds_t nfds, int timeout);
+
+   int poll( // Array containing monitored file descriptors.   
+             // Note: Array alllocated by the caller. 
+             struct pollfd* fds     
+             // Number of monitored file descriptors                                     
+             , nfds_t         nfds    
+             // Timeout for which poll() blocks the current thread.
+             // in milliseconds. If the timeout is (-1), the current 
+             // thread is blocked indefinitely. 
+             , int            timeout                                     
+           );
+#+END_SRC
+
+ *Data Structures* 
+
+  + See: event and rvents flags at ([[https://man7.org/linux/man-pages/man2/poll.2.html][poll(2) - Linux manual page]]).
+
+#+BEGIN_SRC cpp 
+   struct pollfd {
+           // [INPUT] fd => Monitored file descriptor. 
+           // can be set to (-1) when the calling code 
+           // is no longer interested in the file descriptor. 
+           int fd;
+ 
+           // [INPUT] Flags (bitwise-OR) that selects the types of IO events that  
+           // will be monitored for this file descriptor.
+           short events;
+
+           // [OUTPUT] Flags (bitwise-OR) which contains the IO events
+           // that happened to the file descriptor. Those flags are 
+           // set by the function poll(). 
+           short revents;
+   };
+#+END_SRC
+
+ *Usage* 
+
+#+BEGIN_SRC cpp 
+    constexpr size_t nfds = 10;
+
+    // Caller allocates arrays containing the monitored file descriptors.
+    struct pollfd pollv[nfds]; 
+    memset(pollv, 0x00, sizeof(pollfd) * nfds);
+
+    // === Caller register file descriptors and events it is interested ======// 
+    // 
+
+    // Register STDIN (Standard terminal input)
+    pollv[0].fd     = STDIN_FILENO; 
+    pollv[0].events = POLLIN | POLLER | POLLHUP; 
+
+    // Register socket server 
+    pollv[0].fd     = server_socket_fd; 
+    pollv[0].events = POLLIN | POLLER | POLLHUP | POLLOUT; 
+    
+    ... .... ... ...  
+
+   //===================================================// 
+   //   Run event loop / IO-multiplexing loop           // 
+   //===================================================//
+
+   for(;;)
+   {
+      // This thread is blocked indefintely until an IO event happens.
+      int ret = poll(pollv, nfds, -1);
+
+      // --- Check return value -------//
+      if(ret == 0){
+         fprintf(stderr, " [TRACE] Timeout \n");
+         continue;
+      }
+      if(ret == -1){
+         fprintf(stderr, " [ERROR] Non recoverable error happened. Check ERRNO. Abort() \n");
+         exit(EXIT_FAILURE);
+      }
+      
+      // Iterate over IO events 
+      for(int n = 0; n < nfds ; n++)
+      {
+          auto& pfd = pollv[n];
+          // Skip elements for which any event happened. 
+          if(pfd.revents == 0){ continue; }
+
+          if(pfd.fd == STDIN_FILENO && pfd.revents & POLLIN)
+          {
+              // .... User typed something in the console. 
+              continue; 
+          }
+            
+          // A remote machine (client-side) attempts to connect to server. 
+          if(pfd.fd == server_socket_fd)
+          {
+              // .... Income request for connecting to server ... // 
+              // Register client socket 
+              continue;
+           }
+
+          // Event that happens when client socket is ready for read() operation. 
+          if(pfd & POLLIN){
+                // Read bytes from client socket file descriptor. 
+                ssize_t n = read(pfd.fd, buffer, 500);
+                if(n == 1){  perror("read() error"); exit(EXIT_FAILURE); }
+                if(n == 0){  
+                    fprintf(stderr, " [TRACE] Client socket closed connection. \n");
+                    close(pfd.fd);
+                    // The file descriptor is set to (-1) when the calling code 
+                    // is no longer interested in monitoring the descriptor. 
+                    pfd.fd = -1;
+                 }
+
+                // ....  Write to STDOUT ... // 
+                write(STDOUT_FILENO, buffer, n);
+          }
+      }
+#+END_SRC
+
+ *References* 
+
+  + [[https://man7.org/linux/man-pages/man2/poll.2.html][poll(2) - Linux manual page]]
+
+  + [[https://man.openbsd.org/poll.2][poll(2) - OpenBSD manual pages]]
+
+  + [[https://afterthoughtsoftware.com/posts/Polling-on-stdin-with-systemd][Using C poll() on stdin with systemd | Afterthought Software]]
+
+  + [[https://www.ibm.com/support/knowledgecenter/ssw_ibm_i_73/rzab6/poll.htm][Using poll() instead of select()]]
+
+*** Poll() sample code 
+
+In the following sample code, the Poll() API is used for monitoring IO
+events from standard terminal input (stdin); socket server and
+connected client sockets. Anything typed by the user on ther terminal
+is immediately forwarded to the client sockets.
+
+  + GIST with sources at:
+    + https://gist.github.com/43901ae8724abba8fdbec7f5319b19d1 
+
+File: _poll-server.cpp_ 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string> 
+  #include <vector>
+  #include <cassert> 
+  #include <cstring>  // memcpy 
+
+  // ----- Unix/Linux headers -----// 
+  #include <unistd.h>
+  #include <fcntl.h>
+  #include <sys/types.h>    
+  #include <sys/socket.h>
+  #include <netdb.h>
+  #include <limits.h>
+  #include <sys/ioctl.h>
+
+  #include <poll.h>
+
+  // -------------  MAIN() ------------------------------//
+
+  struct sresult{
+      std::string msg;
+      ssize_t     size;
+  };
+
+  sresult read_string(int fd, size_t buffer_size);
+  void    write_buffer(int fd, const void* buffer, size_t size);
+  void    write_buffer(int fd, const void* buffer, size_t size);
+  void    write_string(int fd, std::string const& text);
+
+  constexpr int UNIX_FAILURE = -1;
+  constexpr int BLOCK_INFINITE_TIMEOUT = -1;
+
+
+  int main(int argc, char** argv)
+  {
+      std::fprintf(stderr, " [TRACE] Process Unique Identifier  PID = %d \n", ::getpid());
+
+      // ======= Server configuration =========// 
+      std::uint16_t port     = 9056;
+       const char*  hostname = "0.0.0.0";
+
+      // ====== Create Socket File Descriptor =============// 
+
+       int sockfd = socket (  AF_INET       // domain:   IPv4
+                            , SOCK_STREAM   // type:     TCP 
+                            , 0             // protocol: (value 0) 
+                           );
+
+      std::fprintf(stderr, " [TRACE] sockfd = %d \n", sockfd);
+
+      // Placeholder for future error handling. 
+      // Returns (-1) on failure 
+      assert( sockfd != - 1);
+
+      // Note: t 'struct' is redundant. 
+       struct hostent* h = gethostbyname(hostname);
+       assert(h != nullptr);
+       struct sockaddr_in sa; 
+       memcpy(&sa.sin_addr.s_addr, h->h_addr, h->h_length);
+       sa.sin_family = AF_INET;
+       sa.sin_port   = htons(port); 
+
+       // ----- Bind to Port and wait for client connections ---------//
+       // Enables binding to the same address 
+       int enable_reuseaddr = 1;
+       if ( setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &enable_reuseaddr, sizeof(int)) < 0 )
+       {
+           fprintf(stderr, "Error: unable to set socket option. \n");
+           return EXIT_FAILURE;
+       }
+
+       if( ::bind(sockfd, (sockaddr *) &sa, sizeof(sa)) == -1)
+       {
+           fprintf(stderr, "Error: unable to bind socket \n");
+           return EXIT_FAILURE;
+       }
+
+      int backlog = 5;
+      assert( listen(sockfd, backlog) != UNIX_FAILURE && " Non-recoverable failure. Check errno. " );
+
+      // ================ Server Main Loop ===============//
+
+      // This heap-allocated array contains all file 
+      // descriptors that will be monitored. 
+      auto pollv = std::vector<struct pollfd>{};    
+
+      struct pollfd pfd;
+    
+      // Register STDIN file descriptor 
+      pfd.fd      = STDIN_FILENO;
+      pfd.events  = POLLIN;
+      pfd.revents = 0;
+      pollv.push_back(pfd);
+
+      // Register socket server file descriptor 
+      pfd.fd      = sockfd;
+      pfd.events  = POLLIN;
+      pfd.revents = 0;
+      pollv.push_back(pfd);
+    
+      std::cout << " [TRACE] pollv.size() = " << pollv.size() << '\n';
+
+      // ======= Server Event Loop / IO Multiplexing Loop =======//
+      //
+      for(;;)
+      {
+
+          std::fprintf(stderr, " [TRACE] Waiting IO events. \n");
+
+          // poll() Blocks the current thread until any of the file descriptors become ready 
+          // for IO (Input/Output) operations. On failure, the function returns -1 setting ERRNO.
+          // On success, the function poll() returns the number of file descriptors (nfds)
+          // ready to be written or read. 
+          // 
+          int nfds = ::poll( &pollv[0], pollv.size(), BLOCK_INFINITE_TIMEOUT);
+          std::fprintf(stderr, " [TRACE] File descriptors ready. OK => nfds = %d \n", nfds);        
+        
+          if(nfds == UNIX_FAILURE)
+          {
+              std::fprintf(stderr, " [ERROR] errno = %d / %s \n", errno, strerror(errno) );
+              exit(EXIT_FAILURE);
+          }
+
+          assert(nfds > 0 && "Nfds supposed to be greater than zero.");
+
+          // Iterate over ready file descriptors 
+          for(auto& pf : pollv)
+          {   
+              // Skip entries for which there is no IO event.          
+              if(pf.revents == 0){ continue; }
+
+              // Event that happens when user types something in the console.
+              if(pf.fd == STDIN_FILENO)
+              {
+                  std::string line;
+                  std::getline(std::cin, line);
+                  std::fprintf(stdout, " [EVENT] User entered: %s \n", line.c_str());
+
+                  // Send STDIN message to all connected socket clients.
+                  for(int i = 2; i < pollv.size(); i++){
+                      int fd = pollv[i].fd;
+                      if(fd == -1){ continue; }
+                      write_string(fd, " [STDIN] " + line + "\n");
+                  }
+                
+                  // Skip the parts below this statement. 
+                  continue;   
+              }
+
+              // Event happens when a socket client attempts to connect. 
+              // // if(pf.fd == sockfd && ((pf.revents & POLLIN) == POLLIN)  )
+              if( pf.fd == sockfd )
+              {   
+                  sockaddr_in client_sa;     
+                  socklen_t addrlen = sizeof(sockaddr_in);
+                  int client_fd = accept(sockfd, nullptr, nullptr);
+
+                  //if(client_fd == UNIX_FAILURE){ break; }
+                  assert( client_fd != UNIX_FAILURE && " Non recoverable failure. \n" );
+
+                  std::fprintf(stderr, " [TRACE] Received client connection => client_fd = %d \n", client_fd);     
+
+                  // Register client socket file descriptor 
+                  struct pollfd pfd;
+                  pfd.fd      = client_fd;
+                  pfd.events  = POLLIN | POLLHUP;
+                  pfd.revents = 0;
+                  pollv.push_back(pfd);            
+
+                  // Greet client socket
+                  write_string(client_fd, " [SERVER] Hi, client socket. Welcome to the server. \n\n");
+
+                  continue;
+              }
+
+              // Event that happens when any client socket sends a message.
+              if(pf.revents & POLLIN)
+              {
+                  auto [msg, size] = read_string(pf.fd, 500);            
+                  assert( size >= 0 && "  Number of bytes returned supposed to be grater or equal to zero " );
+
+                  // Socket returns 0 bytes when disconnected 
+                  if(size == 0){
+                      std::fprintf(stdout, " [EVENT] Client socket fd = %d closed connection \n", pf.fd);
+                      // Disable file descriptor 
+                      close(pf.fd);
+                      pf.fd = -1;
+                      continue;
+                  }
+                  std::fprintf(stdout, " [EVENT] fd = %d ; message = %s ", pf.fd, msg.c_str());
+                
+                  write_string(pf.fd, "\n [ECHO] fd = " + std::to_string(pf.fd) + " / " + msg + "\n");
+                  continue;
+              }
+
+          } // ---- End of for() pf iterations --------//
+
+      } // -------- End of server pf loop -----------------------//
+
+      close(sockfd);
+      return 0;
+  }
+
+      // ------------------------------------------------------//
+      //          I M P L E M E N T A T I O N S                //
+      //-------------------------------------------------------//
+
+  sresult
+  read_string(int fd, size_t buffer_size)
+  {
+      // Create a string initialized with null characters 
+      std::string str(buffer_size, 0x00);
+      ssize_t n  = read(fd, &str[0], buffer_size);
+      if(n > 0){ str.resize(n); }
+      return sresult{ str, n };
+  }
+
+
+  void write_buffer(int fd, const void* buffer, size_t size)
+  {
+     // Pre-condition 
+     assert( size <= SSIZE_MAX  );
+     size_t  len  = size;
+     ssize_t nr   = -1;
+     auto pbuf = reinterpret_cast<const std::uint8_t*>(buffer); 
+
+    while(  len != 0 && ( nr = write(fd, pbuf, len) ) != 0 ) 
+    {
+        if(nr == -1 && errno == EINTR){ continue; } 
+        if(nr == -1) { 
+            throw std::runtime_error("An error has happened, check ERRNO ");
+            break;
+        }
+        len  = len - nr; 
+        pbuf = pbuf + nr;
+     }
+  }
+
+  void write_string(int fd, std::string const& text)
+  {
+      write_buffer(fd, text.data(), text.length());
+  } 
+#+END_SRC
+
+Building: 
+
+#+BEGIN_SRC sh 
+   $ g++ poll-server.cpp -o poll-server.bin -std=c++1z -Wall -Wextra -g -O0
+#+END_SRC
+
+Running server in terminal 1: 
+
+#+BEGIN_SRC sh 
+   $ >> ./poll-server.bin 
+   [TRACE] Process Unique Identifier  PID = 434583 
+   [TRACE] sockfd = 3 
+   [TRACE] pollv.size() = 2
+   [TRACE] Waiting IO events. 
+   [TRACE] File descriptors ready. OK => nfds = 1 
+   [TRACE] Received client connection => client_fd = 4 
+   [TRACE] Waiting IO events. 
+   [TRACE] File descriptors ready. OK => nfds = 1 
+   [TRACE] Received client connection => client_fd = 5 
+   [TRACE] Waiting IO events. 
+   [TRACE] File descriptors ready. OK => nfds = 1 
+   [EVENT] fd = 4 ; message = I am the client from the terminal 1
+   [TRACE] Waiting IO events. 
+   [TRACE] File descriptors ready. OK => nfds = 1 
+    [EVENT] fd = 5 ; message = I am the client from the terminal 2
+   [TRACE] Waiting IO events. 
+  This message typed in the server terminal (stdin) will be set to all client sockets.
+   [TRACE] File descriptors ready. OK => nfds = 1 
+    [EVENT] User entered: This message typed in the server terminal (stdin) will be set to all client sockets. 
+   [TRACE] Waiting IO events. 
+   [TRACE] File descriptors ready. OK => nfds = 1 
+   [EVENT] fd = 4 ; message = Turn on valve control system right away.
+   [TRACE] Waiting IO events. 
+   [TRACE] File descriptors ready. OK => nfds = 1 
+    [EVENT] fd = 5 ; message = Shutdown colling system right away.
+   [TRACE] Waiting IO events. 
+  Operation failure (typed by user)
+   [TRACE] File descriptors ready. OK => nfds = 1 
+    [EVENT] User entered: Operation failure (typed by user) 
+   [TRACE] Waiting IO events. 
+   [TRACE] File descriptors ready. OK => nfds = 1 
+   [EVENT] fd = 4 ; message = Typed CTRL + C after this message
+   [TRACE] Waiting IO events. 
+   [TRACE] File descriptors ready. OK => nfds = 1 
+    [EVENT] Client socket fd = 4 closed connection 
+   [TRACE] Waiting IO events. 
+   [TRACE] File descriptors ready. OK => nfds = 1 
+   [EVENT] fd = 5 ; message = Type Ctrl+C for disconnecting from server (terminal 2)
+   [TRACE] Waiting IO events. 
+   [TRACE] File descriptors ready. OK => nfds = 1 
+    [EVENT] Client socket fd = 5 closed connection 
+   [TRACE] Waiting IO events. 
+
+#+END_SRC
+
+Running netcat client (TCP client socket) in terminal 2: 
+
+#+BEGIN_SRC sh 
+  $ nc localhost 9056
+   [SERVER] Hi, client socket. Welcome to the server. 
+
+  I am the client from the terminal 1
+
+   [ECHO] fd = 4 / I am the client from the terminal 1
+
+   [STDIN] This message typed in the server terminal (stdin) will be set to all client sockets.
+  Turn on valve control system right away.
+
+   [ECHO] fd = 4 / Turn on valve control system right away.
+
+   [STDIN] Operation failure (typed by user)
+  Typed CTRL + C after this message
+
+   [ECHO] fd = 4 / Typed CTRL + C after this message
+
+  ^C
+
+#+END_SRC
+
+Running netcat client (TCP client socket) in terminal 3: 
+
+#+BEGIN_SRC sh 
+  $ nc localhost 9056
+   [SERVER] Hi, client socket. Welcome to the server. 
+
+  I am the client from the terminal 2
+
+   [ECHO] fd = 5 / I am the client from the terminal 2
+
+   [STDIN] This message typed in the server terminal (stdin) will be set to all client sockets.
+  Shutdown colling system right away.
+
+   [ECHO] fd = 5 / Shutdown colling system right away.
+
+   [STDIN] Operation failure (typed by user)
+  Type Ctrl+C for disconnecting from server (terminal 2)
+
+   [ECHO] fd = 5 / Type Ctrl+C for disconnecting from server (terminal 2)
+
+  ^C
+
+#+END_SRC
 *** Epoll() multiplexed IO API 
 
 Epoll is a highly scalable and efficient Linux-only multiplexed IO API
