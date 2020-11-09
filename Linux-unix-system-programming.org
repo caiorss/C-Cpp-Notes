@@ -4410,11 +4410,31 @@ Running on Android vai adb shell:
 
   + [[http://www.edenwaith.com/blog/index.php?p=67][Edenwaith : Blog - Calculating Free Space on macOS]]
 
-** Low level IO sycalls overview 
+** Low level open, read, write, close - IO sycalls overview 
 
-C-Library functions which encapsulates file-related systems calls.
+The open(), read(), write() and close() system calls are the hallmark
+of Unix-based operating system as they embody the concept "every is a
+file" or "everything is a file descriptor". Those fundamental system
+calls are able to operate over any type of file descriptors such as
+regular files; symbolic links; in-memory files; anonymous pipes; named
+pipes; sockets; unix domain sockets IPC (Inter-Process Communication);
+character device files representing hardware; block device files, which
+represents non-volatile storage device and so on.
 
-Headers: 
+It is worth noting that, those system-calls are not used directly by
+user-space applications. Instead, applications uses C function
+wrappers provided by the CRT (C Runtime Library), which is GLIBC in
+most Linux distributions. 
+
+  *Special File Descriptors* 
+
+  + STDOUT_FILENO => File descritor for stdout (process standard output)
+
+  + STDERR_FILENO => File descritor for stderr (process standard error output)
+
+  + STDIN_FILENO  => File descritor for stdin (process standard input)
+
+  *Headers* 
 
 #+BEGIN_SRC cpp 
     #include <sys/types.h>
@@ -4422,12 +4442,6 @@ Headers:
     #include <fcntl.h>
     #include <unistd.h>
 #+END_SRC
-
-  *Special File Descriptors* 
-
-  + STDOUT_FILENO => File descritor for stdout (process standard output)
-  + STDERR_FILENO => File descritor for stderr (process standard error output)
-  + STDIN_FILENO => File descritor for stdin (process standard input)
 
   *Functions* 
 
@@ -4447,7 +4461,8 @@ Headers:
    int open(const char *pathname, int flags);
 #+END_SRC
 
-  + creat() => Create file
+  + creat() => Create file. Note: the name is not misspelled. There is
+    really a missing 'e' letter. 
     + Doc: $ man 2 creat 
 
 #+BEGIN_SRC cpp 
@@ -4458,7 +4473,22 @@ Headers:
   + read() => Read bytes from a file descriptor into a buffer, returning the
     number of bytes read. If there is an error, the functions returns
     (-1) setting the global variable _errno_.
-    + Doc: $ man 2 read 
+    + Doc: $ man 2 read
+
+    + Note: If the number of bytes returned is zero, it means that no
+      more bytes can be read in the case of file or that socket
+      connection was closed by the counterpart (socket server or client).
+
+    + Note: The number of bytes returned can smaller than the buffer
+      size in the case of socket file descriptors (partial read).
+
+    + Note: The buffer argument can be a pointer to any POD (Plain-Old
+      Data) type allocated by the calling code. A POD type, does not
+      have any internal pointers or STL containers.
+
+    + Note: A negative return value (-1), as in most Unix APIs, indicates
+      an error. In order to get more information about the error, the
+      calling code must check the _errno_ global variable. 
 
 #+BEGIN_SRC cpp 
   ssize_t read(int fd, void *buf, size_t count);
