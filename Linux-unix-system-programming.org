@@ -8774,7 +8774,6 @@ The following limitation for objects allocation are noteworthy:
   + [[https://users.cs.cf.ac.uk/Dave.Marshall/C/node27.html][IPC:Shared Memory]] 
 
 
-
 *** Sample Code 
 
 This sample code aims to experiment POSIX shared memory
@@ -9120,7 +9119,17 @@ Common TCP/IP Ports:
 
   + [[https://blog.myhro.info/2017/01/how-fast-are-unix-domain-sockets][How fast are Unix Domain Sockets?]]
 
-*** BSD Socket APIs
+*** BSD Socket API 
+
+The BSD socket API is the reference-implementation for network sockets
+inter-process communication mechanism, which powers the internet. The
+BSD socket API was initially implemented on BSD Unix and nowadays is
+used by the most Unix-based operating systems, namely, Linux,
+BSD-variants (FreeBSD, NetBSD, OpenBSD) and MacOSX. The Windows
+sockets (Winsocks) implementation is also based on BSD sockets API,
+although one of the main differences is that on the Winsocks API,
+sockets are not file descriptors and Unix read(),/write() calls or
+windows equivalent APIs cannot be used with sockets.
 
 Headers: 
    + #include <sys/types.h>         
@@ -9143,7 +9152,15 @@ Functions for creating and disposing sockets:
 
    // Usage for TCP/IPv4 
    int sockfd = socket(AF_INET, SOCK_STREAM, 0); 
-   if(sockfd == -1){ printf("Error: failed to create a socket connect."); abort(); }
+
+   // Placeholder for future error handling 
+   assert( sockfd != -1 && "Unable to create socket." );
+
+   // Error handling: 
+   if(sockfd == -1){ 
+       perror("Error: failed to create a socket connect. Check errno"); 
+       exit(EXIT_FAILURE);
+   }
 
    // Usage for UDP/IPv4 
    int sockfd = socket(AF_INET, SOCK_DGRAM, 0); 
@@ -9170,7 +9187,8 @@ Functions for setting a socket as client-socket:
    int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
 #+END_SRC
 
-Functions for setting a socket as a  server socket.
+
+ *Functions for setting up a socket as a server socket* (aka passive  socket, listening socket)
 
   + _bind()_ [SOCKET SERVER] => Bind a given port for listening income
     connections. (used for socket servers)
@@ -9209,24 +9227,87 @@ Functions for setting a socket as a  server socket.
        int setsockopt(int sockfd, int level, int optname, const void *optval, socklen_t optlen);
 #+END_SRC
 
+ *Functions for sending and receiving messages* 
 
-Functions for sending and receiving messages: 
+Functions send, and recev works on all implementations of sockets BSD
+Sockets, used by Unix-based operating systems, and Windows sockets. 
 
   + send() => Send a buffer to a socket.
     + Doc: $ man send 
 
 #+BEGIN_SRC cpp 
-   ssize_t send(int sockfd, const void *buf, size_t len, int flags);
+   // Returns number of bytes received 
+   ssize_t send(  int         sockfd  // Socket file descriptor 
+                , const void* buf     // Pointer to buffer (any POD - Plain Old Data)
+                , size_t      len     // Buffer length (or size) in bytes 
+                , int         flags   // Flags (bitwise OR flags)
+               );
 #+END_SRC
 
-  + recv() => Receive a message from a socket.
-    + Doc: $ man recv 
+  * recv() => Receive a message from a socket. Read 'len' bytes from
+    socket and store data in a buffer. Note: the buffer argument is a
+    pointer to any POD (Plain-Old Data) type, contiguos allocated data
+    without any internal pointer. 
+
+    + Doc: $ man recv
+
+    + This function returns the number of bytes read which the maximum
+      value is the buffer length.
+
+      + The function returns (-1) on error and sets the _errno_ global
+        variable for indicating the failure.
+
+      + The return value (0) indicates that the connection was
+        closed either by the current calling code with close() function
+        applied on the socket file descriptor or by the counterpart
+        socket located in the remote host.
+
+      + If a recev() call is made, and the counterpart socket did not
+        send any data with send() or write(), the call to recev()
+        blocks the current thread if the socket file descriptor is set
+        in blocking mode (default).
+
+      + A call to recev() may not receive all bytes available, even
+        though the peer socket has send a message larger than the
+        buffer size. This situation is called partial-read that must
+        be handled by the calling code.  
 
 #+BEGIN_SRC cpp 
-  ssize_t recv(int sockfd, void *buf, size_t len, int flags);
+  ssize_t recv(  int       sockfd   // Socket file descriptor 
+                , void*    buffer   // Pointer to buffer (POD type) 
+                , size_t   len      // Buffer length or size in bytes 
+                , int      flags    // Flags (bitwise OR flags
+               );
 #+END_SRC
 
-Functions for dealing with network address: 
+Functions read(), write() also works with sockets file descriptors.
+However this feature is not portable to windows sockets
+implementation. 
+
+  + read() => Similar as recev(), but it is only available with
+    BSD-style. The usage of read() is not portable to Windows
+    sockets. 
+
+#+BEGIN_SRC cpp 
+   ssize_t read(  int    fd       // File descriptor or socket file descriptor 
+                , void*  buffer   // Pointer to buffer (any POD type)
+                , size_t size     // Buffer size in bytes 
+               );
+#+END_SRC
+
+ + write() => Similar to write(), but not portable to Windows
+   sockets. It writes data from buffer to any type of file
+   descriptor and returns the number of bytes sent to the peer
+   socket or returns (-1) on failure setting _errno_ global variable. 
+
+#+BEGIN_SRC cpp 
+    ssize_t write( int          fd      // File descriptor or socket file descriptor 
+                  , const void* buffer  // Pointer to buffer (any POD type)
+                  , size_t      size    // Buffer size in bytes 
+                  );
+#+END_SRC
+
+ *Functions for resolving hostnames (DNS Query)* 
 
   + gethostbyname()
     + Translate hostname or IPv4 into IPv4 address. This function
@@ -9678,6 +9759,48 @@ Running client: (netcat tool)
    ^C
 #+END_SRC
 *** Simple Unix-domain socket echo server 
+
+Unix domain-socket (not confuse with BSD socket) is an inter-process
+mechanism that allows usage of socket communication on local machine
+with less overhead than TCP/IP socket. A significat difference between
+IP sockets and Unix sockets is that unlike IP-based sockets, Unix
+domain sockets use file path or abstract namespace not bound to file
+system as address instead of 
+
+The most important usages of Unix-domain sockets are: 
+
+  + Implementing network transparency.
+
+  + IPC - Inter Process Network Communication, 
+
+  + Privilege separation (Security)
+
+
+  *Known usage* 
+
+  * _DBUS_ - Linux DBUS 
+
+  * _X11_ - X Windows Systems uses Unix Domain Sockets locally for
+    enabling network transparency. A code using Unix Domain socket
+    needs does not need many changes for using IP-based sockets and
+    operate over the network.
+
+  * _Docker Container Engine_ - Docker uses Unix Domain Sockets for
+    privilege separation and network transparency. The docker damenon,
+    running with root (administrative) privilege and the docker
+    client, running without administrative privilege, communicate via
+    Unix domain sockets on local machine and or via TCP/IP sockets
+    over the ĩnternt.
+
+  *See also* 
+
+  + [[https://man7.org/linux/man-pages/man7/unix.7.html][unix(7) - Linux manual page]]
+
+  + [[https://en.wikipedia.org/wiki/Unix_domain_socket][Unix domain socket - Wikipedia]]
+
+  + [[https://serverfault.com/questions/124517/what-is-the-difference-between-unix-sockets-and-tcp-ip-sockets][networking - What is the difference between Unix sockets and TCP/IP sockets? - Server Fault]]
+
+  *Sample Code* 
 
 GIST:  
   + https://gist.github.com/ac308ab6a4cd8d92f02b4f9baeb910f3
