@@ -9440,6 +9440,119 @@ Functions that converts from network to host endianess:
    #define h_addr h_addr_list[0] /* for backward compatibility */
 #+END_SRC
 
+*** Network Programming Pitfalls [DRAFT]
+
+There are many pitfalls and edge-cases that a network-related can fall
+in to. This section aims to outline those issues that affect network
+code.  
+
+   * _Lack of error checking_ 
+     + => Most BSD-socket APIs and Unix APIs return (-1) when an error
+       happens and sets the errno global variable. If error is not
+       properly checked, the calling code may be subject to silent and subtle
+       failure without any warning. During the development assertions, assert(),
+       statements can be used as temporary placeholders for error
+       checking. 
+
+   * _TCP message boundary_
+     + => The TCP protocol does not have message boundary, instead TCP
+       is a byte stream oritend protocol. Threfore, there is no way to
+       determine where a message begins or ends. For instance, if a
+       sender sends three messages of 100 bytes via send() or write()
+       functions and the peer socket attempts to read using three
+       calls to read() or recev() using 1000 bytes long buffer, only a
+       single a message will be received and the second call read() or
+       recev() may block the current thread.
+
+     + Solutions:
+
+       + => Use a fixed size message (buffer with constant lenght) on
+         both communication endpoints.
+
+       + => Use custom delimiters for distinguishing the beginning and
+         end of messages. 
+
+       + => Send messages prefixed with number of bytes to be read.
+
+       + => Replace TCP with [[https://en.wikipedia.org/wiki/Stream_Control_Transmission_Protocol][SCTP]] (Stream Control Transmission
+         Protocol) which combines the best features of TCP and UDP. It
+         provides both the TCP realibility and UDP message-boundary
+         feature. 
+
+   * _Partial-Reads_
+     + => Socket functions such recev() or read() may return the
+       number of bytes read smaller than the buffer size, even though
+       there is still bytes avaiable and data sent has a fixed size
+       agreed by both socket endpoints. This edge-case scenario is called
+       _partial-read_, a robust network code should be keeping reading
+       the file descriptor until the buffer is filled or the
+       connection is closed. 
+ 
+   * _Partial-Writes_
+     * => Functions write() or send() may also be affected by similar
+       edge-case to partial-reads and the number of bytes written
+       returned by write() or send() may be smaller than the buffer
+       size. In this case, the calling code, should be keeping sending
+       the remaining parts of the buffer until all data sent over the
+       network. 
+
+   * _Endianess_ (Byte order for numeric types)
+     + => In order to proper exchange a numeric type, both ends of a
+       connection must agree about data endianess, or byte-order
+       representation, since different processor architectures may have
+       different byte order data representation of numeric types. In
+       order to avoid a data being read in a wrong way, both sides of
+       the connection must use the same endianess, which is the
+       _network-byte-order_ (big endian). So, a numeric value in machine
+       endianess (default) should be converted to _network-byte-order_
+       (big-endian) before being sent to the over the network, or
+       written to the file descriptor. And a numeric value received
+       from the network (socket file descriptor) must be converted
+       _from network-byte-order_ to the current machine endianess. 
+
+   * _Fix-width integers_ 
+     + The fundamental integer types in C and C++, int, long, short,
+       long long are not guaranteed to have the same size in all
+       machine. For an instance, on Windows NT 64 bits the type 'long'
+       has 32 bits, while on Linux, the type 'long' has 64 bits. If a
+       socket server running on Linux attempts to send a value with
+       long type to a client socket running on a Windows machine, the
+       value will be interpreted in a incorrect way in the Windows
+       machine. Data misinterpretation such as the previous mentioned
+       can be avoided by using fixed width integers (uint8_t,
+       uint16_t, uint32_t, uint64_t, ...), which are guaranteeed to
+       have the same size in all machines, instead of fundamental
+       integer types.
+
+     + Summary: User fix-width integers (headers: <cstdint> for C++ or
+       <stdint.h> for C) instead of fundamental types for avoiding
+       data interpretation disagreement.
+
+   * _Sending and receiving structured data__
+     * Structs or C++ classes should not be sent or received directly
+       via read(), recev(), write() or send() functions due to many
+       issues related to ABI, machine endianess, type-sizes and
+       message-boundary. The first shortcoming is that the buffer
+       agument of the mentioned functions can only be a pointer to
+       continguous allocated type without any internal pointer. Other
+       shortcoming are the machine endianess and compilers ABIs
+       (Application Binary Interfaces) which may lead to the data to
+       be interpreted in an incorrect way.
+
+     * Solution: Convert and serialize each member of struct or class
+       to an external data representation agreed by both connection
+       endpoints.
+
+ *Further Reading* 
+
+  + [[https://stackoverflow.com/questions/5660070/send-a-struct-over-a-socket-with-correct-padding-and-endianness-in-c][tcp - Send a struct over a socket with correct padding and endianness in C - Stack Overflow]]
+
+  + [[https://developer.ibm.com/tutorials/l-sockpit/][Five pitfalls of Linux sockets programming – IBM Developer]]
+
+  + [[https://barrgroup.com/embedded-systems/how-to/big-endian-little-endian][How Endianness Works: Big-Endian vs. Little Endian]] 
+
+  + [[https://www.openmymind.net/2012/1/12/Reading-From-TCP-Streams/][Reading from TCP streams]]
+
 *** Command Line Tools for Network Debugging
 
  *Display all listening TCP sockets and open ports* (socket servers)
@@ -9461,6 +9574,15 @@ Functions that converts from network to host endianess:
    tcp6       0      0 :::9080                 :::*                    LISTEN      100272/java    
 #+END_SRC
  
+  *List all UDP connections* 
+
+#+BEGIN_SRC 
+  $ netstat --udp
+  Active Internet connections (w/o servers)
+  Proto Recv-Q Send-Q Local Address           Foreign Address         State      
+  udp        0      0 localhost.locald:bootpc _gateway:bootps         ESTABLISHED
+#+END_SRC
+
   *Display all Listening TCP/IP, UDP/IP and Unix Domain Sockets* 
 
 #+BEGIN_SRC 
@@ -9488,6 +9610,7 @@ Functions that converts from network to host endianess:
    unix  2      [ ACC ]     STREAM     LISTENING     36623    -                    @/tmp/dbus-00sao3pj
 
 #+END_SRC
+
  
   *Show ARP table* 
 
