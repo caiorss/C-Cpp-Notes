@@ -9307,6 +9307,120 @@ implementation.
                   );
 #+END_SRC
 
+ *Endianess conversion for binary data exchange of numeric types*
+
+One of the pitfalls of binary data exchange is the endianess, the
+order which bytes of numeric types are placed in the memory. A code
+assuming that the server and client side have the same endianess may
+eventually fail and iterpret a numeric type in a incorrect way if the
+server or client runs in a machine (computer architecture) with a
+different endianess. In order to both socket communication endpoints
+interpret the data in a correct way, both have to agree about the data
+representation (_external representation_) which is the _big-endian_ or
+_network-byte-order_. See also: [[https://developer.ibm.com/technologies/systems/articles/au-endianc/][(IBM endian-independent code]])
+
+The BSD socket API provides the following functions for converting
+between machine (host) and network-order endianess of numeric
+types. Note: those functions are not portable and are neither part of
+C standard nor part of POSIX standard. 
+
+Header: 
+ + #include <arpa/inet.h>
+
+Functions that converts from host to network endianess: 
+
+   + _htonl()_ => Conversion from host (local machine) to
+     network-byte-order endianess. It takes a number in local machine
+     byte-order and returns a number with network-byte-order (big
+     endian) endianess. This function should be used whenever the
+     calling code needs to write to the network via write() or send()
+     calls. 
+
+     + Mneumonic: h-to-n-l (Host to network long)
+
+#+BEGIN_SRC cpp        
+     uint32_t htonl(uint32_t hostlong);
+
+     // --------- Usage example ------------// 
+     //                                     // 
+
+     // ==> Number in host (local machine) endianess. 
+     uint32_t message_size = 500; 
+     // ==> Number in network-byte-order (big-endian)
+     uint32_t data = htonl(message_size); 
+ 
+    if( send(sockfd, &data, sizeof(uint32_t), 0) == -1 )
+    { /* Handler error */ }
+
+   // OR: 
+
+    if( write(sockfd, &data, sizeof(uint32_t)) == -1 )
+    { /* Handler error */ }
+#+END_SRC
+
+  + _htons()_ => Conversion from host to network-byte-order.
+    + Mneumonic: h-to-n-s => (Host to network short)
+   
+#+BEGIN_SRC cpp 
+   uint16_t htons(uint16_t hostshort);
+
+   // --------- Usage Example -------------// 
+   // 
+
+    // ==> Number in host (local machine) endianess. 
+     uint16_t message_size = 500; 
+     // ==> Number in network-byte-order (big-endian)
+     uint16_t data = htonl(message_size); 
+ 
+    if( send(sockfd, &data, sizeof(uint16_t), 0) == -1 )
+    { /* Handler error */ }
+#+END_SRC
+
+Functions that converts from network to host endianess: 
+
+  + _ntohl()_ => Takes a number in network-endianess as argument and
+    returns a number in local-machine endiness. This funtion should be
+    used whenever the calling code is reading data from the network
+    via read() or recev() calls. 
+    + Mneumonic: n-to-h-l (Network to Host Long)
+
+#+BEGIN_SRC cpp 
+   uint32_t ntohl(uint32_t netlong);
+  
+   // ------ Usage example / Reading data from network  ----------// 
+   uint32_t buffer; 
+
+   // Buffer variable will receive the data network-byte-order 
+   // or big-endian.
+   if( recv(sockfd, &buffer,  sizeof(uint32_t), 0 ) == -1 )
+   {  /** Herror handling ... here */  }
+
+   // OR: 
+   if( read(sockfd, &buffer,  sizeof(uint32_t) ) == -1 )
+   {  /** Herror handling ... here */  }
+
+   // Number in host endiness (byte order)
+   uint32_t message_size = nothl(buffer);
+
+   std::fprintf(" Message size in bytes: %u \n", message_size);
+#+END_SRC
+
+  + _ntohs()_ => Similar to ntohl, but uses with short type, or 16 bit
+    integers.
+    + Mneumonic: n-to-h-s (Network to Host Short) 
+
+#+BEGIN_SRC cpp 
+  uint16_t ntohs(uint16_t netshort);
+
+  // ----------- Usage -----------------// 
+
+   uint16_t number; 
+   if( recv(sockfd, &number,  sizeof(uint32_t), 0 ) == -1 )
+   {  /** Herror handling ... here */  }
+  
+   number = ntohs(number);
+#+END_SRC
+
  *Functions for resolving hostnames (DNS Query)* 
 
   + gethostbyname()
