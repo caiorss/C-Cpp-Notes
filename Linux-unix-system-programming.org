@@ -7931,7 +7931,7 @@ Manipulate the watched directories from terminal emulator 2:
    $ >> echo "change file" >> ~/Downloads/testing-files2.txt
 #+END_SRC
 
-** Memory Mapped Files - mmap 
+** mmap - Memory Mapping 
 *** Overview 
 
 File mapping is an operating system mechanism which maps a disk file
@@ -8674,6 +8674,414 @@ Running:
                Machine = 0x8664 
     Number of sections = 7 
 #+END_SRC
+** mmap - Executing and machine code at runtime 
+
+The _mmap_ posix system call and the APIs _mprotect_ can be used for
+allocating memory with executable permission which allows writing and
+executing machine code at runtime. This feature is widely used by JIT
+(Just-In-Time) compilers of interpreted languages such as Julia and 
+Javascript Engine V8, from Chrome browser, for improving the
+runtime performance and reducing the interpretation overhead.
+
+Additional notes related to: mmap, assembly and machine code.
+
+  + Note 1: The function mmap is also available on other Unix-like
+    operating systems such as MacOSx, BSD-variants (FreeBSD, OpenBSD,
+    NetBSD, DragonFly BSD) and so on.
+
+  + Note 2: The the assembly x64 ISA (x86-64 AMD or Intel) is the same
+    on all operating system that supports this ISA (Instruction Set
+    Architecture). However, an object-code (machine code) from one
+    operating system will not be compatible with another different
+    operating system due the difference between the object-code binary
+    format (Linux uses ELF; MacOSX uses MachO; Windows uses PE32);
+    _system calls_; _calling conventions_ and system shared libraries.
+
+  + Note 3: On Windows NT kernels the equivalent functions are:
+    [[https://docs.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualalloc][VirtualAlloc]] (equivalent to mmap) and [[https://docs.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualprotect][VirtualProtect]] (mprotect).
+
+  + Note 4: Most Unix system uses the System V calling convention for
+    x86-64 bits while Windows NT 64 bits uses a different callng
+    convention. 
+
+  *Sample Code*
+
+The following sample application mmap-loader.cpp loads machine code
+(compiled assembly) for two functions, at runtime. The machine codes
+were extract from compiled C application with objdump GNU binutils
+tool.
+
+GIST (Sources files): 
+
+ + https://gist.github.com/4baf7dab5728d0e8f5a475967c0846b5
+
+File: _mmap-loader.cpp_
+
+#+BEGIN_SRC cpp 
+   // =======>>> Load and execute machine code at runtime with mmap <<<======
+  #include <iostream>
+  #include <string>
+  #include <fstream>
+  #include <sstream>
+  #include <cstring>
+  #include <cstdlib>
+  #include <vector>
+
+  #include <sys/mman.h>
+
+  using byte = uint8_t;
+
+  /** Load machine code into process virtual memory */
+  void* load_machine_code(byte* buffer, std::size_t size);
+  void* load_machine_code(std::vector<byte> const& data);
+
+  std::vector<byte>
+  hexstr_to_bytes(std::string const& hexcode);
+
+  template<typename T>
+  inline T load_mcode(std::vector<byte> const& data)
+  {
+       return reinterpret_cast<T>( load_machine_code(data) );
+  }
+
+
+  int main(int argc, char** argv)
+  {
+      std::puts("\n ====== Load add_numbers from machine code ================");
+      // 'extern' means that the variable will be resolved by the Linker
+      extern std::string add_numbers_str;
+
+      // Type alias for function pointer
+      using add_numbers_t = int (*) (int, int);
+
+      auto add_numbers_code = hexstr_to_bytes(add_numbers_str);
+
+      // Load machine code for function add_numbers() at runtime.
+      auto add_numbers  = load_mcode<add_numbers_t>(add_numbers_code);
+
+      std::cout << " [RESULT] add_numbers(20, 100) = " << add_numbers(20, 100) << '\n';
+      std::cout << " [RESULT] add_numbers(206, 782) = " << add_numbers(206, 782) << '\n';
+
+
+      std::puts("\n ======== Load factorial() from machine code =============");
+      extern std::vector<byte> factorial_code;
+
+      // Function pointer alias
+      using factorial_t = int (*) (int);
+      auto factorial_func = load_mcode<factorial_t>(factorial_code);
+
+      std::cout << " [RESULT] factorial(5) = " << factorial_func(5) << '\n';
+      std::cout << " [RESULT] factorial(6) = " << factorial_func(6)  << '\n';
+      std::cout << " [RESULT] factorial(7) = " << factorial_func(7)  << '\n';
+
+      std::fprintf(stdout, " [TRACE] Process terminated gracefully Ok. \n");
+      return 0;
+  }
+
+  //===========================================================//
+  //          I P L E M E N T A T I O N S                      //
+  //===========================================================//
+
+  void* load_machine_code(const byte* buffer, std::size_t size)
+  {
+      // Create anonymous mapping (not backed by file), a memory that will
+      // be later marked as executable.
+      void* pmap = ::mmap(  nullptr
+                          , size
+                          , PROT_READ | PROT_WRITE
+                          , MAP_PRIVATE | MAP_ANONYMOUS
+                          , -1, 0 );
+
+      if(pmap == MAP_FAILED){ throw std::runtime_error("Failed create memory map");  }
+          // Copy machine code to memory map
+      std::memcpy( pmap, buffer, size);
+
+      // Mark memory as executable, but not writable.
+      if( mprotect(pmap, size, PROT_READ | PROT_EXEC ) == -1 )
+          throw std::runtime_error("Faile to change memory protection flags");
+
+      return pmap;
+  }
+
+
+  std::vector<byte>
+  hexstr_to_bytes(std::string const& hexcode)
+  {
+      std::vector<byte> bytes;
+      bytes.reserve(hexcode.size());
+      char* token = strtok((char*) hexcode.data(), "\\x");
+      while( token != nullptr ){
+          char byte = (char) strtol(token, nullptr, 16);
+          // ss << byte;
+          bytes.push_back(byte);
+          token  = strtok(nullptr, "\\x");
+      }
+      return bytes;
+  }
+
+  void* load_machine_code(std::vector<byte> const& data)
+  {
+      return load_machine_code(&data[0], data.size());
+  }
+
+  // int add_numners(int x, int y)
+  //---------------------------------------------------
+  // 0000000000401152 <add_numbers>:
+  //   401152:       55                      push   %rbp
+  //   401153:       48 89 e5                mov    %rsp,%rbp
+  //   401156:       48 89 f8                mov    %rdi,%rax
+  //   401159:       48 01 f0                add    %rsi,%rax
+  //   40115c:       5d                      pop    %rbp
+  //   40115d:       c3                      retq
+  //
+  // Machine encoded as ASCII string
+  std::string add_numbers_str = "\\x55\\x48\\x89\\xe5\\x48\\x89\\xf8\\x48\\x01\\xf0\\x5d\\xc3";
+
+  std::vector<byte> factorial_code = {
+            0x55                                      // push   rbp
+          , 0x48, 0x89, 0xe5                          // mov    rbp,rsp
+          , 0x89, 0x7d, 0xec                          // mov    DWORD PTR [rbp-0x14],edi
+          , 0xc7, 0x45, 0xfc, 0x01, 0x00, 0x00, 0x00  // mov    DWORD PTR [rbp-0x4],0x1
+          , 0xc7, 0x45, 0xf8, 0x01, 0x00, 0x00, 0x00  // mov    DWORD PTR [rbp-0x8],0x1
+          , 0xeb, 0x0e                                // jmp    40115b <factorial+0x25>
+          , 0x8b, 0x45, 0xfc                          // mov    eax,DWORD PTR [rbp-0x4]
+          , 0x0f, 0xaf, 0x45, 0xf8                    // imul   eax,DWORD PTR [rbp-0x8]
+          , 0x89, 0x45, 0xfc                          // mov    DWORD PTR [rbp-0x4],eax
+          , 0x83, 0x45, 0xf8, 0x01                    // add    DWORD PTR [rbp-0x8],0x1
+          , 0x8b, 0x45, 0xf8                          // mov    eax,DWORD PTR [rbp-0x8]
+          , 0x3b, 0x45, 0xec                          // cmp    eax,DWORD PTR [rbp-0x14]
+          , 0x7c, 0xea                                // jl     40114d <factorial+0x17>
+          , 0x8b, 0x45, 0xfc                          // mov    eax,DWORD PTR [rbp-0x4]
+          , 0x5d                                      // pop    rbp
+          , 0xc3                                      // ret 
+  };
+#+END_SRC
+
+Building: 
+
+#+BEGIN_SRC sh 
+   $ >> g++ mmap-loader.cpp -o mmap-loader.bin -std=c++1z -Wall -Wextra -g
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC sh 
+   $ >> ./mmap-loader.bin
+
+   ====== Load add_numbers from machine code ================
+   [RESULT] add_numbers(20, 100) = 120
+   [RESULT] add_numbers(206, 782) = 988
+
+   ======== Load factorial() from machine code =============
+   [RESULT] factorial(5) = 24
+   [RESULT] factorial(6) = 120
+   [RESULT] factorial(7) = 720
+   [TRACE] Process terminated gracefully Ok. 
+#+END_SRC
+
+ *Running in GDB debugger*
+
+Load application in debugger: 
+
+#+BEGIN_SRC sh 
+   $ >> gdb ./mmap-loader.bin --silent
+  Reading symbols from ./mmap-loader.bin...
+#+END_SRC
+
+Set breaking point: 
+
+#+BEGIN_SRC sh 
+  # Set breaking point 
+  (gdb) b main
+  Breakpoint 1 at 0x4023f6: file mmap-loader.cpp, line 30.
+#+END_SRC
+
+Start running: 
+
+#+BEGIN_SRC sh 
+  (gdb) r
+  Starting program: /home/user/asm-projects/asm/mmap-loader.bin 
+  Missing separate debuginfos, use: dnf debuginfo-install glibc-2.31-2.fc32.x86_64
+
+  Breakpoint 1, main (argc=1, argv=0x7fffffffd348) at mmap-loader.cpp:30
+  30		std::puts("\n ====== Load add_numbers from machine code ================");
+  Missing separate debuginfos, use: dnf debuginfo-install libgcc-10.2.1-1.fc32.x86_64 libstdc++-10.2.1-1.fc32.x86_64
+#+END_SRC
+
+Execute multiple steps: 
+
+#+BEGIN_SRC sh 
+   (gdb) n
+
+    ====== Load add_numbers from machine code ================
+   37		auto add_numbers_code = hexstr_to_bytes(add_numbers_str);
+   (gdb) 
+   40		auto add_numbers  = load_mcode<add_numbers_t>(add_numbers_code);
+
+   (gdb) n
+   42		std::cout << " [RESULT] add_numbers(20, 100) = " << add_numbers(20, 100) << '\n';
+   (gdb) 
+
+   (gdb) p add_numbers_code 
+   $1 = std::vector of length 12, capacity 48 = {85 'U', 72 'H', 137 '\211', 229 '\345', 72 'H', 137 '\211', 
+     248 '\370', 72 'H', 1 '\001', 240 '\360', 93 ']', 195 '\303'}
+
+   (gdb) p add_numbers.size()
+   Attempt to extract a component of a value that is not a struct or union
+
+   (gdb) p add_numbers_code.size()
+   $2 = 12
+
+   (gdb) ptype add_numbers
+   type = int (*)(int, int)
+
+   (gdb) ptype add_numbers_code 
+   type = std::vector<unsigned char>
+#+END_SRC
+
+Call the function pointer add_numbers()
+
+#+BEGIN_SRC cpp 
+  (gdb) call add_numbers(20, 100)
+  $3 = 120
+
+  (gdb) call add_numbers(222, -100)
+  $4 = 122
+
+  (gdb) call add_numbers(222, -1000)
+  $5 = -778
+#+END_SRC
+
+Show memory contents as machine code at function pointer memory
+location: 
+
+#+BEGIN_SRC sh 
+   # Bytes at the function pointer memory location 
+   # (memory allocated with mmap)
+   (gdb) x/12b add_numbers
+   0x7ffff7ffb000:	0x55	0x48	0x89	0xe5	0x48	0x89	0xf8	0x48
+   0x7ffff7ffb008:	0x01	0xf0	0x5d	0xc3
+
+   # Show assembly x86-64 (64 bits) in AT&T syntax 
+   (gdb) x/6i add_numbers
+      0x7ffff7ffb000:	push   %rbp
+      0x7ffff7ffb001:	mov    %rsp,%rbp
+      0x7ffff7ffb004:	mov    %rdi,%rax
+      0x7ffff7ffb007:	add    %rsi,%rax
+      0x7ffff7ffb00a:	pop    %rbp
+      0x7ffff7ffb00b:	retq   
+   (gdb) 
+
+   (gdb) set disassembly-flavor intel
+
+   # Show assembly x86-64 (64 bits) in Intel syntax 
+   (gdb) x/6i add_numbers
+      0x7ffff7ffb000:	push   rbp
+      0x7ffff7ffb001:	mov    rbp,rsp
+      0x7ffff7ffb004:	mov    rax,rdi
+      0x7ffff7ffb007:	add    rax,rsi
+      0x7ffff7ffb00a:	pop    rbp
+      0x7ffff7ffb00b:	ret    
+   (gdb) 
+#+END_SRC
+
+Continue execution until process termination: 
+
+#+BEGIN_SRC cpp
+  (gdb) n
+   [RESULT] add_numbers(20, 100) = 120
+  43		std::cout << " [RESULT] add_numbers(206, 782) = " << add_numbers(206, 782) << '\n';
+  (gdb) c
+  Continuing.
+   [RESULT] add_numbers(206, 782) = 988
+
+   ======== Load factorial() from machine code =============
+   [RESULT] factorial(5) = 24
+   [RESULT] factorial(6) = 120
+   [RESULT] factorial(7) = 720
+   [TRACE] Process terminated gracefully Ok. 
+  [Inferior 1 (process 933348) exited normally]
+  (gdb) 
+#+END_SRC
+
+ *Procedure for Extracting the sample machine code with Objdump* 
+
+This procedure presents how the sample machine code was extracted with
+objdump tool. 
+
+File: _functions.c_  
+
+#+BEGIN_SRC c
+  #include <stdio.h>
+
+  int factorial(int n)
+  {
+      int prod = 1; 
+      for(int i = 1; i < n; i++){ 
+          prod = prod * i;
+      }
+      return prod;
+  }
+
+  int main()
+  {
+      printf(" factorial(5) = %d \n", factorial(5));
+      printf(" factorial(6) = %d \n", factorial(6));
+      return 0;
+  }
+#+END_SRC
+
+Build: 
+
+#+BEGIN_SRC sh 
+   $ >> gcc functions.c -o functions.bin -Wall -Wextra -O0
+
+   ~/t/asm
+   $ >> ./functions.bin
+   factorial(5) = 24 
+   factorial(6) = 120 
+#+END_SRC
+
+Extract assembly and machine code (encoded as hexadecimal bytes): 
+
+#+BEGIN_SRC 
+    $ objdump functions.bin -M intel -d 
+
+   functions.bin:     file format elf64-x86-64
+
+
+   Disassembly of section .init:
+
+   0000000000401000 <_init>:
+     401000:	f3 0f 1e fa          	endbr64 
+     401004:	48 83 ec 08          	sub    rsp,0x8
+     401008:	48 8b 05 e9 2f 00 00 	mov    rax,QWORD PTR [rip+0x2fe9]        # 403ff8 <__gmon_start__>
+
+    ...  ...  ...  ...  ...  ...  ...  ...  ... 
+    ...  ...  ...  ...  ...  ...  ...  ...  ... 
+
+   0000000000401126 <factorial>:
+     401126:	55                   	push   rbp
+     401127:	48 89 e5             	mov    rbp,rsp
+     40112a:	89 7d ec             	mov    DWORD PTR [rbp-0x14],edi
+     40112d:	c7 45 fc 01 00 00 00 	mov    DWORD PTR [rbp-0x4],0x1
+     401134:	c7 45 f8 01 00 00 00 	mov    DWORD PTR [rbp-0x8],0x1
+     40113b:	eb 0e                	jmp    40114b <factorial+0x25>
+     40113d:	8b 45 fc             	mov    eax,DWORD PTR [rbp-0x4]
+     401140:	0f af 45 f8          	imul   eax,DWORD PTR [rbp-0x8]
+     401144:	89 45 fc             	mov    DWORD PTR [rbp-0x4],eax
+     401147:	83 45 f8 01          	add    DWORD PTR [rbp-0x8],0x1
+     40114b:	8b 45 f8             	mov    eax,DWORD PTR [rbp-0x8]
+     40114e:	3b 45 ec             	cmp    eax,DWORD PTR [rbp-0x14]
+     401151:	7c ea                	jl     40113d <factorial+0x17>
+     401153:	8b 45 fc             	mov    eax,DWORD PTR [rbp-0x4]
+     401156:	5d                   	pop    rbp
+     401157:	c3                   	ret    
+
+    .... ...  .... ...  .... ...  .... ...  .... ...  .... ... 
+    .... ...  .... ...  .... ...  .... ...  .... ...  .... ... 
+#+END_SRC
+
 ** POSIX Shared Memory 
 *** Overview 
 
@@ -8772,7 +9180,6 @@ The following limitation for objects allocation are noteworthy:
   + [[https://northstar-www.dartmouth.edu/doc/idl/html_6.2/SHMMAP.html][SHMMAP]] - Dartmouth
 
   + [[https://users.cs.cf.ac.uk/Dave.Marshall/C/node27.html][IPC:Shared Memory]] 
-
 
 *** Sample Code 
 
@@ -9546,6 +9953,8 @@ code.
  *Further Reading* 
 
   + [[https://stackoverflow.com/questions/5660070/send-a-struct-over-a-socket-with-correct-padding-and-endianness-in-c][tcp - Send a struct over a socket with correct padding and endianness in C - Stack Overflow]]
+
+  + [[https://www.codeproject.com/Articles/11922/Solution-for-TCP-IP-client-socket-message-boundary][Solution for TCP/IP client socket message boundary problem - CodeProject]]
 
   + [[https://developer.ibm.com/tutorials/l-sockpit/][Five pitfalls of Linux sockets programming – IBM Developer]]
 
