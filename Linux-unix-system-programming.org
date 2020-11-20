@@ -1146,6 +1146,8 @@ functions in low level code bases and legacy C codes. Those functions
 are in the header <string.h> for C or <cstring> for C++.
 
 
+  *String Manipulation* 
+
   + _strlen()_ => Get length of null-terminated character array.
     + Docs: $ man strlen 
 
@@ -1288,6 +1290,49 @@ are in the header <string.h> for C or <cstring> for C++.
    (char [200]) "The square root of 10.000000 is equal to 3.162 \0\0\0..\0\0"
 #+END_SRC
 
+  + _dprintf_ => Print to file descriptor. It can be used for formatted
+    printing to any file descriptor, including sockets, pipes, regular
+    files and standard streams (stdout and stderr).
+
+#+BEGIN_SRC cpp 
+   int dprintf(int fd, const char *format, ...);
+   
+   // -- EXAMPLE =>> CERN's ROOT REPL Session ---------------// 
+
+   root [6] dprintf(STDOUT_FILENO, " [INFO] x = %d ; sqrt(3) = %.3f \n", 100, sqrt(3.0))
+    [INFO] x = 100 ; sqrt(3) = 1.732 
+
+   root [5] dprintf(STDERR_FILENO, " [INFO] x = %d ; sqrt(3) = %.3f \n", 100, sqrt(3.0))
+    [INFO] x = 100 ; sqrt(3) = 1.732 
+   (int) 35
+#+END_SRC
+
+  + _asprintf_ => Print allocated string. Similar to snprintf, but it
+    stores the output in a large enough heap-allocated (dynamically
+    allocated) buffer. 
+
+#+BEGIN_SRC cpp 
+   int asprintf(char **strp, const char *fmt, ...);
+
+   // ==>> EXAMPLE =>> CERN's ROOT REPL Session ============//
+
+   // Output 
+   root [7] char* output;
+
+   root [8] asprintf(&output, " [TRACE] x = %d ; sin(3.1415) = %.5f ; s = %s \n", -261, sin(3.1415), "Hello world")
+   (int) 61
+
+   root [9] output 
+   (char *) " [TRACE] x = -261 ; sin(3.1415) = 0.00009 ; s = Hello world "
+
+   root [10] puts(output)
+    [TRACE] x = -261 ; sin(3.1415) = 0.00009 ; s = Hello world 
+
+   // Release allocated memory., 
+   root [11] free(output)
+   root [12] 
+#+END_SRC
+
   + _strcpy()_ => Copy string 'src' parameter (null-terminated array of
     characters) to a buffer.
     + Docs: $ man strcpy 
@@ -1425,6 +1470,99 @@ are in the header <string.h> for C or <cstring> for C++.
 
     root [19] buff
     (char [100]) "Hello worlHello world APL C++1 RUST DLang OCaml\0\0...\0\0"
+#+END_SRC
+
+
+  + _strtok_ => Break string into tokens. 
+
+#+BEGIN_SRC cpp 
+    char* strtok(char* str, const char* delim);
+
+    // ---- Usage Example ------------------// 
+
+    root [8] const char* sep = ","; // Separators
+    root [9] char text[500] = "BRL , CAD ,, USD ,,, EUR , YEN , JPY";
+
+    root [10] char* tok = strtok(text, sep)
+    (char *) "BRL "
+
+    root [11] while( tok != nullptr) { printf(" => token = %s \n", tok); tok = strtok(nullptr, sep); }
+     => token = BRL  
+     => token =  CAD  
+     => token =  USD  
+     => token =  EUR  
+     => token =  YEN  
+     => token =  JPY 
+#+END_SRC
+
+ 
+  + _strtoul()_ => Attempt to parse an unsigned integer from a
+    string. On failure, this function sets the _errno_ variable to
+    ERANGE. 
+ 
+#+BEGIN_SRC cpp 
+   unsigned long int strtoul (const char* str, char** endptr, int base);
+
+   // --------------- Example -----------------------// 
+
+   root [42] auto n = strtoul("1001001", nullptr, 2)
+   (unsigned long) 73
+
+   root [43] auto n = strtoul("1001001", nullptr, 10)
+   (unsigned long) 1001001
+
+   root [44] auto n = strtoul("1001001", nullptr, 16)
+   (unsigned long) 16781313
+
+   root [45] auto n = strtoul("1001001", nullptr, 8)
+   (unsigned long) 262657
+
+   root [46] auto n = strtoul("AFBC01", nullptr, 16)
+   (unsigned long) 11516929
+
+   // Failure 
+   root [47] auto n = strtoul("XAFBC01", nullptr, 16)
+   (unsigned long) 0
+
+   root [54] auto n = strtoul("AFBC01 rest of text", nullptr, 16)
+   (unsigned long) 11516929
+
+   root [55] auto n = strtoul("  AFBC01 rest of text", nullptr, 16)
+   (unsigned long) 11516929
+#+END_SRC
+
+     *Buffer Manipulation* 
+
+  + _memchr()_ => Locate a byte in a buffer or memory region. This
+    function returns a pointer to the first occurency of the search
+    byte and returns null pointer if the byte is not found. 
+
+#+BEGIN_SRC cpp 
+    void* memchr(const void* buffer, int byte_searched, size_t buffer_size);
+
+   // ----- Example: CERN's ROOT REPL Session ----------------// 
+
+   root [19] char mybuffer[200] = "hello world 9 10 36 buffer byte array 9 0 %";
+
+   // Pointer to first occurrency of character '9' (byte)
+   root [22] p 
+   (char *) "9 10 36 buffer byte array 9 0 %"
+
+   root [23] p[0]
+   (char) '9'
+   root [24] 
+
+   // Position (aka index) where the byte is found 
+   root [35] ptrdiff_t idx = p - mybuffer 
+   (long) 12
+
+   root [37] mybuffer[idx]
+   (char) '9'
+
+   // Next ocurrency 
+   root [41] p = (char*) memchr(mybuffer + idx + 1, '9', 200 - idx)
+   (char *) "9 0 %"
+
 #+END_SRC
 
   + _memset()_ => Fill some memory area (buffer) with a constant byte. 
