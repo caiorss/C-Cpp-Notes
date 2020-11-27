@@ -9750,6 +9750,379 @@ is terminated.
   fish: “./shmem1.bin client” terminated by signal SIGABRT (Abort)
 #+END_SRC
 
+** Syslog - System Message Logging
+*** Overview 
+
+Several Unix-like operating systems provide a system message logging,
+_syslog_ system which allows applications, such as servers and daemons
+(a.k.a system services) to send logging messages reporting events,
+auditing and debugging information to a central location, a syslog
+server which can be in the same machine as the application or in a
+remote host. 
+
+The syslog system has a client-server architecture, comprised of two
+main parts, the client which is any application that sends the
+logging message and the server which receives and consolidates client
+messages via Unix Domain Sockets on local machine; UDP/IP or TCP/IP if
+the server is located in a remote machine. 
+
+Some motivations for using syslog are: 
+
+  * Logging consolidation in a central location - which improves
+    discoverability and makes easier to debug, filter and audit
+    applications that runs without any graphical interface.
+
+  * Logging persistence 
+
+  * Standard logging API, implemented by many Unix-like operating
+    systems such as GNU/Linux distributions; GNU/Linux with systemd;
+    FreeBSD; OpenBSD and MacOSX. 
+
+  * Operating system agnostic. The syslog server or daemon only relies
+    on TCP/UDP, TCP/IP or Unix-Domain sockets, which makes possible to
+    implement a syslog system, even on non-Unix-like operating system.
+
+  * Familiarity of system administrators.
+
+  * Integration to system-d on GNU/Linux distributions.
+
+  * Network infrastructure equipment => Many common network equipment
+    provide facilities for sending auditing information to syslog
+    servers.
+
+  * Multiple ways of visualization. => Unlike printf-like statements,
+    logging can be viewed and inspected from any terminal emulators,
+    graphical applications and also from remote machines. Even for
+    desktop applications, does not run in terminals, logging via
+    syslog is a more convenient way for diagnosing and debugging the
+    application control flow.
+
+Potential use-cases: 
+
+  * Logging for auditing and debugging in daemon (services)
+    applications that runs in background and do not have any graphical
+    user interface. Some of those applications are http servers, ftp
+    servers, ssh servers, authentication systems and so on. 
+ 
+ *Syslog C API* 
+
+API Documentation: 
+
+  + [[https://man7.org/linux/man-pages/man3/syslog.3.html][syslog(3) - Linux manual page]] 
+  + [[https://www.freebsd.org/cgi/man.cgi?query=syslog&sektion=3&apropos=0&manpath=FreeBSD+12.2-RELEASE+and+Ports][syslog(3)]] - Free BSD
+  + [[https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man3/syslog.3.html][Mac OS X Manual Page For syslog(3)]]
+
+Syslog Protocol Technical Standard: 
+
+  + [[https://tools.ietf.org/html/rfc3164][RFC 3164 - The BSD Syslog Protocol]]
+
+Headers: 
+  + #include <syslog.h>
+  + #include <stdarg.h>
+
+Functions: 
+
+  + openlog() => Set logging configuration and attributes that affects
+    calls to the logging functions.
+    + _ident_ => Unique tag name identifier which allows identifying and
+      filtering the application that logging messages belong.
+    + _logopt_ => Logging options bitwise-or flags that speficy the
+      logging behavior.
+    + _facility_ => Parameter the assigns thae default category that all
+      log messages will be related to. Some possible values are:
+      LOG_USER (default) - generic user-level messages ;LOG_AUTH - log
+      messages are related to login and authentication via ssh,
+      terminal and so on; LOG_CRON - Cron clock messages; LOG_FTP -
+      ftp daemon; LOG_KERN for Kernel messages.
+
+#+BEGIN_SRC cpp 
+     void
+     openlog(  const char* ident       // Application unique identifierr 
+             , int         logopt      
+             , int	   facility    // Gr
+            );
+#+END_SRC
+
+  + closelog() => Disable logging messages. 
+
+#+BEGIN_SRC cpp 
+     void closelog(void);
+#+END_SRC
+ 
+  + syslog() => Send logging messages to the syslog daemon.
+    + _priority_ => Flag that indicates the logging severity. It can be:
+      LOG_INFO for informational messages; LOG_DEBUG for debugging
+      messages; LOG_WARNING for warnings; LOG_ERR for errros and so
+      on. See full documentation: [[https://man7.org/linux/man-pages/man3/syslog.3.html][syslog]]
+    + _message_ => Logging message. 
+
+#+BEGIN_SRC cpp 
+     void syslog(int priority, const  char* message, ...);
+
+     void vsyslog(int priority, const char* message, va_list args);
+#+END_SRC
+
+ *Further Reading* 
+
+   + [[https://en.m.wikipedia.org/wiki/Syslog][Syslog - Wikipedia]]
+
+   + [[https://tools.ietf.org/html/rfc3164][RFC 3164 - The BSD Syslog Protocol]]
+
+   + [[https://en.m.wikipedia.org/wiki/Common_Log_Format][Common Log Format - Wikipedia]]
+
+   + [[https://www.loggly.com/ultimate-guide/linux-logging-basics/][Linux Logging Basics - The Ultimate Guide To Logging]]
+
+   + [[https://www.projectatomic.io/blog/2014/09/running-syslog-within-a-docker-container/][Running Syslog Within a Docker Container — Project Atomic]]
+
+   + [[https://www.syslog-ng.com/community/b/blog/posts/how-to-collect-windows-event-logs-with-syslog-ng-without-installing-an-agent][How to collect Windows Event Logs with syslog-ng without installing an agent]]
+
+   + [[https://www.winsyslog.com/][The original Windows Syslog Server - WinSyslog]]
+
+   + [[https://www.juniper.net/documentation/en_US/jsa7.3.3/jsa-configuring-dsm/topics/task/operational/jsa-dsm-configuring-syslog-on-your-apple.html][Configuring Syslog on Your Apple Mac OS X - TechLibrary - Juniper Networks]]
+
+   + [[https://www.howtogeek.com/356942/how-to-view-the-system-log-on-a-mac/][How to View the System Log on a Mac]]
+
+   + [[https://gist.github.com/darconeous/1b3aee893536c1de2401][Using OS X as a Syslog Server · GitHub]]
+
+   + [[https://golang.org/pkg/log/syslog/][syslog - The Go Programming Language]]
+
+   + [[https://medium.com/@yhjhoo/create-a-syslog-server-with-golang-8ffa0787437][syslog with golang | Medium]]
+
+   + FreeBSD - [[https://www.freebsd.org/cgi/man.cgi?query=syslogd&sektion=8][syslogd(8)]] - Syslog Daemon
+
+   + FreeBSD - [[https://www.freebsd.org/cgi/man.cgi?query=logger&sektion=1&apropos=0&manpath=FreeBSD+12.2-RELEASE+and+Ports][logger(1)]] - Command line tool for sending logging
+     messages to syslog server from terminal. 
+
+   + FreeBSD - [[https://www.freebsd.org/doc/handbook/configtuning-syslog.html][11.7. Configuring System Logging]]
+
+   + FreeBSD - [[https://docs.freebsd.org/doc/7.3-RELEASE/usr/share/doc/handbook/network-syslogd.html][Remote Host Logging with syslogd]]
+
+   + [[https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man3/syslog.3.html][Mac OS X Manual Page For syslog(3)]]
+
+   + [[https://www.syslog-ng.com/technical-documents/doc/syslog-ng-open-source-edition/3.16/administration-guide/8][syslog-ng Open Source Edition 3.16 - Administration Guide]]
+*** Usage example 
+
+File: _syslog-test.cpp_ 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <cmath>
+
+  // ---- Unix-specific headers ---------//
+  #include <syslog.h>
+  #include <unistd.h> // sleep() 
+
+  int main(int argc, char** argv)
+  {
+
+      // Unique identifier 
+      const char* ident = "MYSERVER";
+
+      int logopt =  // Include PID (process unique identifier number)
+                    // in the log messages
+                    LOG_PID    
+                  | LOG_ODELAY 
+                  // Print log messages to console (terminal) stderr 
+                  | LOG_PERROR 
+                  ;
+
+      // Configure logger  
+      openlog(ident, logopt, LOG_USER);
+
+      syslog(LOG_INFO, " Logging has started Ok.");
+      syslog(LOG_DEBUG, "Starting server main loop");
+
+      for(int i = 0; i < 10; i++)
+      {
+          syslog(LOG_INFO, "Loop counter value = %d - sqrt(%d) = %f"
+                 , i, i, std::sqrt(i));
+          // Sleep for 1 second 
+          sleep(1);
+      }
+
+      syslog(LOG_WARNING, "Main loop terminated.");
+
+      // Shutdown logging 
+      closelog();
+      return 0;
+  }
+#+END_SRC
+
+ *Building:*
+
+#+BEGIN_SRC sh 
+  $ g++ syslog-test.cpp -o syslog-test -Wall -Wextra -g -std=c++1z 
+#+END_SRC
+
+
+ *Running:* (Terminal 1)
+
+#+BEGIN_SRC 
+   $ >> build/test-syslog 
+  MYSERVER[1668452]:  Logging has started Ok.
+  MYSERVER[1668452]: Starting server main loop
+  MYSERVER[1668452]: Loop counter value = 0 - sqrt(0) = 0.000000
+  MYSERVER[1668452]: Loop counter value = 1 - sqrt(1) = 1.000000
+  MYSERVER[1668452]: Loop counter value = 2 - sqrt(2) = 1.414214
+  MYSERVER[1668452]: Loop counter value = 3 - sqrt(3) = 1.732051
+  MYSERVER[1668452]: Loop counter value = 4 - sqrt(4) = 2.000000
+  MYSERVER[1668452]: Loop counter value = 5 - sqrt(5) = 2.236068
+  MYSERVER[1668452]: Loop counter value = 6 - sqrt(6) = 2.449490
+  MYSERVER[1668452]: Loop counter value = 7 - sqrt(7) = 2.645751
+  MYSERVER[1668452]: Loop counter value = 8 - sqrt(8) = 2.828427
+  MYSERVER[1668452]: Loop counter value = 9 - sqrt(9) = 3.000000
+  MYSERVER[1668452]: Main loop terminated.
+
+#+END_SRC
+
+ *Monitoring via journalctl:* (Terminal 2)
+
+In a second terminal run the command '$ journalctl -f' that displays
+the newest logging entries. 
+
+#+BEGIN_SRC sh 
+   $ >> journalctl -f
+  -- Logs begin at Mon 2020-05-11 22:09:13 -03. --
+  Nov 27 14:20:39 localhost.localdomain dnf[1666375]: Fedora 32 - x86_64                               21 kB/s | 3.3 kB     00:00
+  Nov 27 14:20:40 localhost.localdomain dnf[1666375]: RPM Fusion for Fedora 32 - Nonfree - NVIDIA Dri  23 kB/s |  11 kB     00:00
+    ...   ...   ...   ...   ...   ... 
+    ...   ...   ...   ...   ...   ... 
+
+  Nov 27 14:50:44 localhost.localdomain MYSERVER[1668452]:  Logging has started Ok.
+  Nov 27 14:50:44 localhost.localdomain MYSERVER[1668452]: Starting server main loop
+  Nov 27 14:50:44 localhost.localdomain MYSERVER[1668452]: Loop counter value = 0 - sqrt(0) = 0.000000
+  Nov 27 14:50:45 localhost.localdomain MYSERVER[1668452]: Loop counter value = 1 - sqrt(1) = 1.000000
+  Nov 27 14:50:46 localhost.localdomain MYSERVER[1668452]: Loop counter value = 2 - sqrt(2) = 1.414214
+  Nov 27 14:50:47 localhost.localdomain MYSERVER[1668452]: Loop counter value = 3 - sqrt(3) = 1.732051
+  Nov 27 14:50:48 localhost.localdomain MYSERVER[1668452]: Loop counter value = 4 - sqrt(4) = 2.000000
+  Nov 27 14:50:49 localhost.localdomain MYSERVER[1668452]: Loop counter value = 5 - sqrt(5) = 2.236068
+  Nov 27 14:50:50 localhost.localdomain MYSERVER[1668452]: Loop counter value = 6 - sqrt(6) = 2.449490
+  Nov 27 14:50:51 localhost.localdomain MYSERVER[1668452]: Loop counter value = 7 - sqrt(7) = 2.645751
+  Nov 27 14:50:52 localhost.localdomain MYSERVER[1668452]: Loop counter value = 8 - sqrt(8) = 2.828427
+  Nov 27 14:50:53 localhost.localdomain MYSERVER[1668452]: Loop counter value = 9 - sqrt(9) = 3.000000
+  Nov 27 14:50:54 localhost.localdomain MYSERVER[1668452]: Main loop terminated.
+#+END_SRC
+
+View only logging entries related to tag MYSERVER: (Approach 1)
+
+#+BEGIN_SRC sh
+    $ >> journalctl -f -t MYSERVER
+   -- Logs begin at Mon 2020-05-11 22:09:13 -03. --
+   Nov 27 14:50:45 localhost.localdomain MYSERVER[1668452]: Loop counter value = 1 - sqrt(1) = 1.000000
+   Nov 27 14:50:46 localhost.localdomain MYSERVER[1668452]: Loop counter value = 2 - sqrt(2) = 1.414214
+   Nov 27 14:50:47 localhost.localdomain MYSERVER[1668452]: Loop counter value = 3 - sqrt(3) = 1.732051
+   Nov 27 14:50:48 localhost.localdomain MYSERVER[1668452]: Loop counter value = 4 - sqrt(4) = 2.000000
+   Nov 27 14:50:49 localhost.localdomain MYSERVER[1668452]: Loop counter value = 5 - sqrt(5) = 2.236068
+   Nov 27 14:50:50 localhost.localdomain MYSERVER[1668452]: Loop counter value = 6 - sqrt(6) = 2.449490
+   Nov 27 14:50:51 localhost.localdomain MYSERVER[1668452]: Loop counter value = 7 - sqrt(7) = 2.645751
+   Nov 27 14:50:52 localhost.localdomain MYSERVER[1668452]: Loop counter value = 8 - sqrt(8) = 2.828427
+   Nov 27 14:50:53 localhost.localdomain MYSERVER[1668452]: Loop counter value = 9 - sqrt(9) = 3.000000
+   Nov 27 14:50:54 localhost.localdomain MYSERVER[1668452]: Main loop terminated.
+#+END_SRC
+
+View only log entries related to tag MYSERVER: (Approach 2)
+
+#+BEGIN_SRC sh 
+   $ >> journalctl SYSLOG_IDENTIFIER=MYSERVER
+  -- Logs begin at Mon 2020-05-11 22:09:13 -03, end at Fri 2020-11-27 14:52:01 -03. --
+  Nov 27 14:50:44 localhost.localdomain MYSERVER[1668452]:  Logging has started Ok.
+  Nov 27 14:50:44 localhost.localdomain MYSERVER[1668452]: Starting server main loop
+  Nov 27 14:50:44 localhost.localdomain MYSERVER[1668452]: Loop counter value = 0 - sqrt(0) = 0.000000
+  Nov 27 14:50:45 localhost.localdomain MYSERVER[1668452]: Loop counter value = 1 - sqrt(1) = 1.000000
+  Nov 27 14:50:46 localhost.localdomain MYSERVER[1668452]: Loop counter value = 2 - sqrt(2) = 1.414214
+  Nov 27 14:50:47 localhost.localdomain MYSERVER[1668452]: Loop counter value = 3 - sqrt(3) = 1.732051
+  Nov 27 14:50:48 localhost.localdomain MYSERVER[1668452]: Loop counter value = 4 - sqrt(4) = 2.000000
+  Nov 27 14:50:49 localhost.localdomain MYSERVER[1668452]: Loop counter value = 5 - sqrt(5) = 2.236068
+  Nov 27 14:50:50 localhost.localdomain MYSERVER[1668452]: Loop counter value = 6 - sqrt(6) = 2.449490
+  Nov 27 14:50:51 localhost.localdomain MYSERVER[1668452]: Loop counter value = 7 - sqrt(7) = 2.645751
+  Nov 27 14:50:52 localhost.localdomain MYSERVER[1668452]: Loop counter value = 8 - sqrt(8) = 2.828427
+  Nov 27 14:50:53 localhost.localdomain MYSERVER[1668452]: Loop counter value = 9 - sqrt(9) = 3.000000
+  Nov 27 14:50:54 localhost.localdomain MYSERVER[1668452]: Main loop terminated.
+#+END_SRC
+
+View log messages in JSON format (machine readable): 
+
+#+BEGIN_SRC sh 
+  $ >> journalctl SYSLOG_IDENTIFIER=MYSERVER -o json-pretty
+  {
+          "_MACHINE_ID" : "a1ac43b933e24659bba5edf2b9cec1e1",
+          "_CMDLINE" : "build/test-syslog",
+          "_UID" : "1000",
+          "_HOSTNAME" : "localhost.localdomain",
+          "_SYSTEMD_SLICE" : "user-1000.slice",
+          "PRIORITY" : "6",
+          "_COMM" : "test-syslog",
+          "_EXE" : "/home/myunixuser/temp-projects/quickjs-project/build/test-syslog",
+          "SYSLOG_FACILITY" : "1",
+          "MESSAGE" : " Logging has started Ok.",
+          "_SOURCE_REALTIME_TIMESTAMP" : "1606499444168590",
+          "_GID" : "1000",
+          "_SYSTEMD_CGROUP" : "/user.slice/user-1000.slice/session-6.scope",
+          "_SYSTEMD_USER_SLICE" : "-.slice",
+          "_AUDIT_LOGINUID" : "1000",
+          "_SYSTEMD_SESSION" : "6",
+          "__CURSOR" : "s=c5bc71b70e1e4196ad228c9854261d9a;i=a55c3;b=367eba6384324bf9a1b17ed43352d82e;m=218d3e06963;t=5b51a4cb397e2;x=ce1952db56e33f8b",
+          "__REALTIME_TIMESTAMP" : "1606499444168674",
+          "_PID" : "1668452",
+          "_BOOT_ID" : "367eba6384324bf9a1b17ed43352d82e",
+          "_TRANSPORT" : "syslog",
+          "SYSLOG_IDENTIFIER" : "MYSERVER",
+          "_AUDIT_SESSION" : "6",
+          "__MONOTONIC_TIMESTAMP" : "2305657170275",
+          "_SYSTEMD_UNIT" : "session-6.scope",
+          "_CAP_EFFECTIVE" : "0",
+          "SYSLOG_PID" : "1668452",
+          "_SYSTEMD_OWNER_UID" : "1000",
+          "SYSLOG_TIMESTAMP" : "Nov 27 14:50:44 ",
+          "_SYSTEMD_INVOCATION_ID" : "b25ee3d518c54e5c805521823f22d60d"
+  }
+  {
+          "_SYSTEMD_OWNER_UID" : "1000",
+          "SYSLOG_IDENTIFIER" : "MYSERVER",
+          "_SOURCE_REALTIME_TIMESTAMP" : "1606499444168718",
+          "_PID" : "1668452",
+          "_UID" : "1000",
+          "_CMDLINE" : "build/test-syslog",
+          "_GID" : "1000",
+          "_AUDIT_SESSION" : "6",
+          "MESSAGE" : "Starting server main loop",
+          "__MONOTONIC_TIMESTAMP" : "2305657481811",
+          "PRIORITY" : "7",
+          "__CURSOR" : "s=c5bc71b70e1e4196ad228c9854261d9a;i=a55c4;b=367eba6384324bf9a1b17ed43352d82e;m=218d3e52a53;t=5b51a4cb858d3;x=f796bcc2cb08f71e",
+          "_HOSTNAME" : "localhost.localdomain",
+          "_SYSTEMD_INVOCATION_ID" : "b25ee3d518c54e5c805521823f22d60d",
+          "_MACHINE_ID" : "a1ac43b933e24659bba5edf2b9cec1e1",
+          "_BOOT_ID" : "367eba6384324bf9a1b17ed43352d82e",
+          "_SYSTEMD_CGROUP" : "/user.slice/user-1000.slice/session-6.scope",
+          "SYSLOG_FACILITY" : "1",
+          "_SYSTEMD_USER_SLICE" : "-.slice",
+          "_SYSTEMD_UNIT" : "session-6.scope",
+          "_SYSTEMD_SLICE" : "user-1000.slice",
+          "__REALTIME_TIMESTAMP" : "1606499444480211",
+          "_TRANSPORT" : "syslog",
+          "_EXE" : "/home/myunixuser/temp-projects/quickjs-project/build/test-syslog",
+          "_COMM" : "test-syslog",
+          "SYSLOG_PID" : "1668452",
+          "_CAP_EFFECTIVE" : "0",
+          "SYSLOG_TIMESTAMP" : "Nov 27 14:50:44 ",
+          "_AUDIT_LOGINUID" : "1000",
+          "_SYSTEMD_SESSION" : "6"
+  }
+   ... ... ... ... 
+   ... ... ... 
+#+END_SRC
+
+See also: 
+
+  + [[https://serverfault.com/questions/754953/systemds-journalctl-how-to-filter-by-message][debian jessie - systemd's journalctl: how to filter by message? - Server Fault]]
+
+  + [[https://unix.stackexchange.com/questions/189647/pulling-log-messages-for-a-particular-log-in-systemd-journal][c - Pulling log messages for a particular log in systemd journal? - Unix & Linux Stack Exchange]]
+
+  + [[https://net2.com/how-to-analyze-linux-systemd-logs-using-journalctl-advanced-filtering-options/][How to analyze Linux systemd logs using journalctl advanced filtering options]]
+
+  + [[https://sematext.com/blog/journald-logging-tutorial/][Logging w/ journald: Why use it & how it performs vs syslog - Sematext]]
+
+  + [[https://www.digitalocean.com/community/tutorials/how-to-use-journalctl-to-view-and-manipulate-systemd-logs][How To Use Journalctl to View and Manipulate Systemd Logs | DigitalOcean]]
 ** Sockets - TCP/IP and Unix Domain Sockets 
 *** Overview 
 
