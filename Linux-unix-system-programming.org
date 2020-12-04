@@ -10521,7 +10521,7 @@ Functions that converts from network to host endianess:
 
    uint16_t number; 
    if( recv(sockfd, &number,  sizeof(uint32_t), 0 ) == -1 )
-   {  /** Herror handling ... here */  }
+   {  /** Error handling ... here */  }
   
    number = ntohs(number);
 #+END_SRC
@@ -12579,6 +12579,569 @@ Running: (Client 2 netcat from terminal 3)
   from client 2 to server
    [SERVER ECHO] => ID = 8 => from client 2 to server
   ^C
+
+#+END_SRC
+** Ptrace - system call 
+*** Overview 
+
+Ptrace is common system-call implemented by many Unix-like operating
+systems, such as Linux and FreeBSD, which provides facilities for
+manipulating and observing other processes. The purpose of this sytem
+call is to support the implementation of debuggers such as GDB (GNU
+Debugger), that use this sytem call for examining, modifying and
+manipulating the memory of debugged processes. Besides GDB, the ptrace
+system call is also used by the other tools like _ltrace_, for tracing
+library calls, and by _strace_, for tracing system calls. Although,
+ptrace has similar capabilities among many different Unix-based
+operating systems, ptrace is not a standardized system call, therefore
+there are many specific details such as type signature and request
+parameters that are operating-system dependent.
+
+ *Documentation*  
+
+  + [[https://www.man7.org/linux/man-pages/man2/ptrace.2.html][PTrace / Linux Manpage]] 
+
+  + [[https://www.freebsd.org/cgi/man.cgi?query=ptrace][Ptrace / FreeBSD Manpage]]
+    + => Note: Ptrace from FreeBSD is different than Linux's Ptrace.
+
+ *Ptrace capabilities*
+
+  + Attach to forked child process.
+  + Attach to an already running process.
+  + Read/write tracee process' virtual memory ( represented by the file /proc/<PID>/mem )
+  + Get/Set tracee's process CPU registers.
+  + Red/Write tracee's process virtual memory 
+  + Intercept and modify systems calls invoked by the monitored process.
+  + Trace library calls 
+  + Set breaking points
+
+ *Known usage*
+
+  + GDB (GNU Debugger)
+  + strace => Utility for tracing system calls.
+  + ltrace => Utility for tracing library calls.
+
+ *Further Reading* 
+
+  + [[https://www.man7.org/linux/man-pages/man2/ptrace.2.html][PTrace / Linux Manpage]] 
+
+  + [[https://www.freebsd.org/cgi/man.cgi?query=ptrace][Ptrace / FreeBSD Manpage]]
+
+  + [[https://lwn.net/Articles/446593/][Ptrace documentation, draft #6 [LWN.net]] (Linux)
+
+  + [[https://www.linuxjournal.com/article/6100][Playing with ptrace, Part I | Linux Journal]] 
+
+  + [[https://ops.tips/gists/using-c-to-inspect-linux-syscalls/][Using C to inspect Linux syscalls | OpsTips]]
+
+  + [[https://eng.uber.com/pyflame-python-profiler/][Pyflame: Uber Engineering's Profiler for Python | Uber Engineering Blog]]
+
+  + [[https://gist.github.com/yamnikov-oleg/454f48c3c45b735631f2][Linux Syscalls Reference · GitHub]]
+
+  + [[https://filippo.io/linux-syscall-table/][Searchable Linux Syscall Table for x86 and x86_64 | PyTux]]
+
+  + [[https://blog.packagecloud.io/eng/2016/04/05/the-definitive-guide-to-linux-system-calls/][The Definitive Guide to Linux System Calls - Packagecloud Blog]]
+
+  + [[https://en.m.wikipedia.org/wiki/X86_calling_conventions#x86-64_calling_conventions][x86 calling conventions - Wikipedia]] 
+
+  + [[http://www.brendangregg.com/blog/2015-03-17/linux-performance-analysis-perf-tools.html][Linux Performance Analysis: New Tools and Old Secrets]] - Brendan Gregg
+*** Linux Ptrace-related functions 
+
+Function: _waitpid()_:  
+
+  + Wait for state change of some process. This function returns (-1)
+    on failure.
+  + Manpage:
+    + [[https://man7.org/linux/man-pages/man2/waitpid.2.html][waitpid (Linux)]]
+    + [[https://www.freebsd.org/cgi/man.cgi?query=waitpid][waitpid (FreeBSD)]] 
+  + Headers:
+    + #include <sys/types.h>
+    + #include <sys/wait.h>
+
+#+BEGIN_SRC cpp 
+   pid_t waitpid(  pid_t pid       // (Process ID) Unique numeric idefier of monitored process.
+                 , int*  wstatus   // Allocated by caller. 
+                 , int   options
+               );
+
+     // ==== U S A G E -  E X A M P L E S ============ //
+    
+    // Wait until any child process terminated. 
+    // -------------------------------------------
+    int status = 0;
+    waitpid(-1, &status, 0); 
+  
+    // Check whether process has terminated normally. 
+    //-----------------------------------------------
+    int status = 0;
+    waitpid(8922, &status, 0);    
+    if( WIFEXITED(status) ){ /* Process terminated normally. */ }
+
+   
+#+END_SRC
+
+Function _ptrace()_: 
+
+    + Allows observing and manipulating other processes, such as
+      forked child processes or processes already running.
+
+    + Manpage:
+      + [[https://www.man7.org/linux/man-pages/man2/ptrace.2.html][PTrace / Linux Manpage]] 
+
+    + Headers: 
+      * <sys/ptrace.h>
+      * <linux/ptrace.h>
+      * <linux/tracehook.h>
+
+    + Parameters:
+      + /request/ => Determines the action to be performed.
+      + /pid/  => Pid of tracee (monitored) process.
+      + /addr/ => Address within the tracee virtual memory. This
+        parameter is null (nullptr in C++, or NULL in C) for most of
+        request parameters
+      + /data/ => Data send to tracee's process virtual memory. For most
+        _request_ parameters, this parameter is null.
+      + /RETURN/
+        * => Return value, returns (-1) on failure setting _errno_
+          variable. The meaning of the return value depends on the
+          _request_ parameter that was used.
+
+#+BEGIN_SRC cpp 
+   // Returns (-1) on failure. 
+   long  ptrace(  int    request  // Request or command 
+                , pid_t  pid      // PID of tracee or monitored pro ess 
+                , void*  addr     // Address within the tracee's process virtual memory.        
+                , void*  data     // Data parameter, used by some Ptrace 
+             );
+#+END_SRC
+
+Summary for some possible values for the _ptrace_'s request parameters: 
+
+  * PTRACE_ATTACH
+    + Attach to an already running process given its PID (Unique numeric id identifier)
+
+  * PTRACE_DETACH
+    + Detach from attached process. 
+
+  * PTRACE_TRACEME 
+    + Used for tracing a child process spawned with fork()
+      library-call. (Note: fork() on Linux is not a system call)
+
+  * PTRACE_PEEKDATA
+    + Read data from tracee's process memory. 
+
+  * PTRACE_POKEDATA
+    * Write/set data to some tracee's process location (addr parameter)
+
+  * PTRACE_GETREGS
+    * Obtain current CPU registers from tracee process.
+
+  * PTRACE_SETREGS 
+    * Set tracee process' CPU registers.
+
+  * PTRACE_SYSCALL
+    * Used for tracing and modifying tracee process' system calls.
+
+Struct: *user_regs_struct* 
+ 
+  + => Contains CPU registers (context) of monitored process. The
+    fields struct 'user_regs_struct', which represents the CPU
+    registers used by the monitored process, are dependent on the
+    current ISA (Instruction Set Architecture) of current machine. 
+
+  + Headers:
+    + <sys/user.h>
+
+#+BEGIN_SRC cpp 
+  // Fields of user_regs_struct for x86-64 ISA (AMD64 ISA)
+  struct user_regs_struct
+  {
+    __extension__ unsigned long long int r15;
+    __extension__ unsigned long long int r14;
+    __extension__ unsigned long long int r13;
+    __extension__ unsigned long long int r12;
+    __extension__ unsigned long long int rbp;
+    __extension__ unsigned long long int rbx;
+    __extension__ unsigned long long int r11;
+    __extension__ unsigned long long int r10;
+    __extension__ unsigned long long int r9;
+    __extension__ unsigned long long int r8;
+    __extension__ unsigned long long int rax;
+    __extension__ unsigned long long int rcx;
+    __extension__ unsigned long long int rdx;
+    __extension__ unsigned long long int rsi;
+    __extension__ unsigned long long int rdi;
+    __extension__ unsigned long long int orig_rax;
+    __extension__ unsigned long long int rip;
+    __extension__ unsigned long long int cs;
+    __extension__ unsigned long long int eflags;
+    __extension__ unsigned long long int rsp;
+    __extension__ unsigned long long int ss;
+    __extension__ unsigned long long int fs_base;
+    __extension__ unsigned long long int gs_base;
+    __extension__ unsigned long long int ds;
+    __extension__ unsigned long long int es;
+    __extension__ unsigned long long int fs;
+    __extension__ unsigned long long int gs;
+  };
+#+END_SRC
+*** Example - trace system calls of a running process 
+
+The following sample code, traces system and logs system calls
+performed by an already running process. 
+
+GIST: 
+  + https://gist.github.com/339b00fc8ab1b3d1d46ed9167ccbaeeb 
+
+File: _ptrace-attach.cpp_ 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+  #include <sstream> 
+  #include <cstring> // memcpy, memset, ...
+  #include <cassert> // assert() statement 
+  #include <vector>
+  #include <functional>
+  #include <map> 
+
+  // --- Unix-specific headers -----// 
+  #include <unistd.h> 
+  #include <sys/ptrace.h>
+  #include <sys/reg.h>
+  #include <sys/wait.h>
+  #include <sys/types.h>
+  #include <sys/syscall.h>
+  #include <sys/user.h>
+
+  #include <fcntl.h>
+
+  constexpr int FAILURE = -1;
+
+  enum class WaitResult
+  {
+        STOPPED     = 0
+      , TERMINATED  = 1
+  };
+
+  /** Ptrace wrapper that terminates the current process there is any error. */
+  long _ptrace(int request, pid_t pid, void* addr, void* data);
+
+  WaitResult     ptrace_wait_syscall( pid_t pid );
+  std::string      ptrace_get_string( pid_t pid, std::uintptr_t addr, std::size_t size );
+  std::string ptrace_get_string_null( pid_t pid, std::uintptr_t addr );
+
+  int main(int argc, char** argv)
+  {
+      if(argc < 2)
+      {
+          std::fprintf(stderr, " Usage: $ %s  <PID> \n", argv[0]);
+          return EXIT_FAILURE;
+      }
+
+      // Next line: throws exception. 
+      pid_t pid  = std::stoi(argv[1]);
+
+      // Attempt to attach to process. 
+      _ptrace(PTRACE_ATTACH, pid, nullptr, nullptr);
+      std::fprintf(stderr, " [TRACE] Attached to process. Ok \n");
+
+      // Fix PTRACE sigrap problem. That happens after attaching to child 
+      // process with PTRACE_ATTACH and the child process receives a SIGTRAP signal.
+      // See: https://stackoverflow.com/questions/44630382
+      _ptrace( PTRACE_SETOPTIONS, pid, nullptr, (void*) PTRACE_O_TRACECLONE);
+    
+      // Makes possible to distinguish system-call related stops from other
+      // types of stops. 
+      _ptrace( PTRACE_SETOPTIONS, pid, nullptr, (void*) PTRACE_O_TRACESYSGOOD);
+   
+      // CPU registers (context) of the monitored process 
+      struct user_regs_struct regs; 
+
+      /// ========== Ptrace event loop ==============//
+
+      std::fprintf(stderr, " [TRACE] Start event loop. Ok. \n");
+      for(;;)
+      {
+          // Intercept system call entry 
+          if(  ptrace_wait_syscall(pid) == WaitResult::TERMINATED)
+          { 
+              std::fprintf(stderr, " [TRACE] (1) Monitored process has terminated. \n");
+              break;
+          }
+
+          // Intercept system call exit 
+          if( ptrace_wait_syscall(pid) == WaitResult::TERMINATED)
+          {                  
+              std::fprintf(stderr, " [TRACE] (2) Monitored process has terminated. \n");
+              break;
+          }
+
+          // Get  CPU register for the current process. 
+          _ptrace( PTRACE_GETREGS, pid, nullptr, &regs);
+
+          // Get system call number
+          int syscall = regs.orig_rax;
+
+          // System call => open() 
+          // int openat( int dirfd              // Register RDI (1st syscall arg.)
+          //           , const char *pathname   // Register RSI (2nd syscall arg.) 
+          //           , int flags              // Register RSI (3rd syscall arg.)
+          //           );
+          if(syscall == SYS_openat)
+          {   
+              auto ptr  = uintptr_t{regs.rsi};
+              auto file = ptrace_get_string_null(pid, regs.rsi);  
+              std::fprintf(stderr, " [TRACE] openat() system call found => file = %s \n", file.c_str());
+              continue;
+          }
+
+          // => Note: Linux system calls for x64 is the System V x86-64/ calling convention. 
+          // 
+          // System call: write(   int fd        // register RDI (1st syscall argument)
+          //                     , void* buffer  // register RSI (2nd syscall argument)
+          //                     , size_t size   // register RDX (3rd syscall argument)
+          //                    ) 
+          if(syscall == SYS_write)
+          {
+
+              int       write_fd   = regs.rdi; // File descriptor of write system call 
+              uintptr_t write_ptr  = regs.rsi; // Pointer to buffer.             
+              size_t    write_size = regs.rdx; // Buffer size.              
+
+              auto buffer_text = ptrace_get_string(pid, write_ptr, write_size);  
+
+              std::fprintf( stderr
+                              , " [TRACE] Write system (syscall = %d ) " 
+                              " fd = %d ; buffer_ptr = 0x%x ; size = %zu ; \n => buffer_text = '%s' \n\n"
+                              , syscall
+                              , write_fd, write_ptr, write_size, buffer_text.c_str());    
+
+              continue;        
+          }   
+
+
+      } // ====== End of ptrace event loop ====// 
+
+      return 0;
+  } // --- End of main() ------- //
+ 
+          // ============================================== //
+          //         I P L E M E N T A T I O N S            //
+          //------------------------------------------------//
+
+  long 
+  _ptrace(int request, pid_t pid, void* addr, void* data)
+  {
+      long r = ptrace( (__ptrace_request) request, pid, addr, data);
+      if(r == -1){
+          std::stringstream ss;
+          ss  << " [PTRACE FAILURE] " 
+              << " ; errno = " << errno 
+              << " ; msg = '" << strerror(errno) 
+              << "' \n";        
+          throw std::runtime_error(ss.str());
+      }
+      return r;
+  }
+
+  WaitResult 
+  ptrace_wait_syscall(pid_t pid)
+  {
+      long result;
+      int  status;
+
+      for(;;){
+          result = _ptrace(PTRACE_SYSCALL, pid, nullptr, nullptr);
+          waitpid(pid, &status, 0);
+
+          // This predicate holds when the monitored process
+          // has terminated.
+          if( WIFEXITED(status) )
+          { return WaitResult::TERMINATED; }
+
+          // Credits and further reading:  
+          //   => https://ops.tips/gists/using-c-to-inspect-linux-syscalls
+          if( WIFSTOPPED(status) && WSTOPSIG(status) & 0x80 )
+          { return WaitResult::STOPPED; }
+      }
+  }
+
+  std::string
+  ptrace_get_string(pid_t pid, std::uintptr_t addr, std::size_t size) 
+  {
+      constexpr size_t long_size = sizeof(long);
+
+      union ptrace_data {
+          long data;
+          char bytes[long_size];
+      };
+    
+      int   n      = 0;
+      int   steps  = size / sizeof(long);
+      auto  pdata  = ptrace_data{};
+      auto  result = std::string(size + 1, 0);
+      char* paddr  = &result[0];
+    
+      assert(result.length() == size + 1);
+
+      while(n < steps)
+      {
+          pdata.data = _ptrace( PTRACE_PEEKDATA, pid
+                              , reinterpret_cast<void*>(addr + n * long_size)
+                              , nullptr
+                              );
+          std::memcpy(paddr, pdata.bytes, long_size);
+          n++;
+          paddr = paddr + long_size;
+
+      }
+      // '%' integer remainder 
+      steps = size % long_size;
+
+      if( steps != 0 ) {
+          pdata.data = _ptrace( PTRACE_PEEKDATA, pid
+                              , reinterpret_cast<void*>(addr + n * long_size)
+                              , nullptr
+                              );
+          memcpy(paddr, pdata.bytes, steps);
+      }
+
+      result[size] = '\0';
+
+      return result;
+  }
+
+  std::string
+  ptrace_get_string_null(pid_t pid, std::uintptr_t addr) 
+  {
+      constexpr size_t long_size = sizeof(long);
+
+      union ptrace_data {
+          long data;
+          char bytes[long_size];
+      };
+    
+      int   nread  = 0;
+      auto  pdata  = ptrace_data{};
+      auto  result = std::string{""};
+
+      std::memset(&pdata.bytes[0], 0x00, long_size * sizeof(char));
+    
+      for(;;)
+      {
+          pdata.data = _ptrace( PTRACE_PEEKDATA
+                              , pid
+                              , reinterpret_cast<void*>(addr + nread)
+                              , nullptr
+                              );                
+
+          result.resize(result.size() + long_size + 1);
+          char* pinit = &result[0];
+          memcpy(pinit + nread, &pdata.data, 1 * sizeof(long));
+          nread += long_size;
+
+          //  If the null terminating character '\0' (0x00) is found
+          // , then exit the current loop.
+          for(size_t i = 0; i < long_size; i++)
+              if( pdata.bytes[i] == '\0' ) { goto exit_loop; }
+      } 
+
+  exit_loop:
+      return result;
+  }
+#+END_SRC
+
+Building: 
+
+#+BEGIN_SRC sh 
+   $ git clone https://gist.github.com/339b00fc8ab1b3d1d46ed9167ccbaeeb gist && cd gist 
+   $ g++ ptrace-attach.cpp -o ptrace-attach.bin -std=c++1z -Wall -Wextra -g
+#+END_SRC
+
+(TERMINAL EMULATOR 1) => Run python3 interactive interpreter on
+terminal emulator 1, the run the _patrace-attach.bin_ applicaton on
+terminal 2 and attach to the PID of Python interpreter. After the
+ptrace monitor application is attached to the current process, the
+ptrace monitor application will log _open()_ and _write()_ system calls
+performed by the python process.
+
+#+BEGIN_SRC sh 
+    $ >> python
+   Python 3.8.5 (default, Aug 12 2020, 00:00:00) 
+   [GCC 10.2.1 20200723 (Red Hat 10.2.1-1)] on linux
+   Type "help", "copyright", "credits" or "license" for more information.
+
+   >>> import os
+   >>> os.getpid() # =>> Get Process ID unique identifier and attach to it from other terminal
+   2073259
+
+   >>> print("Hello world Ptrace")
+   Hello world Ptrace
+
+   >>> import dbus
+
+   >>> fd = open("/tmp/logging.txt", "w")
+   >>> 
+
+   >>> fd = open("/tmp/logging.txt", "w")
+   >>> fd.write("Hello world Python logging"); fd.flush()
+   26
+   >>> 
+
+#+END_SRC
+
+(TERMINAL EMULATOR 2) => Run _ptrace-attach.bin_ on terminal emulator 2
+and attach to the Python interpreter process.
+
+#+BEGIN_SRC sh 
+   $ ./ptrace-attach.bin 2073259
+    [TRACE] Attached to process. Ok 
+    [TRACE] Start event loop. Ok. 
+
+    [TRACE] Write system (syscall = 1 )  fd = 1 ; buffer_ptr = 0xf75f7010 ; size = 1 ; 
+    => buffer_text = '
+   ' 
+
+    [TRACE] Write system (syscall = 1 )  fd = 1 ; buffer_ptr = 0xf751a6d0 ; size = 19 ; 
+    => buffer_text = 'Hello world Ptrace
+   ' 
+
+    [TRACE] Write system (syscall = 1 )  fd = 1 ; buffer_ptr = 0xf75f7010 ; size = 4 ; 
+    => buffer_text = '>>> ' 
+
+     ... ... .. ...   ... ... .. ...   ... ... .. ... 
+     ... ... .. ...   ... ... .. ...   ... ... .. ... 
+
+    [TRACE] openat() system call found => file = /usr/lib64/python3.8/site-packages/dbus/__pycache__/__init__.cpython-38.pyc 
+    [TRACE] openat() system call found => file = /usr/lib64/python3.8/site-packages/dbus 
+    [TRACE] openat() system call found => file = /usr/lib64/python3.8/site-packages/dbus/__pycache__/_compat.cpython-38.pyc 
+    [TRACE] openat() system call found => file = /usr/lib64/python3.8/site-packages/dbus/__pycache__/exceptions.cpython-38.pyc 
+    [TRACE] openat() system call found => file = /usr/lib64/python3.8/site-packages/dbus/__pycache__/types.cpython-38.pyc 
+    [TRACE] openat() system call found => file = /usr/lib64/python3.8/site-packages/_dbus_bindings.so 
+    [TRACE] openat() system call found => file = /home/mxpkf8/dlang/dmd-2.092.0/linux/lib64/libdbus-1.so.3 
+    [TRACE] openat() system call found => file = /etc/ld.so.cache 
+    [TRACE] openat() system call found => file = /lib64/libdbus-1.so.3 
+    [TRACE] openat() system call found => file = /home/mxpkf8/dlang/dmd-2.092.0/linux/lib64/libsystemd.so.0 
+    [TRACE] openat() system call found => file = /lib64/libsystemd.so.0 
+    [TRACE] openat() system call found => file = /home/mxpkf8/dlang/dmd-2.092.0/linux/lib64/librt.so.1 
+    [TRACE] openat() system call found => file = /lib64/librt.so.1 
+    [TRACE] openat() system call found => file = /home/mxpkf8/dlang/dmd-2.092.0/linux/lib64/liblzma.so.5 
+    [TRACE] openat() system call found => file = /lib64/liblzma.so.5 
+      ....    ....    ....    ....    .... 
+      ....    ....    ....    ....    ....    .... 
+
+    [TRACE] openat() system call found => file = /tmp/logging.txt 
+    [TRACE] Write system (syscall = 1 )  fd = 1 ; buffer_ptr = 0xf75f7010 ; size = 4 ; 
+    => buffer_text = '>>> ' 
+
+     ... ... ... ... ... ... ... ... ... ... 
+     ... ... ... .. ... ... ... ... .. ... .. . .. . . 
+
+    [TRACE] Write system (syscall = 1 )  fd = 3 ; buffer_ptr = 0xf7643390 ; size = 26 ; 
+    => buffer_text = 'Hello world Python logging' 
+
+    [TRACE] Write system (syscall = 1 )  fd = 1 ; buffer_ptr = 0xf75f7010 ; size = 4 ; 
+    => buffer_text = '>>> ' 
 
 #+END_SRC
 ** X11 - X Windows System 
