@@ -11375,6 +11375,683 @@ Check unix-socket file:
   srwxrwxr-x 1 mxpkf8 mxpkf8 0 Jul  2 01:22 /tmp/unix-socket-file=
 #+END_SRC
 
+** Sockets with SSL/TSL - Secure Communication
+*** Overview 
+
+Many widely network protocols, such as HTTP, FTP, Telnet or SMTP, were
+designed without any security considerations, without any type of
+encryption which makes the data transmitted by those protocols
+vulnerable to eavesdropping; tampering, the data can be changed by
+third party during the transmission; spoofing (impersonation); MIT
+(Man-In-The Middle attack) a third-party actor can impersonate both
+sides and modify the data sent over the connection; and integrity
+violation.
+
+The TLS (Transport Layer Security) and its predecessor SSL (Secure
+Socket Layer) are the bed rocks of internet security, they are network
+protocol stacks designed for encapsulating the TCP protocol and solve
+its major security shortcomings by providing _confidentiality_ through
+encryption, a third party will only be able to view obfuscated
+non-readable binary data (blobs); _non-repudiation_ and _authentication_
+through certificates and public key infrastructure (PKI); _data
+integrity_ as property of encryption, both sides of communication
+channel are able to detect any data tampering.
+
+The TSL protcol stack is comprised of basically two parts, the _TLS
+_handshake protocol_, that takes care of authentication, certificate
+verification and shared key generation and exchange; and the _TLS
+record protocol_, that takes care of encapsulating the TCP protocol and
+providing encrypted communication. When the connection is opened, the
+TSL hanshaking takes place and the following sequence of events
+happen: both sides negotiate the TLS version; decides the ciphers that
+will be used; the client checks server certificate by using a trusted
+certificate authority; the server may also check the client
+certificate, but this feature is semdom used; generate a shared
+encryption key (symmetric encryption) for exchanging encryoted
+data. After the TLS handshake, the _TLS record protocol_ is used for
+encapsulating TCP-based protocols, such as HTTP, FTP or SMTP by
+providing data encryption by using the generated shared (symmetric)
+key, which is unique for every connection. 
+  
+  *Some network protocols that relies on TLS/SSL* 
+
+  + HTTPS (HTTP + SSL/TLS), port 443 => Http protocol encapsulated with TLS/SSL.
+
+  + FTPS (FTP + SSL/TLS) => FTP encapsulated with TLS/SSL
+
+  + OpenVPN
+
+  + SSTP (Secure Socket Tunneling Protocol)
+
+  + DoH (DNS over TLS) 
+  
+
+  *Some Implementation of TLS and SSL Protocol Stack* 
+
+   * [[https://www.openssl.org/][OpenSSL]]
+     + Reference-implementation and first implementation of the SSL
+       and TLS network protocol stack. In addition to the shared
+       library provided by OpenSSL suite, it also provide command line
+       tools for creating and validating certificates; creating
+       self-signed certificates and check connection certificate;
+       creating digital signature and so on.
+ 
+   * [[https://www.gnutls.org/][GNU TLS]]
+     * License: LGPL 
+     * GNU Implementation of TLS protocol stack.
+
+   * [[https://www.libressl.org/][LibreSSL]]
+     + Fork of OpenSSL created by OpenBSD developers.
+
+   * [[https://boringssl.googlesource.com/boringssl/][BoringSSL]] 
+     + Google's implementation of TLS/SSL.
+
+   * [[https://tls.mbed.org/][Mbed TLS]] (Embedded Systems)
+     + Lightweight implementation derived from Mbed operating system
+       for embedded systems.
+     + Repository: [[https://github.com/ARMmbed/mbedtls][GitHub - ARMmbed/mbedtls]] 
+
+   * [[https://www.wolfssl.com/][wolfSSL]] (Embedded Systems)
+     * License: Dual license, GPL3 and commercial for closed source applications.
+     * Highly secure implementation, designed embedded systems.
+
+   * [[https://botan.randombit.net/][Botan]]
+     * License: BSD
+     * Repository: https://github.com/randombit/botan
+     * "Botan's goal is to be the best option for cryptography in C++
+       by offering the tools necessary to implement a range of
+       practical systems, such as TLS protocol, X.509 certificates,
+       modern AEAD ciphers, PKCS#11 and TPM hardware support, password
+       hashing, and post quantum crypto schemes. A Python binding is
+       included, and several other language bindings are available. It
+       is used in many open source and commercial products. The
+       library is accompanied by a featureful command line interface."
+
+   * [[https://docs.rs/rustls/0.19.0/rustls/][Rust TLS]]
+     * TLS protocol stack implemented in Rust that conforms to OpenSLL API.
+     * Repository: https://github.com/wolfSSL/wolfssl
+
+   * [[https://docs.microsoft.com/en-us/windows/win32/secauthn/creating-a-secure-connection-using-schannel][Schannel]]
+     * Microsft Windows-only implementation of SSL and TSL protocol stack.
+
+  *Useful Terminology* 
+
+  * _IETF_ - Internet Engineering Task Force
+
+  * _RFC_ - Request For Comment
+
+  * _SSL_ - Socket Secure Layer (predecessor of TLS, first used by
+    Netscape Web Browser)
+
+  * _TLS_ - Transport Layer Security (over TCP) - provides security for
+    TCP based protocols, such as HTTP, FTP, SMTP and so on.
+
+  * _DTLS_ - Datagram Transport Layer Security - provides security for
+    UDP based protocols.
+
+  * _PKI_ - Public Key Infrastructure
+
+  * _Non-Repudiation_ (Used for digital signature and data integrity)
+    * If the message recipient has the data received from the sender,
+      the data hash created by the sender's private key, the sender's
+      public key and the receiver is really sure about the public key
+      ownership validated by a CA - Certificate Authority. The sender,
+      owner of the private key, cannot deny that he or she really sent
+      the message and cannot deny anything about the message content.
+
+  * _CA_ - Certificate Authority (PKI - Public Key Infrastructure)
+    + Provides _non-repudiation_, it allows the receiver of the message,
+      for instance a Web browser, to be sure about sender, which could
+      be a the http server, _identity_ and the sender is really the
+      intended communication counterparty. The CA chain also solves
+      the MITM problem. Web browsers use a built-in set of certificate
+      authorities trusted by the browser vendor, which are used for
+      validating certificates from web sites (http servers).
+
+  * _SRP_ - Secure Remote Password
+
+  * _CRL_ - Certificate Revocation List
+
+  * _RSA_ - Rivest–Shamir–Adleman public-key algorithm.
+
+  * _ECC_ - Elliptic Curve Cryptography
+
+  * _ECDSA_ - Elliptic Curve Digital Signature Algorithm 
+
+  * _MAC_ - Message Authentication Code
+
+  * _HMAC_ - Keyed-Hashing for Message Authentication
+
+  * _DES_ - Data Encryption Standard
+
+  *Further Reading* 
+
+Technical standards and specifications: 
+
+  + [[https://tools.ietf.org/html/rfc2246][RFC 2246 - The TLS Protocol Version 1.0]]
+    + "This document specifies Version 1.0 of the Transport Layer
+      Security (TLS) protocol. The TLS protocol provides
+      communications privacy over the Internet. The protocol allows
+      client/server applications to communicate in a way that is
+      designed to prevent eavesdropping, tampering, or message
+      forgery." 
+
+  + [[https://tools.ietf.org/html/rfc4346][RFC 4346 - The Transport Layer Security (TLS) Protocol Version 1.1]]
+
+  + [[https://datatracker.ietf.org/doc/rfc8446/][RFC 8446 - The Transport Layer Security (TLS) Protocol Version 1.3]]
+
+  + [[https://tools.ietf.org/html/rfc4680][RFC 4680 - TLS Handshake Message for Supplemental Data]]
+
+  + [[https://tools.ietf.org/html/rfc4681][RFC 4681 - TLS User Mapping Extension]]
+
+  + [[https://tools.ietf.org/html/rfc5746][RFC 5746 - Transport Layer Security (TLS) Renegotiation Indication Extension]]
+
+  + [[https://tools.ietf.org/html/rfc6476][RFC 6476 - Using Message Authentication Code (MAC) Encryption in the Cryptographic Message Syntax (CMS)]]
+
+  + [[https://tools.ietf.org/html/rfc5280][RFC 5280 - Internet X.509 Public Key Infrastructure Certificate and Certificate Revocation List (CRL) Profile]]
+
+  + [[https://tools.ietf.org/html/rfc8484][RFC 8484 - DNS Queries over HTTPS (DoH)]]
+
+SSL/TSL Concepts: 
+
+  + [[https://en.m.wikipedia.org/wiki/Information_security][INFOSEC - Information security]]
+
+  + [[https://en.m.wikipedia.org/wiki/X.509][X.509 Certificate]]
+
+  + [[https://en.m.wikipedia.org/wiki/Online_Certificate_Status_Protocol][Online Certificate Status Protocol]] 
+
+  + [[https://en.m.wikipedia.org/wiki/OpenSSL][OpenSSL]] - Reference implementation of TSL and SSL protocols.
+
+  + [[https://www.thesslstore.com/blog/tls-1-3-approved/][TLS 1.3 is finally published by the IETF as RFC 8446 - Hashed Out]]
+
+  + [[https://en.m.wikipedia.org/wiki/Comparison_of_TLS_implementations][Comparison of TLS implementations]]
+
+  + [[https://www.cloudflare.com/learning/ssl/what-is-ssl/][What is SSL (Secure Sockets Layer)? | Cloudflare]]
+
+  + [[https://www.ssl.com/faqs/faq-what-is-ssl/][What is SSL? - SSL.com]]
+
+  + [[https://security.stackexchange.com/questions/14858/mac-vs-encryption][cryptography - MAC vs Encryption - Information Security Stack Exchange]]
+
+  + [[https://security.stackexchange.com/questions/2202/lessons-learned-and-misconceptions-regarding-encryption-and-cryptology/2206#2206][cryptography - Lessons learned and misconceptions regarding encryption and cryptology]]
+
+  + [[https://searchsecurity.techtarget.com/definition/message-authentication-code-MAC][What is message authentication code (MAC)? - Definition from WhatIs.com]]
+
+  + [[https://www.cloudflare.com/learning/ssl/what-happens-in-a-tls-handshake/][What Happens in a TLS Handshake? | SSL Handshake | Cloudflare]]
+
+Cryptography Concepts: 
+
+ + [[https://en.m.wikipedia.org/wiki/Public-key_cryptography][Public-key cryptography]]
+
+ + [[https://en.m.wikipedia.org/wiki/Symmetric-key_algorithm][Symmetric-key algorithm]]
+
+ + [[https://en.m.wikipedia.org/wiki/Web_of_trust][Web of trust]] 
+
+ + PKI - [[https://en.m.wikipedia.org/wiki/Public_key_infrastructure][Public key infrastructure]]
+
+ + [[https://www.acunetix.com/blog/articles/tls-ssl-terminology-basics-part-3/][TLS Security 3: SSL/TLS Terminology and Basics | Acunetix]]
+
+ + [[https://en.wikipedia.org/wiki/Elliptic_Curve_Digital_Signature_Algorithm][Elliptic Curve Digital Signature Algorithm - Wikipedia]]
+
+ + [[https://en.bitcoin.it/wiki/Elliptic_Curve_Digital_Signature_Algorithm#:~:text=Elliptic%20Curve%20Digital%20Signature%20Algorithm%20or%20ECDSA%20is%20a%20cryptographic,the%20person%20that%20generated%20it.][Elliptic Curve Digital Signature Algorithm - Bitcoin Wiki]]
+
+ + [[https://blog.cloudflare.com/ecdsa-the-digital-signature-algorithm-of-a-better-internet/][ECDSA: The digital signature algorithm of a better internet]]
+
+ + [[https://blog.cloudflare.com/a-relatively-easy-to-understand-primer-on-elliptic-curve-cryptography/][A (Relatively Easy To Understand) Primer on Elliptic Curve Cryptography]]
+
+OpenSSL API
+
+ + [[https://wiki.openssl.org/index.php/SSL/TLS_Client][SSL/TLS Client - OpenSSLWiki]]
+
+ + [[https://wiki.openssl.org/index.php/Simple_TLS_Server][Simple TLS Server - OpenSSLWiki]]
+
+ + [[https://linux.die.net/man/3/ssl][ssl(3) API Manpage]]
+
+ + [[https://manpages.ubuntu.com/manpages/bionic/man7/ssl.7ssl.html][Ubuntu Manpage: ssl - OpenSSL SSL/TLS library]]
+
+ + [[https://www.usenix.org/sites/default/files/conference/protected-files/security16_slides-yun.pdf][USENIX - APISan: Sanitizing API Usages through Semantic  Cross-checking]]
+
+ + [[https://www.informit.com/articles/article.aspx?p=22079][Securing Sockets with OpenSSL (Part 1) | Differentiating the Authorities | InformIT]]
+
+ + [[https://www.informit.com/articles/article.aspx?p=22078][Securing Sockets with OpenSSL (Part 2) | Writing an HTTPS Server | InformIT]]
+
+ + [[https://www.openssl.org/docs/man1.0.2/man3/SSL_CTX_load_verify_locations.html][/docs/man1.0.2/man3/SSL_CTX_load_verify_locations.html]]
+
+ + [[https://geekcabi.net/article/using-ssl-connections-over-ncat/][GeekCabinet – Using SSL Connections Over ncat]]
+
+DoH - DNS over HTTPS (DNS over TLS)
+
+ + [[https://www.ssl.com/faqs/what-is-dns-over-https-doh/][What is DNS over HTTPS (DoH)? - SSL.com]]
+
+ + [[https://tools.ietf.org/html/rfc8484][RFC 8484 - DNS Queries over HTTPS (DoH)]]
+
+ + [[https://www.thesslstore.com/blog/what-is-dns-over-tls/#:~:text=DNS%20over%20TLS%20is%20a,is%20the%20successor%20to%20SSL.][What is DNS over TLS? Everything you need to know]]
+
+ + [[https://en.wikipedia.org/wiki/DNS_over_TLS][DNS over TLS - Wikipedia]]
+
+*** TCP/IP Client Socket with TLS (OpenSSL)
+
+This sample code contains a TCP/IP client socket using TLS 
+encapsulation for secure communication. 
+
+OpenSSL Documentation: 
+  + https://www.openssl.org/docs
+  + https://www.openssl.org/docs/manmaster/man3/
+
+All codes and files available at: 
+
+ + https://gist.github.com/bb884fd36b8930cb7358133c2afe9b56
+
+ *File:* _CMakeLists.txt_ 
+
+#+BEGIN_SRC cmake 
+   cmake_minimum_required(VERSION 3.9)
+   project(Sample_SLL)
+
+   #========== Global Configurations =============#
+   #----------------------------------------------#
+
+   set(CMAKE_CXX_STANDARD 17)     
+   set(CMAKE_VERBOSE_MAKEFILE ON )
+
+   #----------- Set targets -------------------------------#
+
+   find_package( OpenSSL REQUIRED )
+
+          add_executable( ssl-test ssl-test.cpp    )
+   target_link_libraries( ssl-test ${OPENSSL_LIBRARIES} )
+#+END_SRC
+
+ *File:* _ssl-test.cpp_ 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+  #include <cstring> // Equivalent to #include <string.h> in C
+  #include <cassert> // assert() macro.
+
+  // ----- Unix/Linux headers -----// 
+  #include <unistd.h>
+  #include <fcntl.h>
+  #include <sys/types.h>    
+  #include <sys/socket.h>
+  #include <netdb.h>
+  #include <limits.h>
+  #include <tuple>
+
+  // ----- OpenSSL headers -------//
+  #include <openssl/ssl.h>
+  #include <openssl/bio.h>
+  #include <openssl/err.h>
+
+  constexpr int FAILURE     = -1;
+  constexpr int SSL_FAILURE = -1;
+
+  using SSL_Tuple = std::tuple<SSL_CTX*, SSL*>;
+
+  // Create and return a client socket and connecting to a hostname.
+  int socket_connect(const char* hostname, std::uint16_t port);
+
+  // Instantiate SSL data structures.
+  SSL_Tuple setup_ssl();
+
+  // Shows certificate information. 
+  void display_certificate(SSL* ssl);
+
+  int main(int argc, char** argv)
+  {
+      if(argc < 3)
+      {
+          std::fprintf(stderr, " Usage: %s <HOSTNAME> <PORT> \n", argv[0]);
+          return EXIT_FAILURE;
+      }
+
+      uint16_t    port     = std::stod(argv[2]);
+      const char* hostname = argv[1];
+
+      const char* trust_cert_path = X509_get_default_cert_dir();
+
+      std::fprintf( stderr, " [TRACE] X509 Trust Certificate Directory: %s \n"
+                  , trust_cert_path);
+
+      // =========== SSL/TSL Initialization ===============//
+      //---------------------------------------------------// 
+
+      // Requires C++ 17
+      auto [ctx, ssl] = setup_ssl();
+
+      //============ Connect to server =====================// 
+      //----------------------------------------------------//
+    
+      int sockfd = socket_connect(hostname, port);
+    
+      // Encapsulate TCP protcol 
+      SSL_set_fd(ssl, sockfd);
+    
+      if( SSL_connect(ssl) == SSL_FAILURE )
+      {
+          std::fprintf(stderr, " [ERROR] Failure to setup SSL/TSL connection");
+          ERR_print_errors_fp(stderr);
+          std::abort();
+      }
+
+      std::fprintf(stdout, " [INFO] Connected to the server Ok. ");
+
+      // From OpenSSL library
+      display_certificate(ssl);
+
+      // Check certifcate 
+      if( SSL_get_verify_result(ssl) == X509_V_OK ) {
+          std::fprintf(stdout, " [INFO] Certificate validated. Ok. \n");
+      } else { 
+          std::fprintf(stdout, " [ERROR] Certificate validation. => May be self signed. \n");
+          ERR_print_errors_fp(stderr);
+      }
+
+
+      // ========= Session Loop =============================//
+      //-----------------------------------------------------//
+    
+      constexpr size_t BUFFER_SIZE = 500;
+      // Null character '\0' initialized buffer 
+      char buffer[BUFFER_SIZE] = {0}; 
+
+      for(;;)
+      {
+          ssize_t size = SSL_read(ssl, buffer, BUFFER_SIZE);
+        
+          // Return 0 bytes when peer (server) closes connection.
+          if(size == 0)
+          {
+              std::fprintf(stderr, " [INFO] Peer closed the connection. \n");
+              break;
+          }
+          if(size == -1){
+              std::fprintf(stderr, " [ERROR] Failed to read socket. \n");
+          }
+          std::string msg = " [SERVER] " + std::string(buffer, buffer + size);
+          std::cout << msg << '\n';
+
+          // Write back message to server.
+          SSL_write(ssl, msg.data(), msg.size() );
+      }
+
+      // ========= Dispose Resources ========================//
+      //-----------------------------------------------------//
+
+      // Dispose resource (file descriptor)
+      close(sockfd);
+      // Release SSL context 
+      SSL_CTX_free(ctx);
+  }
+
+      //==================================================//
+      //          I M P L E M E N T A T I O N S           // 
+      //==================================================// 
+
+  int 
+  socket_connect(const char* hostname, std::uint16_t port)
+  {
+      int sockfd =  socket (  AF_INET, SOCK_STREAM, 0);
+      // assert() => Placeholder for future error handling.
+      assert( sockfd != FAILURE );
+
+      // Query DNS 
+      struct hostent* h = gethostbyname(hostname);
+      assert( h != nullptr );
+    
+      struct sockaddr_in sa; 
+      std::memcpy(&sa.sin_addr.s_addr, h->h_addr, h->h_length);
+      sa.sin_family = AF_INET;
+      sa.sin_port   = htons(port); 
+
+      int res = connect(  sockfd
+                        , reinterpret_cast<sockaddr*>(&sa)
+                        , sizeof(sockaddr_in));
+      assert( res != FAILURE && "Failure to connect => Check errno. " );
+    
+      return sockfd;
+  }
+
+  SSL_Tuple
+  setup_ssl()
+  {
+      SSL_load_error_strings();
+      ERR_load_BIO_strings();
+      OpenSSL_add_all_algorithms();
+      SSL_library_init();
+    
+      // Instantiate SSL method 
+      const SSL_METHOD* method = SSLv23_method();
+      assert( method != nullptr && "Failure to load SSL method.");
+
+      // Create SSL context (ctx)
+      SSL_CTX* ctx = SSL_CTX_new( method );
+      if( ctx == nullptr )
+      {
+          std::fprintf(stderr, " [ERROR] Failed to create SSL context \n");
+          ERR_print_errors_fp(stderr);
+          std::abort();
+      }
+
+      if( !SSL_CTX_set_default_verify_paths(ctx) )
+      {
+          std::fprintf(stderr, " [ERROR] Failure to set default trusted CA paths");
+          ERR_print_errors_fp(stderr);
+          exit(EXIT_FAILURE);
+      }
+
+      SSL* ssl = SSL_new(ctx);
+      assert( ssl != nullptr );
+
+      return SSL_Tuple{ ctx, ssl };
+  }
+
+  void 
+  display_certificate(SSL* ssl)
+  {
+      X509* cert = SSL_get_peer_certificate(ssl);
+      if( cert == nullptr )
+      {
+          std::fprintf(stderr, " [ERROR] Failed to get certificate \n");
+          ERR_print_errors_fp(stderr);
+          return;
+      }    
+
+      char* out  = nullptr;
+    
+      long version = X509_get_version(cert);
+      std::fprintf(stdout, " [CERTIFICATE] version = %d \n", version);
+
+      out = X509_NAME_oneline( X509_get_subject_name(cert), 0, 0);
+      std::fprintf(stdout, " [CERTIFICATE] name = %s \n", out);
+      free(out);
+
+      out = X509_NAME_oneline( X509_get_issuer_name(cert), 0, 0);
+      std::fprintf(stdout, " [CERTIFICATE] issuer = %s \n", out);
+      free(out);
+
+      X509_free(cert);
+  }
+#+END_SRC
+
+  *Install OpenSSL Dependency* 
+
+Debian and Ubuntu Linux: 
+
+#+BEGIN_SRC sh 
+  $ sudo apt-get install libssl-dev
+#+END_SRC
+
+Fedora Linux: 
+
+#+BEGIN_SRC sh 
+   $ sudo dnf install -y openssl-devel.x86_64
+#+END_SRC
+
+ *Building* 
+
+Building manually: 
+
+#+BEGIN_SRC sh 
+   $ >> git clone https://gist.github.com/bb884fd36b8930cb7358133c2afe9b56 proj && cd proj 
+   $ >> g++ ssl-test.cpp -o ssl-test -std=c++1z -Wall -Wextra -lssl -lcrypto
+#+END_SRC
+
+Building with CMake: 
+
+#+BEGIN_SRC sh 
+   $ >> git clone https://gist.github.com/bb884fd36b8930cb7358133c2afe9b56 proj && cd proj 
+
+   $ >> ls
+  cert.pem  CMakeLists.txt  key.pem  ssl-test.cpp
+
+   $ >> cmake -H. -B_build -DCMAKE_BUILD_TYPE=Debug
+   $ >> cmake --build _build --target
+
+   $ >> file _build/ssl-test 
+  _build/ssl-test: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), 
+  dynamically linked, interpreter /lib64/ld-linux-x86-64.so.
+  2, BuildID[sha1]=ff0d3e3765841a53a13dab7b700726fcbd92fe56, for GNU/Linux 3.2.0, with debug_info, not stripped
+#+END_SRC
+
+  *Generate a sample certificate for testing purposes* 
+
+Create a certificate (cert.pem) and private key (key.pem) and answer the prompt. 
+
+#+BEGIN_SRC sh 
+  $ openssl req -x509 -nodes -days 5000 -newkey rsa:1024 -keyout key.pem -out cert.pem
+#+END_SRC
+
+View certificate: 
+
+#+BEGIN_SRC sh
+    $ >> openssl x509 -text -in cert.pem
+
+   Certificate:
+       Data:
+           Version: 3 (0x2)
+           Serial Number:
+               57:5b:cc:50:94:fe:5f:e8:cb:7e:44:43:80:50:76:27:47:61:ba:7e
+           Signature Algorithm: sha256WithRSAEncryption
+           Issuer: C = UK, ST = Bristol, L = Yorkshire, O = some company, OU = dummy department, CN = www.myserver.com, emailAddress = company@mail.co.de
+           Validity
+               Not Before: Dec  9 22:25:09 2020 GMT
+               Not After : Aug 18 22:25:09 2034 GMT
+           Subject: C = UK, ST = Bristol, L = Yorkshire, O = some company, OU = dummy department, CN = www.myserver.com, emailAddress = company@mail.co.de
+           Subject Public Key Info:
+               Public Key Algorithm: rsaEncryption
+                   RSA Public-Key: (1024 bit)
+                   Modulus:
+                       00:f3:73:c4:8c:86:6e:d5:06:a7:86:5d:1d:2f:f3:
+                       e7:7e:cd:f5:30:b5:c7:21:47:c2:8b:3f:f4:f3:09:
+                       30:27:7e:5f:9d:a9:44:b9:5d:e4:50:4b:fe:d7:41:
+                       d0:17:da:72:a6:99:f7:25:c5:e1:f1:1f:ee:47:69:
+                       d0:c2:47:63:f7:f1:4a:ff:aa:3c:66:57:29:35:a4:
+                       c8:9d:b2:cf:44:e4:c4:15:21:8b:4d:25:61:c3:ee:
+                       c4:47:50:88:b6:19:d7:77:06:39:d8:6f:34:f0:51:
+                       9f:86:78:2e:5c:d9:a5:e6:33:c4:29:a4:f8:8e:01:
+                       c0:c7:27:fe:73:bf:ea:3d:2f
+                   Exponent: 65537 (0x10001)
+           X509v3 extensions:
+               X509v3 Subject Key Identifier: 
+                   52:48:8A:A3:78:49:BD:65:A5:E2:C9:EC:86:FF:05:93:D1:7F:A4:C4
+               X509v3 Authority Key Identifier: 
+                   keyid:52:48:8A:A3:78:49:BD:65:A5:E2:C9:EC:86:FF:05:93:D1:7F:A4:C4
+
+               X509v3 Basic Constraints: critical
+                   CA:TRUE
+       Signature Algorithm: sha256WithRSAEncryption
+            b8:ee:be:e6:17:5f:9f:be:61:9f:05:c8:d2:58:f7:86:70:84:
+            5f:4b:0c:2a:e8:e5:19:03:20:62:6f:93:34:0c:65:af:68:ac:
+            95:ac:33:84:7e:3e:04:54:69:26:a3:f6:60:61:25:38:f2:0c:
+            24:94:fc:68:5a:f4:02:e1:61:8c:a7:bd:63:1d:39:e0:b9:f7:
+            d7:77:ea:1e:5b:10:13:29:85:26:bf:a0:dc:e6:7d:4f:ff:73:
+            26:e4:d7:92:f3:be:6c:5b:55:c9:6f:e3:4e:1a:a6:b0:a8:ce:
+            59:e8:4c:21:b3:b7:03:7c:26:71:a4:61:8d:24:9b:cf:d8:d4:
+            8a:4b
+   -----BEGIN CERTIFICATE-----
+   MIIDJDCCAo2gAwIBAgIUV1vMUJT+X+jLfkRDgFB2J0dhun4wDQYJKoZIhvcNAQEL
+   BQAwgaMxCzAJBgNVBAYTAlVLMRAwDgYDVQQIDAdCcmlzdG9sMRIwEAYDVQQHDAlZ
+   b3Jrc2hpcmUxFTATBgNVBAoMDHNvbWUgY29tcGFueTEZMBcGA1UECwwQZHVtbXkg
+   ZGVwYXJ0bWVudDEZMBcGA1UEAwwQd3d3Lm15c2VydmVyLmNvbTEhMB8GCSqGSIb3
+   DQEJARYSY29tcGFueUBtYWlsLmNvLmRlMB4XDTIwMTIwOTIyMjUwOVoXDTM0MDgx
+   ODIyMjUwOVowgaMxCzAJBgNVBAYTAlVLMRAwDgYDVQQIDAdCcmlzdG9sMRIwEAYD
+   VQQHDAlZb3Jrc2hpcmUxFTATBgNVBAoMDHNvbWUgY29tcGFueTEZMBcGA1UECwwQ
+   ZHVtbXkgZGVwYXJ0bWVudDEZMBcGA1UEAwwQd3d3Lm15c2VydmVyLmNvbTEhMB8G
+   CSqGSIb3DQEJARYSY29tcGFueUBtYWlsLmNvLmRlMIGfMA0GCSqGSIb3DQEBAQUA
+   A4GNADCBiQKBgQDzc8SMhm7VBqeGXR0v8+d+zfUwtcchR8KLP/TzCTAnfl+dqUS5
+   XeRQS/7XQdAX2nKmmfclxeHxH+5HadDCR2P38Ur/qjxmVyk1pMidss9E5MQVIYtN
+   JWHD7sRHUIi2Gdd3BjnYbzTwUZ+GeC5c2aXmM8QppPiOAcDHJ/5zv+o9LwIDAQAB
+   o1MwUTAdBgNVHQ4EFgQUUkiKo3hJvWWl4snshv8Fk9F/pMQwHwYDVR0jBBgwFoAU
+   UkiKo3hJvWWl4snshv8Fk9F/pMQwDwYDVR0TAQH/BAUwAwEB/zANBgkqhkiG9w0B
+   AQsFAAOBgQC47r7mF1+fvmGfBcjSWPeGcIRfSwwq6OUZAyBib5M0DGWvaKyVrDOE
+   fj4EVGkmo/ZgYSU48gwklPxoWvQC4WGMp71jHTnguffXd+oeWxATKYUmv6Dc5n1P
+   /3Mm5NeS875sW1XJb+NOGqawqM5Z6Ewhs7cDfCZxpGGNJJvP2NSKSw==
+   -----END CERTIFICATE-----
+#+END_SRC
+
+ *Run Netcat server as TLS server using the generated certificate* 
+
+Netcat terminal emulator: 
+
+#+BEGIN_SRC sh 
+   $ >> nc --verbose  --ssl-key key.pem --ssl-cert cert.pem --listen 9051
+  Ncat: Version 7.80 ( https://nmap.org/ncat )
+  Ncat: Listening on :::9051
+  Ncat: Listening on 0.0.0.0:9051
+  Ncat: Connection from 127.0.0.1.
+  Ncat: Connection from 127.0.0.1:60202.
+  User types message in server terminal, the client sends them back to server
+   [SERVER] User types message in server terminal, the client sends them back to server
+  Turn on control valve 
+   [SERVER] Turn on control valve
+  Shutdown cooling system
+   [SERVER] Shutdown cooling system
+  Solve control equations
+   [SERVER] Solve control equations
+  Type Ctrl + C at server terminal to shutdown the connection.^C⏎   
+#+END_SRC
+
+TLS Client terminal emulator: 
+
+#+BEGIN_SRC sh 
+  $ ./build/ssl-test localhost 9051 
+   [TRACE] X509 Trust Certificate Directory: /etc/pki/tls/certs 
+   [INFO] Connected to the server Ok.  [CERTIFICATE] version = 2 
+   [CERTIFICATE] name = /C=UK/ST=Bristol/L=Yorkshire/O=some company/OU=dummy department/CN=www.myserver.com/emailAddress=company@mail.co.de 
+   [CERTIFICATE] issuer = /C=UK/ST=Bristol/L=Yorkshire/O=some company/OU=dummy department/CN=www.myserver.com/emailAddress=company@mail.co.de 
+   [ERROR] Certificate validation. => May be self signed. 
+   [SERVER] User types message in server terminal, the client sends them back to server
+
+   [SERVER] Turn on control valve
+
+   [SERVER] Shutdown cooling system
+
+   [SERVER] Solve control equations
+
+   [INFO] Peer closed the connection. 
+#+END_SRC
+
+ *Attempt to connect to web sites using HTTPS - HTTP/TLS (port 443)* 
+
+#+BEGIN_SRC sh 
+   $ >> build/ssl-test www.yahoo.com 443
+   [TRACE] X509 Trust Certificate Directory: /etc/pki/tls/certs 
+   [INFO] Connected to the server Ok.  [CERTIFICATE] version = 2 
+   [CERTIFICATE] name = /C=US/ST=California/L=Sunnyvale/O=Oath Inc/CN=*.www.yahoo.com 
+   [CERTIFICATE] issuer = /C=US/O=DigiCert Inc/OU=www.digicert.com/CN=DigiCert SHA2 High Assurance Server CA 
+   [INFO] Certificate validated. Ok. 
+  ^C^C⏎  
+
+   $ >> build/ssl-test www.bing.com 443
+   [TRACE] X509 Trust Certificate Directory: /etc/pki/tls/certs 
+   [INFO] Connected to the server Ok.  [CERTIFICATE] version = 2 
+   [CERTIFICATE] name = /CN=www.bing.com 
+   [CERTIFICATE] issuer = /C=US/O=Microsoft Corporation/CN=Microsoft RSA TLS CA 02 
+   [INFO] Certificate validated. Ok. 
+  ^C⏎ 
+#+END_SRC
+
 ** Sockets with Multiplexed IO APIs (poll, epoll) [DRAFT]
 *** Overview 
 
@@ -13416,6 +14093,77 @@ Animation:
   * [[https://www.x.org/releases/X11R7.5/doc/man/man1/xeyes.1.html][xeyes]] - Eye animation that follows the mouse pointer.
 
   * [[https://linux.die.net/man/1/xlogo][xlogo]] - X windows System "X" logo picture.
+
+*** Setting  keyboard mode via setxkbmap
+
+There many cases where there is the need for changing the keyboard
+settings, such as testing a Live-CD linux distribution, that oftens
+uses the American keyboard settings by default, even though the
+keyboard model is non-English; type in languages that does not uses
+the lantin script or practice foreign languages that uses a different
+type of keyboard configuration. The command line tool setxkbmap is
+useful for setting the keyboard language mode in X11 X Windows System
+environment. 
+
+Note: The setxkmap does not work on Wayland environment. This tool
+only works on X11 (X Windows System).
+
+Some commands for changing keyboard layout: 
+
+ * Swap Ctrl and Capslock (Friendly to Emacs users):
+   * /$ setxkbmap ctrl:swapcaps/
+
+ * Swap ESC (Escape) and Capslock (Friendly to Vi Users):
+   * $ /setxkbmap -option caps:swapescape/
+
+ * [[https://en.wikipedia.org/wiki/British_and_American_keyboards][American]] keyboard layout:
+   + /$ setxkbmap us/
+
+ * American keyboard layout with dvorak keyboard:
+   + /$ setxkbmap us -variant dvorak/
+
+ * American and Greek keyboard layouts. (use-case: typing math formulas)
+   * /$ setxkbmap -layout us,gr -option grp:alt_shift_toggle/
+   * Type Shift + Alt for toggling the layout to Greek. This
+     configuration is useful for typing math formulas.
+
+ * American and Greek keyboard layout. (case-case: typing math formulas)
+   * /$ setxkbmap -layout us,gr -option grp:win_switch/
+   * Hold Windows-key and the corresponding key to type in Greek. For
+     instance, by holding Windows-Key and typing A, the letter alpha
+     (α) is typed instead of (a). If the same steps is applied to the
+     letter (b), the letter beta (β) is typed.
+
+ * French keyboard layout:
+   + /$ setxkbmap fr/
+
+ * [[https://en.wikipedia.org/wiki/German_keyboard_layout][German]] keyboard layout. 
+   + /$ setxkbmap de/
+
+ * Greek keyboard layout:
+   * /$ setxkbmap gr/
+
+ * Bulgarian keyboard layout (Cyrillic Script):
+   * /$ setxkbmap bg/
+
+ * Russian keyboard layout (Cyrillic Script):
+   * /$ setxkmap ru/
+
+ * Ukranian keyboard layout (Cyrillic Script):
+   * /$ setxkmap ua/
+
+ * Hebrew keyboard layout:
+   * /$ setxkbmap il/
+
+ * Spanish - Latin America keyboard layout:
+   * /$ setxkbmap latam/
+
+ * Portuguese ABNT2: 
+   * /$ setxkbmap -model abnt2 -layout br -variant abnt2/
+
+See also: 
+
+  * [[https://gist.github.com/jatcwang/ae3b7019f219b8cdc6798329108c9aee][List of all setxkbmap configuration options (including models/layout/etc) · GitHub]]
 
 *** Sample X11 Window via Xlib 
 
