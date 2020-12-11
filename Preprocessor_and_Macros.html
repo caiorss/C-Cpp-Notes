@@ -3,7 +3,7 @@
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
-<!-- 2020-11-27 Fri 15:11 -->
+<!-- 2020-12-11 Fri 14:14 -->
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>CPP / C++ - Preprocessor and Macros</title>
@@ -252,42 +252,822 @@ for the JavaScript code in this tag.
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents">
 <ul>
-<li><a href="#org347ee31">1. Preprocessor and macros</a>
+<li><a href="#org362a96e">1. Preprocessor and macros</a>
 <ul>
-<li><a href="#org7452143">1.1. General Predefined Macros</a></li>
-<li><a href="#org720a324">1.2. Macros for detecting platform or operating system</a></li>
-<li><a href="#org4efa5a3">1.3. Macros for detecting compiler</a></li>
-<li><a href="#org90e4ff1">1.4. Macros for detecting architecture</a></li>
-<li><a href="#orgdb02cb2">1.5. Macros for checking whether the compiler is 32 (x86) or 64 bits (x86-64)</a></li>
-<li><a href="#orga02e6e4">1.6. Useful macros for debugging and tracing</a></li>
-<li><a href="#org8761e41">1.7. Custom Assertion Macro</a>
+<li><a href="#orgd09fbf7">1.1. Enable and disable macros during compilation</a></li>
+<li><a href="#org871c7fa">1.2. Temporarily disable a code block</a></li>
+<li><a href="#orgee47372">1.3. Custom Assertion Macro</a>
 <ul>
-<li><a href="#orgac49be1">1.7.1. Simple assertion macro</a></li>
-<li><a href="#orgde3cf07">1.7.2. Improved assertion macro</a></li>
-<li><a href="#org3e633a8">1.7.3. Type equality assertion macro</a></li>
+<li><a href="#orgdbcf101">1.3.1. Simple assertion macro</a></li>
+<li><a href="#org1fa14e9">1.3.2. Improved assertion macro</a></li>
+<li><a href="#org10a532e">1.3.3. Type equality assertion macro</a></li>
 </ul>
 </li>
-<li><a href="#org7a4fafd">1.8. Tips and guidelines for writing macros</a>
+<li><a href="#org78c5a09">1.4. Tips and guidelines for writing macros</a>
 <ul>
-<li><a href="#org100e001">1.8.1. DO NOT Use macros for defining constants</a></li>
-<li><a href="#orgf96ce94">1.8.2. Use parenthesis within macros around parameter names</a></li>
-<li><a href="#orgbad3f1b">1.8.3. Dump all GCC's preprocessor defines</a></li>
-<li><a href="#orga258ecc">1.8.4. Dump all preprocessor macros from a given header file</a></li>
+<li><a href="#org70480a6">1.4.1. DO NOT Use macros for defining constants</a></li>
+<li><a href="#org8fd24a1">1.4.2. Use parenthesis within macros around parameter names</a></li>
+<li><a href="#orgb2a6589">1.4.3. Dump all GCC's preprocessor defines</a></li>
+<li><a href="#orgd18a364">1.4.4. Dump all preprocessor macros from a given header file</a></li>
 </ul>
 </li>
+<li><a href="#orgd2ad373">1.5. Useful macros for debugging and tracing</a></li>
+<li><a href="#org9eee74e">1.6. General Predefined Macros</a></li>
+<li><a href="#org18f1af8">1.7. Macros for detecting platform or operating system</a></li>
+<li><a href="#orga16989e">1.8. Macros for detecting compiler</a></li>
+<li><a href="#org7cd50b1">1.9. Macros for detecting architecture</a></li>
+<li><a href="#orga69a748">1.10. Macros for checking whether the compiler is 32 (x86) or 64 bits (x86-64)</a></li>
 </ul>
 </li>
 </ul>
 </div>
 </div>
 
-<div id="outline-container-org347ee31" class="outline-2">
-<h2 id="org347ee31"><span class="section-number-2">1</span> Preprocessor and macros</h2>
+<div id="outline-container-org362a96e" class="outline-2">
+<h2 id="org362a96e"><span class="section-number-2">1</span> Preprocessor and macros</h2>
 <div class="outline-text-2" id="text-1">
 </div>
-<div id="outline-container-org7452143" class="outline-3">
-<h3 id="org7452143"><span class="section-number-3">1.1</span> General Predefined Macros</h3>
+<div id="outline-container-orgd09fbf7" class="outline-3">
+<h3 id="orgd09fbf7"><span class="section-number-3">1.1</span> Enable and disable macros during compilation</h3>
 <div class="outline-text-3" id="text-1-1">
+<p>
+This section is reminder about how to enable and disable macros during
+compilation. This technique can be used for both C or C++. Note:
+defining macros with -DMACRO=VALUE only works for GCC(G++) or
+Clang. MSVC (Microsft Visual C++ compiler) uses '/' slash for defining
+macros from command line. I this case the macro can be defined using
+/DMACRO=VALUE. 
+</p>
+
+<p>
+File: <span class="underline">macro-test.cpp</span> 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">iostream</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+
+<span class="org-preprocessor">#if</span><span class="org-negation-char"><span class="org-preprocessor">n</span></span><span class="org-preprocessor">def</span> CODE_VERSION
+<span class="org-preprocessor">  #define</span> <span class="org-variable-name">CODE_VERSION</span> <span class="org-string">"0.1"</span> 
+<span class="org-preprocessor">#endif</span> 
+
+<span class="org-type">int</span> <span class="org-function-name">main</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">int</span> <span class="org-variable-name">argc</span>, <span class="org-type">char</span>** <span class="org-variable-name">argv</span><span class="org-rainbow-delimiters-depth-1">)</span>
+<span class="org-rainbow-delimiters-depth-1">{</span>
+
+  <span class="org-keyword">if</span><span class="org-rainbow-delimiters-depth-2">(</span>argc &lt; 2<span class="org-rainbow-delimiters-depth-2">)</span>
+  <span class="org-rainbow-delimiters-depth-2">{</span>
+      <span class="org-constant">std</span>::fprintf<span class="org-rainbow-delimiters-depth-3">(</span>stderr,  <span class="org-string">" Product version: %s \n"</span>, CODE_VERSION<span class="org-rainbow-delimiters-depth-3">)</span>;
+      <span class="org-constant">std</span>::fprintf<span class="org-rainbow-delimiters-depth-3">(</span>stderr, <span class="org-string">" Usage: %s &lt;NUMBER&gt; \n"</span>, argv<span class="org-rainbow-delimiters-depth-4">[</span>0<span class="org-rainbow-delimiters-depth-4">]</span><span class="org-rainbow-delimiters-depth-3">)</span>;
+      <span class="org-keyword">return</span> EXIT_FAILURE;
+  <span class="org-rainbow-delimiters-depth-2">}</span>
+
+  <span class="org-type">int</span> <span class="org-variable-name">n</span>    = <span class="org-constant">std</span>::stoi<span class="org-rainbow-delimiters-depth-2">(</span>argv<span class="org-rainbow-delimiters-depth-3">[</span>1<span class="org-rainbow-delimiters-depth-3">]</span><span class="org-rainbow-delimiters-depth-2">)</span>;
+  <span class="org-type">int</span> <span class="org-variable-name">prod</span> = 1;
+
+  <span class="org-keyword">for</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">int</span> <span class="org-variable-name">i</span> = 1; i &lt;= n; i++<span class="org-rainbow-delimiters-depth-2">){</span>
+    prod *= i;
+
+<span class="org-preprocessor">    #if</span> LOGGING 
+      <span class="org-constant">std</span>::fprintf<span class="org-rainbow-delimiters-depth-3">(</span>stderr, <span class="org-string">" =&gt; i = %d ; prod = %d \n"</span>, i, prod<span class="org-rainbow-delimiters-depth-3">)</span>; 
+<span class="org-preprocessor">    #endif</span> 
+  <span class="org-rainbow-delimiters-depth-2">}</span>
+
+  <span class="org-constant">std</span>::printf<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">" =&gt; product = %d \n"</span>, prod<span class="org-rainbow-delimiters-depth-2">)</span>; 
+
+  <span class="org-comment-delimiter">// </span><span class="org-comment">Same as: return 0;</span>
+  <span class="org-keyword">return</span> EXIT_SUCCESS;
+<span class="org-rainbow-delimiters-depth-1">}</span>
+</pre>
+</div>
+
+<p>
+File: <span class="underline">CMakeLists.txt</span> 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cmake"><span class="org-function-name">cmake_minimum_required</span>(VERSION 3.9)
+<span class="org-function-name">project</span>(MacroCmake)
+
+<span class="org-function-name">set</span>(CMAKE_CXX_STANDARD 17)     
+<span class="org-function-name">set</span>(CMAKE_VERBOSE_MAKEFILE ON )
+
+<span class="org-function-name">option</span>(ENABLE_LOGGING <span class="org-string">"Enable compilation with logging"</span> OFF)
+
+<span class="org-comment">#============== Set targets =============================#</span>
+
+            <span class="org-function-name">add_executable</span>( macro-test macro-test.cpp    )
+<span class="org-function-name">target_compile_definitions</span>( macro-test PRIVATE
+                                       CODE_VERSION=<span class="org-string">"\\"</span>0.25\\<span class="org-string">""</span>
+                           )
+
+<span class="org-keyword">IF</span>(ENABLE_LOGGING)
+  <span class="org-function-name">target_compile_definitions</span>( macro-test PRIVATE LOGGING)
+<span class="org-keyword">ENDIF</span>()
+</pre>
+</div>
+
+<p>
+<b>Building manually</b>  
+</p>
+
+<p>
+Build without setting any preprocessor directive.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">$ &gt;&gt; g++ macro-test.cpp -o <span class="org-keyword">macro-test.bin</span> -std=c++1z -Wall -Wextra
+
+$ &gt;&gt; ./macro-test.bin 
+Product version: 0.1 
+<span class="org-function-name">Usage</span>: ./macro-test.bin &lt;NUMBER&gt; 
+
+$ &gt;&gt; ./macro-test.bin 10
+=&gt; product = 3628800 
+</pre>
+</div>
+
+<p>
+Build defining the <span class="underline">LOGGING</span> macro. 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">$ &gt;&gt; ./macro-test.bin
+Product version: 0.1 
+<span class="org-function-name">Usage</span>: ./macro-test.bin &lt;NUMBER&gt; 
+
+$ &gt;&gt; g++ macro-test.cpp -o <span class="org-keyword">macro-test.bin</span> -std=c++1z -Wall -Wextra -DLOGGING
+
+$ &gt;&gt; ./macro-test.bin 5
+=&gt; i = 1 ; prod = 1 
+=&gt; i = 2 ; prod = 2 
+=&gt; i = 3 ; prod = 6 
+=&gt; i = 4 ; prod = 24 
+=&gt; i = 5 ; prod = 120 
+=&gt; product = 120 
+</pre>
+</div>
+
+<p>
+<b>Building with CMake</b> 
+</p>
+
+<p>
+Build defining a different value for the version macro. 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">$ &gt;&gt; g++ macro-test.cpp -o <span class="org-keyword">macro-test.bin</span> -std=c++1z -Wall -Wextra -DLOGGING -DCODE_VERSION=<span class="org-string">'"1.5"'</span>
+
+$ &gt;&gt; ./macro-test.bin
+Product version: 1.5 
+<span class="org-function-name">Usage</span>: ./macro-test.bin &lt;NUMBER&gt; 
+
+
+$ &gt;&gt; ./macro-test.bin 6
+=&gt; i = 1 ; prod = 1 
+=&gt; i = 2 ; prod = 2 
+=&gt; i = 3 ; prod = 6 
+=&gt; i = 4 ; prod = 24 
+=&gt; i = 5 ; prod = 120 
+=&gt; i = 6 ; prod = 720 
+=&gt; product = 720 
+</pre>
+</div>
+
+<p>
+Build without enabling logging. 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">$ &gt;&gt; cmake -H. -B_build -DCMAKE_BUILD_TYPE=Debug  
+$ &gt;&gt; cmake --build _build --target
+
+$ &gt;&gt; _build/macro-test 
+Product version: <span class="org-string">"0.25"</span> 
+<span class="org-function-name">Usage</span>: _build/macro-test &lt;NUMBER&gt; 
+
+$ &gt;&gt; _build/macro-test 6
+=&gt; product = 720 
+</pre>
+</div>
+
+<p>
+Build enabling logging. 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">$ &gt;&gt; cmake -H. -B_build -DCMAKE_BUILD_TYPE=Debug -DENABLE_LOGGING=ON
+$ &gt;&gt; cmake --build _build --target
+
+$ &gt;&gt; _build/macro-test 6
+=&gt; i = 1 ; prod = 1 
+=&gt; i = 2 ; prod = 2 
+=&gt; i = 3 ; prod = 6 
+=&gt; i = 4 ; prod = 24 
+=&gt; i = 5 ; prod = 120 
+=&gt; i = 6 ; prod = 720 
+=&gt; product = 720 
+</pre>
+</div>
+
+<p>
+Build defining macros on command line: (Note: this procedure is not
+portable, it will not work with MSVC - visual C++ compiler as the MSVC
+macros uses '/D' slash instead of '-D' dash for setting macros.)
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">$ &gt;&gt; cmake -H. -B_build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS=<span class="org-string">'-DLOGGING -DCODE_VERSION=\"3.0\"'</span>
+$ &gt;&gt; cmake --build _build --target
+
+$ &gt;&gt; _build/macro-test
+Product version: 3.0 
+<span class="org-function-name">Usage</span>: _build/macro-test &lt;NUMBER&gt; 
+
+$ &gt;&gt; _build/macro-test 4
+=&gt; i = 1 ; prod = 1 
+=&gt; i = 2 ; prod = 2 
+=&gt; i = 3 ; prod = 6 
+=&gt; i = 4 ; prod = 24 
+=&gt; product = 24 
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org871c7fa" class="outline-3">
+<h3 id="org871c7fa"><span class="section-number-3">1.2</span> Temporarily disable a code block</h3>
+<div class="outline-text-3" id="text-1-2">
+<p>
+A useful technique for during development of C or C++ applications is
+to surround a piece of code with macros ( <i>#if 1 &#x2026; #endif</i> ), for
+enabling the compilation of this code block, or (<i>#if 0</i> <i>&#x2026; #endif</i>),
+for disabling the compilation of this code block. This technique can
+be used identifying and isolating a piece of code that causes
+compile-time error or runtime error.
+</p>
+
+<ul class="org-ul">
+<li>Case 1 - Enable code block =&gt; Code block surrounded by #if 1 &#x2026; #else enabled.</li>
+</ul>
+
+<p>
+File: <span class="underline">macro-if-else.cpp</span>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">iostream</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+
+<span class="org-type">int</span> <span class="org-function-name">main</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">int</span> <span class="org-variable-name">arc</span>, <span class="org-type">char</span>** <span class="org-variable-name">argv</span><span class="org-rainbow-delimiters-depth-1">)</span>
+<span class="org-rainbow-delimiters-depth-1">{</span>
+  <span class="org-type">int</span> <span class="org-variable-name">n</span> = 10;
+  <span class="org-type">int</span> <span class="org-variable-name">sum</span> = 0;
+
+  <span class="org-keyword">for</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">int</span> <span class="org-variable-name">i</span> = 0; i &lt; n; i++<span class="org-rainbow-delimiters-depth-2">){</span>
+    sum += i;
+<span class="org-preprocessor">    #if</span> 1
+      <span class="org-constant">std</span>::printf<span class="org-rainbow-delimiters-depth-3">(</span><span class="org-string">" =&gt; i = %d ; sum = %d \n"</span>, i, sum<span class="org-rainbow-delimiters-depth-3">)</span>;
+<span class="org-preprocessor">    #endif</span>
+  <span class="org-rainbow-delimiters-depth-2">}</span>
+
+  <span class="org-constant">std</span>::printf<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">" =&gt; sum = %d \n"</span>, sum<span class="org-rainbow-delimiters-depth-2">)</span>;
+
+  <span class="org-keyword">return</span> 0;
+<span class="org-rainbow-delimiters-depth-1">}</span>
+</pre>
+</div>
+
+<p>
+Output: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">$ &gt;&gt; g++ macro-if-else.cpp -o <span class="org-keyword">macro-if-else.bin</span> -std=c++1z -Wall -Wextra
+
+$ &gt;&gt; ./macro-if-else.bin
+=&gt; i = 0 ; sum = 0 
+=&gt; i = 1 ; sum = 1 
+=&gt; i = 2 ; sum = 3 
+=&gt; i = 3 ; sum = 6 
+=&gt; i = 4 ; sum = 10 
+=&gt; i = 5 ; sum = 15 
+=&gt; i = 6 ; sum = 21 
+=&gt; i = 7 ; sum = 28 
+=&gt; i = 8 ; sum = 36 
+=&gt; i = 9 ; sum = 45 
+=&gt; sum = 45 
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>Case 2 - Code block Disabled =&gt; Coce block surrounded by #if 0 &#x2026; #else disabled.</li>
+</ul>
+
+<p>
+File: <span class="underline">macro-if-else.cpp</span>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">iostream</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+
+<span class="org-type">int</span> <span class="org-function-name">main</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">int</span> <span class="org-variable-name">arc</span>, <span class="org-type">char</span>** <span class="org-variable-name">argv</span><span class="org-rainbow-delimiters-depth-1">)</span>
+<span class="org-rainbow-delimiters-depth-1">{</span>
+  <span class="org-type">int</span> <span class="org-variable-name">n</span> = 10;
+  <span class="org-type">int</span> <span class="org-variable-name">sum</span> = 0;
+
+  <span class="org-keyword">for</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-type">int</span> <span class="org-variable-name">i</span> = 0; i &lt; n; i++<span class="org-rainbow-delimiters-depth-2">){</span>
+    sum += i;
+<span class="org-preprocessor">    #if</span> 0
+      <span class="org-constant">std</span>::printf<span class="org-rainbow-delimiters-depth-3">(</span><span class="org-string">" =&gt; i = %d ; sum = %d \n"</span>, i, sum<span class="org-rainbow-delimiters-depth-3">)</span>; 
+<span class="org-preprocessor">    #endif</span> 
+  <span class="org-rainbow-delimiters-depth-2">}</span>
+
+  <span class="org-constant">std</span>::printf<span class="org-rainbow-delimiters-depth-2">(</span><span class="org-string">" =&gt; sum = %d \n"</span>, sum<span class="org-rainbow-delimiters-depth-2">)</span>; 
+
+  <span class="org-keyword">return</span> 0;
+<span class="org-rainbow-delimiters-depth-1">}</span>
+</pre>
+</div>
+
+<p>
+Output: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">$ &gt;&gt; g++ macro-if-else.cpp -o <span class="org-keyword">macro-if-else.bin</span> -std=c++1z -Wall -Wextra
+
+$ &gt;&gt; ./macro-if-else.bin
+=&gt; sum = 45 
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-orgee47372" class="outline-3">
+<h3 id="orgee47372"><span class="section-number-3">1.3</span> Custom Assertion Macro</h3>
+<div class="outline-text-3" id="text-1-3">
+</div>
+<div id="outline-container-orgdbcf101" class="outline-4">
+<h4 id="orgdbcf101"><span class="section-number-4">1.3.1</span> Simple assertion macro</h4>
+<div class="outline-text-4" id="text-1-3-1">
+<p>
+Example: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">iostream</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">cassert</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+
+<span class="org-preprocessor">#define</span> <span class="org-variable-name">ASSERTION_ENABLED</span>
+
+<span class="org-comment-delimiter">// </span><span class="org-comment">Requires header: &lt;cassert&gt;</span>
+<span class="org-preprocessor">#ifdef</span>  ASSERTION_ENABLED
+<span class="org-preprocessor">  #define</span> <span class="org-function-name">ASSERT</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-variable-name">condition</span>, <span class="org-variable-name">text</span><span class="org-rainbow-delimiters-depth-1">)</span>    \
+              <span class="org-rainbow-delimiters-depth-1">{</span> <span class="org-keyword">if</span> <span class="org-rainbow-delimiters-depth-2">(</span><span class="org-negation-char">!</span><span class="org-rainbow-delimiters-depth-3">(</span>condition<span class="org-rainbow-delimiters-depth-3">)</span><span class="org-rainbow-delimiters-depth-2">)</span> <span class="org-rainbow-delimiters-depth-2">{</span>  \
+                               <span class="org-constant">std</span>::cerr &lt;&lt; <span class="org-string">" [ASSERTION] "</span> &lt;&lt;  __FILE__ &lt;&lt; <span class="org-string">":"</span> &lt;&lt; __LINE__ &lt;&lt; <span class="org-string">": "</span> \
+                             &lt;&lt; text &lt;&lt; <span class="org-string">"\n"</span> ;  \
+                               assert<span class="org-rainbow-delimiters-depth-3">(</span>condition<span class="org-rainbow-delimiters-depth-3">)</span>;   <span class="org-rainbow-delimiters-depth-2">}</span><span class="org-rainbow-delimiters-depth-1">}</span>
+<span class="org-preprocessor">#else</span>
+<span class="org-preprocessor">  #define</span> <span class="org-function-name">ASSERT</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-variable-name">condition</span>, <span class="org-variable-name">text</span><span class="org-rainbow-delimiters-depth-1">)</span>
+<span class="org-preprocessor">#endif</span>
+
+<span class="org-type">int</span> <span class="org-function-name">main</span><span class="org-rainbow-delimiters-depth-1">(){</span>
+        <span class="org-type">int</span> <span class="org-variable-name">x</span> = 100;
+        ASSERT<span class="org-rainbow-delimiters-depth-2">(</span>x &gt; 200, <span class="org-string">"Assumption: x &gt; 200"</span><span class="org-rainbow-delimiters-depth-2">)</span>;
+
+        <span class="org-keyword">return</span> 0;
+<span class="org-rainbow-delimiters-depth-1">}</span>
+</pre>
+</div>
+
+<p>
+When the assertion fails, it prints the message: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">g++ scractch.cpp -o <span class="org-keyword">scractch.bin</span> -g -std=c++1z -Wall -Wextra &amp;&amp; ./scractch.bin
+ [ASSERTION] scractch.cpp:33: Assumption: x &gt; 200
+<span class="org-function-name">scractch.bin</span>: scractch.cpp:33: int main(): Assertion <span class="org-sh-quoted-exec">`x &gt; 200' failed.</span>
+
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-org1fa14e9" class="outline-4">
+<h4 id="org1fa14e9"><span class="section-number-4">1.3.2</span> Improved assertion macro</h4>
+<div class="outline-text-4" id="text-1-3-2">
+<p>
+This assertion macro provides more context information than <b>assert</b> 
+from &lt;cassert&gt; header. When the predicate of an assertion failure
+happens, this assertion macro prints the file name, line, function and
+assertion predicate where the failure happened and then terminates the
+program calling std::terminate. 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">iostream</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
+
+<span class="org-preprocessor">#define</span> <span class="org-variable-name">ENABLE_ASSERT</span>
+
+<span class="org-preprocessor">#ifdef</span> ENABLE_ASSERT
+<span class="org-preprocessor">#define</span> <span class="org-function-name">M_ASSERT</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-variable-name">expr</span><span class="org-rainbow-delimiters-depth-1">)</span> \
+      <span class="org-rainbow-delimiters-depth-1">{</span> \
+         <span class="org-keyword">if</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-negation-char">!</span><span class="org-rainbow-delimiters-depth-3">(</span>expr<span class="org-rainbow-delimiters-depth-3">)</span><span class="org-rainbow-delimiters-depth-2">){</span> \
+            <span class="org-constant">std</span>::cerr &lt;&lt; <span class="org-string">"ASSERTION FAILURE: \n"</span>; \
+            <span class="org-constant">std</span>::cerr &lt;&lt; <span class="org-string">" =&gt; Condition: "</span> &lt;&lt; #expr &lt;&lt; <span class="org-string">"\n"</span>; \
+            <span class="org-constant">std</span>::cerr &lt;&lt; <span class="org-string">" =&gt;  Function: "</span> &lt;&lt; __FUNCTION__ &lt;&lt; <span class="org-string">"\n"</span>; \
+            <span class="org-constant">std</span>::cerr &lt;&lt; __FILE__ &lt;&lt; <span class="org-string">":"</span> &lt;&lt; __LINE__ &lt;&lt; <span class="org-string">":"</span> &lt;&lt; <span class="org-string">"\n"</span>; \
+            <span class="org-constant">std</span>::terminate<span class="org-rainbow-delimiters-depth-3">()</span>; \
+         <span class="org-rainbow-delimiters-depth-2">}</span> \
+      <span class="org-rainbow-delimiters-depth-1">}</span>
+<span class="org-preprocessor">#else</span>
+<span class="org-preprocessor">#define</span> <span class="org-function-name">M_ASSERT</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-variable-name">expr</span><span class="org-rainbow-delimiters-depth-1">)</span>
+<span class="org-preprocessor">#endif</span>
+</pre>
+</div>
+
+<p>
+Usage: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-type">XMLElement</span>* <span class="org-variable-name">node</span> = elem-&gt;FirstChildElement<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-string">"CubeX"</span><span class="org-rainbow-delimiters-depth-1">)</span>;
+M_ASSERT<span class="org-rainbow-delimiters-depth-1">(</span>node != <span class="org-constant">nullptr</span><span class="org-rainbow-delimiters-depth-1">)</span>;
+</pre>
+</div>
+
+<p>
+Program output when assertion fails:  
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">... ... ... ... 
+ASSERTION FAILURE: 
+ =&gt; Condition: node != nullptr
+ =&gt;  Function: main
+<span class="org-function-name">tinyxml2-test.cpp</span>:64:
+terminate called without an active exception
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org10a532e" class="outline-4">
+<h4 id="org10a532e"><span class="section-number-4">1.3.3</span> Type equality assertion macro</h4>
+<div class="outline-text-4" id="text-1-3-3">
+<p>
+Compile-time static assertions that aborts compilation when types are
+not equal. It is useful for checking assumptions about types at
+compile-time. 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-preprocessor">#define</span> <span class="org-function-name">ASSERT_TYPE_EQUAL</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-variable-name">type</span>, <span class="org-variable-name">expr</span><span class="org-rainbow-delimiters-depth-1">)</span> \
+   static_assert<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-constant">std</span>::<span class="org-constant">is_same</span><span class="org-rainbow-delimiters-depth-2">&lt;</span>type, expr<span class="org-rainbow-delimiters-depth-2">&gt;</span>::value, <span class="org-string">"Expected type equality"</span><span class="org-rainbow-delimiters-depth-1">)</span>
+</pre>
+</div>
+
+<p>
+Usage example: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-keyword">using</span> <span class="org-type">iter</span> = <span class="org-constant">std</span>::<span class="org-constant">vector</span><span class="org-rainbow-delimiters-depth-1">&lt;</span><span class="org-type">int</span><span class="org-rainbow-delimiters-depth-1">&gt;</span>::iterator;
+
+ASSERT_TYPE_EQUAL<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-constant">std</span>::random_access_iterator_tag,  <span class="org-constant">iter</span>::iterator_category<span class="org-rainbow-delimiters-depth-1">)</span>;
+
+ASSERT_TYPE_EQUAL<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">int</span> ,      <span class="org-constant">iter</span>::value_type <span class="org-rainbow-delimiters-depth-1">)</span>;
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-org78c5a09" class="outline-3">
+<h3 id="org78c5a09"><span class="section-number-3">1.4</span> Tips and guidelines for writing macros</h3>
+<div class="outline-text-3" id="text-1-4">
+</div>
+<div id="outline-container-org70480a6" class="outline-4">
+<h4 id="org70480a6"><span class="section-number-4">1.4.1</span> DO NOT Use macros for defining constants</h4>
+<div class="outline-text-4" id="text-1-4-1">
+<p>
+Unlike in C, in C++ is preferable to use const keyword approach for
+defining constants instead of preprocessor define macros.
+</p>
+
+<p>
+For instance, use: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-comment-delimiter">// </span><span class="org-comment">PI Number</span>
+<span class="org-keyword">const</span> <span class="org-type">double</span> <span class="org-variable-name">PI</span> = 3.141592653589793; 
+<span class="org-comment-delimiter">// </span><span class="org-comment">Euler's number </span>
+<span class="org-keyword">const</span> <span class="org-type">double</span>  <span class="org-variable-name">E</span> = 2.718281828459045;
+<span class="org-comment-delimiter">// </span><span class="org-comment">Buffer size in bytes </span>
+<span class="org-keyword">const</span> <span class="org-type">size_t</span> <span class="org-variable-name">BUFFER_SIZE</span> = 1024; 
+</pre>
+</div>
+
+<p>
+Instead of: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-preprocessor">#define</span> <span class="org-variable-name">PI</span> 3.141592653589793
+<span class="org-preprocessor">#define</span> <span class="org-variable-name">E</span>  2.718281828459045
+<span class="org-preprocessor">#define</span> <span class="org-variable-name">BUFFER_SIZE</span> 1024
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org8fd24a1" class="outline-4">
+<h4 id="org8fd24a1"><span class="section-number-4">1.4.2</span> Use parenthesis within macros around parameter names</h4>
+<div class="outline-text-4" id="text-1-4-2">
+<p>
+Reference:  <a href="https://wiki.sei.cmu.edu/confluence/display/c/PRE01-C.+Use+parentheses+within+macros+around+parameter+names">PRE01-C. Use parentheses within macros around parameter names - SEI CERT C Coding Standard - Confluence</a>
+</p>
+
+<p>
+Example: The following code fails, if the macro argument is an
+experession such as 2 + 1.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-preprocessor">#define</span> <span class="org-function-name">CUBE</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-variable-name">x</span><span class="org-rainbow-delimiters-depth-1">)</span> <span class="org-rainbow-delimiters-depth-1">(</span>x * x * x<span class="org-rainbow-delimiters-depth-1">)</span>
+</pre>
+</div>
+
+<p>
+So, the result of the followign invokation will be: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-comment-delimiter">// </span><span class="org-comment">Expected value 81 / 3^3 = 81/27 = 3</span>
+<span class="org-type">int</span> <span class="org-variable-name">k</span> = 81 / CUBE<span class="org-rainbow-delimiters-depth-1">(</span>2 + 1<span class="org-rainbow-delimiters-depth-1">)</span>; 
+<span class="org-comment-delimiter">// </span><span class="org-comment">Remember the macro just does text substitution. </span>
+<span class="org-type">int</span> <span class="org-variable-name">k</span> = 81 / <span class="org-rainbow-delimiters-depth-1">(</span> 2 + 1 * 2 + 1 * 2 + 1 <span class="org-rainbow-delimiters-depth-1">)</span>;
+<span class="org-type">int</span> <span class="org-variable-name">k</span> = 81 / <span class="org-rainbow-delimiters-depth-1">(</span> 2 + 2 + 2 + 1 <span class="org-rainbow-delimiters-depth-1">)</span> = 81/7 = 11;
+<span class="org-comment-delimiter">// </span><span class="org-comment">Expected k = 3, but got k = 11 </span>
+<span class="org-type">int</span> <span class="org-variable-name">k</span> = 11;
+</pre>
+</div>
+
+<p>
+The correct way to define this macro is to enclose the references to
+the macro's arguments in its body. 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-preprocessor">#define</span> <span class="org-function-name">CUBE</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-variable-name">x</span><span class="org-rainbow-delimiters-depth-1">)</span> <span class="org-rainbow-delimiters-depth-1">(</span><span class="org-rainbow-delimiters-depth-2">(</span>x<span class="org-rainbow-delimiters-depth-2">)</span> * <span class="org-rainbow-delimiters-depth-2">(</span>x<span class="org-rainbow-delimiters-depth-2">)</span> * <span class="org-rainbow-delimiters-depth-2">(</span>x<span class="org-rainbow-delimiters-depth-2">)</span><span class="org-rainbow-delimiters-depth-1">)</span>
+</pre>
+</div>
+
+<p>
+Now, it works: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-type">int</span> <span class="org-variable-name">k</span> = 81 / CUBE<span class="org-rainbow-delimiters-depth-1">(</span>2 + 1<span class="org-rainbow-delimiters-depth-1">)</span>; 
+<span class="org-type">int</span> <span class="org-variable-name">k</span> = 81 / <span class="org-rainbow-delimiters-depth-1">(</span><span class="org-rainbow-delimiters-depth-2">(</span>2 + 1<span class="org-rainbow-delimiters-depth-2">)</span> * <span class="org-rainbow-delimiters-depth-2">(</span>2 + 1<span class="org-rainbow-delimiters-depth-2">)</span> * <span class="org-rainbow-delimiters-depth-2">(</span>2 + 1<span class="org-rainbow-delimiters-depth-2">)</span><span class="org-rainbow-delimiters-depth-1">)</span>;
+<span class="org-type">int</span> <span class="org-variable-name">k</span> = 81 / 27;
+<span class="org-type">int</span> <span class="org-variable-name">k</span> = 3;
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgb2a6589" class="outline-4">
+<h4 id="orgb2a6589"><span class="section-number-4">1.4.3</span> Dump all GCC's preprocessor defines</h4>
+<div class="outline-text-4" id="text-1-4-3">
+<p>
+Reference: 
+</p>
+<ul class="org-ul">
+<li><a href="https://stackoverflow.com/questions/2224334/gcc-dump-preprocessor-defines">g++ - GCC dump preprocessor defines - Stack Overflow</a></li>
+<li><a href="http://nadeausoftware.com/articles/2011/12/c_c_tip_how_list_compiler_predefined_macros">C/C++ tip: How to list compiler predefined macros | Nadeau Software</a></li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-sh">$ gcc -dM -E - &lt; /dev/null
+<span class="org-comment-delimiter">#</span><span class="org-comment">define __DBL_MIN_EXP__ (-1021)</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">define __FLT32X_MAX_EXP__ 1024</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">define __UINT_LEAST16_MAX__ 0xffff</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">define __ATOMIC_ACQUIRE 2</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">define __FLT128_MAX_10_EXP__ 4932</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">define __FLT_MIN__ 1.17549435082228750796873653722224568e-38F</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">define __GCC_IEC_559_COMPLEX 2</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">define __UINT_LEAST8_TYPE__ unsigned char</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">define __SIZEOF_FLOAT80__ 16</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">define __INTMAX_C(c) c ## L</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">define __CHAR_BIT__ 8</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">define __UINT8_MAX__ 0xff</span>
+... ... ... ..
+<span class="org-comment-delimiter">#</span><span class="org-comment">define __UINT_FAST16_MAX__ 0xffffffffffffffffUL</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">define __GCC_ATOMIC_SHORT_LOCK_FREE 2</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">define __INT_LEAST64_WIDTH__ 64</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">define __UINT_FAST8_TYPE__ unsigned char</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">define __ATOMIC_ACQ_REL 4</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">define __ATOMIC_RELEASE 3</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgd18a364" class="outline-4">
+<h4 id="orgd18a364"><span class="section-number-4">1.4.4</span> Dump all preprocessor macros from a given header file</h4>
+<div class="outline-text-4" id="text-1-4-4">
+<p>
+Reference: <a href="https://stackoverflow.com/questions/2224334/gcc-dump-preprocessor-defines">g++ - GCC dump preprocessor defines - Stack Overflow</a>
+</p>
+
+<ul class="org-ul">
+<li>GCC (C-Compiler) Dump</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-sh">$ echo <span class="org-string">"#include &lt;sys/socket.h&gt;"</span> | gcc -E -dM - | tail -n 10
+<span class="org-comment-delimiter">#</span><span class="org-comment">define SOL_LLC 268</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">define __DBL_MIN_EXP__ (-1021)</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">define AF_LLC PF_LLC</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">define __FLT32X_MAX_EXP__ 1024</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">define AF_MAX PF_MAX</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">define __UINT_LEAST16_MAX__ 0xffff</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">define __ATOMIC_ACQUIRE 2</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">define CMSG_NXTHDR(mhdr,cmsg) __cmsg_nxthdr (mhdr, cmsg)</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">define __FLT128_MAX_10_EXP__ 4932</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">define __FLT_MIN__ 1.17549435082228750796873653722224568e-38F</span>
+
+   ...  ...  ...  ...  ...  ...  ...  ...  ...  ...  ... 
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">define __P(args) args</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">define PF_LOCAL 1</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">define __ATOMIC_ACQ_REL 4</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">define __ATOMIC_RELEASE 3</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">define __fsblkcnt_t_defined </span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">define _BITS_UIO_H 1</span>
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>G++ (C++ Compiler) Dump</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-sh">$ echo <span class="org-string">"#include &lt;cmath&gt;"</span> | gcc -x c++ -std=c++11 -dD -E - | head -n 10
+<span class="org-comment-delimiter"># </span><span class="org-comment">1 "&lt;stdin&gt;"</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">1 "&lt;built-in&gt;"</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">define __STDC__ 1</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">define __cplusplus 201103L</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">define __STDC_UTF_16__ 1</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">define __STDC_UTF_32__ 1</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">define __STDC_HOSTED__ 1</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">define __GNUC__ 7</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">define __GNUC_MINOR__ 3</span>
+<span class="org-comment-delimiter">#</span><span class="org-comment">define __GNUC_PATCHLEVEL__ 1</span>
+
+.. ... ... .. ... ... .. ... ... 
+
+$ echo <span class="org-string">"#include &lt;cmath&gt;"</span> | gcc -x c++ -std=c++11 -dD -E - | tail -n 40
+  constexpr float
+  tgamma(float __x)
+  { <span class="org-keyword">return</span> __builtin_tgammaf(__x); }
+
+  constexpr long double
+  tgamma(long double __x)
+  { <span class="org-keyword">return</span> __builtin_tgammal(__x); }
+
+
+
+  template&lt;typename _Tp&gt;
+    constexpr typename __gnu_cxx::__enable_if&lt;__is_integer&lt;_Tp&gt;::__value,
+                                              double&gt;::__type
+    tgamma(_Tp __x)
+    { <span class="org-keyword">return</span> __builtin_tgamma(__x); }
+
+
+
+  constexpr float
+  trunc(float __x)
+  { <span class="org-keyword">return</span> __builtin_truncf(__x); }
+
+  constexpr long double
+  trunc(long double __x)
+  { <span class="org-keyword">return</span> __builtin_truncl(__x); }
+
+
+
+  template&lt;typename _Tp&gt;
+    constexpr typename __gnu_cxx::__enable_if&lt;__is_integer&lt;_Tp&gt;::__value,
+                                              double&gt;::__type
+    trunc(_Tp __x)
+    { <span class="org-keyword">return</span> __builtin_trunc(__x); }
+
+
+
+}
+<span class="org-comment-delimiter"># </span><span class="org-comment">1917 "/usr/include/c++/7/cmath" 3</span>
+}
+<span class="org-comment-delimiter"># </span><span class="org-comment">1 "&lt;stdin&gt;" 2</span>
+
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-orgd2ad373" class="outline-3">
+<h3 id="orgd2ad373"><span class="section-number-3">1.5</span> Useful macros for debugging and tracing</h3>
+<div class="outline-text-3" id="text-1-5">
+<p>
+Usage: Put this block at the top of the file to debug or log or in a
+separate header file and compile with the flag <code>-DDEBUG_MODE</code>, for
+instance. <span class="underline">$ g++ file1.cpp fil2.cpp -DDEBUG_MODE</span> 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-cpp"><span class="org-preprocessor">#if</span> <span class="org-preprocessor">defined</span><span class="org-rainbow-delimiters-depth-1">(</span>DEBUG_MODE<span class="org-rainbow-delimiters-depth-1">)</span>
+<span class="org-preprocessor">  #define</span> <span class="org-function-name">disp</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-variable-name">expr</span><span class="org-rainbow-delimiters-depth-1">)</span>  <span class="org-constant">std</span>::cerr &lt;&lt; __FILE__ &lt;&lt; <span class="org-string">":"</span> &lt;&lt; __LINE__ &lt;&lt; <span class="org-string">":"</span> \
+      &lt;&lt; <span class="org-string">" ; "</span> &lt;&lt;  #expr &lt;&lt; <span class="org-string">" = "</span> &lt;&lt; <span class="org-rainbow-delimiters-depth-1">(</span>expr<span class="org-rainbow-delimiters-depth-1">)</span>  &lt;&lt;  <span class="org-constant">std</span>::endl
+
+<span class="org-preprocessor">  #define</span> <span class="org-function-name">dbgloc</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-variable-name">msg</span><span class="org-rainbow-delimiters-depth-1">)</span>  <span class="org-constant">std</span>::cerr &lt;&lt; __FILE__ &lt;&lt; <span class="org-string">":"</span> &lt;&lt; __LINE__ &lt;&lt; <span class="org-string">":"</span> &lt;&lt; msg 
+<span class="org-preprocessor">  #define</span> <span class="org-variable-name">dbgline</span> __FILE__ &lt;&lt; <span class="org-string">":"</span> &lt;&lt; __LINE__ &lt;&lt; <span class="org-string">":"</span> &lt;&lt;
+<span class="org-preprocessor">  #define</span> <span class="org-function-name">dbgtrace</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-variable-name">msg</span><span class="org-rainbow-delimiters-depth-1">)</span> <span class="org-constant">std</span>::cerr &lt;&lt; __FILE__ &lt;&lt; <span class="org-string">":"</span> &lt;&lt; __LINE__ &lt;&lt; <span class="org-string">": TRACING "</span> &lt;&lt; msg &lt;&lt; <span class="org-string">"\n"</span>;
+<span class="org-preprocessor">#else</span>
+<span class="org-preprocessor">  #define</span> <span class="org-function-name">disp</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-variable-name">expr</span><span class="org-rainbow-delimiters-depth-1">)</span> 
+<span class="org-preprocessor">  #define</span> <span class="org-function-name">dbgloc</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-variable-name">msg</span><span class="org-rainbow-delimiters-depth-1">)</span>  
+<span class="org-preprocessor">  #define</span> <span class="org-variable-name">dbgline</span> 
+<span class="org-preprocessor">  #define</span> <span class="org-function-name">dbgtrace</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-variable-name">msg</span><span class="org-rainbow-delimiters-depth-1">)</span> 
+<span class="org-preprocessor">#endif</span> 
+</pre>
+</div>
+
+
+<p>
+Note: the program's stdout output is clickable in Emacs which allows
+to go quickly to the code location that generated the output. To
+compile and run a c++ program in Emacs use: 
+</p>
+
+<p>
+$ <code>M-x compile g++ program1.cpp program2.cpp -o out.bin -DDEBUG_MODE &amp;&amp; ./out.bin</code>
+</p>
+
+<p>
+<b>Macro dbgtrace</b>
+</p>
+
+<p>
+The macro dbgtrace creates the message shown in the following code
+block displaying the file and the line where the message was
+generated:  
+</p>
+
+<p>
+Sample usage:
+</p>
+
+<ul class="org-ul">
+<li>dbtrace("invoking copy constructor")</li>
+</ul>
+
+<p>
+Output example: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-function-name">gslLinalg.cpp</span>:46: TRACING invoking copy constructor
+</pre>
+</div>
+
+<p>
+<b>Macro disp</b>
+</p>
+
+<p>
+The macro disp displays any expression in the way it is written, it is
+useful to create C++ code demonstration and creating proof-of-concept
+programs. 
+</p>
+
+<p>
+Sample usage: 
+</p>
+
+<ul class="org-ul">
+<li>disp(x * x + 10);</li>
+</ul>
+
+<p>
+Output example: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><span class="org-function-name">math1.cpp</span>:10: ; x * x + 10 = 19
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-org9eee74e" class="outline-3">
+<h3 id="org9eee74e"><span class="section-number-3">1.6</span> General Predefined Macros</h3>
+<div class="outline-text-3" id="text-1-6">
 <p>
 C++ Provides some useful predefined macros for debugging, logging,
 compiler identification and detecting the version of C++ standard the
@@ -458,9 +1238,9 @@ Example:
 </div>
 </div>
 
-<div id="outline-container-org720a324" class="outline-3">
-<h3 id="org720a324"><span class="section-number-3">1.2</span> Macros for detecting platform or operating system</h3>
-<div class="outline-text-3" id="text-1-2">
+<div id="outline-container-org18f1af8" class="outline-3">
+<h3 id="org18f1af8"><span class="section-number-3">1.7</span> Macros for detecting platform or operating system</h3>
+<div class="outline-text-3" id="text-1-7">
 <p>
 The preprocessor macros can be used for cross platform compilation,
 creating cross platform libraries and isolating platform-specific 
@@ -662,9 +1442,9 @@ Usage example:
 </div>
 </div>
 
-<div id="outline-container-org4efa5a3" class="outline-3">
-<h3 id="org4efa5a3"><span class="section-number-3">1.3</span> Macros for detecting compiler</h3>
-<div class="outline-text-3" id="text-1-3">
+<div id="outline-container-orga16989e" class="outline-3">
+<h3 id="orga16989e"><span class="section-number-3">1.8</span> Macros for detecting compiler</h3>
+<div class="outline-text-3" id="text-1-8">
 <p>
 Compiler detection: 
 </p>
@@ -862,9 +1642,9 @@ See also:
 </div>
 </div>
 
-<div id="outline-container-org90e4ff1" class="outline-3">
-<h3 id="org90e4ff1"><span class="section-number-3">1.4</span> Macros for detecting architecture</h3>
-<div class="outline-text-3" id="text-1-4">
+<div id="outline-container-org7cd50b1" class="outline-3">
+<h3 id="org7cd50b1"><span class="section-number-3">1.9</span> Macros for detecting architecture</h3>
+<div class="outline-text-3" id="text-1-9">
 <p>
 The following pre-defined macros are useful for checking the architecture which
 the current application is being compiled. This compile-time checking
@@ -1079,9 +1859,9 @@ Further reading:
 </ul>
 </div>
 </div>
-<div id="outline-container-orgdb02cb2" class="outline-3">
-<h3 id="orgdb02cb2"><span class="section-number-3">1.5</span> Macros for checking whether the compiler is 32 (x86) or 64 bits (x86-64)</h3>
-<div class="outline-text-3" id="text-1-5">
+<div id="outline-container-orga69a748" class="outline-3">
+<h3 id="orga69a748"><span class="section-number-3">1.10</span> Macros for checking whether the compiler is 32 (x86) or 64 bits (x86-64)</h3>
+<div class="outline-text-3" id="text-1-10">
 <p>
 The following macros, taken from <a href="https://stackoverflow.com/questions/1505582/determining-32-vs-64-bit-in-c">(SO 1505582)</a>, are useful for checking
 whether the compiler is 32 bits (Intel x86 based-processor) or 64 bits
@@ -1127,476 +1907,10 @@ Sample usage:
 </div>
 </div>
 </div>
-
-<div id="outline-container-orga02e6e4" class="outline-3">
-<h3 id="orga02e6e4"><span class="section-number-3">1.6</span> Useful macros for debugging and tracing</h3>
-<div class="outline-text-3" id="text-1-6">
-<p>
-Usage: Put this block at the top of the file to debug or log or in a
-separate header file and compile with the flag <code>-DDEBUG_MODE</code>, for
-instance. <span class="underline">$ g++ file1.cpp fil2.cpp -DDEBUG_MODE</span> 
-</p>
-
-<div class="org-src-container">
-<pre class="src src-cpp"><span class="org-preprocessor">#if</span> <span class="org-preprocessor">defined</span><span class="org-rainbow-delimiters-depth-1">(</span>DEBUG_MODE<span class="org-rainbow-delimiters-depth-1">)</span>
-<span class="org-preprocessor">  #define</span> <span class="org-function-name">disp</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-variable-name">expr</span><span class="org-rainbow-delimiters-depth-1">)</span>  <span class="org-constant">std</span>::cerr &lt;&lt; __FILE__ &lt;&lt; <span class="org-string">":"</span> &lt;&lt; __LINE__ &lt;&lt; <span class="org-string">":"</span> \
-      &lt;&lt; <span class="org-string">" ; "</span> &lt;&lt;  #expr &lt;&lt; <span class="org-string">" = "</span> &lt;&lt; <span class="org-rainbow-delimiters-depth-1">(</span>expr<span class="org-rainbow-delimiters-depth-1">)</span>  &lt;&lt;  <span class="org-constant">std</span>::endl
-
-<span class="org-preprocessor">  #define</span> <span class="org-function-name">dbgloc</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-variable-name">msg</span><span class="org-rainbow-delimiters-depth-1">)</span>  <span class="org-constant">std</span>::cerr &lt;&lt; __FILE__ &lt;&lt; <span class="org-string">":"</span> &lt;&lt; __LINE__ &lt;&lt; <span class="org-string">":"</span> &lt;&lt; msg 
-<span class="org-preprocessor">  #define</span> <span class="org-variable-name">dbgline</span> __FILE__ &lt;&lt; <span class="org-string">":"</span> &lt;&lt; __LINE__ &lt;&lt; <span class="org-string">":"</span> &lt;&lt;
-<span class="org-preprocessor">  #define</span> <span class="org-function-name">dbgtrace</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-variable-name">msg</span><span class="org-rainbow-delimiters-depth-1">)</span> <span class="org-constant">std</span>::cerr &lt;&lt; __FILE__ &lt;&lt; <span class="org-string">":"</span> &lt;&lt; __LINE__ &lt;&lt; <span class="org-string">": TRACING "</span> &lt;&lt; msg &lt;&lt; <span class="org-string">"\n"</span>;
-<span class="org-preprocessor">#else</span>
-<span class="org-preprocessor">  #define</span> <span class="org-function-name">disp</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-variable-name">expr</span><span class="org-rainbow-delimiters-depth-1">)</span> 
-<span class="org-preprocessor">  #define</span> <span class="org-function-name">dbgloc</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-variable-name">msg</span><span class="org-rainbow-delimiters-depth-1">)</span>  
-<span class="org-preprocessor">  #define</span> <span class="org-variable-name">dbgline</span> 
-<span class="org-preprocessor">  #define</span> <span class="org-function-name">dbgtrace</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-variable-name">msg</span><span class="org-rainbow-delimiters-depth-1">)</span> 
-<span class="org-preprocessor">#endif</span> 
-</pre>
-</div>
-
-
-<p>
-Note: the program's stdout output is clickable in Emacs which allows
-to go quickly to the code location that generated the output. To
-compile and run a c++ program in Emacs use: 
-</p>
-
-<p>
-$ <code>M-x compile g++ program1.cpp program2.cpp -o out.bin -DDEBUG_MODE &amp;&amp; ./out.bin</code>
-</p>
-
-<p>
-<b>Macro dbgtrace</b>
-</p>
-
-<p>
-The macro dbgtrace creates the message shown in the following code
-block displaying the file and the line where the message was
-generated:  
-</p>
-
-<p>
-Sample usage:
-</p>
-
-<ul class="org-ul">
-<li>dbtrace("invoking copy constructor")</li>
-</ul>
-
-<p>
-Output example: 
-</p>
-
-<div class="org-src-container">
-<pre class="src src-sh"><span class="org-function-name">gslLinalg.cpp</span>:46: TRACING invoking copy constructor
-</pre>
-</div>
-
-<p>
-<b>Macro disp</b>
-</p>
-
-<p>
-The macro disp displays any expression in the way it is written, it is
-useful to create C++ code demonstration and creating proof-of-concept
-programs. 
-</p>
-
-<p>
-Sample usage: 
-</p>
-
-<ul class="org-ul">
-<li>disp(x * x + 10);</li>
-</ul>
-
-<p>
-Output example: 
-</p>
-
-<div class="org-src-container">
-<pre class="src src-sh"><span class="org-function-name">math1.cpp</span>:10: ; x * x + 10 = 19
-</pre>
-</div>
-</div>
-</div>
-<div id="outline-container-org8761e41" class="outline-3">
-<h3 id="org8761e41"><span class="section-number-3">1.7</span> Custom Assertion Macro</h3>
-<div class="outline-text-3" id="text-1-7">
-</div>
-<div id="outline-container-orgac49be1" class="outline-4">
-<h4 id="orgac49be1"><span class="section-number-4">1.7.1</span> Simple assertion macro</h4>
-<div class="outline-text-4" id="text-1-7-1">
-<p>
-Example: 
-</p>
-
-<div class="org-src-container">
-<pre class="src src-cpp"><span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">iostream</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
-<span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">cassert</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
-
-<span class="org-preprocessor">#define</span> <span class="org-variable-name">ASSERTION_ENABLED</span>
-
-<span class="org-comment-delimiter">// </span><span class="org-comment">Requires header: &lt;cassert&gt;</span>
-<span class="org-preprocessor">#ifdef</span>  ASSERTION_ENABLED
-<span class="org-preprocessor">  #define</span> <span class="org-function-name">ASSERT</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-variable-name">condition</span>, <span class="org-variable-name">text</span><span class="org-rainbow-delimiters-depth-1">)</span>    \
-              <span class="org-rainbow-delimiters-depth-1">{</span> <span class="org-keyword">if</span> <span class="org-rainbow-delimiters-depth-2">(</span><span class="org-negation-char">!</span><span class="org-rainbow-delimiters-depth-3">(</span>condition<span class="org-rainbow-delimiters-depth-3">)</span><span class="org-rainbow-delimiters-depth-2">)</span> <span class="org-rainbow-delimiters-depth-2">{</span>  \
-                               <span class="org-constant">std</span>::cerr &lt;&lt; <span class="org-string">" [ASSERTION] "</span> &lt;&lt;  __FILE__ &lt;&lt; <span class="org-string">":"</span> &lt;&lt; __LINE__ &lt;&lt; <span class="org-string">": "</span> \
-                             &lt;&lt; text &lt;&lt; <span class="org-string">"\n"</span> ;  \
-                               assert<span class="org-rainbow-delimiters-depth-3">(</span>condition<span class="org-rainbow-delimiters-depth-3">)</span>;   <span class="org-rainbow-delimiters-depth-2">}</span><span class="org-rainbow-delimiters-depth-1">}</span>
-<span class="org-preprocessor">#else</span>
-<span class="org-preprocessor">  #define</span> <span class="org-function-name">ASSERT</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-variable-name">condition</span>, <span class="org-variable-name">text</span><span class="org-rainbow-delimiters-depth-1">)</span>
-<span class="org-preprocessor">#endif</span>
-
-<span class="org-type">int</span> <span class="org-function-name">main</span><span class="org-rainbow-delimiters-depth-1">(){</span>
-        <span class="org-type">int</span> <span class="org-variable-name">x</span> = 100;
-        ASSERT<span class="org-rainbow-delimiters-depth-2">(</span>x &gt; 200, <span class="org-string">"Assumption: x &gt; 200"</span><span class="org-rainbow-delimiters-depth-2">)</span>;
-
-        <span class="org-keyword">return</span> 0;
-<span class="org-rainbow-delimiters-depth-1">}</span>
-</pre>
-</div>
-
-<p>
-When the assertion fails, it prints the message: 
-</p>
-
-<div class="org-src-container">
-<pre class="src src-sh">g++ scractch.cpp -o <span class="org-keyword">scractch.bin</span> -g -std=c++1z -Wall -Wextra &amp;&amp; ./scractch.bin
- [ASSERTION] scractch.cpp:33: Assumption: x &gt; 200
-<span class="org-function-name">scractch.bin</span>: scractch.cpp:33: int main(): Assertion <span class="org-sh-quoted-exec">`x &gt; 200' failed.</span>
-
-</pre>
-</div>
-</div>
-</div>
-<div id="outline-container-orgde3cf07" class="outline-4">
-<h4 id="orgde3cf07"><span class="section-number-4">1.7.2</span> Improved assertion macro</h4>
-<div class="outline-text-4" id="text-1-7-2">
-<p>
-This assertion macro provides more context information than <b>assert</b> 
-from &lt;cassert&gt; header. When the predicate of an assertion failure
-happens, this assertion macro prints the file name, line, function and
-assertion predicate where the failure happened and then terminates the
-program calling std::terminate. 
-</p>
-
-<div class="org-src-container">
-<pre class="src src-cpp"><span class="org-preprocessor">#include</span> <span class="org-string"><span class="org-rainbow-delimiters-depth-1">&lt;</span></span><span class="org-string">iostream</span><span class="org-string"><span class="org-rainbow-delimiters-depth-1">&gt;</span></span>
-
-<span class="org-preprocessor">#define</span> <span class="org-variable-name">ENABLE_ASSERT</span>
-
-<span class="org-preprocessor">#ifdef</span> ENABLE_ASSERT
-<span class="org-preprocessor">#define</span> <span class="org-function-name">M_ASSERT</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-variable-name">expr</span><span class="org-rainbow-delimiters-depth-1">)</span> \
-      <span class="org-rainbow-delimiters-depth-1">{</span> \
-         <span class="org-keyword">if</span><span class="org-rainbow-delimiters-depth-2">(</span><span class="org-negation-char">!</span><span class="org-rainbow-delimiters-depth-3">(</span>expr<span class="org-rainbow-delimiters-depth-3">)</span><span class="org-rainbow-delimiters-depth-2">){</span> \
-            <span class="org-constant">std</span>::cerr &lt;&lt; <span class="org-string">"ASSERTION FAILURE: \n"</span>; \
-            <span class="org-constant">std</span>::cerr &lt;&lt; <span class="org-string">" =&gt; Condition: "</span> &lt;&lt; #expr &lt;&lt; <span class="org-string">"\n"</span>; \
-            <span class="org-constant">std</span>::cerr &lt;&lt; <span class="org-string">" =&gt;  Function: "</span> &lt;&lt; __FUNCTION__ &lt;&lt; <span class="org-string">"\n"</span>; \
-            <span class="org-constant">std</span>::cerr &lt;&lt; __FILE__ &lt;&lt; <span class="org-string">":"</span> &lt;&lt; __LINE__ &lt;&lt; <span class="org-string">":"</span> &lt;&lt; <span class="org-string">"\n"</span>; \
-            <span class="org-constant">std</span>::terminate<span class="org-rainbow-delimiters-depth-3">()</span>; \
-         <span class="org-rainbow-delimiters-depth-2">}</span> \
-      <span class="org-rainbow-delimiters-depth-1">}</span>
-<span class="org-preprocessor">#else</span>
-<span class="org-preprocessor">#define</span> <span class="org-function-name">M_ASSERT</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-variable-name">expr</span><span class="org-rainbow-delimiters-depth-1">)</span>
-<span class="org-preprocessor">#endif</span>
-</pre>
-</div>
-
-<p>
-Usage: 
-</p>
-
-<div class="org-src-container">
-<pre class="src src-cpp"><span class="org-type">XMLElement</span>* <span class="org-variable-name">node</span> = elem-&gt;FirstChildElement<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-string">"CubeX"</span><span class="org-rainbow-delimiters-depth-1">)</span>;
-M_ASSERT<span class="org-rainbow-delimiters-depth-1">(</span>node != <span class="org-constant">nullptr</span><span class="org-rainbow-delimiters-depth-1">)</span>;
-</pre>
-</div>
-
-<p>
-Program output when assertion fails:  
-</p>
-
-<div class="org-src-container">
-<pre class="src src-sh">... ... ... ... 
-ASSERTION FAILURE: 
- =&gt; Condition: node != nullptr
- =&gt;  Function: main
-<span class="org-function-name">tinyxml2-test.cpp</span>:64:
-terminate called without an active exception
-</pre>
-</div>
-</div>
-</div>
-
-<div id="outline-container-org3e633a8" class="outline-4">
-<h4 id="org3e633a8"><span class="section-number-4">1.7.3</span> Type equality assertion macro</h4>
-<div class="outline-text-4" id="text-1-7-3">
-<p>
-Compile-time static assertions that aborts compilation when types are
-not equal. It is useful for checking assumptions about types at
-compile-time. 
-</p>
-
-<div class="org-src-container">
-<pre class="src src-cpp"><span class="org-preprocessor">#define</span> <span class="org-function-name">ASSERT_TYPE_EQUAL</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-variable-name">type</span>, <span class="org-variable-name">expr</span><span class="org-rainbow-delimiters-depth-1">)</span> \
-   static_assert<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-constant">std</span>::<span class="org-constant">is_same</span><span class="org-rainbow-delimiters-depth-2">&lt;</span>type, expr<span class="org-rainbow-delimiters-depth-2">&gt;</span>::value, <span class="org-string">"Expected type equality"</span><span class="org-rainbow-delimiters-depth-1">)</span>
-</pre>
-</div>
-
-<p>
-Usage example: 
-</p>
-
-<div class="org-src-container">
-<pre class="src src-cpp"><span class="org-keyword">using</span> <span class="org-type">iter</span> = <span class="org-constant">std</span>::<span class="org-constant">vector</span><span class="org-rainbow-delimiters-depth-1">&lt;</span><span class="org-type">int</span><span class="org-rainbow-delimiters-depth-1">&gt;</span>::iterator;
-
-ASSERT_TYPE_EQUAL<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-constant">std</span>::random_access_iterator_tag,  <span class="org-constant">iter</span>::iterator_category<span class="org-rainbow-delimiters-depth-1">)</span>;
-
-ASSERT_TYPE_EQUAL<span class="org-rainbow-delimiters-depth-1">(</span><span class="org-type">int</span> ,      <span class="org-constant">iter</span>::value_type <span class="org-rainbow-delimiters-depth-1">)</span>;
-</pre>
-</div>
-</div>
-</div>
-</div>
-
-<div id="outline-container-org7a4fafd" class="outline-3">
-<h3 id="org7a4fafd"><span class="section-number-3">1.8</span> Tips and guidelines for writing macros</h3>
-<div class="outline-text-3" id="text-1-8">
-</div>
-<div id="outline-container-org100e001" class="outline-4">
-<h4 id="org100e001"><span class="section-number-4">1.8.1</span> DO NOT Use macros for defining constants</h4>
-<div class="outline-text-4" id="text-1-8-1">
-<p>
-Unlike in C, in C++ is preferable to use const keyword approach for
-defining constants instead of preprocessor define macros.
-</p>
-
-<p>
-For instance, use: 
-</p>
-
-<div class="org-src-container">
-<pre class="src src-cpp"><span class="org-comment-delimiter">// </span><span class="org-comment">PI Number</span>
-<span class="org-keyword">const</span> <span class="org-type">double</span> <span class="org-variable-name">PI</span> = 3.141592653589793; 
-<span class="org-comment-delimiter">// </span><span class="org-comment">Euler's number </span>
-<span class="org-keyword">const</span> <span class="org-type">double</span>  <span class="org-variable-name">E</span> = 2.718281828459045;
-<span class="org-comment-delimiter">// </span><span class="org-comment">Buffer size in bytes </span>
-<span class="org-keyword">const</span> <span class="org-type">size_t</span> <span class="org-variable-name">BUFFER_SIZE</span> = 1024; 
-</pre>
-</div>
-
-<p>
-Instead of: 
-</p>
-
-<div class="org-src-container">
-<pre class="src src-cpp"><span class="org-preprocessor">#define</span> <span class="org-variable-name">PI</span> 3.141592653589793
-<span class="org-preprocessor">#define</span> <span class="org-variable-name">E</span>  2.718281828459045
-<span class="org-preprocessor">#define</span> <span class="org-variable-name">BUFFER_SIZE</span> 1024
-</pre>
-</div>
-</div>
-</div>
-
-<div id="outline-container-orgf96ce94" class="outline-4">
-<h4 id="orgf96ce94"><span class="section-number-4">1.8.2</span> Use parenthesis within macros around parameter names</h4>
-<div class="outline-text-4" id="text-1-8-2">
-<p>
-Reference:  <a href="https://wiki.sei.cmu.edu/confluence/display/c/PRE01-C.+Use+parentheses+within+macros+around+parameter+names">PRE01-C. Use parentheses within macros around parameter names - SEI CERT C Coding Standard - Confluence</a>
-</p>
-
-<p>
-Example: The following code fails, if the macro argument is an
-experession such as 2 + 1.
-</p>
-
-<div class="org-src-container">
-<pre class="src src-cpp"><span class="org-preprocessor">#define</span> <span class="org-function-name">CUBE</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-variable-name">x</span><span class="org-rainbow-delimiters-depth-1">)</span> <span class="org-rainbow-delimiters-depth-1">(</span>x * x * x<span class="org-rainbow-delimiters-depth-1">)</span>
-</pre>
-</div>
-
-<p>
-So, the result of the followign invokation will be: 
-</p>
-
-<div class="org-src-container">
-<pre class="src src-cpp"><span class="org-comment-delimiter">// </span><span class="org-comment">Expected value 81 / 3^3 = 81/27 = 3</span>
-<span class="org-type">int</span> <span class="org-variable-name">k</span> = 81 / CUBE<span class="org-rainbow-delimiters-depth-1">(</span>2 + 1<span class="org-rainbow-delimiters-depth-1">)</span>; 
-<span class="org-comment-delimiter">// </span><span class="org-comment">Remember the macro just does text substitution. </span>
-<span class="org-type">int</span> <span class="org-variable-name">k</span> = 81 / <span class="org-rainbow-delimiters-depth-1">(</span> 2 + 1 * 2 + 1 * 2 + 1 <span class="org-rainbow-delimiters-depth-1">)</span>;
-<span class="org-type">int</span> <span class="org-variable-name">k</span> = 81 / <span class="org-rainbow-delimiters-depth-1">(</span> 2 + 2 + 2 + 1 <span class="org-rainbow-delimiters-depth-1">)</span> = 81/7 = 11;
-<span class="org-comment-delimiter">// </span><span class="org-comment">Expected k = 3, but got k = 11 </span>
-<span class="org-type">int</span> <span class="org-variable-name">k</span> = 11;
-</pre>
-</div>
-
-<p>
-The correct way to define this macro is to enclose the references to
-the macro's arguments in its body. 
-</p>
-
-<div class="org-src-container">
-<pre class="src src-cpp"><span class="org-preprocessor">#define</span> <span class="org-function-name">CUBE</span><span class="org-rainbow-delimiters-depth-1">(</span><span class="org-variable-name">x</span><span class="org-rainbow-delimiters-depth-1">)</span> <span class="org-rainbow-delimiters-depth-1">(</span><span class="org-rainbow-delimiters-depth-2">(</span>x<span class="org-rainbow-delimiters-depth-2">)</span> * <span class="org-rainbow-delimiters-depth-2">(</span>x<span class="org-rainbow-delimiters-depth-2">)</span> * <span class="org-rainbow-delimiters-depth-2">(</span>x<span class="org-rainbow-delimiters-depth-2">)</span><span class="org-rainbow-delimiters-depth-1">)</span>
-</pre>
-</div>
-
-<p>
-Now, it works: 
-</p>
-
-<div class="org-src-container">
-<pre class="src src-cpp"><span class="org-type">int</span> <span class="org-variable-name">k</span> = 81 / CUBE<span class="org-rainbow-delimiters-depth-1">(</span>2 + 1<span class="org-rainbow-delimiters-depth-1">)</span>; 
-<span class="org-type">int</span> <span class="org-variable-name">k</span> = 81 / <span class="org-rainbow-delimiters-depth-1">(</span><span class="org-rainbow-delimiters-depth-2">(</span>2 + 1<span class="org-rainbow-delimiters-depth-2">)</span> * <span class="org-rainbow-delimiters-depth-2">(</span>2 + 1<span class="org-rainbow-delimiters-depth-2">)</span> * <span class="org-rainbow-delimiters-depth-2">(</span>2 + 1<span class="org-rainbow-delimiters-depth-2">)</span><span class="org-rainbow-delimiters-depth-1">)</span>;
-<span class="org-type">int</span> <span class="org-variable-name">k</span> = 81 / 27;
-<span class="org-type">int</span> <span class="org-variable-name">k</span> = 3;
-</pre>
-</div>
-</div>
-</div>
-
-<div id="outline-container-orgbad3f1b" class="outline-4">
-<h4 id="orgbad3f1b"><span class="section-number-4">1.8.3</span> Dump all GCC's preprocessor defines</h4>
-<div class="outline-text-4" id="text-1-8-3">
-<p>
-Reference: 
-</p>
-<ul class="org-ul">
-<li><a href="https://stackoverflow.com/questions/2224334/gcc-dump-preprocessor-defines">g++ - GCC dump preprocessor defines - Stack Overflow</a></li>
-<li><a href="http://nadeausoftware.com/articles/2011/12/c_c_tip_how_list_compiler_predefined_macros">C/C++ tip: How to list compiler predefined macros | Nadeau Software</a></li>
-</ul>
-
-<div class="org-src-container">
-<pre class="src src-sh">$ gcc -dM -E - &lt; /dev/null
-<span class="org-comment-delimiter">#</span><span class="org-comment">define __DBL_MIN_EXP__ (-1021)</span>
-<span class="org-comment-delimiter">#</span><span class="org-comment">define __FLT32X_MAX_EXP__ 1024</span>
-<span class="org-comment-delimiter">#</span><span class="org-comment">define __UINT_LEAST16_MAX__ 0xffff</span>
-<span class="org-comment-delimiter">#</span><span class="org-comment">define __ATOMIC_ACQUIRE 2</span>
-<span class="org-comment-delimiter">#</span><span class="org-comment">define __FLT128_MAX_10_EXP__ 4932</span>
-<span class="org-comment-delimiter">#</span><span class="org-comment">define __FLT_MIN__ 1.17549435082228750796873653722224568e-38F</span>
-<span class="org-comment-delimiter">#</span><span class="org-comment">define __GCC_IEC_559_COMPLEX 2</span>
-<span class="org-comment-delimiter">#</span><span class="org-comment">define __UINT_LEAST8_TYPE__ unsigned char</span>
-<span class="org-comment-delimiter">#</span><span class="org-comment">define __SIZEOF_FLOAT80__ 16</span>
-<span class="org-comment-delimiter">#</span><span class="org-comment">define __INTMAX_C(c) c ## L</span>
-<span class="org-comment-delimiter">#</span><span class="org-comment">define __CHAR_BIT__ 8</span>
-<span class="org-comment-delimiter">#</span><span class="org-comment">define __UINT8_MAX__ 0xff</span>
-... ... ... ..
-<span class="org-comment-delimiter">#</span><span class="org-comment">define __UINT_FAST16_MAX__ 0xffffffffffffffffUL</span>
-<span class="org-comment-delimiter">#</span><span class="org-comment">define __GCC_ATOMIC_SHORT_LOCK_FREE 2</span>
-<span class="org-comment-delimiter">#</span><span class="org-comment">define __INT_LEAST64_WIDTH__ 64</span>
-<span class="org-comment-delimiter">#</span><span class="org-comment">define __UINT_FAST8_TYPE__ unsigned char</span>
-<span class="org-comment-delimiter">#</span><span class="org-comment">define __ATOMIC_ACQ_REL 4</span>
-<span class="org-comment-delimiter">#</span><span class="org-comment">define __ATOMIC_RELEASE 3</span>
-</pre>
-</div>
-</div>
-</div>
-
-<div id="outline-container-orga258ecc" class="outline-4">
-<h4 id="orga258ecc"><span class="section-number-4">1.8.4</span> Dump all preprocessor macros from a given header file</h4>
-<div class="outline-text-4" id="text-1-8-4">
-<p>
-Reference: <a href="https://stackoverflow.com/questions/2224334/gcc-dump-preprocessor-defines">g++ - GCC dump preprocessor defines - Stack Overflow</a>
-</p>
-
-<ul class="org-ul">
-<li>GCC (C-Compiler) Dump</li>
-</ul>
-
-<div class="org-src-container">
-<pre class="src src-sh">$ echo <span class="org-string">"#include &lt;sys/socket.h&gt;"</span> | gcc -E -dM - | tail -n 10
-<span class="org-comment-delimiter">#</span><span class="org-comment">define SOL_LLC 268</span>
-<span class="org-comment-delimiter">#</span><span class="org-comment">define __DBL_MIN_EXP__ (-1021)</span>
-<span class="org-comment-delimiter">#</span><span class="org-comment">define AF_LLC PF_LLC</span>
-<span class="org-comment-delimiter">#</span><span class="org-comment">define __FLT32X_MAX_EXP__ 1024</span>
-<span class="org-comment-delimiter">#</span><span class="org-comment">define AF_MAX PF_MAX</span>
-<span class="org-comment-delimiter">#</span><span class="org-comment">define __UINT_LEAST16_MAX__ 0xffff</span>
-<span class="org-comment-delimiter">#</span><span class="org-comment">define __ATOMIC_ACQUIRE 2</span>
-<span class="org-comment-delimiter">#</span><span class="org-comment">define CMSG_NXTHDR(mhdr,cmsg) __cmsg_nxthdr (mhdr, cmsg)</span>
-<span class="org-comment-delimiter">#</span><span class="org-comment">define __FLT128_MAX_10_EXP__ 4932</span>
-<span class="org-comment-delimiter">#</span><span class="org-comment">define __FLT_MIN__ 1.17549435082228750796873653722224568e-38F</span>
-
-   ...  ...  ...  ...  ...  ...  ...  ...  ...  ...  ... 
-
-<span class="org-comment-delimiter">#</span><span class="org-comment">define __P(args) args</span>
-<span class="org-comment-delimiter">#</span><span class="org-comment">define PF_LOCAL 1</span>
-<span class="org-comment-delimiter">#</span><span class="org-comment">define __ATOMIC_ACQ_REL 4</span>
-<span class="org-comment-delimiter">#</span><span class="org-comment">define __ATOMIC_RELEASE 3</span>
-<span class="org-comment-delimiter">#</span><span class="org-comment">define __fsblkcnt_t_defined </span>
-<span class="org-comment-delimiter">#</span><span class="org-comment">define _BITS_UIO_H 1</span>
-</pre>
-</div>
-
-<ul class="org-ul">
-<li>G++ (C++ Compiler) Dump</li>
-</ul>
-
-<div class="org-src-container">
-<pre class="src src-sh">$ echo <span class="org-string">"#include &lt;cmath&gt;"</span> | gcc -x c++ -std=c++11 -dD -E - | head -n 10
-<span class="org-comment-delimiter"># </span><span class="org-comment">1 "&lt;stdin&gt;"</span>
-<span class="org-comment-delimiter"># </span><span class="org-comment">1 "&lt;built-in&gt;"</span>
-<span class="org-comment-delimiter">#</span><span class="org-comment">define __STDC__ 1</span>
-<span class="org-comment-delimiter">#</span><span class="org-comment">define __cplusplus 201103L</span>
-<span class="org-comment-delimiter">#</span><span class="org-comment">define __STDC_UTF_16__ 1</span>
-<span class="org-comment-delimiter">#</span><span class="org-comment">define __STDC_UTF_32__ 1</span>
-<span class="org-comment-delimiter">#</span><span class="org-comment">define __STDC_HOSTED__ 1</span>
-<span class="org-comment-delimiter">#</span><span class="org-comment">define __GNUC__ 7</span>
-<span class="org-comment-delimiter">#</span><span class="org-comment">define __GNUC_MINOR__ 3</span>
-<span class="org-comment-delimiter">#</span><span class="org-comment">define __GNUC_PATCHLEVEL__ 1</span>
-
-.. ... ... .. ... ... .. ... ... 
-
-$ echo <span class="org-string">"#include &lt;cmath&gt;"</span> | gcc -x c++ -std=c++11 -dD -E - | tail -n 40
-  constexpr float
-  tgamma(float __x)
-  { <span class="org-keyword">return</span> __builtin_tgammaf(__x); }
-
-  constexpr long double
-  tgamma(long double __x)
-  { <span class="org-keyword">return</span> __builtin_tgammal(__x); }
-
-
-
-  template&lt;typename _Tp&gt;
-    constexpr typename __gnu_cxx::__enable_if&lt;__is_integer&lt;_Tp&gt;::__value,
-                                              double&gt;::__type
-    tgamma(_Tp __x)
-    { <span class="org-keyword">return</span> __builtin_tgamma(__x); }
-
-
-
-  constexpr float
-  trunc(float __x)
-  { <span class="org-keyword">return</span> __builtin_truncf(__x); }
-
-  constexpr long double
-  trunc(long double __x)
-  { <span class="org-keyword">return</span> __builtin_truncl(__x); }
-
-
-
-  template&lt;typename _Tp&gt;
-    constexpr typename __gnu_cxx::__enable_if&lt;__is_integer&lt;_Tp&gt;::__value,
-                                              double&gt;::__type
-    trunc(_Tp __x)
-    { <span class="org-keyword">return</span> __builtin_trunc(__x); }
-
-
-
-}
-<span class="org-comment-delimiter"># </span><span class="org-comment">1917 "/usr/include/c++/7/cmath" 3</span>
-}
-<span class="org-comment-delimiter"># </span><span class="org-comment">1 "&lt;stdin&gt;" 2</span>
-
-</pre>
-</div>
-</div>
-</div>
-</div>
 </div>
 </div>
 <div id="postamble" class="status">
-<p class="date">Created: 2020-11-27 Fri 15:11</p>
+<p class="date">Created: 2020-12-11 Fri 14:14</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
 </body>
