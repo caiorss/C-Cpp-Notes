@@ -7939,13 +7939,31 @@ File: unix-readdir.cpp
 
 #+END_SRC
 
-Building: 
+Building on Linux: 
 
 #+BEGIN_SRC sh 
   $ g++ unix-readdir.cpp -o unix-readdir.bin -std=c++1z -g -Wall -Wextra 
 #+END_SRC
 
-Running: 
+Building on MacOSX: 
+
+#+BEGIN_SRC sh 
+  # Note: It is not (GNU GCC), g++ command refers to CLang 
+  $ g++ unix-readdir.cpp -o unix-readdir.bin -std=c++1z -g -Wall -Wextra 
+
+  # Same as previous command (CLang compiler)
+  $ clang++ unix-readdir.cpp -o unix-readdir.bin -std=c++1z -g -Wall -Wextra 
+
+  $ file unix-readdir.bin 
+  unix-readdir.bin: Mach-O 64-bit executable x86_64
+
+  $ du -h unix-readdir.bin
+   44K    unix-readdir.bin
+
+#+END_SRC
+
+
+Running on Linux: 
 
 #+BEGIN_SRC sh 
   $ >> ./unix-readdir.bin /
@@ -7958,12 +7976,7 @@ Running:
     [5] path => run
     [6] path => media
     ... ... ... 
-    [18] path => lib
-    [19] path => usr
-    [20] path => boot
-    [21] path => mnt
-    [22] path => sbin
-  ... .. .... ... ... 
+    ... .. .... ... ... 
 
    $ >> ./unix-readdir.bin /boot 
    List directory contents 
@@ -7972,10 +7985,54 @@ Running:
     [2] path => /boot/initramfs-5.6.12-300.fc32.x86_64.img
     [3] path => /boot/grub2
     [4] path => /boot/vmlinuz-0-rescue-a1ac43b933e24659bba5edf2b9cec1e1
-    [5] path => /boot/memtest86+-5.01
-    [6] path => /boot/initramfs-5.6.6-300.fc32.x86_64.img
-     ... ... ...     ... ... ...     ... ... ...     ... ... ...     
+      ... ... ...     ... ... ...     ... ... ...     ... ... ...     
 #+END_SRC
+
+Running on MacOSX Catalina VM: 
+
+  + Note: on MacOSX, the command g++ is not GCC, it refers to Clang.
+
+#+BEGIN_SRC sh 
+  ./unix-readdir /
+   List directory contents 
+    [0] path => .
+    [1] path => ..
+    [2] path => home
+    [3] path => usr
+    [4] path => .DS_Store
+    [5] path => bin
+    [6] path => sbin
+    [7] path => .file
+    [8] path => etc
+    [9] path => var
+    [10] path => Library
+    [11] path => System
+    [12] path => .VolumeIcon.icns
+    [13] path => .fseventsd
+    [14] path => private
+    [15] path => .vol
+    [16] path => Users
+    [17] path => Applications
+    [18] path => opt
+    [19] path => dev
+    [20] path => Volumes
+    [21] path => tmp
+    [22] path => cores
+
+   ./unix-readdir /Applications/iTerm.app/Contents
+    List directory contents 
+     [0] path => /Applications/iTerm.app/Contents/.
+     [1] path => /Applications/iTerm.app/Contents/..
+     [2] path => /Applications/iTerm.app/Contents/CodeResources
+     [3] path => /Applications/iTerm.app/Contents/_CodeSignature
+     [4] path => /Applications/iTerm.app/Contents/MacOS
+     [5] path => /Applications/iTerm.app/Contents/Resources
+     [6] path => /Applications/iTerm.app/Contents/XPCServices
+     [7] path => /Applications/iTerm.app/Contents/Frameworks
+     [8] path => /Applications/iTerm.app/Contents/Info.plist
+     [9] path => /Applications/iTerm.app/Contents/PkgInfo
+#+END_SRC
+
 ** Monitor file system changes with Inotify API
 *** Overview 
 
@@ -11462,7 +11519,9 @@ key, which is unique for every connection.
   
   *Some network protocols that relies on TLS/SSL* 
 
-  + HTTPS (HTTP + SSL/TLS), port 443 => Http protocol encapsulated with TLS/SSL.
+  + HTTPS (HTTP + SSL/TLS), port 443 => Http protocol encapsulated
+    with TLS/SSL. Web sites with https URL, for instance
+    https://www.httpbin.org, are using TLS.    
 
   + FTPS (FTP + SSL/TLS) => FTP encapsulated with TLS/SSL
 
@@ -11501,6 +11560,7 @@ key, which is unique for every connection.
    * [[https://www.wolfssl.com/][wolfSSL]] (Embedded Systems)
      * License: Dual license, GPL3 and commercial for closed source applications.
      * Highly secure implementation, designed embedded systems.
+     * Repository: https://github.com/wolfSSL/wolfssl
 
    * [[https://botan.randombit.net/][Botan]]
      * License: BSD
@@ -11515,8 +11575,7 @@ key, which is unique for every connection.
        library is accompanied by a featureful command line interface."
 
    * [[https://docs.rs/rustls/0.19.0/rustls/][Rust TLS]]
-     * TLS protocol stack implemented in Rust that conforms to OpenSLL API.
-     * Repository: https://github.com/wolfSSL/wolfssl
+     * TLS protocol stack implemented in Rust that conforms to OpenSSL API.
 
    * [[https://bearssl.org/][BearSSL - Main]]
      * "BearSSL is an implementation of the SSL/TLS protocol
@@ -11606,6 +11665,15 @@ key, which is unique for every connection.
       key, if the server has the public key; TLS and SSL uses public
       key for exchanging the shared key.
 
+  * _X.509 Certificates_ - The certificate encapsulates is standardized
+    format by [[https://tools.ietf.org/html/rfc5280][RFC 5280]] that encapsulates the identification metadata,
+    server or client public key and digital signatures from
+    certificate authorities for validating the identification linked
+    to the certificate.  In order to a TLS communication to be
+    established, at least one side needs a TLS certificate, which is
+    in most of the cases only the server. However, client-isde
+    certificate can also be used for client authentication.
+
   * _CA_ - Certificate Authority (PKI - Public Key Infrastructure)
     + Provides _non-repudiation_, it allows the receiver of the message,
       for instance a Web browser, to be sure about sender, which could
@@ -11630,6 +11698,12 @@ key, which is unique for every connection.
   * _HMAC_ - Keyed-Hashing for Message Authentication
 
   * _DES_ - Data Encryption Standard
+
+  * _BER_ - Basic Enconding Rules (Related to X509 Certificates)
+
+  * _DER_ - Distinguished Encoding Rules (Related to X509 Certificates)
+
+  * _PEM_ - Privacy Enhanced Mail 
 
   *Further Reading* 
 
@@ -11734,6 +11808,113 @@ DoH - DNS over HTTPS (DNS over TLS)
  + [[https://www.thesslstore.com/blog/what-is-dns-over-tls/#:~:text=DNS%20over%20TLS%20is%20a,is%20the%20successor%20to%20SSL.][What is DNS over TLS? Everything you need to know]]
 
  + [[https://en.wikipedia.org/wiki/DNS_over_TLS][DNS over TLS - Wikipedia]]
+
+*** Open SSL commands 
+
+ *View certificate of some sever, given its hostname* 
+
+#+BEGIN_SRC sh 
+   $ >> openssl s_client -showcerts -connect www.httpbin.org:443 < /dev/null 
+
+  CONNECTED(00000003)
+  depth=2 C = US, O = Amazon, CN = Amazon Root CA 1
+  verify return:1
+  depth=1 C = US, O = Amazon, OU = Server CA 1B, CN = Amazon
+  verify return:1
+  depth=0 CN = httpbin.org
+  verify return:1
+  ---
+  Certificate chain
+   0 s:CN = httpbin.org
+     i:C = US, O = Amazon, OU = Server CA 1B, CN = Amazon
+  -----BEGIN CERTIFICATE-----
+  MIIFbjCCBFagAwIBAgIQC6tW9S/J9yHIw1v8WOnMPDANBgkqhkiG9w0BAQsFADBG
+  MQswCQYDVQQGEwJVUzEPMA0GA1UEChMGQW1hem9uMRUwEwYDVQQLEwxTZXJ2ZXIg
+  Q0EgMUIxDzANBgNVBAMTBkFtYXpvbjAeFw0yMDAxMTgwMDAwMDBaFw0yMTAyMTgx
+  MjAwMDBaMBYxFDASBgNVBAMTC2h0dHBiaW4ub3JnMIIBIjANBgkqhkiG9w0BAQEF
+   .... ... ...
+   ........ 
+
+  qPGwissH0W8HgYWhKVISkN2ui55RgbHXQHYDX0uYgGK6iRMxHHlOR1vOqRgEvVGF
+  5g8CcK3EzritKaHkD6bf0pnSE/E7cjKXzgB4l+58dsNcIVo9YgID4xYGS6paetso
+  XHE=
+  -----END CERTIFICATE-----
+
+    ... ... ... ... ... . 
+    ... ... ... ... ... ... 
+
+  ---
+  Server certificate
+  subject=CN = httpbin.org
+
+  issuer=C = US, O = Amazon, OU = Server CA 1B, CN = Amazon
+
+  ---
+  No client certificate CA names sent
+  Peer signing digest: SHA512
+  Peer signature type: RSA
+  Server Temp Key: ECDH, P-256, 256 bits
+  ---
+  SSL handshake has read 5509 bytes and written 443 bytes
+  Verification: OK
+  ---
+  New, TLSv1.2, Cipher is ECDHE-RSA-AES128-GCM-SHA256
+  Server public key is 2048 bit
+  Secure Renegotiation IS supported
+  Compression: NONE
+  Expansion: NONE
+  No ALPN negotiated
+  SSL-Session:
+      Protocol  : TLSv1.2
+      Cipher    : ECDHE-RSA-AES128-GCM-SHA256
+      Session-ID: F63AEC9287D557EE6FE770BE0DB46CC0B26991704DEE81E9071377849356F0D6
+      Session-ID-ctx: 
+      Master-Key: 9FA0D73281EBBD07DEF167E5517207BDB80CCFC22D8C53DE9E0354D50A01B5279C51C3C55BE972497329E3E70BE73C43
+      PSK identity: None
+      PSK identity hint: None
+      SRP username: None
+      TLS session ticket lifetime hint: 43200 (seconds)
+      TLS session ticket:
+      0000 - d0 62 5a 94 f7 f7 a8 e1-c9 40 e9 ff bc ff e1 d2   .bZ......@......
+      0010 - 02 08 f4 aa 80 60 d7 e3-1f 85 1e d1 ba e3 b8 75   .....`.........u
+      0020 - 20 8f 7f 21 62 b9 72 a1-23 f5 05 8d 61 db b2 2d    ..!b.r.#...a..-
+      0030 - 20 71 38 0d 70 30 30 3d-98 ed 64 b1 66 85 75 eb    q8.p00=..d.f.u.
+      0040 - a6 e2 fe 13 9d 86 aa f4-43 42 be b3 86 2c a2 30   ........CB...,.0
+      0050 - 7c 90 f1 1b 84 b8 58 31-72 3e c2 92 83 d2 4a 33   |.....X1r>....J3
+      0060 - a1 76 f7 f4 c1 f1 6a a9-bc ce f7 c4 b6 81 28 2f   .v....j.......(/
+      0070 - 76 10 c1 ca a7 5f cf 16-0e 40 ee 09 ab b9 2b d1   v...._...@....+.
+      0080 - 05 85 ed 48 30 2b 84 2c-f4 1d b6 61 08 b5 66 ff   ...H0+.,...a..f.
+      0090 - c6 3c d3 ac e4 bb 8a de-70 73 af d9 d0 e4 f4 65   .<......ps.....e
+      00a0 - 1e 42 74 0d 8b 71 a7 a1-58 84 a3 d1 3b 4e 8c 24   .Bt..q..X...;N.$
+      00b0 - 64 46 2f ce 5a a9 a3 a0-64 23 46 36 73 92 50 2f   dF/.Z...d#F6s.P/
+
+      Start Time: 1607966129
+      Timeout   : 7200 (sec)
+      Verify return code: 0 (ok)
+      Extended master secret: no
+  ---
+  DONE
+
+
+#+END_SRC
+
+ *Generate certificate* 
+
+  + Generates the private key mykey.pem, which should never be
+    disclosed, and the certificate mycert.pem. 
+
+#+BEGIN_SRC sh 
+  $ openssl req -x509 -nodes -days 5000 -newkey rsa:1024 -keyout mykey.pem -out mycert.pem
+#+END_SRC
+
+ *View Certificate* 
+
+#+BEGIN_SRC sh 
+  $ openssl x509 -text -in mycert.pem
+#+END_SRC
+
+More commands at: 
+  + [[https://wiki.openssl.org/index.php/Command_Line_Utilities][Command Line Utilities - OpenSSLWiki]]
 
 *** TCP/IP Client Socket with TLS (OpenSSL)
 
