@@ -1,4 +1,18 @@
 
+/** Load Javascript at runtime */
+async function load_javascript (url, location){
+    var scriptTag = document.createElement('script');
+    scriptTag.setAttribute('src', url);
+    scriptTag.setAttribute('type','text/javascript');
+    location.appendChild(scriptTag);
+
+    var p = new Promise( (resolve, reject) => {
+        scriptTag.onload = resolve;
+    });
+
+    return p;
+};
+
 function hideNavBar(){
     var toc = document.querySelector("#table-of-contents");
     toc.style.display = "none";
@@ -46,7 +60,8 @@ var isOverflown = function(element) {
     // || element.scrollWidth > element.clientWidth;
 }
 
-var addCodeExpansionButton = function(){
+function addCodeExpansionButton()
+{
     codes = document.querySelectorAll("pre");   
 	
 	if(window.screen.width <= 960)
@@ -290,9 +305,9 @@ const id_selector_content_font = "selector-content-font";
 
 const storage_content_font = new LocalStorageList("content-font", 0, 
     [
-          {text: "spectral",  value: "spectral"}
+          {text: "monospace", value: "monospace"   }
+        , {text: "spectral",  value: "spectral"}
         , {text: "arial",     value: "arial"   }
-        , {text: "monospace", value: "monospace"   }
     ]); 
 
 storage_content_font.add_observer(sender => {
@@ -300,7 +315,7 @@ storage_content_font.add_observer(sender => {
     document.documentElement.style.setProperty('--content-font', font);
 });
 
-const storage_code_font_type = new LocalStorageList("code-font-type", 0, 
+const storage_code_font_type = new LocalStorageList("code-font-type", 1, 
     [
           {text: "monospace", value: "monospace"    }
         , {text: "Iosevka",   value: "code-Iosevka" }
@@ -421,7 +436,7 @@ function startControlPanel(isMobile) {
         elem.scrollTop = 0;
 
         var doc = document.documentElement || document;
-        doc.scrollTop = 0;ssssssssssssssssssssss
+        doc.scrollTop = 0;
     });
 
     elem.querySelector("#btn-bottom").addEventListener("click", () => {
@@ -446,6 +461,7 @@ function startControlPanel(isMobile) {
     
     addCodeExpansionButton();        
 
+    dialogPolyfill.registerDialog(dialog);
 
     /** ---- Table of Content Folding button -------------- */
     if(isMobile){
@@ -474,6 +490,10 @@ function startControlPanel(isMobile) {
         tocLinks.forEach(a => a.addEventListener("click", closeTOCMenu));
         
     }
+
+    if(!isMobile){
+
+    }
     
 
 }; // --- End of function initMobileTocMenu() ------------ //
@@ -485,7 +505,11 @@ function toggle_theme() {
 
 }
 
-var init = function(){
+var init = async function(){
+
+    await load_javascript("theme/dialog-polyfill.js", document.body);
+        
+    console.trace(" Script loaded. Ok. ");
 
     var isMobile = window.screen.width <= 960;
     startControlPanel(isMobile);
@@ -504,7 +528,8 @@ var init = function(){
         ctpanel.style.top  = "200px"; 
         ctpanel.style.left = "1080px";
         console.log("Control panel style = ", ctpanel.style);
-    }
+    }    
+
 
     storage_code_font_size.bind_list("#selector-font-code");
     storage_text_font_size.bind_list("#selector-font-text");
@@ -518,6 +543,7 @@ var init = function(){
     storage_content_font.notify();
 
     storage_content_font.bind_list("#" + id_selector_content_font);
+
         
   /*   var dom_content = document.querySelector("#content");
     dom_content.classList.toggle("theme-light-content");     */
