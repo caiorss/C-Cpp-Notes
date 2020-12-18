@@ -9076,7 +9076,7 @@ Running:
                Machine = 0x8664 
     Number of sections = 7 
 #+END_SRC
-*** Example - Running machine code at runtime 
+*** Example - mmap - Running machine code at runtime 
 
 The _mmap_ posix system call and the APIs _mprotect_ can be used for
 allocating memory with executable permission which allows writing and
@@ -9259,6 +9259,8 @@ File: _mmap-loader.cpp_
   };
 #+END_SRC
 
+ *Building and running on Linux* 
+
 Building: 
 
 #+BEGIN_SRC sh 
@@ -9281,7 +9283,43 @@ Running:
    [TRACE] Process terminated gracefully Ok. 
 #+END_SRC
 
- *Running in GDB debugger*
+ *Building Running on MacOSX* 
+
+Building: 
+
+#+BEGIN_SRC sh
+  $ clang++ mmap-loader.cpp -o mmap-loader.bin -std=c++1z -Wall -Wextra -g
+
+
+  $ file mmap-loader.bin
+  mmap-loader.bin: Mach-O 64-bit executable x86_64
+
+  $ otool -L mmap-loader.bin
+  mmap-loader.bin:
+          /usr/lib/libc++.1.dylib (compatibility version 1.0.0, current version 902.1.0)
+          /usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1281.100.1)
+#+END_SRC
+
+Running: 
+  + Note: It works on MacOSX because the Linux, MacOSX and other
+    Unix-based sytems use the System V x86-64 calling convention and
+    the machine code does not use any C library function. 
+
+#+BEGIN_SRC sh 
+   $ ./mmap-loader.bin
+
+   ====== Load add_numbers from machine code ================
+   [RESULT] add_numbers(20, 100) = 120
+   [RESULT] add_numbers(206, 782) = 988
+
+   ======== Load factorial() from machine code =============
+   [RESULT] factorial(5) = 24
+   [RESULT] factorial(6) = 120
+   [RESULT] factorial(7) = 720
+   [TRACE] Process terminated gracefully Ok. 
+#+END_SRC
+
+ *Running the application in GDB debugger on Linux* 
 
 Load application in debugger: 
 
