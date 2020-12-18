@@ -11478,6 +11478,361 @@ Check unix-socket file:
   $ ls -l /tmp/unix-socket-file 
   srwxrwxr-x 1 mxpkf8 mxpkf8 0 Jul  2 01:22 /tmp/unix-socket-file=
 #+END_SRC
+*** Telnet-like client and server application
+
+The following code is a sample telent-like application, which provide
+remote access to interactive shells (REPLs read-eval-print-loop) from
+local machine, where the application is running. The application can
+work in server or client mode. When running in client mode, it
+attempts to connect to remote netcat server. When running in server
+mode, the application accepts connection from any netcat
+server. Interactive shells are applications such as: irb (Ruby shell);
+ash shell; TCL shell and so on.
+
+File: _rsh-server.cpp_
+
+#+BEGIN_SRC cpp
+  // Desc: Simple telnet-like server.
+
+  #include <iostream>
+  #include <string>
+  #include <vector>
+  #include <cassert>
+  #include <cstring>  // memcpy
+
+  // ----- Unix/Linux headers -----//
+  #include <unistd.h>
+  #include <fcntl.h>
+  #include <sys/types.h>
+  #include <sys/socket.h>
+  #include <netdb.h>
+  #include <sys/types.h>
+  #include <sys/wait.h>
+
+  constexpr int UNIX_FAILURE = -1;
+
+  // Create server socket and return its file descriptor.
+  int  create_server (const char* hostname, std::uint16_t port, int backlog);
+
+  // Spawn a process and redirect its standard streams
+  // to socket (stderr, stdin, stdout)
+  void spawn_redirect (int sockfd, const char* executable);
+
+  // Send text message to socket
+  void send_msg (int sockfd, const char* message);
+
+  // Connect to remote server and return client socket file descriptor.
+  int socket_connect(const char* hostname, std::uint16_t port);
+
+  // Handle session between server and client.
+  void session_handler(int sockfd);
+
+  // -------------  MAIN() ------------------------------//
+
+  int main(int argc, char** argv)
+  {
+      // Placeholder for future error handling.
+       assert( argc == 4 && " Requires at least three arguments. " );
+
+       int sockfd = -1;
+       auto command  = std::string{ argv[1] };
+       auto hostname = std::string{ argv[2] };
+       int port      = std::stoi(argv[3]);
+
+       // Run as client mode => Forwarding the shell to the server.
+       if(command == "client") for(;;) {
+           sockfd = socket_connect(hostname.c_str(), port);
+
+           if( sockfd > 0 )
+              std::fprintf(stderr, " [OK   ] Connected to server. \n");
+           else
+              std::fprintf(stderr, " [ERROR] Conncection failure. Retry. \n");
+
+           session_handler(sockfd);
+           sleep(2);
+       } // ---- End of client command ---- //
+
+       // Run in server mode => Liste connection.
+       if(command == "server")
+       {
+           sockfd = create_server(hostname.c_str(), port, 5);
+           assert( sockfd != -1 );
+
+           // ============= Server Event Loop =============//
+           for(;;){
+
+               struct sockaddr_in client_sa;
+               socklen_t addrlen = sizeof(sockaddr_in);
+
+               fprintf(stderr, " [TRACE] Waiting for client connection. \n");
+               int sock_client = accept(sockfd, (sockaddr *) &client_sa, &addrlen );
+
+               if(sock_client == -1)
+               {
+                   fprintf(stderr, " Error: failure to handle client socket. Check errno \n");
+                   close(sock_client);
+                   continue;
+               }
+
+               session_handler(sock_client);
+
+           } // --- End of for(;;) server loop ------//
+
+       } // --- End of server command ---//
+
+
+       // Release resource => RAII (Resource-Acquisition-Is-Initialization) fits here.
+       close(sockfd);
+       return 0;
+  }
+
+
+     // =============================================//
+     //          D E F I N I T I O N S               //
+     //==============================================//
+
+  int create_server(const char* hostname, std::uint16_t port, int backlog)
+  {
+      // --- Create socket file descriptor -----------------------//
+
+       int sockfd = socket ( AF_INET, SOCK_STREAM, 0);
+
+       // Future error handling.
+       // Returns (-1) on failure
+       assert( sockfd != - 1);
+
+       // ---------- query address ------------------------------//
+       // Note: the keyword 'struct' is not necessary here (redundant).
+       struct hostent* h = gethostbyname(hostname);
+       assert(h != nullptr);
+
+       struct sockaddr_in sa;
+       memcpy(&sa.sin_addr.s_addr, h->h_addr, h->h_length);
+       sa.sin_family = AF_INET;
+       // The function htons convert a number to big-endian format.
+       sa.sin_port   = htons(port);
+
+       // ----- Bind to Port and wait for client connections ---------//
+       if( ::bind(sockfd, (sockaddr *) &sa, sizeof(sa)) == -1)
+       {
+           fprintf(stderr, "Error: unable to bind socket \n");
+           return EXIT_FAILURE;
+       }
+       // Enables binding to the same address
+       int enable_reuseaddr = 1;
+       if ( setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &enable_reuseaddr, sizeof(int)) < 0 )
+       {
+           fprintf(stderr, "Error: unable to set socket option. \n");
+           return EXIT_FAILURE;
+       }
+
+       fprintf(stderr, " [TRACE] Listening client connection \n");
+       assert( listen(sockfd, backlog) != -1 );
+
+       return sockfd;
+  }
+
+  int socket_connect(const char* hostname, std::uint16_t port)
+  {
+      int sockfd =  socket (  AF_INET, SOCK_STREAM, 0);
+      // assert() => Placeholder for future error handling.
+      assert( sockfd != UNIX_FAILURE );
+
+      // Query DNS
+      struct hostent* h = gethostbyname(hostname);
+      assert( h != nullptr );
+
+      struct sockaddr_in sa;
+      std::memcpy(&sa.sin_addr.s_addr, h->h_addr, h->h_length);
+      sa.sin_family = AF_INET;
+      sa.sin_port   = htons(port);
+
+      int res = connect( sockfd
+                       , reinterpret_cast<sockaddr*>(&sa)
+                       , sizeof(sockaddr_in));
+
+      if( res == -1){ return -1; }
+      return sockfd;
+  }
+
+
+  void send_msg(int sockfd, const char* message)
+  {
+      send(sockfd, message, strlen(message), 0);
+  }
+
+
+  void spawn_redirect(int sockfd, const char* executable)
+  {
+      pid_t pid = fork();
+
+      switch (pid) {
+      case -1:
+          std::fprintf(stderr, "Error: unable to fork process. ");
+          exit(EXIT_FAILURE);
+          break;
+          // ----------- Child Process ------------//
+      case 0: {
+
+          std::fprintf( stderr, " [TRACE] Spawning process (PID = %d ) shell: %s \n"
+                      , ::getpid(), executable);
+
+          // Redirect standard streams to socket file descriptor
+          dup2(sockfd, STDOUT_FILENO);
+          dup2(sockfd, STDIN_FILENO );
+          dup2(sockfd, STDERR_FILENO);
+
+          const char* args [] = {
+              "rshell"    // Process name (arbitrary)
+              , nullptr   // Sentinel value - (always NULL pointer)
+          };
+
+          // Spawn a new process.
+          int status = execvp( executable, const_cast<char* const*>(args) );
+          if( status == UNIX_FAILURE ){
+              int err = errno;
+              send_msg(sockfd, " [SERVER ERROR] Unable to locate REPL \n");
+              send_msg(sockfd, strerror(err));
+              close(sockfd);
+              exit(EXIT_FAILURE);
+          }
+
+      }
+          break;
+          //----------- Parent Process ------------//
+      default:
+          // Wait for child process termination.
+          ::waitpid(pid, nullptr, 0);
+          break;
+      }
+  }
+
+  void session_handler(int sockfd)
+  {
+      constexpr size_t SIZE = 500;
+      char buffer[500];
+      // Always initialize buffer for avoiding undefined behavior.
+      std::memset(buffer, 0x00, SIZE);
+
+      send_msg(sockfd, "Enter the shell to be spawned: ");
+      if( ::recv(sockfd, buffer, SIZE, 0) <= 0)
+      {
+          std::fprintf(stderr, "Connection error or peer closed connection \n");
+          return;
+      }
+
+      std::fprintf(stderr, " [TRACE] Waiting for child process termination. \n");
+
+      // Remove '\n' end line character if it is found.
+      if( char* ptr_char = (char*) ::memchr(buffer, '\n', SIZE) )
+      { *ptr_char = '\0'; }
+
+      // Fork a new process (run executable indicated by the buffer).
+      spawn_redirect(sockfd, buffer);
+
+      std::fprintf(stderr, " [TRACE] Child process terminated Ok. \n");
+  }
+
+#+END_SRC
+
+  *Running on MacOSX*
+
+Building on MacOSX Catalina:
+
+#+BEGIN_SRC sh
+  $ g++ rsh-server.cpp -o rsh-server.osx -std=c++1z -Wall -Wextra -g
+
+  $ file rsh-server.osx
+  rsh-server.osx: Mach-O 64-bit executable x86_64
+
+  $ otool -L rsh-server.osx
+  rsh-server.osx:
+          /usr/lib/libc++.1.dylib (compatibility version 1.0.0, current version 902.1.0)
+          /usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1281.100.1)
+#+END_SRC
+
+Run terminal A => (Remote Linux Machine, netcat as server):
+
+#+BEGIN_SRC sh
+  $ >> rlwrap netcat  -l 9070
+  Enter the shell to be spawned: sh
+
+  # User typed: $ whoami
+  whoami
+  unix
+
+  # User typed: $ uname -a
+  uname -a
+  Darwin ghosts-iMac-Pro.local 19.5.0 Darwin Kernel Version 19.5.0: Tue May 26 20:41:44 PDT 2020; root:xnu-6153.121.2~2/RELEASE_X86_64 x86_64
+
+  # User typed: $ ls /
+  ls /
+  Applications
+  Library
+  System
+  Users
+  Volumes
+  bin
+  cores
+  dev
+  etc
+  home
+  opt
+  private
+  sbin
+  tmp
+  usr
+  var
+
+  # User typed: $ ls /Applications
+  ls /Applications
+  Safari.app
+  Utilities
+  iTerm.app
+
+  # User typed : '$ osalang' for listing all supported
+  # OSA (Open Scripting Architecture) languages.
+  osalang
+  AppleScript
+  JavaScript
+  Generic Scripting System
+
+  # User typeed: # osascript -e .... ...
+  osascript -e 'display dialog "My Dialog in OSA AppleScripting Automation!" '
+  Unable to create basic Accelerated OpenGL renderer.
+  Unable to create basic Accelerated OpenGL renderer.
+  Core Image is now using the software OpenGL renderer. This will be slow.
+  button returned:OK
+
+  # User typed: $ osascript -e ....
+  osascript -e 'tell app "Finder" to make new Finder window'
+  Finder window id 117
+
+   # User typed: $ osascript -e ....
+  osascript -e 'display notification "Temperature 31 celsius." with title "Wheather report"'
+
+
+  # Type Ctrl + C to shutdown server
+
+#+END_SRC
+
+Run terminal B => (MacOSX, run rsh-server in client mode):
+
+#+BEGIN_SRC sh
+  ./rsh-server.osx client 10.0.2.2 9070
+   [OK   ] Connected to server.
+   [TRACE] Waiting for child process termination.
+   [TRACE] Spawning process (PID = 1569 ) shell: sh
+   [TRACE] Child process terminated Ok.
+   [ERROR] Conncection failure. Retry.
+  Connection error or peer closed connection
+   [ERROR] Conncection failure. Retry.
+  Connection error or peer closed connection
+   [ERROR] Conncection failure. Retry.
+  Connection error or peer closed connection
+   [OK   ] Connected to server.
+#+END_SRC
+
 
 ** Sockets with SSL/TSL - Secure Communication
 *** Overview 
