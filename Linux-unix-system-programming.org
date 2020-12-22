@@ -11615,7 +11615,7 @@ Check unix-socket file:
   $ ls -l /tmp/unix-socket-file 
   srwxrwxr-x 1 mxpkf8 mxpkf8 0 Jul  2 01:22 /tmp/unix-socket-file=
 #+END_SRC
-*** Telnet-like client and server application 
+*** Telnet-like application 
 
 The following code is a sample telent-like application, which provide
 remote access to interactive shells (REPLs read-eval-print-loop) from
@@ -11968,6 +11968,562 @@ Run terminal B => (MacOSX, run rsh-server in client mode):
    [ERROR] Conncection failure. Retry. 
   Connection error or peer closed connection 
    [OK   ] Connected to server. 
+#+END_SRC
+
+*** Telnet-like application with pseudo-terminal devices
+
+The previous telnet-like application is not able to display colors or
+handle interactive applications which expect to be running in a
+terminal device, such as sudo, python and so on.
+
+This rewrite of the previous code solves those shortcomings by using
+UNIX pseudo-terminal device pair, comprised of master and slave pseudo
+terminal devices.  In this new code version, the slave pseudo terminal
+device is connected to the remote application's standard streams
+stdin, stdout and stederr. The master pseudo terminal device is
+connected to the socket. Any message received by the socket is
+forwarded to the master pseudo-terminal device, then the slave
+pseudo-terminal devices forwards this data to the process input. Any
+process output, stderr or stdout, are relayed to the slave pseudo
+terminal device, then the master pseudo terminal device forwards to
+the socket that sends the data over the network.
+
+The (API) application for dealing with pseudo terminal devices is one
+of the most complicated UNIX APIs has a sparse documentation and lots
+of historical baggage that dates back from mainframe era, such as baud rate.
+
+ *Concepts involved in the Terminal API*
+
+   + UNIX signals
+
+   + TTY
+
+   + PTY - Pseudo terminal device
+
+   + Shell
+     + Interactive intepreter REPL (read-eval-print-loop), such as
+       bash or python.
+
+   + Controlling terminal
+
+   + Terminal emulator (Example: Xterm, Gnome terminal)
+
+   + Child process
+
+   + Parent process
+
+   + Session leader (often the shell)
+
+   + Session - set of or one or more process groups.
+
+   + Process group (also called 'job')
+
+   + Foreground process
+
+   + Background process
+
+   + Pseudo-terminal modes:
+     + _Canonical mode_ (default) => allso called non raw mode. Reads
+       line, by line. Provides default command line history, echoing
+       and allows moving the cursor forward.
+     + _Non-canonical_ => also called raw mode => This mode does not
+       provide, history, character echoing, cursor backward movement
+       and so on. Used by Emacs and VI and other interactive terminal
+       applications.
+
+   + Applications that cannot work without pseudo terminals:
+     + ssh
+     + telnet => Predecessor of ssh
+     + script => Records shell session to a file
+     + rlogin
+     + GNU screen
+     + Tmux   => Terminal multiplexer
+     + sudo   => For elevate privilege
+
+
+ *Articles related to pseudo-terminal device API:*
+
+  + [[https://linux.die.net/man/7/pty][pty - pseudoterminal interfaces / Linux Manpage]]
+
+  + [[https://docs.oracle.com/cd/E19253-01/816-4855/index.html][Streams Programming Guide - Oracle]]
+
+  + [[https://blog.nelhage.com/2011/02/changing-ctty/][reptyr: Changing a process's controlling terminal]]
+
+  + [[https://pubs.opengroup.org/onlinepubs/007908775/xbd/termios.html][General Terminal Interface - UNIX Open Group]]
+
+  + [[https://www.feyrer.de/NetBSD/ttys.html][TTYs and X Windows - Unix User Interaction now and then]]
+
+  + [[https://jdebp.eu/FGA/bernstein-on-ttys/cttys.html][Controlling TTYs: A Unix Horror Story]]
+
+  + [[https://www.linusakesson.net/programming/tty/][The TTY desmystified.]]
+
+  + [[https://blog.nelhage.com/2009/12/a-brief-introduction-to-termios/][A brief introduction to Termios]]
+
+  + [[https://blog.nelhage.com/2009/12/a-brief-introduction-to-termios-termios3-and-stty/][A brief introduction to termios:(3) and stty]]
+
+  + [[http://poincare.matf.bg.ac.rs/~ivana/courses/ps/sistemi_knjige/pomocno/apue/APUE/0201433079/ch09lev1sec6.html][Controlling terminal]]
+
+  + [[https://www.freebsd.org/doc/handbook/consoles.html][Virtual Consoles and Terminals]]
+
+  + [[https://justaguyinphilly.wordpress.com/2011/09/04/tty-session-leader-terminal-controlling-terminal-stdout-and-stdin-foreground-and-background/][tty, session leader, terminal, controlling terminal, stdout and stdin, foreground and background]]
+
+
+ *File*: _rshell.cpp_
+
+#+BEGIN_SRC cpp
+  // Desc: Simple telnet-like server using pseudo terminal devices.
+
+  #include <iostream>
+  #include <string>
+  #include <vector>
+  #include <cassert>
+  #include <cstring>  // memcpy
+
+  // ----- Unix/Linux headers -----//
+  #include <unistd.h>
+  #include <fcntl.h>
+  #include <sys/types.h>
+  #include <sys/socket.h>
+
+  #include <netdb.h>
+  #include <sys/types.h>
+  #include <sys/wait.h>
+  #include <poll.h>
+
+
+  // ------ UNIX Pseudo Terminal Device API headers ---------//
+  //
+  #include <termios.h>
+
+  #if defined(__linux__)
+  // On Linux
+  #include <pty.h>
+  #else
+  // On BSDs =>> MacOSX, FreeBSD, OpenBSD
+  #include <util.h>
+  #include <sys/ioctl.h>
+  #endif
+
+
+  constexpr int UNIX_FAILURE = -1;
+
+  // Create server socket and return its file descriptor.
+  int  create_server (const char* hostname, std::uint16_t port, int backlog);
+
+  // Spawn a process and redirect its standard streams
+  // to socket (stderr, stdin, stdout)
+  void spawn_redirect (int sockfd, const char* executable);
+
+  // Send text message to socket
+  void send_msg (int sockfd, const char* message);
+
+  // Connect to remote server and return client socket file descriptor.
+  int socket_connect(const char* hostname, std::uint16_t port);
+
+  // Handle session between server and client.
+  void session_handler(int sockfd, const char* executable);
+
+  void set_raw_terminal(int pty_fd);
+
+  // -------------  MAIN() ------------------------------//
+
+  int main(int argc, char** argv)
+  {
+
+      if(argc != 4)
+      {
+          fprintf(stderr, " Usage: $ %s client <HOSTNAME> <PORT> \n", argv[0]);
+          fprintf(stderr, " Usage: $ %s server <HOSTNAME> <PORT> \n", argv[0]);
+          return EXIT_FAILURE;
+      }
+
+  int sockfd = -1;
+  auto command  = std::string{ argv[1] };
+  auto hostname = std::string{ argv[2] };
+  int port      = std::stoi(argv[3]);
+
+  const char* shell_executable = "bash";
+
+  // Run as client mode => Forwarding the shell to the server.
+  if(command == "client") for(;;) {
+        sockfd = socket_connect(hostname.c_str(), port);
+
+        if( sockfd > 0 )
+             std::fprintf(stderr, " [OK   ] Connected to server. \n");
+        else
+               std::fprintf(stderr, " [ERROR] Conncection failure. Retry. \n");
+
+        session_handler(sockfd, shell_executable);
+        sleep(2);
+  } // ---- End of client command ---- //
+
+  // Run in server mode => Liste connection.
+  if(command == "server")
+  {
+      sockfd = create_server(hostname.c_str(), port, 5);
+      assert( sockfd != -1 );
+
+      // ============= Server Event Loop =============//
+      for(;;){
+
+          struct sockaddr_in client_sa;
+          socklen_t addrlen = sizeof(sockaddr_in);
+
+          fprintf(stderr, " [TRACE] Waiting for client connection. \n");
+          int sock_client = accept(sockfd, (sockaddr *) &client_sa, &addrlen );
+
+          if(sock_client == -1)
+          {
+              fprintf(stderr, " Error: failure to handle client socket. Check errno \n");
+              close(sock_client);
+              continue;
+          }
+
+          session_handler(sock_client, shell_executable);
+
+      } // --- End of for(;;) server loop ------//
+
+  } // --- End of server command ---//
+
+
+  // Release resource => RAII (Resource-Acquisition-Is-Initialization) fits here.
+  close(sockfd);
+  return 0;
+  }
+
+
+  // =============================================//
+  //          D E F I N I T I O N S               //
+  //==============================================//
+
+  int create_server(const char* hostname, std::uint16_t port, int backlog)
+  {
+      // --- Create socket file descriptor -----------------------//
+
+      int sockfd = socket ( AF_INET, SOCK_STREAM, 0);
+
+      // Future error handling.
+      // Returns (-1) on failure
+      assert( sockfd != - 1);
+
+      // ---------- query address ------------------------------//
+      // Note: the keyword 'struct' is not necessary here (redundant).
+      struct hostent* h = gethostbyname(hostname);
+      assert(h != nullptr);
+
+      struct sockaddr_in sa;
+      memcpy(&sa.sin_addr.s_addr, h->h_addr, h->h_length);
+      sa.sin_family = AF_INET;
+      // The function htons convert a number to big-endian format.
+      sa.sin_port   = htons(port);
+
+      // ----- Bind to Port and wait for client connections ---------//
+      if( ::bind(sockfd, (sockaddr *) &sa, sizeof(sa)) == -1)
+      {
+          fprintf(stderr, "Error: unable to bind socket \n");
+          return EXIT_FAILURE;
+      }
+      // Enables binding to the same address
+      int enable_reuseaddr = 1;
+      if ( setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &enable_reuseaddr, sizeof(int)) < 0 )
+      {
+          fprintf(stderr, "Error: unable to set socket option. \n");
+          return EXIT_FAILURE;
+      }
+
+      fprintf(stderr, " [TRACE] Listening client connection \n");
+      assert( listen(sockfd, backlog) != -1 );
+
+      return sockfd;
+  }
+
+  int socket_connect(const char* hostname, std::uint16_t port)
+  {
+      int sockfd =  socket (  AF_INET, SOCK_STREAM, 0);
+      // assert() => Placeholder for future error handling.
+      assert( sockfd != UNIX_FAILURE );
+
+      // Query DNS
+      struct hostent* h = gethostbyname(hostname);
+      assert( h != nullptr );
+
+      struct sockaddr_in sa;
+      std::memcpy(&sa.sin_addr.s_addr, h->h_addr, h->h_length);
+      sa.sin_family = AF_INET;
+      sa.sin_port   = htons(port);
+
+      int res = connect( sockfd
+                         , reinterpret_cast<sockaddr*>(&sa)
+                         , sizeof(sockaddr_in));
+
+      if( res == -1){ return -1; }
+      return sockfd;
+  }
+
+
+  void send_msg(int sockfd, const char* message)
+  {
+      send(sockfd, message, strlen(message), 0);
+  }
+
+  void session_handler(int sockfd, const char* executable)
+  {
+      char name[500];
+      memset(name, 0x00, 500);
+
+      // File descriptor of master pseudo terminal (PTY) pair.
+      // The master pseudo terminal is connected to the parent process.
+      int pty_master = -1;
+
+      // File descriptor of slave pseudo terminal (PTY) pair.
+      // The slave pseudo terminal is connected to the child process (shell).
+      //
+      int pty_slave  = -1;
+
+      assert( openpty(&pty_master, &pty_slave, &name[0], nullptr, nullptr) != -1 );
+
+      fprintf(stderr, " [TRACE] Slave  PTY fd = %d ; file = %s \n", pty_slave,  ttyname(pty_slave));
+      fprintf(stderr, " [TRACE] Master PTY fd = %d ; file = %s \n", pty_master, ttyname(pty_master));
+
+      int flag = 1;
+      // Note: ioctl() returns 0 on success.
+      assert( ioctl(pty_master, TIOCPKT, &flag ) != -1);
+      // assert( ioctl(pty_master, FIONBIO, &flag ) != -1);
+      set_raw_terminal(pty_slave);
+
+      struct winsize win;
+      assert( ioctl(pty_master, TIOCGWINSZ, &win) != -1);
+      fprintf(stderr, " [TRACE] Window size of cols = %d ; rows = %d \n", win.ws_col, win.ws_row);
+
+      // Fork a child process
+      pid_t pid = fork();
+
+      switch (pid)
+      {
+      case -1:
+          std::fprintf(stderr, "Error: unable to fork process. ");
+          exit(EXIT_FAILURE);
+          break;
+          // ----------- Child Process ------------//
+      case 0: {
+
+          std::fprintf( stderr, " [TRACE] Spawning process (PID = %d ) pty = %s ; shell: %s \n"
+                        , ::getpid(), name, executable);
+
+          // Turn the current terminal into the session leader of the child process.
+          assert( setsid() > 0);
+
+          // Redirect process (stdin, stdout, stderr) to the pseudo terminal slave device (PTY).
+          assert( dup2(pty_slave, STDOUT_FILENO) != -1);
+          assert( dup2(pty_slave, STDIN_FILENO ) != -1);
+          assert( dup2(pty_slave, STDERR_FILENO) != -1);
+
+          const char* args [] = {
+              executable    // Process name (arbitrary)
+              , nullptr     // Sentinel value - (always NULL pointer)
+          };
+
+          // Spawn a new process.
+          int status = execvp( executable, const_cast<char* const*>(args) );
+          if( status == UNIX_FAILURE ){
+              int err = errno;
+              send_msg(sockfd, " [SERVER ERROR] Unable to locate REPL \n");
+              send_msg(sockfd, strerror(err));
+              close(sockfd);
+              exit(EXIT_FAILURE);
+          }
+
+      }
+          break;
+          //----------- Parent Process ------------//
+      default:
+
+          // Buffer size in bytes.
+          constexpr size_t BUFFER_SIZE = 1024;
+          char buffer[BUFFER_SIZE];
+
+          constexpr  size_t N = 2;
+          struct pollfd pollv[N];
+
+          // Register socket and pseudo-terminal master side.
+          pollv[0].fd      = sockfd;
+          pollv[0].events  = POLLIN;
+          pollv[0].revents = 0;
+          pollv[1].fd      = pty_master;
+          pollv[1].events  = POLLIN;
+          pollv[1].revents = 0;
+
+          // --------- Connection session loop -----------------------------//
+          //
+          for(;;)
+          {
+              // Block current thread until any file descriptor becomes
+              // ready for read operation.
+              int nfds = ::poll( pollv, N, -1);
+              if(nfds < 0){
+                  fprintf(stderr, " [TRACE] An error has happened. Abort. ");
+                  std::terminate();
+              }
+
+
+              // Event that happens when socket becomes ready (counterparty sends a message)
+              if( pollv[0].revents & POLLIN ) {
+                  size_t n = read(sockfd, buffer, BUFFER_SIZE);
+                  if(n == 0){
+                      fprintf(stderr, " [TRACE] Peer closed connection \n");
+                      close(pty_master);
+                      break;
+                  }
+                  // Echoe command output to the server terminal
+                  write(STDOUT_FILENO, buffer, n);
+
+                  // Write socket remote input (stdin) to the master pseudo-terminal device (PTY)
+                  assert( write(pty_master, buffer, n) > 0);
+              }
+
+              // Event that happens when the process connected to the slave-end of pseudo
+              // terminal (PTY) sends a message.
+              if( pollv[1].revents & POLLIN ) {
+                  size_t nn = read(pty_master, buffer, BUFFER_SIZE);
+                  assert( nn > 0 );
+
+                  // Relay process output from master pseudo terminal to the socket file descriptor.
+                  assert( write(sockfd, buffer, nn) > 0);
+              }
+
+          } // --- End of session loop ------//
+
+          break;
+      }
+  }
+
+
+  // Set pseudo terminal device in raw mode (not cooked mode, default)
+  // The algorithm was extracted from the following Python code:
+  //  =>>  https://github.com/python/cpython/blob/711381dfb09fbd434cc3b404656f7fd306161a64/Lib/tty.py#L18
+  void set_raw_terminal(int pty_fd)
+  {
+      // Saved terminal settings
+      struct termios tty_old;
+
+      // Current terminal settings
+      struct termios tty_new;
+
+      // Save the default parameters of the slave side of the PTY
+      int rc = tcgetattr(pty_fd, &tty_old);
+      assert( rc != -1 );
+
+      tty_new = tty_old;
+      cfmakeraw (&tty_new);
+      tty_new.c_iflag = tty_new.c_iflag & ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON) ;
+      tty_new.c_oflag = tty_new.c_oflag & ~(OPOST);
+      tty_new.c_cflag = tty_new.c_cflag & ~(CSIZE | PARENB);
+      tty_new.c_cflag = tty_new.c_cflag | CS8;
+      tty_new.c_lflag = tty_new.c_lflag & ~(ECHO | ICANON | IEXTEN | ISIG);
+      tty_new.c_cc[VMIN] = 1;
+      tty_new.c_cc[VTIME] = 0;
+
+      tcsetattr (pty_fd, TCSANOW, &tty_new);
+      // tcsetattr (pty_slave, TCSANOW, &tty_new);
+  }
+
+#+END_SRC
+
+ *Building*
+
+This application is able to be build on Linux, BSD-variants or
+MacOSX. In this case it was compiled on a MacOSX VM:
+
+#+BEGIN_SRC sh
+  $ clang++ rshell.cpp -o rshell-osx.bin -std=c++1z -Wall -Wextra
+
+  $ file rshell-osx.bin
+  rshell.bin: Mach-O 64-bit executable x86_64
+
+  $ otool -L rshell-osx.bin
+  rshell.bin:
+          /usr/lib/libc++.1.dylib (compatibility version 1.0.0, current version 902.1.0)
+          /usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1281.100.1)
+#+END_SRC
+
+ *Running*
+
+Terminal 1: Run netcat as server in a Linux machine:
+
+#+BEGIN_SRC sh
+   $ nc -l 9056
+
+   The default interactive shell is now zsh.
+   To update your account to use zsh, please run `chsh -s /bin/zsh`.
+   For more details, please visit https://support.apple.com/kb/HT208050.
+   bash-3.2$
+   bash-3.2$ uname -a
+   Darwin ghosts-iMac-Pro.local 19.5.0 Darwin Kernel Version 19.5.0: ... ... 
+
+   bash-3.2$ pwd
+   /Volumes/data/macosx
+
+   bash-3.2$ ls /
+   Applications    Volumes         etc             sbin
+   Library         bin             home            tmp
+   System          cores           opt             usr
+   Users           dev             private         var
+   bash-3.2$
+
+
+   bash-3.2$ osascript -l JavaScript -i
+
+   >> ObjC.import("Foundation")
+   ObjC.import("Foundation")
+   => undefined
+   >> ObjC.import("Cocoa")
+   ObjC.import("Cocoa")
+   => undefined
+   >>
+
+   >> console.log("Hello world - Hola mundo - Ola mundo")
+   console.log("Hello world - Hola mundo - Ola mundo")
+   Hello world - Hola mundo - Ola mundo
+   => undefined
+   >>
+
+   >> $.NSLog("Mac OSX Objective C is awesome => GNUSTep")
+   $.NSLog("Mac OSX Objective C is awesome => GNUSTep")
+   2020-12-22 14:19:01.001 osascript[8194:730902] Mac OSX Objective C is awesome => GNUSTep
+
+
+   >> z = $.NSNumber.numberWithFloat(10.2323)
+   z = $.NSNumber.numberWithFloat(10.2323)
+   => $(10.2322998046875)
+
+   >>  $.NSLog(" z = %@", z)
+    $.NSLog(" z = %@", z)
+   2020-12-22 14:20:47.164 osascript[8194:730902]  z = 10.2323
+
+
+   >>  alert = $.NSAlert.alloc.init
+    alert = $.NSAlert.alloc.init
+   => [id NSAlert]
+
+   >>  alert.messageText = "Hello world Alert button"
+    alert.messageText = "Hello world Alert button"
+   => "Hello world Alert button"
+
+   >> alert.runModal(); $.NSLog(" Finished")
+   alert.runModal(); $.NSLog(" Finished")
+#+END_SRC
+
+Terminal 2: Run rshell as client in a MacOSX VM:
+
+#+BEGIN_SRC sh
+ $  ./rshell-osx.bin client 10.0.2.2 9056 
+ [OK   ] Connected to server. 
+ [TRACE] Slave  PTY fd = 5 ; file = /dev/ttys021 
+ [TRACE] Master PTY fd = 4 ; file = (null) 
+ [TRACE] Window size of cols = 0 ; rows = 0 
+ [TRACE] Spawning process (PID = 8191 ) pty = /dev/ttys021 ; shell: bash 
+  ... ..   ... ..   ... ..   ... ..   ... ..   ... .. 
+   ... ..   ... ..   ... ..   ... ..   ... ..   ... ..   ... .. 
 #+END_SRC
 
 ** Sockets with SSL/TSL - Secure Communication
