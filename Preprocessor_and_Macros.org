@@ -369,6 +369,96 @@ Usage example:
 
   ASSERT_TYPE_EQUAL(int ,      iter::value_type );
 #+END_SRC
+** Macros for automating boilerplate code 
+
+Macros can be used for automating repetitive and boilerplate code such
+as declaring default constructors, copy constructor, delete copy
+constructor, move operators and so on. 
+
+Some macros for automating construction declaration: 
+
+#+BEGIN_SRC cpp 
+  // Define default constructor 
+  #define CL_CTOR_DEFAULT( className ) \
+      public:                          \
+      className() = default;           \
+      private:
+
+  // Makes a class non copiable. 
+  // Auomates the boilerplate code for 
+  // declaring a class as non-copiable 
+  #define CL_NON_COPIABLE( className )                  \
+      public:                                           \
+      className( className const&) = delete;            \
+      className& operator= (className const&) = delete; \
+      private:
+
+  // Makes a class movable.
+  // Automates the boilerplate code for 
+  // declaring default move constructor and 
+  // and move operator. 
+  #define CL_CTOR_MOVE_DEFAULT( className )         \
+      public:                                       \
+      className (className&&) = default;            \
+      className& operator= (className&&) = default; \
+      private:                                
+        
+  // Makes a class only movable, but non-copiable. 
+  #define CL_MOVABLE_ONLY( className )  \
+      CL_NON_COPIABLE( className )    \
+      CL_CTOR_DEFAULT( className ) 
+        
+
+  // Declare default copy constructor explicitly 
+  #define CL_CTOR_COPY_DEFAULT(className)                      \
+      public:                                                  \
+         className ( const className & ) = default;            \
+         className& operator= ( const className & ) = default; \
+      private: \
+#+END_SRC
+
+Declaring a non-copiable (deleted copy constructor and copy-assignment
+operators) and movable-only:
+
+#+BEGIN_SRC cpp 
+  class Socket
+  {   
+      int fd = -1;
+    
+      CL_CTOR_DEFAULT(Socket)
+      CL_CTOR_MOVE_DEFAULT(Socket)
+      CL_NON_COPIABLE(Socket)
+  public:
+      // ... ...  ... // 
+      int get() const { return fd; } 
+    
+      ssize_t send(void* buffer, size_t size);  
+      ssize_t send(const char* message);
+      // ... Placeholder for remaining methods here ... // 
+  };
+#+END_SRC
+
+Class declared with default move constructors and move-assignment
+operators. 
+
+#+BEGIN_SRC cpp 
+  class Transformation 
+  {
+      float m_x, m_y, m_z, m_w;
+    
+      CL_CTOR_COPY_DEFAULT(Transformation)
+      CL_CTOR_MOVE_DEFAULT( Transformation )
+  public:
+    
+      float x() const { return m_x; }
+      float y() const { return m_y; }
+      float z() const { return m_z; }
+      // .... ... ... ... // 
+  };
+#+END_SRC
+
+
+
 ** Tips and guidelines for writing macros 
 *** DO NOT Use macros for defining constants
 
