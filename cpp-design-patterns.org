@@ -4903,7 +4903,6 @@ used by boost::noncopyable [[https://github.com/inducer/boost-python-ublas-subse
 
 
 
-
 ** Copy and swap idiom 
 
 The copy-and-swap idiom is a widely used technique for implementing
@@ -6052,6 +6051,124 @@ Compilation Output:
    [TRACE] Property [basis-points] set to value = 80
    => plist[0]->Name() = basis-points plist[0]->Get<int>() = 80
 #+END_SRC
+** Virtual Friend Function Idiom 
+
+A C++ friend function is a free function with access to a class
+protected and private member variables and member functions. Unlike
+virtual member functions (aka virtual methods), which are resolved at
+runtime and can be overridden by each derived class, friend functions
+cannot be declared as virtual and be overridden by each derived class
+for customizing the function behavior for each different
+implementation.  The virtual friend function idiom emulates the
+virtual member function by forwarding the method call to a member
+function.
+
+This technique can be used for implementing stream insertion (<<) and
+extraction operator for reading and writing derived classes from
+streams. 
+
+In the following code, the idiom is used for printing a class
+hierarchy and customizing the behavior of the stream insertion
+operator (<<), which is a friend function, for each derived class. 
+
+File: _virtual-friend-function.cpp_ 
+
+#+BEGIN_SRC cpp 
+  #include <iostream> 
+  #include <string> 
+
+  // Shape interface 
+  class IShape
+  {
+  // Protected =>> Means that only derived classes 
+  // can access this function.     
+  protected:
+         // Print object to the stream object 
+         virtual void print_me(std::ostream& os) const = 0;
+  public:
+      virtual void draw() const = 0;
+      virtual ~IShape() = default;
+    
+      // Friend function => (Just a free function)
+      friend std::ostream& operator<<(std::ostream& os, const IShape& shape)
+      {
+           shape.print_me(os);
+           return os;
+      }
+  };
+
+  class Circle: public IShape
+  {
+  private:
+      double radius = 0.0;
+    
+      void print_me(std::ostream& os) const override 
+      {
+          os << " IShape(Cicle) with radius = " << radius;
+      }
+    
+  public:  
+      Circle(double radius): radius(radius){ }
+    
+      void draw() const override {
+          // Implementation here ....
+      }
+  };
+
+
+  class Square: public IShape
+  {
+  private:
+      double length = 0.0;
+    
+      void print_me(std::ostream& os) const override 
+      {
+          os << " IShape(Square) with length = " << length;
+      }
+    
+  public:  
+      Square(double length): length(length){ }
+    
+      void draw() const override {
+          // Implementation here ....
+      }
+  };
+
+
+  int main(int argc, char** argv)
+  {
+      Square shapeA{5};
+      Circle shapeB{10}; 
+    
+      /* 
+       ,*  virtual-friend-function.cpp: In function ‘int main(int, char**)’:
+       ,* virtual-friend-function.cpp:67:30: error: 
+       ,*    ‘virtual void Square::print_me(std::ostream&) const’ is private *      within this context
+       |     shapeA.print_me(std::cout);
+       ,*/
+          // shapeA.print_me(std::cout);  // Compile-time error.
+    
+      std::cout << " [INFO] shape A = " << shapeA << '\n';
+      std::cout << " [INFO] shape B = " << shapeB << '\n';
+    
+      return 0;
+  }
+#+END_SRC
+
+
+Building: 
+
+#+BEGIN_SRC sh 
+  $ g++ virtual-friend-function.cpp -o out.bin -std=c++1z -Wall -Wextra -g
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC sh 
+  $ ./out.bin
+   [INFO] shape A =  IShape(Square) with length = 5
+   [INFO] shape B =  IShape(Cicle) with radius = 10
+#+END_SRC
 
 ** CRTP - Curious Recurring Template Pattern
 *** Overview 
@@ -6365,7 +6482,6 @@ Output of main():
  10 + p1 = Point2D[ x = 20 ; y = 30 ] 
 #+END_SRC
 
-
 ** Virtual Copy Constructor Idiom - Prototype Pattern 
 *** Overview 
 
@@ -6666,8 +6782,8 @@ Testign in ROOT REPL:
 #+END_SRC
 ** Cross platform code with conditional compilation
 
-Note: It is not a design pattern, but a for methodology for
-developing cross platform applications in C++.
+Note: It is not a design pattern, but a methodology for developing
+cross platform applications in C++. 
 
    1. Avoid relying on platform-specific features as much as
       possible.
