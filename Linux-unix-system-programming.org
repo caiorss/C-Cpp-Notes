@@ -10836,6 +10836,28 @@ code.
 
  *Show Routing Table* 
 
+Linux: 
+
+#+BEGIN_SRC sh 
+  $ route -n
+  Kernel IP routing table
+  Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+  0.0.0.0         10.0.0.1        0.0.0.0         UG    600    0        0 wlp2s0
+  10.0.0.0        0.0.0.0         255.255.255.0   U     600    0        0 wlp2s0
+  169.254.0.0     0.0.0.0         255.255.0.0     U     1000   0        0 wlp2s0
+#+END_SRC
+
+Linux: 
+
+#+BEGIN_SRC sh 
+   $ netstat -rn
+   Kernel IP routing table
+   Destination     Gateway         Genmask         Flags   MSS Window  irtt Iface
+   0.0.0.0         10.0.0.1        0.0.0.0         UG        0 0          0 wlp2s0
+   10.0.0.0        0.0.0.0         255.255.255.0   U         0 0          0 wlp2s0
+   169.254.0.0     0.0.0.0         255.255.0.0     U         0 0          0 wlp2s0
+#+END_SRC
+
 Mac OSX: 
 
 #+BEGIN_SRC sh 
@@ -10889,8 +10911,43 @@ Mac OSX:
 #+END_SRC
 
  *Network interfaces*
+
+For newer Linux distributions: 
+
+  + The following command shows that the current machine has three
+    network interfaces. _lo_ is a virtual network interface that
+    corresponds to localhost (127.0.0.1); enps10 => corresponds to a
+    ethernet network card, wbhich is not active; and finally wlp2s0
+    which is a wifi network card, which the IPv4 address on the local
+    network is 10.0.0.175 and IPv6 address is
+    fe81::88a:6b9c:fcef:4e32.
+
+#+BEGIN_SRC sh 
+  $ ip addr
+
+  1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+      link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+      inet 127.0.0.1/8 scope host lo
+         valid_lft forever preferred_lft forever
+      inet6 ::1/128 scope host 
+         valid_lft forever preferred_lft forever
+
+  2: enp1s0: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc fq_codel state DOWN group default qlen 1000
+      link/ether 9a:8b:8c:f2:b3:d4 brd ff:ff:ff:ff:ff:ff
+
+  3: wlp2s0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000
+      link/ether 9a:8c:8a:ef:ff:0c brd ff:ff:ff:ff:ff:ff
+      inet 10.0.0.175/24 brd 10.0.0.255 scope global dynamic noprefixroute wlp2s0
+         valid_lft 84718sec preferred_lft 84718sec
+      inet6 fe81::88a:6b9c:fcef:4e32/64 scope link noprefixroute 
+         valid_lft forever preferred_lft forever
+#+END_SRC
+
  
-For BSD, MacOSX and old Linux Distributions:
+For BSD, MacOSX and older Linux Distributions. 
+
+  + Note: The ifconfig cli application is deprecated on most Linux
+    distributions and was replaced by the _ip_ command..
 
 #+BEGIN_SRC sh 
     # On MacOSX VM 
@@ -12586,12 +12643,18 @@ key, which is unique for every connection.
     need to care about encryption details.
 
   * The private key should never be disclosed, otherwise any third
-    party, that obtains the key, will be able to intercept and decrypt
-    the communication.
+    party agent, that obtained the key, will be able to intercept and
+    decrypt the communication.
 
-  * Avoiding rolling own or proprietary encryption. Cryptography is
-    easy to get wrong and requires deeper knowledge of number theory,
-    random numbers, discrete mathematics and abstract algebra.   
+  * Always keep openSSL library updated with the latest security
+    fixes. This library is a fundamental piece of internet
+    security. Any OpenSSLL vulnerability will make anything that
+    depends on this library vulnerable.
+
+  * Avoiding creating custom or proprietary encryption as cryptography
+    is business critical and requires deeper knowledge of number
+    theory, random numbers, discrete mathematics and abstract
+    algebra. 
 
   *Some network protocols that relies on TLS/SSL* 
 
@@ -12704,8 +12767,12 @@ key, which is unique for every connection.
       over an unsafe channels as the encryption keys need to be send
       over an unsafe channel before the encrypted communication takes
       place.
-    * Use cases: bulk data encryption, hiding and obfuscation; file
-      encryption; file system encryption or disk encryption.
+    * Use cases: bulk data encryption for hiding and obfuscating data; file
+      encryption; file system encryption or disk encryption. Shared
+      key cryptography can be used for encrypted communication, but
+      before the secure data exchange takes place, the key must be
+      disclosed what makes it vulnerable to interception by a
+      third-party agent. 
 
   * _Public-Key Cryptography_ (a.k.a Asymmetric key cryptography)
     * Unlike the shared key cryptography, where the same key is used
@@ -12738,8 +12805,9 @@ key, which is unique for every connection.
       disclosing private keys; _digital signature_ for legal documents
       and contracts; _data integrity detection_, any data modification
       can be detected by both sides; _authentication_ using the private
-      key, if the server has the public key; TLS and SSL uses public
-      key for exchanging the shared key.
+      key, if the server has the client's public key; _blockchain_;
+      cryptocurrencies such as Bitcon or Litecoin; TLS and SSL uses
+      public-key cryptography for exchanging the shared key.
 
   * _X.509 Certificates_ - The certificate encapsulates is standardized
     format by [[https://tools.ietf.org/html/rfc5280][RFC 5280]] that encapsulates the identification metadata,
