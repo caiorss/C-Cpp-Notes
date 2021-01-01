@@ -1855,7 +1855,7 @@ APIS.
 
   *File Descriptor Manipulation* 
 
-   + [[https://www.man7.org/linux/man-pages/man2/dup.2.html][dup, dup2, dup3]] - Redirect IO. 
+   + [[https://www.man7.org/linux/man-pages/man2/dup.2.html][dup, dup2, dup3]] - Duplicate file descriptors for IO redirection.
 
    + [[https://www.man7.org/linux/man-pages/man2/fcntl.2.html][fcntl(2)]] - Manipulate file descriptor.
 
@@ -2062,8 +2062,23 @@ systems.
 
   *Functionalities for supporting containers and sandboxing* 
 
-   + [[https://man7.org/linux/man-pages/man2/clone.2.html][clone(2)]] [LINUX ONLY] - clone() system call can be used for
-     creating processes to Linux namespaces.
+Containers are a lightweight virtualization alternative to virtual
+machines, that uses fewer system resources, such as memory and CPU
+time as unlike virtual machines, containers share the same
+kernel. Containers are nothing more than _sandboxed processes_ with
+restricted access to system resources. On Linux, container runtimes,
+such as Docker, Podman (Red-Hat) or LXC implement containers with the
+following APIs: _cgroups_ API for restricting CPU time and memory usage;
+_chroot_ or restricting the directories that a sandboxed processes can
+access and making them look like the process' root directory; Linux
+user, pid, mount, network and _namespaces_ for restricting user
+privilege, access to system directories and network. 
+
+
+   + [[https://man7.org/linux/man-pages/man2/clone.2.html][clone(2)]] [LINUX ONLY] - clone() system call for creating
+     processes with Linux namespaces, which can restrict a process
+     capability and system access. This system call is also the
+     primitive for creating new processes or threads. 
 
    + [[https://man7.org/linux/man-pages/man2/unshare.2.html][unshare(2)]] 
 
@@ -9208,7 +9223,7 @@ File: _mmap-loader.cpp_
   }
 
   //===========================================================//
-  //          I P L E M E N T A T I O N S                      //
+  //          I M P L E M E N T A T I O N S                    //
   //===========================================================//
 
   void* load_machine_code(const byte* buffer, std::size_t size)
@@ -12767,12 +12782,13 @@ key, which is unique for every connection.
       over an unsafe channels as the encryption keys need to be send
       over an unsafe channel before the encrypted communication takes
       place.
-    * Use cases: bulk data encryption for hiding and obfuscating data; file
-      encryption; file system encryption or disk encryption. Shared
-      key cryptography can be used for encrypted communication, but
-      before the secure data exchange takes place, the key must be
-      disclosed what makes it vulnerable to interception by a
-      third-party agent. 
+    * Use cases: bulk data encryption for hiding and obfuscating data
+      from unauthorized access; file encryption; file system
+      encryption; disk encryption and encrypted backup. Shared key
+      cryptography can be used for encrypted communication. However,
+      before the encrypted communication takes place, the key may be
+      transmitted in an unencrypted way which makes the key vulnerable
+      to interception.
 
   * _Public-Key Cryptography_ (a.k.a Asymmetric key cryptography)
     * Unlike the shared key cryptography, where the same key is used
@@ -12827,6 +12843,38 @@ key, which is unique for every connection.
       authorities trusted by the browser vendor, which are used for
       validating certificates from web sites (http servers).
 
+  * _CHF_ - _Crytography Hash Function_ => Cryptography hash are
+    deterministic, _non-reversible_ and one-way functions that uniquely
+    map any amount of data, taken as input, to a fixed-width output,
+    named _hash value_, _message-digest_ or _checksum_. Some of those
+    algorithms are: MD5, SHA-1, SHA-2, SHA-3, SHA-256, Argon-2,
+    PBKDF2, Bcrypt and so on. Some applications of hash functions are:
+
+    * _Digital Signature_ 
+
+    * _Uniquely identifying a file_: The computed hash value is unique
+      for each file, as a result it uniquely identifies a file. For
+      instance, when comparing two files at different machines, it is
+      faster to compare their hash values rather than downloading the
+      counterpart file and checking the equality of all bytes.
+
+    * _File integrity checking_: given a file and its
+      previously computed hash, an user can verify if the file is not
+      corrupted or was not tampered by comparing the previously
+      computed hash value and the current file hash value. If the
+      computed value and the already known hash matches, then the file
+      was not currupted and not tampered.
+
+    * _Data Checksum_: if a data is transmistted with its checksum (hash
+      value), it is possible to detect any data change or corruption
+      by computing the received data hash value (checksum) and
+      comparing with the received hash value. 
+
+    * _Secure password storage_ for web applications. If only the hash
+      value of user passwords are storead and the database is leaked,
+      whoever accesses the hashes will not be able to reuse it on
+      other websites.
+
   * _SRP_ - Secure Remote Password
 
   * _CRL_ - Certificate Revocation List
@@ -12847,7 +12895,15 @@ key, which is unique for every connection.
 
   * _DER_ - Distinguished Encoding Rules (Related to X509 Certificates)
 
-  * _PEM_ - Privacy Enhanced Mail 
+  * _PEM_ - Privacy Enhanced Mail
+
+  * _AES_ - Advanced Encryption Standard
+
+  * _CBC_ - Cipher Block Chaining  Mode
+
+  * _OFB_ - Output FeedBack Mode 
+
+  * _ECB_ - Electronic Code Book Mode
 
   *Further Reading* 
 
@@ -15310,11 +15366,6 @@ X-Server by using:
   + [[https://xcb.freedesktop.org/][XCb]] C Library => (Lower level than XLib) Similar to XLib, but has
     a smaller footprint and lower latency, better suport for thread.
 
-  + [[https://github.com/python-xlib/python-xlib][python-xlib]] (Python) - Alternative implentation for X11 client in pure Python.
-
-  + [[https://github.com/BurntSushi/xgb][xgb]] (Go, Golang) - Alternative implementation for X11 client in
-    pure GO, aka Golang language.
-
  *Notes and considerations:*
 
   * Unlike on Windows and Mac-OSX, the graphics interface is not part
@@ -15378,6 +15429,13 @@ Wayland (Future Replacemente for X11)
 
    + [[https://github.com/varmd/wine-wayland][GitHub - varmd/wine-wayland]] - Wine-wayland allows playing
      DX9/DX11 and Vulkan games using pure wayland and Wine/DXVK.
+
+X11 client alternative Implementations: 
+
+  + [[https://github.com/python-xlib/python-xlib][python-xlib]] (Python) - Alternative implentation for X11 client in pure Python.
+
+  + [[https://github.com/BurntSushi/xgb][xgb]] (Go, Golang) - Alternative implementation for X11 client in
+    pure GO, aka Golang language.
 
 *** X11 Utilities 
 
