@@ -106,8 +106,6 @@ Build defining the _LOGGING_ macro.
    => product = 120 
 #+END_SRC
 
-  *Building with CMake* 
-
 Build defining a different value for the version macro. 
 
 #+BEGIN_SRC sh 
@@ -127,6 +125,8 @@ Build defining a different value for the version macro.
    => i = 6 ; prod = 720 
    => product = 720 
 #+END_SRC
+
+  *Building with CMake* 
 
 Build without enabling logging. 
 
@@ -264,6 +264,76 @@ Output:
     $ >> ./macro-if-else.bin
     => sum = 45 
 #+END_SRC
+** Variable argument macros 
+
+Variable argument macros are function-like macros that can take one or
+or an arbirtrary amount of arguments. This sections presents an
+example about how to use this type of macros ~__VAR__ARGS__~
+
+File: _macro-args.cpp_ 
+
+#+BEGIN_SRC cpp 
+  #include <iostream> 
+  #include <string> 
+
+  // Note: this macro does not work without at least a third argument. 
+  #define LOG(severity, message, ...) \
+      std::fprintf(stderr, severity " (file: %s, line: %d) / " message "\n", __FILE__, __LINE__,  __VA_ARGS__  )
+    
+  // Note: This macro can work without a third argument, but it requires C++11. 
+  // Note: __VA_OPT__(,) only works on GNU-C compiler or C++ compilers supporting at least C++11. 
+  #define LOG2(severity, message, ...) \
+      std::fprintf(stderr, severity " (file: %s, line: %d) / " message "\n", __FILE__, __LINE__  __VA_OPT__(,) __VA_ARGS__  )
+        
+  #define LOG_INFO(message, ...) LOG("\t[INFO] ", message, __VA_ARGS__)
+  #define LOG_WARN(message, ...) LOG("\t[WARN] ", message, __VA_ARGS__)
+    
+  int main(int argc, char** argv)
+  {
+      LOG2("\t[WARN]", "Program started Ok.");
+      int sum = 0;
+      LOG_INFO("sum = %d", sum);
+    
+      for(int n = 0; n < 10; n++)
+      {
+          sum = n * n;
+          LOG_INFO("Iteration k = %d ; sum = %d", n, sum);
+      }
+    
+      std::fprintf(stdout, " Result => The sum is equal to = %d \n", sum);
+    
+      // Requires C++11.
+      LOG2("\t[WARN]", "Iterations stopped Ok.");
+      return 0;
+  }
+#+END_SRC
+
+Building and running: 
+
+#+BEGIN_SRC sh 
+   $ >> g++ macro-args.cpp -o macro-args.bin -std=c++1z -Wall -Wextra -g
+
+   $ >> ./macro-args.bin 
+          [WARN] (file: macro-args.cpp, line: 18) / Program started Ok.
+          [INFO]  (file: macro-args.cpp, line: 20) / sum = 0
+          [INFO]  (file: macro-args.cpp, line: 25) / Iteration k = 0 ; sum = 0
+          [INFO]  (file: macro-args.cpp, line: 25) / Iteration k = 1 ; sum = 1
+          [INFO]  (file: macro-args.cpp, line: 25) / Iteration k = 2 ; sum = 4
+          [INFO]  (file: macro-args.cpp, line: 25) / Iteration k = 3 ; sum = 9
+          [INFO]  (file: macro-args.cpp, line: 25) / Iteration k = 4 ; sum = 16
+          [INFO]  (file: macro-args.cpp, line: 25) / Iteration k = 5 ; sum = 25
+          [INFO]  (file: macro-args.cpp, line: 25) / Iteration k = 6 ; sum = 36
+          [INFO]  (file: macro-args.cpp, line: 25) / Iteration k = 7 ; sum = 49
+          [INFO]  (file: macro-args.cpp, line: 25) / Iteration k = 8 ; sum = 64
+          [INFO]  (file: macro-args.cpp, line: 25) / Iteration k = 9 ; sum = 81
+   Result => The sum is equal to = 81 
+          [WARN] (file: macro-args.cpp, line: 31) / Iterations stopped Ok.
+
+
+   $ >> ./macro-args.bin 2> /dev/null 
+   Result => The sum is equal to = 81 
+#+END_SRC
+
 ** Custom Assertion Macro 
 *** Simple assertion macro 
 
@@ -456,7 +526,6 @@ operators.
       // .... ... ... ... // 
   };
 #+END_SRC
-
 
 
 ** Tips and guidelines for writing macros 
@@ -733,9 +802,7 @@ the code is being compiled.
 | 201103L                    | C++11                                             |
 | 201402L                    | C++14                                             |
 | 201703L                    | C++17                                             |
-| N/A                        | C++20  - Still waiting                            |
-| N/A                        | C++ with module system? - Only gosh knows!        |
-| N/A                        | C++ with a standardized ABI - "Keep on dreaming!" |
+| N/A                        | C++20                                             |
 |----------------------------+---------------------------------------------------|
 
 Example: 
