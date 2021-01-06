@@ -933,7 +933,7 @@ Or just in a single step:
   $ cd build && make && cd ..
 #+END_SRC
 
-** Sample Project with multiple targets and a single CMakeLists
+** Sample Project with multiple targets 
 *** Adding and setting multiple targets  
 
 This section provides shows how to set up a project with additional
@@ -1400,7 +1400,7 @@ Install Dependencies - Shared Libraries:
  + [[https://cmake.org/pipermail/cmake/2009-June/030205.html][Install of library sub-project prior to building application]]
 
  + [[http://cmake.3232098.n2.nabble.com/Copying-Shared-Libraries-DLLs-Next-to-the-Executable-td7597163.html][Copying Shared Libraries (DLLs) Next to the Executable]]
-** Sample Project with sub-projects
+** Sample Project with multiple sub-projects
 *** Overview 
 
 The following code is a cross-platform CMake project, with
@@ -1438,7 +1438,7 @@ Repository:
 
  *Top-Level Files* 
 
-File: CMakeLists.txt 
+File: _CMakeLists.txt_
 
 #+BEGIN_SRC cmake 
    cmake_minimum_required(VERSION 3.9)
@@ -1449,6 +1449,9 @@ File: CMakeLists.txt
 
    set(CMAKE_CXX_STANDARD 17)     
    set(CMAKE_VERBOSE_MAKEFILE ON)
+
+   # Export ALL DLLs symbols on Windows without __declspec(xxxx) annotations.
+   set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS true)
 
    function(ADD_RUN_TARGET tname target)
        add_custom_target( ${tname}
@@ -1478,6 +1481,13 @@ File: CMakeLists.txt
 
           add_executable( app1 app1.cpp )
    target_link_libraries( app1 lib::util lib::tool )
+
+
+   if(_WIN32)
+       set_target_properties( lib::util PROPERTIES 
+                                        OUTPUT_NAME Util 
+                                        CLEAN_DIRECTORY_OUTPUT 1 )  
+   endif()
 
    # Set RPATH in the executable for making it relocatable on Unix.
    # It allows installing the application on any directory or 
@@ -1512,12 +1522,13 @@ File: CMakeLists.txt
             LIBRARY  DESTINATION ${CMAKE_INSTALL_LIBDIR}          
             # Static libraries: *.a 
             ARCHIVE  DESTINATION ${CMAKE_INSTALL_LIBDIR}
-          )
 
-  install(FILES LICENSE.txt DESTINATION data)
+   )
+
+   install(FILES LICENSE.txt DESTINATION data)
 #+END_SRC
 
-File: Makefile 
+File: _Makefile_
   + Makefile for performing project commands.
 
 #+BEGIN_SRC sh 
@@ -1563,7 +1574,7 @@ File: Makefile
           rm -rf -v ./_release 
 #+END_SRC
 
-File: app1.cpp / target app1 
+File: _app1.cpp_ / target app1 
 
 #+BEGIN_SRC cpp 
   #include <iostream>
@@ -1587,7 +1598,7 @@ File: app1.cpp / target app1
    }
 #+END_SRC
 
-File: app2.cpp / target app2 
+File: _app2.cpp_ / target app2 
 
 #+BEGIN_SRC cpp 
    #include <iostream>
@@ -1914,7 +1925,7 @@ Clone the repository:
      /lib64/ld-linux-x86-64.so.2 (0x00007fed49773000)
 #+END_SRC
 
-*** Building and installing on Windows 
+*** Building and installing on Windows with MSVC 
 
   *Building and installing locally* (non sytem wide mode)
 
@@ -1927,24 +1938,26 @@ Clone the repository:
 
   + Configure: 
 
-#+BEGIN_SRC sh 
-  $ cmake --config Release -H. -B_install1 -DCMAKE_INSTALL_PREFIX=C:\\Users\mxpkf8\Desktop\mycmake-app
+    + Note: If the option -G is omitted, CMake will chose the newest
+      version of MSVC installed on the current machine. 
 
-  -- Building for: Visual Studio 16 2019
-  -- The C compiler identification is MSVC 19.26.28806.0
-  -- The CXX compiler identification is MSVC 19.26.28806.0
-  -- Check for working C compiler: C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Tools/MSVC/14.26.28801/bin/Hostx64/x64/cl.exe
-  -- Check for working C compiler: C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Tools/MSVC/14.26.28801/bin/Hostx64/x64/cl.exe - works
-  -- Detecting C compiler ABI info
-  -- Detecting C compiler ABI info - done
-  -- Detecting C compile features
-  -- Detecting C compile features - done
-    ...   ...   ...   ...   ...   ...   ...   ...   ...   ... 
-    ...   ...   ...   ...   ...   ...   ...   ...   ... 
-  -- Detecting CXX compile features - done
-  -- Configuring done
-  -- Generating done
-  -- Build files have been written to: C:/Users/mxpkf8/Desktop/cnest/_install1
+    + Note: Visual Sudio Compilers MSVC older than 2019 versions does
+      not use the command line switch -A for specifying the
+      architecture. For instance, for MSVC 2017, the command line
+      switch should be:
+      * -G "Visual Sudio 15 2017" for x86 (IA32 - 32 bits)
+      * -G "Visual Sudio 15 2017 Win64" for x86-64 64 bits (AMD64 or IA64)
+      * -G "Visual Sudio 15 2017 ARM" for ARM architecture
+
+#+BEGIN_SRC sh 
+  # For Visual Studio MSVC 2019 / x86-64 (AMD64 or IA64 - 64 bits)
+  $ cmake --Config Release -H. -B_install1 -G "Visual Studio 16 2019" -A x64 -DCMAKE_INSTALL_PREFIX=%USERPROFILE%\Desktop\mycmake-app
+
+  # For Visual Studio MSVC 2017 / x86-64 (64 bits)
+  $ cmake --Config Release -H. -B_install1 -G "Visual Studio 16 2017 Win64" -DCMAKE_INSTALL_PREFIX=%USERPROFILE%\Desktop\mycmake-app
+ 
+  # For Visual Studio MSVC 2017 x86 - 32 bits 
+  $ cmake --Config Release -H. -B_install1 -G "Visual Studio 16 2017" -DCMAKE_INSTALL_PREFIX=%USERPROFILE%\Desktop\mycmake-app
 #+END_SRC
 
  + Build all targets: 
@@ -1954,32 +1967,45 @@ Clone the repository:
 #+END_SRC
 
  + Show contents of build directory
+   + Note: ls => is Unix tool ported for Windows, provided by bash and
+     git on Windows.
 
 #+BEGIN_SRC sh 
-   $ dir _install1\Debug\
+  $ ls _install1
 
-    Volume in drive C has no label.
-    Volume Serial Number is 2AC0-732B
+  ALL_BUILD.vcxproj          CMake_With_Makefile.sln  run-app1.vcxproj
+  ALL_BUILD.vcxproj.filters  CMakeCache.txt           run-app1.vcxproj.filters
+  app1.dir/                  CMakeFiles/              run-app2.vcxproj
+  app1.vcxproj               Debug/                   run-app2.vcxproj.filters
+  app1.vcxproj.filters       INSTALL.vcxproj          x64/
+  app2.dir/                  INSTALL.vcxproj.filters  ZERO_CHECK.vcxproj
+  app2.vcxproj               install_manifest.txt     ZERO_CHECK.vcxproj.filters
+  app2.vcxproj.filters       lib_tool/
+  cmake_install.cmake        lib_util/
 
-    Directory of C:\Users\mxpkf8\Desktop\cnest\_install1\Debug
+  $ ls _install1/Debug
+  app1.exe*  app1.pdb   app2.ilk  tool.lib  util.dll*  util.ilk  util.pdb
+  app1.ilk   app2.exe*  app2.pdb  tool.pdb  util.exp   util.lib
 
-   07/05/2020  03:09 PM    <DIR>          .
-   07/05/2020  03:09 PM    <DIR>          ..
-   07/05/2020  03:09 PM            58,368 app1.exe
-   07/05/2020  03:09 PM           599,064 app1.ilk
-   07/05/2020  03:09 PM           790,528 app1.pdb
-   07/05/2020  03:09 PM            58,368 app2.exe
-   07/05/2020  03:09 PM           599,064 app2.ilk
-   07/05/2020  03:09 PM           790,528 app2.pdb
-   07/05/2020  03:09 PM            53,116 tool.lib
-   07/05/2020  03:09 PM           421,888 tool.pdb
-   07/05/2020  03:09 PM            58,880 util.dll
-   07/05/2020  03:09 PM             4,505 util.exp
-   07/05/2020  03:09 PM           512,192 util.ilk
-   07/05/2020  03:09 PM             7,666 util.lib
-   07/05/2020  03:09 PM           724,992 util.pdb
-                 13 File(s)      4,679,159 bytes
-                  2 Dir(s)  49,404,833,792 bytes free
+  # ----- Check file types ----------------------------------------------#
+
+  $ file _install1/Debug/app1.exe
+  _install1/Debug/app1.exe: PE32+ executable (console) x86-64, for MS Windows
+
+  $ file _install1/Debug/app1.ilk
+  _install1/Debug/app1.ilk: data
+
+  $ file _install1/Debug/app1.pdb
+  _install1/Debug/app1.pdb: MSVC program database ver 7.00, 4096*267 bytes
+
+  $ file _install1/Debug/app1.lib
+  _install1/Debug/app1.lib: cannot open `_install1/Debug/app1.lib' (No such file or directory)
+
+  $ file _install1/Debug/tool.lib
+  _install1/Debug/tool.lib: current ar archive
+
+  $ file _install1/Debug/util.exp
+  _install1/Debug/util.exp: Intel amd64 COFF object file, not stripped, 2 sections, symbol offset=0xb38, 38 symbols
 #+END_SRC
 
  + Testing executable targets: 
@@ -1998,26 +2024,25 @@ Clone the repository:
    Type RETURN to exit
 #+END_SRC
 
- + Peform installation 
+ + Peform installation target: 
 
 #+BEGIN_SRC sh 
   $ cmake --build _install1 --target install
-
-  Microsoft (R) Build Engine version 16.6.0+5ff7b0c9e for .NET Framework
+  Microsoft (R) Build Engine version 16.8.2+25e4d540b for .NET Framework
   Copyright (C) Microsoft Corporation. All rights reserved.
 
-    tool.vcxproj -> C:\Users\mxpkf8\Desktop\cnest\_install1\Debug\tool.lib
+    tool.vcxproj -> Z:\cnest\_install1\Debug\tool.lib
     Auto build dll exports
-    util.vcxproj -> C:\Users\mxpkf8\Desktop\cnest\_install1\Debug\util.dll
-    app1.vcxproj -> C:\Users\mxpkf8\Desktop\cnest\_install1\Debug\app1.exe
-    app2.vcxproj -> C:\Users\mxpkf8\Desktop\cnest\_install1\Debug\app2.exe
+    util.vcxproj -> Z:\cnest\_install1\Debug\util.dll
+    app1.vcxproj -> Z:\cnest\_install1\Debug\app1.exe
+    app2.vcxproj -> Z:\cnest\_install1\Debug\app2.exe
     -- Install configuration: "Debug"
-    -- Installing: C:/Users/mxpkf8/Desktop/mycmake-app/bin/app1.exe
-    -- Installing: C:/Users/mxpkf8/Desktop/mycmake-app/bin/app2.exe
-    -- Installing: C:/Users/mxpkf8/Desktop/mycmake-app/lib/util.lib
-    -- Installing: C:/Users/mxpkf8/Desktop/mycmake-app/bin/util.dll
-    -- Installing: C:/Users/mxpkf8/Desktop/mycmake-app/lib/tool.lib
-    -- Installing: C:/Users/mxpkf8/Desktop/mycmake-app/data/LICENSE.txt
+    -- Installing: C:/Users/h03fx/Desktop/mycmake-app/bin/app1.exe
+    -- Installing: C:/Users/h03fx/Desktop/mycmake-app/bin/app2.exe
+    -- Installing: C:/Users/h03fx/Desktop/mycmake-app/lib/util.lib
+    -- Installing: C:/Users/h03fx/Desktop/mycmake-app/bin/util.dll
+    -- Installing: C:/Users/h03fx/Desktop/mycmake-app/lib/tool.lib
+    -- Installing: C:/Users/h03fx/Desktop/mycmake-app/data/LICENSE.txt
 #+END_SRC
 
  + Listing installation directory. 
@@ -2064,10 +2089,11 @@ Clone the repository:
 
   *Building and installing globally* (sytem wide mode)
 
- + Building and insttalling with default generator  
+ + Building and installing with default generator
+   + Note: This step requires running a terminal emulator with administrative privilege. 
 
 #+BEGIN_SRC sh 
-  $ cmake --config Release -H. -B_install2 
+  $ cmake --Config Release -H. -B_install2 -G "Visual Studio 16 2019" -A x64
 
   $ cmake --build _install2 --target install
   Microsoft (R) Build Engine version 16.6.0+5ff7b0c9e for .NET Framework
@@ -2087,24 +2113,7 @@ Clone the repository:
     -- Installing: C:/Program Files (x86)/CMake_With_Makefile/data/LICENSE.txt
 #+END_SRC
 
- + Building and insttalling with another CMake generator 
-
- #+BEGIN_SRC sh 
-  $ cmake --config Release -H. -B_install3 -G "Visual Studio 14 2015 Win64"
-
-  $ cmake --build _install3 --target install 
-  ... ... ... ... ... ... ... ... ... 
-   Building Custom Rule C:/Users/mxpkf8/Desktop/cnest/CMakeLists.txt
-   -- Install configuration: "Debug"
-   -- Installing: C:/Program Files/CMake_With_Makefile/bin/app1.exe
-   -- Installing: C:/Program Files/CMake_With_Makefile/bin/app2.exe
-   -- Installing: C:/Program Files/CMake_With_Makefile/lib/util.lib
-   -- Installing: C:/Program Files/CMake_With_Makefile/bin/util.dll
-   -- Installing: C:/Program Files/CMake_With_Makefile/lib/tool.lib
-   -- Installing: C:/Program Files/CMake_With_Makefile/data/LICENSE.txt
- #+END_SRC
-
-  + Running: 
+ + Running: 
 
 #+BEGIN_SRC sh 
  $ "C:/Program Files/CMake_With_Makefile/bin/app1.exe"
@@ -2119,6 +2128,94 @@ Clone the repository:
   [TRACE] Called tool_lib_function() OK.
   Type RETURN to exit
 
+ $ "%PROGRAMFILES%"\CMake_With_Makefile\bin\app1.exe
+  [INFO] Application 1 Called Ok.
+  [TRACE] util_function() called with n = 100
+  [TRACE] Called tool_lib_function() OK.
+  Type RETURN to exit
+
+
+#+END_SRC
+
+*** Building and installing on Windows with MinGW
+
+Clone the repository: 
+
+#+BEGIN_SRC sh 
+    $ git clone https://github.com/caiorss/cmake-cpp-nested cnest 
+    $ cd cnest
+#+END_SRC
+
+ *Build and install in a non-system wide way* 
+
+ + Perform configuration step: 
+
+#+BEGIN_SRC sh 
+   $ cmake --config Debug -H. -B_buildmg -G "MinGW Makefiles" -DCMAKE_INSTALL_PREFIX=%USERPROFILE%\Desktop\cnest-mingw-install
+#+END_SRC
+
+ + Perform build step: 
+
+#+BEGIN_SRC sh 
+  $ cmake --build _buildmg --target
+#+END_SRC
+ 
+ + Check build directory: 
+
+#+BEGIN_SRC sh 
+  $ ls _buildmg
+  app1.exe  cmake_install.cmake  CMakeFiles  lib_util   libutil.dll    Makefile
+  app2.exe  CMakeCache.txt       lib_tool    libtool.a  libutil.dll.a
+#+END_SRC
+
+ + Test executables: 
+
+#+BEGIN_SRC sh 
+  $ _buildmg/app1.exe
+   [INFO] Application 1 Called Ok.
+   [TRACE] util_function() called with n = 100
+   [TRACE] Called tool_lib_function() OK.
+   Type RETURN to exit
+
+  $ _buildmg/app1.exe
+   [INFO] Application 1 Called Ok.
+   [TRACE] util_function() called with n = 100
+   [TRACE] Called tool_lib_function() OK.
+   Type RETURN to exit
+#+END_SRC
+
+ + Run install target: 
+
+#+BEGIN_SRC sh 
+   $ cmake --build _buildmg --target install
+     ...   ...   ...   ...   ...   ... 
+     ...   ...   ...   ...   ...   ... 
+
+    Install the project...
+   C:\Users\myuser\scoop\apps\cmake\3.19.2\bin\cmake.exe -P cmake_install.cmake
+   -- Install configuration: ""
+   -- Installing: C:/Users/myuser/Desktop/cnest-mingw-install/bin/app1.exe
+   -- Installing: C:/Users/myuser/Desktop/cnest-mingw-install/bin/app2.exe
+   -- Installing: C:/Users/myuser/Desktop/cnest-mingw-install/lib/libutil.dll.a
+   -- Installing: C:/Users/myuser/Desktop/cnest-mingw-install/bin/libutil.dll
+   -- Installing: C:/Users/myuser/Desktop/cnest-mingw-install/lib/libtool.a
+   -- Installing: C:/Users/myuser/Desktop/cnest-mingw-install/data/LICENSE.txt
+#+END_SRC
+
+ + Run executables from install directory: 
+
+#+BEGIN_SRC sh 
+  $ %USERPROFILE%\Desktop\cnest-mingw-install\bin\app1.exe
+   [INFO] Application 1 Called Ok.
+   [TRACE] util_function() called with n = 100
+   [TRACE] Called tool_lib_function() OK.
+   Type RETURN to exit
+
+  $ %USERPROFILE%\Desktop\cnest-mingw-install\bin\app2.exe
+   [INFO] Application 2 Called Ok.
+   [TRACE] util_function() called with n = 20
+   [TRACE] Called tool_lib_function() OK.
+   Type RETURN to exit
 #+END_SRC
 *** Building and installing on Mac OSX 
 
@@ -3536,7 +3633,6 @@ window-subsystem is by using the following CMake Lines:
       set_property(TARGET my-target PROPERTY WIN32_EXECUTALE true)
    ENDIF()
 #+END_SRC
-
 
 *** Set target subsystem: console/window
 
