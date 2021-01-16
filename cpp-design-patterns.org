@@ -4190,6 +4190,124 @@ Further Reading:
 
  + [[https://www.fluentcpp.com/2018/09/18/how-to-remove-pointers-from-a-vector-in-cpp/][How to Remove Pointers from a Vector in C++ - Fluent C++]]
  + [[http://amse.ru/courses/cpp2/2011_03_14.html][C++. STL algorithms]] (in Russian)
+** Virtual Friend Function Idiom 
+
+A C++ friend function is a free function with access to a class
+protected and private member variables and member functions. Unlike
+virtual member functions (aka virtual methods), which are resolved at
+runtime and can be overridden by each derived class, friend functions
+cannot be declared as virtual and be overridden by each derived class
+for customizing the function behavior for each different
+implementation.  The virtual friend function idiom emulates the
+virtual member function by forwarding the method call to a member
+function.
+
+This technique can be used for implementing stream insertion (<<) and
+extraction operator for reading and writing derived classes from
+streams. 
+
+In the following code, the idiom is used for printing a class
+hierarchy and customizing the behavior of the stream insertion
+operator (<<), which is a friend function, for each derived class. 
+
+File: _virtual-friend-function.cpp_ 
+
+#+BEGIN_SRC cpp 
+  #include <iostream> 
+  #include <string> 
+
+  // Shape interface 
+  class IShape
+  {
+  // Protected =>> Means that only derived classes 
+  // can access this function.     
+  protected:
+         // Print object to the stream object 
+         virtual void print_me(std::ostream& os) const = 0;
+  public:
+      virtual void draw() const = 0;
+      virtual ~IShape() = default;
+    
+      // Friend function => (Just a free function)
+      friend std::ostream& operator<<(std::ostream& os, const IShape& shape)
+      {
+           shape.print_me(os);
+           return os;
+      }
+  };
+
+  class Circle: public IShape
+  {
+  private:
+      double radius = 0.0;
+    
+      void print_me(std::ostream& os) const override 
+      {
+          os << " IShape(Cicle) with radius = " << radius;
+      }
+    
+  public:  
+      Circle(double radius): radius(radius){ }
+    
+      void draw() const override {
+          // Implementation here ....
+      }
+  };
+
+
+  class Square: public IShape
+  {
+  private:
+      double length = 0.0;
+    
+      void print_me(std::ostream& os) const override 
+      {
+          os << " IShape(Square) with length = " << length;
+      }
+    
+  public:  
+      Square(double length): length(length){ }
+    
+      void draw() const override {
+          // Implementation here ....
+      }
+  };
+
+
+  int main(int argc, char** argv)
+  {
+      Square shapeA{5};
+      Circle shapeB{10}; 
+    
+      /* 
+       ,*  virtual-friend-function.cpp: In function ‘int main(int, char**)’:
+       ,* virtual-friend-function.cpp:67:30: error: 
+       ,*    ‘virtual void Square::print_me(std::ostream&) const’ is private *      within this context
+       |     shapeA.print_me(std::cout);
+       ,*/
+          // shapeA.print_me(std::cout);  // Compile-time error.
+    
+      std::cout << " [INFO] shape A = " << shapeA << '\n';
+      std::cout << " [INFO] shape B = " << shapeB << '\n';
+    
+      return 0;
+  }
+#+END_SRC
+
+
+Building: 
+
+#+BEGIN_SRC sh 
+  $ g++ virtual-friend-function.cpp -o out.bin -std=c++1z -Wall -Wextra -g
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC sh 
+  $ ./out.bin
+   [INFO] shape A =  IShape(Square) with length = 5
+   [INFO] shape B =  IShape(Cicle) with radius = 10
+#+END_SRC
 
 ** RAII idiom - Resource Aquisition Is Initialization
 *** Overview 
@@ -4901,8 +5019,6 @@ used by boost::noncopyable [[https://github.com/inducer/boost-python-ublas-subse
 
 
 
-
-
 ** Copy and swap idiom 
 
 The copy-and-swap idiom is a widely used technique for implementing
@@ -5495,6 +5611,466 @@ References and further reading:
  + [[https://en.wikibooks.org/wiki/More_C%2B%2B_Idioms/Interface_Class][More C++ Idioms/Interface Class - Wikibooks, open books for an open world]]
  + [[https://accu.org/index.php/journals/269][ACCU - Separating Interface and Implementation in C++]]
  + [[https://www.boost.org/doc/libs/1_63_0/libs/smart_ptr/sp_techniques.html][Smart Pointer Programming Techniques - 1.63.0]]
+** CRTP - Curious Recurring Template Pattern
+*** Overview 
+
+It is a variation of GOF template design pattern where an algorithm
+defined by the base class is customized or specified by the derived 
+class. However, unlike the GOF one, this version uses C++ template
+metaprogramming for emulating dynamic polymorphism or inheritance
+at compile time. So it makes the code faster by eliminating virtual
+function-calls.
+
+Features: 
+ + Coined by James Coplien - 1995
+ + Static polymorphism technique based on template metaprogramming for
+   speeding up the code eliminating virtual functions.
+
+Use cases:
+ + Reduce virtual function call overhead - by simulating dynamic
+   polymorphism through static polymorphism. 
+ + Implement state machines.
+ + Implement high performance numerical libraries.
+ + Code injection.
+
+Libraries using this pattern:
+ + Boost.Iterator
+ + Boost.Python
+ + Boost.Serialization 
+
+Also known as: 
+ + Code injection
+ + Barton‐Nackman Trick
+ + Mixin - Name used outside C++ community 
+
+*** Eliminating Virtual Member Function 
+
+ *Approach 1 - GOF - OOP template pattern* 
+
+ - Code 1: GOF Template method design pattern using virtual functions.
+
+ #+BEGIN_SRC cpp 
+   class IntervalSummation{
+   public:
+           // Algorithm or entry point which calls the derived class method.
+           // This is the template method 
+           double summation(int lower, int upper) const{
+                   double sum = 0;
+                   for(int i = lower; i <= upper; i++)
+                           sum += this->stepFn(i);
+                   return sum; 
+           }
+   protected:
+           // Hook method or to be defined by the derived class
+           virtual double stepFn(double x) const = 0 ;
+   };
+
+   class SumOfSquares: public IntervalSummation{
+   private:
+           double stepFn(double x) const { return x * x; }
+   };
+
+   class SumOfCubes: public IntervalSummation{
+   private:
+           double stepFn(double x) const { return x * x * x; }
+   };
+
+   void clientCode(const IntervalSummation& obj){
+           std::cout << "Summation at [0, 15] = " << obj.summation(0, 15) << std::endl;
+   }
+#+END_SRC
+
+  *Approach 2 - CRTP generic programming pattern* 
+
+ + Code 2: Code rewritten using CRTP for eliminating virtual function
+   calls. The advantage is that this code can run faster than the
+   previous one, however the cost is the higher complexity, loss of
+   readability and runtime polymorphism. For instance, now is not
+   possible to store multiple implementations of IntervalSummation in
+   a data structure or refer to them with the same pointer.
+
+ + File: [[file:src/design-patterns/crtp1.cpp][file:src/design-patterns/crtp1.cpp]]
+ + Online Compiler: https://rextester.com/ZLZH2040
+
+#+BEGIN_SRC cpp 
+  template<class Implementation>
+  class IntervalSummation{
+  public:
+          // Get reference to implementation 
+          Implementation& self(){
+                  return *static_cast<Implementation*>(this);
+          }
+          // Overload method 
+          const Implementation& self() const {
+                  return *static_cast<Implementation const * const>(this);
+          } 	
+          double summation(int lower, int upper) const {
+          double sum = 0;
+          for(int i = lower; i <= upper; i++)
+                sum += self().stepFn(i);
+          return sum; 
+          }
+  };
+
+  class SumOfSquares: public IntervalSummation<SumOfSquares>{
+  public:
+          double stepFn(double x) const { return x * x; }
+  };
+
+  class SumOfCubes: public IntervalSummation<SumOfCubes>{
+  public:
+          double stepFn(double x) const { return x * x * x; }
+  };
+
+  template<class T>
+  void clientCode(const IntervalSummation<T>& obj){
+          std::cout << "Summation at [0, 15] = " << obj.summation(0, 15) << std::endl;
+  }
+
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC sh 
+  $ clang++ crtp.cpp -o crtp.bin -std=c++1z -Wall -Wextra  && ./crtp.bin
+  Sum of squares in [0, 10] = 385
+  Sum of cubes   in [0, 10] = 3025
+  Summation at [0, 15] = 1240
+  Summation at [0, 15] = 14400
+#+END_SRC
+
+References: 
+
+ + [[https://www.codeproject.com/Tips/537606/Cplusplus-Prefer-Curiously-Recurring-Template-Patt][C++: Prefer Curiously Recurring Template Pattern (CRTP) to Template Pattern - CodeProject]]
+ + [[https://mklimenko.github.io/english/2018/07/02/platform-dependent-crtp/][CRTP-based platform-dependent optimizations | GNSS C++ solutions]]
+ + http://stevedewhurst.com/once_weakly/once-weakly20170328/once-weakly20170328.pdf
+ + [[http://enki-tech.blogspot.com/2012/08/c11-generic-singleton.html][Enki :: Technical Blog: C++11: A generic Singleton]]
+ + IDENTIFYING PROGRAMMING IDIOMS IN C++ GENERIC LIBRARIES -
+   <https://etd.ohiolink.edu/rws_etd/document/get/kent1259116053/inline>
+ + [[http://www.masaers.com/2014/01/22/CRTP-operator-hijacking.html][Using CRTP to easily hijack operators in c++11 | masaers’ blog]]
+ + https://github.com/nojhan/crtp_functor_ttp
+ + [[https://web.archive.org/web/20060211034709/http://devnet.developerpipeline.com/documents/s=9843/cuj0601diggins/][Developer::Pipelines | Building More Flexible Types with Mixins]]
+ + [[https://accu.org/index.php/journals/296][ACCU :: Better Encapsulation for the Curiously Recurring Template Pattern]]
+ + [[http://www.di.unipi.it/~nids/docs/templates_vs_inheritance.html][Replacing Virtual Methods with Templates]]
+ + http://gsd.web.elte.hu/lectures/bolyai/2018/mixin_crtp/mixin_crtp.pdf
+ + https://faithandbrave.hateblo.jp/entry/20071206/1196934096
+ + [[https://nativecoding.wordpress.com/2015/06/05/virtual-methods-vs-crtp-benchmark-2/][Virtual Methods vs CRTP Benchmark – Native Coding]]
+ + https://nativecoding.wordpress.com/2015/01/11/important-c-idioms/
+ + http://barngoggles.com/visitor-with-crtp/
+
+Best Links: 
+
+ + https://nativecoding.wordpress.com/2015/01/11/important-c-idioms/
+ + https://marcoarena.wordpress.com/2012/04/29/use-crtp-for-polymorphic-chaining/
+ + http://thothonegan.tumblr.com/post/157363120503/crtp-curiously-recurring-template-pattern
+
+Videos: 
+
+ + Curiously Recurring Template Pattern (CRTP) -
+   <https://www.youtube.com/watch?v=C3Pi5GlIfjs>
+
+ + 
+
+ + 
+*** Generating operator overloading free functions 
+
+The CRTP design pattern can be used for generating operator free
+functions and  avoiding code repetition when implementing them. 
+
+ + File:  [[file:src/design-patterns/crtp-operators.cpp][file:src/design-patterns/crtp-operators.cpp]]
+ + Online Compiler: https://rextester.com/PBI36673
+
+
+ *Example:*
+
+Class EqualityOperator: 
+  + Requirement: the _Impl_ class must implement the member function:
+    + _bool T::equal(T const& rhs) const_
+
+#+BEGIN_SRC cpp 
+  template<typename Impl>
+  class EqualityOperator
+  {
+  public:
+
+      friend bool operator==(Impl const& lhs, Impl const& rhs)
+      {
+          return lhs.equal(rhs);
+      }
+
+      friend bool operator!=(Impl const& lhs, Impl const& rhs)
+      {
+          return lhs.equal(rhs);
+      }
+
+  };
+#+END_SRC
+
+Class AddOperator: 
+
+  + Imlements the operator (+) free functions. 
+  + Requirement => The class _Impl_ must implement the member function:
+    + Impl Impl::add(T const& T) const
+
+#+BEGIN_SRC cpp 
+  template<typename Impl, typename T>
+  struct AddOperator
+  {
+  public:
+
+      friend Impl operator+(Impl const& lhs, T const& rhs)
+      {
+          return lhs.add(rhs);
+      }
+
+      friend Impl operator+(T const& lhs, Impl const& rhs)
+      {
+          return rhs.add(lhs);
+      }
+  };
+#+END_SRC
+
+Class StreamInsertionOperator:
+
+  + Implements the operator (<<) stream-insertion operator for the
+    class Impl.
+
+  + Requirement: The class Impl must implement the following member function:
+    + void printme(std::ostream& os) const 
+
+#+BEGIN_SRC cpp 
+  template<typename Impl>
+  struct StreamInsertionOperator
+  {
+  public:
+
+      friend std::ostream& operator<<(std::ostream& os, Impl const& rhs)
+      {
+          rhs.printme(os);
+          return os;
+      }
+
+  };
+#+END_SRC
+
+Class Point2D: 
+  + Inherits and all previous CRTP classes and implements their
+    requirements (implicit interface).
+
+#+BEGIN_SRC cpp 
+  class Point2D: public EqualityOperator<Point2D>
+               , public AddOperator<Point2D, int>
+               , public StreamInsertionOperator<Point2D>
+  {
+  public:
+      int x;
+      int y;
+      Point2D(int x, int y): x(x), y(y) { }
+
+
+      // Required by:
+      void printme(std::ostream& os) const
+      {
+          os << "Point2D[ x = " << x << " ; y = " << y << " ] " << std::endl;
+      }
+
+  private:
+      // Allows class EqualityOperator<Point2D> to access private
+      // members of this class.
+      friend class EqualityOperator<Point2D>;
+      friend struct AddOperator<Point2D, int>;
+
+      // Required by: EqualityOperator<Point2D>
+      bool equal(Point2D const& rhs) const
+      {
+          return x == rhs.x && y == rhs.y;
+      }
+
+      // Required by: AddOperator<Point2D, int>
+      Point2D add(int rhs) const
+      {
+          return Point2D(this->x + rhs, this->y + rhs);
+      }
+
+  };
+#+END_SRC
+
+Function: main()
+
+#+BEGIN_SRC cpp 
+  Point2D p1(10, 20);
+  Point2D p2(25, 30);
+  Point2D p3(10, 20);
+
+  std::cout << std::boolalpha;
+
+  std::cout << " p1 === p2 ? => " << (p1 == p2) << std::endl;
+  std::cout << " p1 === p3 ? => " << (p1 == p3) << std::endl;
+
+  std::cout <<" p1 + 10 = " << p1 + 10 << std::endl;
+  std::cout <<" 10 + p1 = " << 10 + p1 << std::endl;
+#+END_SRC
+
+Output of main():
+
+#+BEGIN_SRC sh 
+ $ ./crtp-operators.bin 
+
+ p1 === p2 ? => false
+ p1 === p3 ? => true
+ p1 + 10 = Point2D[ x = 20 ; y = 30 ] 
+
+ 10 + p1 = Point2D[ x = 20 ; y = 30 ] 
+#+END_SRC
+
+*** CRTP with more concise notation 
+
+The following code uses the convenience templated function rcast<>
+provide a more concise notation for expressing the code intent and
+takes care of const qualifiers. 
+
+File: _crtp.cpp_
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+  #include <iomanip> 
+
+  // Convenience function for CRTP pattern.
+  template<typename Dest, typename Src>
+  inline Dest& rcast(Src* td){ return *reinterpret_cast<Dest*>(td); }
+
+  // Convenience templated function for CRTP pattern. This overload can be 
+  // called from member functions functions with const annotation. Such as: 
+  //   ReturType MyClass::someMemberFunc(arg0, ...) const 
+  template<typename Dest, typename Src>
+  inline const Dest& rcast(const Src* td){ return *reinterpret_cast<const Dest*>(td); }
+
+  template<typename Impl>
+  struct CurvePlotter
+  {
+      // Version 1 => Using convenience function rcast<T>(), which 
+      // saves typing and expresses the intent in a more explicit way.
+      //
+      void tabulate_1(double start, double stop, double step) const 
+      {
+          std::cout << " ======== Version 1 =========" << '\n';
+          rcast<Impl>(this).show_function_name();
+        
+          for(double x = start; x < stop; x += step)
+          {
+              double y = rcast<Impl>(this).eval(x);
+              std::cout << std::setw(10) << x << std::setw(10) << y << '\n';
+          }
+      }
+    
+
+     // Version 2 => Implementation 2 => Without using convenience function.     
+      void tabulate_2(double start, double stop, double step) const 
+      {
+          std::cout << " ======== Version 2 =========" << '\n';
+        
+          reinterpret_cast<Impl const*>(this)->show_function_name();
+        
+          for(double x = start; x < stop; x += step)
+          {
+              double y = reinterpret_cast<const Impl*>(this)->eval(x);
+              std::cout << std::setw(10) << x << std::setw(10) << y << '\n';
+          }        
+      }
+  };
+
+  class LinearPlotter: public CurvePlotter<LinearPlotter>
+  {
+    double m_a, m_b;
+  public:
+      LinearPlotter(double a, double b): m_a(a), m_b(b) { }
+      void show_function_name() const { std::cout << " Curver name = linear " << '\n';  }
+      double eval(double x) const { return m_a * x + m_b; }    
+  };
+
+
+  class QuadraticPlotter: public CurvePlotter<QuadraticPlotter>
+  {
+      double m_a, m_b, m_c;
+  public:
+      QuadraticPlotter(double a, double b, double c): m_a(a), m_b(b), m_c(c){ }
+    
+      void show_function_name() const { std::cout << " Curver name = quadratic " << '\n';  }
+      double eval(double x) const { return m_a * x * x + m_b * x + m_c; }
+  };
+
+  int main()
+  {
+      auto plt_lin = LinearPlotter(3.0, 5.0);
+      plt_lin.tabulate_1(-5.0, 6.0, 1.0);
+      plt_lin.tabulate_2(-5.0, 6.0, 1.0);
+    
+      auto plt_quad = QuadraticPlotter(2.0, -10.0, 25.0);
+      plt_quad.tabulate_1(-5.0, 6.0, 1.0);
+      plt_quad.tabulate_2(-5.0, 6.0, 1.0);
+  }
+#+END_SRC
+
+Building and running: 
+
+#+BEGIN_SRC sh 
+   $ clang++ crtp.cpp -o out.bin -std=c++1z -g -Wall -Wextra
+
+  $ ./out.bin                                                                                                                                                                                                                             
+   ======== Version 1 =========                                                                                                                                                                                                           
+   Curver name = linear                                                                                                                                                                                                                   
+          -5       -10                                                                                                                                                                                                                    
+          -4        -7                                                                                                                                                                                                                    
+          -3        -4                                                                                                                                                                                                                    
+          -2        -1                                                                                                                                                                                                                    
+          -1         2                                                                                                                                                                                                                    
+           0         5                                                                                                                                                                                                                    
+           1         8                                                                                                                                                                                                                    
+           2        11                                                                                                                                                                                                                    
+           3        14                                                                                                                                                                                                                    
+           4        17                                                                                                                                                                                                                    
+           5        20                                                                                                                                                                                                                    
+   ======== Version 2 =========                                                                                                                                                                                                           
+   Curver name = linear                                                                                                                                                                                                                   
+          -5       -10                                                                                                                                                                                                                    
+          -4        -7                                                                                                                                                                                                                    
+          -3        -4                                                                                                                                                                                                                    
+          -2        -1                                                                                                                                                                                                                    
+          -1         2                                                                                                                                                                                                                    
+           0         5                                                                                                                                                                                                                    
+           1         8                                                                                                                                                                                                                    
+           2        11                                                                                                                                                                                                                    
+           3        14                                                                                                                                                                                                                    
+           4        17                                                                                                                                                                                                                    
+           5        20                                                                                                                                                                                                                    
+   ======== Version 1 =========                                                                                                                                                                                                           
+   Curver name = quadratic                                                                                                                                                                                                                
+          -5       125                                                                                                                                                                                                                    
+          -4        97                                                                                                                                                                                                                    
+          -3        73                                                                                                                                                                                                                    
+          -2        53                                                                                                                                                                                                                    
+          -1        37                                                                                                                                                                                                                    
+           0        25                                                                                                                                                                                                                    
+           1        17                                                                                                                                                                                                                    
+           2        13                                                                                                                                                                                                                    
+           3        13                                                                                                                                                                                                                    
+           4        17                                                                                                                                                                                                                    
+           5        25                                                                                                                                                                                                                    
+   ======== Version 2 =========                                                                                                                                                                                                           
+   Curver name = quadratic                                                                                                                                                                                                                
+          -5       125                                                                                                                                                                                                                    
+          -4        97                                                                                                                                                                                                                    
+          -3        73                                                                                                                                                                                                                    
+          -2        53                                                                                                                                                                                                                    
+          -1        37                                                                                                                                                                                                                    
+           0        25
+           1        17
+           2        13
+           3        13
+           4        17
+           5        25                                                                              
+#+END_SRC
 ** Type Erasure Pattern 
 *** Overview  
 
@@ -6051,437 +6627,6 @@ Compilation Output:
    [TRACE] Property [basis-points] set to value = 80
    => plist[0]->Name() = basis-points plist[0]->Get<int>() = 80
 #+END_SRC
-** Virtual Friend Function Idiom 
-
-A C++ friend function is a free function with access to a class
-protected and private member variables and member functions. Unlike
-virtual member functions (aka virtual methods), which are resolved at
-runtime and can be overridden by each derived class, friend functions
-cannot be declared as virtual and be overridden by each derived class
-for customizing the function behavior for each different
-implementation.  The virtual friend function idiom emulates the
-virtual member function by forwarding the method call to a member
-function.
-
-This technique can be used for implementing stream insertion (<<) and
-extraction operator for reading and writing derived classes from
-streams. 
-
-In the following code, the idiom is used for printing a class
-hierarchy and customizing the behavior of the stream insertion
-operator (<<), which is a friend function, for each derived class. 
-
-File: _virtual-friend-function.cpp_ 
-
-#+BEGIN_SRC cpp 
-  #include <iostream> 
-  #include <string> 
-
-  // Shape interface 
-  class IShape
-  {
-  // Protected =>> Means that only derived classes 
-  // can access this function.     
-  protected:
-         // Print object to the stream object 
-         virtual void print_me(std::ostream& os) const = 0;
-  public:
-      virtual void draw() const = 0;
-      virtual ~IShape() = default;
-    
-      // Friend function => (Just a free function)
-      friend std::ostream& operator<<(std::ostream& os, const IShape& shape)
-      {
-           shape.print_me(os);
-           return os;
-      }
-  };
-
-  class Circle: public IShape
-  {
-  private:
-      double radius = 0.0;
-    
-      void print_me(std::ostream& os) const override 
-      {
-          os << " IShape(Cicle) with radius = " << radius;
-      }
-    
-  public:  
-      Circle(double radius): radius(radius){ }
-    
-      void draw() const override {
-          // Implementation here ....
-      }
-  };
-
-
-  class Square: public IShape
-  {
-  private:
-      double length = 0.0;
-    
-      void print_me(std::ostream& os) const override 
-      {
-          os << " IShape(Square) with length = " << length;
-      }
-    
-  public:  
-      Square(double length): length(length){ }
-    
-      void draw() const override {
-          // Implementation here ....
-      }
-  };
-
-
-  int main(int argc, char** argv)
-  {
-      Square shapeA{5};
-      Circle shapeB{10}; 
-    
-      /* 
-       ,*  virtual-friend-function.cpp: In function ‘int main(int, char**)’:
-       ,* virtual-friend-function.cpp:67:30: error: 
-       ,*    ‘virtual void Square::print_me(std::ostream&) const’ is private *      within this context
-       |     shapeA.print_me(std::cout);
-       ,*/
-          // shapeA.print_me(std::cout);  // Compile-time error.
-    
-      std::cout << " [INFO] shape A = " << shapeA << '\n';
-      std::cout << " [INFO] shape B = " << shapeB << '\n';
-    
-      return 0;
-  }
-#+END_SRC
-
-
-Building: 
-
-#+BEGIN_SRC sh 
-  $ g++ virtual-friend-function.cpp -o out.bin -std=c++1z -Wall -Wextra -g
-#+END_SRC
-
-Running: 
-
-#+BEGIN_SRC sh 
-  $ ./out.bin
-   [INFO] shape A =  IShape(Square) with length = 5
-   [INFO] shape B =  IShape(Cicle) with radius = 10
-#+END_SRC
-
-** CRTP - Curious Recurring Template Pattern
-*** Overview 
-
-It is a variation of GOF template design pattern where an algorithm
-defined by the base class is customized or specified by the derived 
-class. However, unlike the GOF one, this version uses C++ template
-metaprogramming for emulating dynamic polymorphism or inheritance
-at compile time. So it makes the code faster by eliminating virtual
-function-calls.
-
-Features: 
- + Coined by James Coplien - 1995
- + Static polymorphism technique based on template metaprogramming for
-   speeding up the code eliminating virtual functions.
-
-Use cases:
- + Reduce virtual function call overhead - by simulating dynamic
-   polymorphism through static polymorphism. 
- + Implement state machines.
- + Implement high performance numerical libraries.
- + Code injection.
-
-Libraries using this pattern:
- + Boost.Iterator
- + Boost.Python
- + Boost.Serialization 
-
-Also known as: 
- + Code injection
- + Barton‐Nackman Trick
- + Mixin - Name used outside C++ community 
-
-*** Example - Eliminating Virtual Member Function 
-
- *Approach 1 - GOF - OOP template pattern* 
-
- - Code 1: GOF Template method design pattern using virtual functions.
-
- #+BEGIN_SRC cpp 
-   class IntervalSummation{
-   public:
-           // Algorithm or entry point which calls the derived class method.
-           // This is the template method 
-           double summation(int lower, int upper) const{
-                   double sum = 0;
-                   for(int i = lower; i <= upper; i++)
-                           sum += this->stepFn(i);
-                   return sum; 
-           }
-   protected:
-           // Hook method or to be defined by the derived class
-           virtual double stepFn(double x) const = 0 ;
-   };
-
-   class SumOfSquares: public IntervalSummation{
-   private:
-           double stepFn(double x) const { return x * x; }
-   };
-
-   class SumOfCubes: public IntervalSummation{
-   private:
-           double stepFn(double x) const { return x * x * x; }
-   };
-
-   void clientCode(const IntervalSummation& obj){
-           std::cout << "Summation at [0, 15] = " << obj.summation(0, 15) << std::endl;
-   }
-#+END_SRC
-
-  *Approach 2 - CRTP generic programming pattern* 
-
- + Code 2: Code rewritten using CRTP for eliminating virtual function
-   calls. The advantage is that this code can run faster than the
-   previous one, however the cost is the higher complexity, loss of
-   readability and runtime polymorphism. For instance, now is not
-   possible to store multiple implementations of IntervalSummation in
-   a data structure or refer to them with the same pointer.
-
- + File: [[file:src/design-patterns/crtp1.cpp][file:src/design-patterns/crtp1.cpp]]
- + Online Compiler: https://rextester.com/ZLZH2040
-
-#+BEGIN_SRC cpp 
-  template<class Implementation>
-  class IntervalSummation{
-  public:
-          // Get reference to implementation 
-          Implementation& self(){
-                  return *static_cast<Implementation*>(this);
-          }
-          // Overload method 
-          const Implementation& self() const {
-                  return *static_cast<Implementation const * const>(this);
-          } 	
-          double summation(int lower, int upper) const {
-          double sum = 0;
-          for(int i = lower; i <= upper; i++)
-                sum += self().stepFn(i);
-          return sum; 
-          }
-  };
-
-  class SumOfSquares: public IntervalSummation<SumOfSquares>{
-  public:
-          double stepFn(double x) const { return x * x; }
-  };
-
-  class SumOfCubes: public IntervalSummation<SumOfCubes>{
-  public:
-          double stepFn(double x) const { return x * x * x; }
-  };
-
-  template<class T>
-  void clientCode(const IntervalSummation<T>& obj){
-          std::cout << "Summation at [0, 15] = " << obj.summation(0, 15) << std::endl;
-  }
-
-#+END_SRC
-
-Running: 
-
-#+BEGIN_SRC sh 
-  $ clang++ crtp.cpp -o crtp.bin -std=c++1z -Wall -Wextra  && ./crtp.bin
-  Sum of squares in [0, 10] = 385
-  Sum of cubes   in [0, 10] = 3025
-  Summation at [0, 15] = 1240
-  Summation at [0, 15] = 14400
-#+END_SRC
-
-References: 
-
- + [[https://www.codeproject.com/Tips/537606/Cplusplus-Prefer-Curiously-Recurring-Template-Patt][C++: Prefer Curiously Recurring Template Pattern (CRTP) to Template Pattern - CodeProject]]
- + [[https://mklimenko.github.io/english/2018/07/02/platform-dependent-crtp/][CRTP-based platform-dependent optimizations | GNSS C++ solutions]]
- + http://stevedewhurst.com/once_weakly/once-weakly20170328/once-weakly20170328.pdf
- + [[http://enki-tech.blogspot.com/2012/08/c11-generic-singleton.html][Enki :: Technical Blog: C++11: A generic Singleton]]
- + IDENTIFYING PROGRAMMING IDIOMS IN C++ GENERIC LIBRARIES -
-   <https://etd.ohiolink.edu/rws_etd/document/get/kent1259116053/inline>
- + [[http://www.masaers.com/2014/01/22/CRTP-operator-hijacking.html][Using CRTP to easily hijack operators in c++11 | masaers’ blog]]
- + https://github.com/nojhan/crtp_functor_ttp
- + [[https://web.archive.org/web/20060211034709/http://devnet.developerpipeline.com/documents/s=9843/cuj0601diggins/][Developer::Pipelines | Building More Flexible Types with Mixins]]
- + [[https://accu.org/index.php/journals/296][ACCU :: Better Encapsulation for the Curiously Recurring Template Pattern]]
- + [[http://www.di.unipi.it/~nids/docs/templates_vs_inheritance.html][Replacing Virtual Methods with Templates]]
- + http://gsd.web.elte.hu/lectures/bolyai/2018/mixin_crtp/mixin_crtp.pdf
- + https://faithandbrave.hateblo.jp/entry/20071206/1196934096
- + [[https://nativecoding.wordpress.com/2015/06/05/virtual-methods-vs-crtp-benchmark-2/][Virtual Methods vs CRTP Benchmark – Native Coding]]
- + https://nativecoding.wordpress.com/2015/01/11/important-c-idioms/
- + http://barngoggles.com/visitor-with-crtp/
-
-Best Links: 
-
- + https://nativecoding.wordpress.com/2015/01/11/important-c-idioms/
- + https://marcoarena.wordpress.com/2012/04/29/use-crtp-for-polymorphic-chaining/
- + http://thothonegan.tumblr.com/post/157363120503/crtp-curiously-recurring-template-pattern
-
-Videos: 
-
- + Curiously Recurring Template Pattern (CRTP) -
-   <https://www.youtube.com/watch?v=C3Pi5GlIfjs>
-
- + 
-
- + 
-*** Example - Generating operator free functions 
-
-The CRTP design pattern can be used for generating operator free
-functions and  avoiding code repetition when implementing them. 
-
- + File:  [[file:src/design-patterns/crtp-operators.cpp][file:src/design-patterns/crtp-operators.cpp]]
- + Online Compiler: https://rextester.com/PBI36673
-
-
- *Example:*
-
-Class EqualityOperator: 
-  + Requirement: the _Impl_ class must implement the member function:
-    + _bool T::equal(T const& rhs) const_
-
-#+BEGIN_SRC cpp 
-  template<typename Impl>
-  class EqualityOperator
-  {
-  public:
-
-      friend bool operator==(Impl const& lhs, Impl const& rhs)
-      {
-          return lhs.equal(rhs);
-      }
-
-      friend bool operator!=(Impl const& lhs, Impl const& rhs)
-      {
-          return lhs.equal(rhs);
-      }
-
-  };
-#+END_SRC
-
-Class AddOperator: 
-
-  + Imlements the operator (+) free functions. 
-  + Requirement => The class _Impl_ must implement the member function:
-    + Impl Impl::add(T const& T) const
-
-#+BEGIN_SRC cpp 
-  template<typename Impl, typename T>
-  struct AddOperator
-  {
-  public:
-
-      friend Impl operator+(Impl const& lhs, T const& rhs)
-      {
-          return lhs.add(rhs);
-      }
-
-      friend Impl operator+(T const& lhs, Impl const& rhs)
-      {
-          return rhs.add(lhs);
-      }
-  };
-#+END_SRC
-
-Class StreamInsertionOperator:
-
-  + Implements the operator (<<) stream-insertion operator for the
-    class Impl.
-
-  + Requirement: The class Impl must implement the following member function:
-    + void printme(std::ostream& os) const 
-
-#+BEGIN_SRC cpp 
-  template<typename Impl>
-  struct StreamInsertionOperator
-  {
-  public:
-
-      friend std::ostream& operator<<(std::ostream& os, Impl const& rhs)
-      {
-          rhs.printme(os);
-          return os;
-      }
-
-  };
-#+END_SRC
-
-Class Point2D: 
-  + Inherits and all previous CRTP classes and implements their
-    requirements (implicit interface).
-
-#+BEGIN_SRC cpp 
-  class Point2D: public EqualityOperator<Point2D>
-               , public AddOperator<Point2D, int>
-               , public StreamInsertionOperator<Point2D>
-  {
-  public:
-      int x;
-      int y;
-      Point2D(int x, int y): x(x), y(y) { }
-
-
-      // Required by:
-      void printme(std::ostream& os) const
-      {
-          os << "Point2D[ x = " << x << " ; y = " << y << " ] " << std::endl;
-      }
-
-  private:
-      // Allows class EqualityOperator<Point2D> to access private
-      // members of this class.
-      friend class EqualityOperator<Point2D>;
-      friend struct AddOperator<Point2D, int>;
-
-      // Required by: EqualityOperator<Point2D>
-      bool equal(Point2D const& rhs) const
-      {
-          return x == rhs.x && y == rhs.y;
-      }
-
-      // Required by: AddOperator<Point2D, int>
-      Point2D add(int rhs) const
-      {
-          return Point2D(this->x + rhs, this->y + rhs);
-      }
-
-  };
-#+END_SRC
-
-Function: main()
-
-#+BEGIN_SRC cpp 
-  Point2D p1(10, 20);
-  Point2D p2(25, 30);
-  Point2D p3(10, 20);
-
-  std::cout << std::boolalpha;
-
-  std::cout << " p1 === p2 ? => " << (p1 == p2) << std::endl;
-  std::cout << " p1 === p3 ? => " << (p1 == p3) << std::endl;
-
-  std::cout <<" p1 + 10 = " << p1 + 10 << std::endl;
-  std::cout <<" 10 + p1 = " << 10 + p1 << std::endl;
-#+END_SRC
-
-Output of main():
-
-#+BEGIN_SRC sh 
- $ ./crtp-operators.bin 
-
- p1 === p2 ? => false
- p1 === p3 ? => true
- p1 + 10 = Point2D[ x = 20 ; y = 30 ] 
-
- 10 + p1 = Point2D[ x = 20 ; y = 30 ] 
-#+END_SRC
-
 ** Virtual Copy Constructor Idiom - Prototype Pattern 
 *** Overview 
 
@@ -6780,6 +6925,207 @@ Testign in ROOT REPL:
   >> 
 
 #+END_SRC
+** QT Parent-child memory management 
+
+QT does not uses smart pointers for widgets memory management, instead
+it uses raw pointers and parent-child relationship for organizing
+widgets as tree data structure. In the parent-child relationship
+memory management technique, every child object (heap-allocated) is
+owned by a single parent and every parent is responsible for releasing
+the memory allocated for its children object. When a parent object is
+destroyed, all its children are also destroyed. The root widget
+object, which is often stack allocated, calls the destructor of its
+children objects, and each of its children objects also call the
+destructors of its offspring. 
+
+Note: This is similar to the composite design pattern.  
+
+References: 
+
+  + [[https://doc.qt.io/qt-5/objecttrees.html][Qt5 - Object Trees & Ownership]]
+
+  + [[https://stackoverflow.com/questions/2491707/memory-management-in-qt][Stackoverflow - Memory management in Qt?]] 
+
+  *Sample Code* 
+
+File: _parent-child.cpp_
+
+#+BEGIN_SRC cpp 
+  #include <iostream> 
+  #include <string> 
+  #include <vector>
+
+  class Widget 
+  {
+  public:
+      virtual  ~Widget() = default;
+      Widget() = default;
+
+      // Make class non-copiable. 
+      Widget(const Widget&)          = delete;
+      Widget& operator=(const Widget&) = delete;
+    
+      virtual const char* name() const = 0;
+      virtual void display()     const = 0;
+  };
+
+  // Convenience function for CRTP pattern.
+  template<typename Dest, typename Src>
+  inline Dest& rcast(Src* td){ return *reinterpret_cast<Dest*>(td); }
+
+  // Convenience templated function for CRTP pattern. This overload can be 
+  // called from member functions functions with const annotation. Such as: 
+  //   ReturType MyClass::someMemberFunc(arg0, ...) const 
+  template<typename Dest, typename Src>
+  inline const Dest& rcast(const Src* td){ return *reinterpret_cast<const Dest*>(td); }
+
+  template<typename Impl>
+  class Container: public Widget 
+  {
+      std::vector<Widget*> m_children{};
+  public:    
+      Container() = default;
+
+      void addChild(Widget* child)
+      {
+          m_children.push_back(child);
+      }
+    
+      void display() const override
+      {
+          std::fprintf(  stdout, " [TRACE] Display container (id = %d) / type = '%s' \n"
+                       , rcast<Impl>(this).getid() , name());
+          for(auto ch: m_children){ ch->display(); }
+      }
+    
+      // Delete all child widget;
+      ~Container() 
+      {
+          for(auto ch: m_children){ delete ch; }
+        
+          // CRTP is used because it is not possible to call 
+          // virtual method from destructor.
+          std::printf(  " [TRACE] Delete container (id = %d) (type = %s) \n"
+                      , reinterpret_cast<Impl*>(this)->getid()
+                      , rcast<Impl>(this).type() 
+                     );       
+      }
+  };
+
+
+  class VerticalContainer: public Container<VerticalContainer> 
+  {
+      int m_id = 0;
+  public:
+      VerticalContainer() = default;
+      VerticalContainer(int id) { m_id = id; }
+      int getid() const { return m_id; }    
+      const char* name() const { return "vcontainer"; } 
+      const char* type() const { return "vcontainer"; } 
+  };
+
+  class HorizontalContainer: public Container<HorizontalContainer>
+  {
+      int m_id = 0;
+  public:
+      HorizontalContainer() = default;
+      HorizontalContainer(int id) { m_id = id; }
+      int getid() const { return m_id; }
+      const char* name() const { return "hcontainer"; } 
+      const char* type() const { return "hcontainer"; } 
+  };
+
+
+  class Label: public Widget
+  {
+      int m_id = -1;
+  public:
+      Label(int id){ m_id = id; }
+      const char* name() const { return "label"; }
+      int getid() const { return m_id; }
+      void display() const 
+      {
+          std::printf(" [TRACE] Display label (n = %d) \n", m_id);
+      }
+    
+       ~Label(){ std::printf(" [TRACE] Label deleted (n = %d) \n", m_id); }
+  };
+
+
+  class Button: public Widget
+  {
+      int m_id = -1;
+  public:
+      Button(){ m_id = 0; }
+      Button(int id){ m_id = id; }
+      const char* name() const { return "button"; }    
+    
+      void display() const 
+      {
+          printf(" [TRACE] Display button (id = %d) \n", m_id);
+      }
+    
+      ~Button(){ printf(" [TRACE] Button deleted  (n = %d) \n", m_id); }
+  };
+
+  int main()
+  {
+      // Root object (allocated on stack)
+      // will own all sub-objects. 
+      VerticalContainer vbox{0};
+    
+      vbox.addChild( new Label(15) );
+    
+      auto hbox = new HorizontalContainer{0};
+      hbox->addChild( new Button(0) );
+      hbox->addChild( new Button(1) );    
+    
+      // vbox2 will own the label objects with IDs (100 and 200).
+      auto vbox2 = new VerticalContainer{1};
+      vbox2->addChild( new Label(100));
+      vbox2->addChild( new Label(200));
+      hbox->addChild(vbox2);
+      vbox.addChild( hbox );
+    
+      vbox.addChild( new Button(2) );    
+      vbox.addChild( new Label(17) );
+    
+      vbox.display();
+      printf("\n =========== [TERMINATED] ================\n");
+      return 0;
+  }
+#+END_SRC
+
+Building and running: 
+
+#+BEGIN_SRC sh 
+  $ clang++ parent-child.cpp -o out.bin -std=c++1z -Wall -Wextra -g   
+
+  $ ./out.bin                                                                                        
+   [TRACE] Display container (id = 0) / type = 'vcontainer'                                          
+   [TRACE] Display label (n = 15)                                                                    
+   [TRACE] Display container (id = 0) / type = 'hcontainer'                                          
+   [TRACE] Display button (id = 0)                                                                   
+   [TRACE] Display button (id = 1)                                                                   
+   [TRACE] Display container (id = 1) / type = 'vcontainer'                                          
+   [TRACE] Display label (n = 100)                                                                   
+   [TRACE] Display label (n = 200)                                                                   
+   [TRACE] Display button (id = 2)                                                                   
+   [TRACE] Display label (n = 17) 
+
+   =========== [TERMINATED] ================
+   [TRACE] Label deleted (n = 15) 
+   [TRACE] Button deleted  (n = 0) 
+   [TRACE] Button deleted  (n = 1) 
+   [TRACE] Label deleted (n = 100) 
+   [TRACE] Label deleted (n = 200) 
+   [TRACE] Delete container (id = 1) (type = vcontainer) 
+   [TRACE] Delete container (id = 0) (type = hcontainer) 
+   [TRACE] Button deleted  (n = 2) 
+   [TRACE] Label deleted (n = 17) 
+   [TRACE] Delete container (id = 0) (type = vcontainer) 
+#+END_SRC
+
 ** Cross platform code with conditional compilation
 
 Note: It is not a design pattern, but a methodology for developing
