@@ -2424,6 +2424,121 @@ Analysze depdencies of an executable:
   $ cmake --build _build2 --target install
 #+END_SRC
 
+** [DRAFT] Enabling and disabling preprocessor macros 
+
+File: _CMakeLists.txt_ 
+
+#+BEGIN_SRC cmake 
+   cmake_minimum_required(VERSION 3.9)
+   project(MacroCmake)
+
+   set(CMAKE_CXX_STANDARD 17)     
+   set(CMAKE_VERBOSE_MAKEFILE ON )
+
+   option(ENABLE_LOGGING "Enable compilation with logging" OFF)
+
+   #============== Set targets =============================#
+
+               add_executable( macro-test macro-test.cpp    )
+   target_compile_definitions( macro-test PRIVATE
+                                          CODE_VERSION="\\"0.25\\""
+                              )
+
+   IF(ENABLE_LOGGING)
+     target_compile_definitions( macro-test PRIVATE LOGGING)
+   ENDIF()
+#+END_SRC
+
+File: _macro-test.cpp_ 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+
+  #ifndef CODE_VERSION
+    #define CODE_VERSION "0.1" 
+  #endif 
+
+  int main(int argc, char** argv)
+  {
+
+    if(argc < 2)
+    {
+        std::fprintf(stderr,  " Product version: %s \n", CODE_VERSION);
+        std::fprintf(stderr, " Usage: %s <NUMBER> \n", argv[0]);
+        return EXIT_FAILURE;
+    }
+  
+    int n    = std::stoi(argv[1]);
+    int prod = 1;
+
+    for(int i = 1; i <= n; i++){
+      prod *= i;
+    
+      #if LOGGING 
+        std::fprintf(stderr, " => i = %d ; prod = %d \n", i, prod); 
+      #endif 
+    }
+
+    std::printf(" => product = %d \n", prod); 
+
+    // Same as: return 0;
+    return EXIT_SUCCESS;
+  }
+#+END_SRC
+
+
+  *Building*
+
+Build without enabling logging. 
+
+#+BEGIN_SRC sh 
+   $ >> cmake -H. -B_build -DCMAKE_BUILD_TYPE=Debug  
+   $ >> cmake --build _build --target
+
+   $ >> _build/macro-test 
+   Product version: "0.25" 
+   Usage: _build/macro-test <NUMBER> 
+
+   $ >> _build/macro-test 6
+   => product = 720 
+#+END_SRC
+
+Build enabling logging. 
+
+#+BEGIN_SRC sh 
+   $ >> cmake -H. -B_build -DCMAKE_BUILD_TYPE=Debug -DENABLE_LOGGING=ON
+   $ >> cmake --build _build --target
+
+   $ >> _build/macro-test 6
+   => i = 1 ; prod = 1 
+   => i = 2 ; prod = 2 
+   => i = 3 ; prod = 6 
+   => i = 4 ; prod = 24 
+   => i = 5 ; prod = 120 
+   => i = 6 ; prod = 720 
+   => product = 720 
+#+END_SRC
+
+Build defining macros on command line: (Note: this procedure is not
+portable, it will not work with MSVC - visual C++ compiler as the MSVC
+macros uses '/D' slash instead of '-D' dash for setting macros.)
+
+#+BEGIN_SRC sh 
+   $ >> cmake -H. -B_build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS='-DLOGGING -DCODE_VERSION=\"3.0\"'
+   $ >> cmake --build _build --target
+
+   $ >> _build/macro-test
+   Product version: 3.0 
+   Usage: _build/macro-test <NUMBER> 
+
+   $ >> _build/macro-test 4
+   => i = 1 ; prod = 1 
+   => i = 2 ; prod = 2 
+   => i = 3 ; prod = 6 
+   => i = 4 ; prod = 24 
+   => product = 24 
+#+END_SRC
+
 ** Consuming or Dependencies 
 *** Overview 
 
