@@ -52,6 +52,7 @@
      runtime, create generalized algorithms, functions, simplify event
      handling, callbacks and design patterns.  
 ** Singleton 
+*** Overview 
 
 Singleton is a creational design pattern where there is only a single
 instance of a class and client code is forbidden from creating new
@@ -107,7 +108,7 @@ Example where singletons are found:
     + std::cerr => Encapsulates console stderr - standard error output
     + std::clog 
 
- *See also* 
+ *Further Reading* 
 
   + [[https://en.wikipedia.org/wiki/Singleton_pattern][Singleton pattern - Wikipedia]]
 
@@ -132,6 +133,7 @@ Example where singletons are found:
   + [[https://www.codeproject.com/Articles/307233/Singleton-Pattern-Positive-and-Negative-Aspects-2][Singleton Pattern – Positive and Negative Aspects - CodeProject]]
 
   + https://wiki.unity3d.com/index.php/Singleton (Games C#)
+*** Example 1 - FileRepository Class
 
 
  *Example Code* 
@@ -314,7 +316,175 @@ Compiling and running ([[file:src/design-patterns/singleton1.cpp][file:src/desig
    File = fileX3.pdf
    [LOG] File Respository Deleted. Ok.
 #+END_SRC
+*** Example 2 - OpenGL GLFW Keyboard Manager 
 
+The following singleton class allows registering multiple capturing
+lambda callbacks for a given keyboard key. The purpose of the class
+KeyboardManager is to provide an easier way to pass capturing C++11
+lambdas to the function [[https://www.glfw.org/docs/3.3/group__input.html#ga1caf18159767e761185e49a3be019f8d][glfwSetKeyCallback()]]. Passing capturing
+lambdas to glfwSetKeyCallback() directly is not possible as this
+function lacks an extra void pointer for passing user data. In order
+to overcome this issue, a Singleton class was used as global variable
+for passing lambda to the GLFW callback.
+
+Relevant type signatures: 
+
+#+BEGIN_SRC cpp 
+  GLFWkeyfun glfwSetKeyCallback	(  GLFWwindow * window
+                                 , GLFWkeyfun 	callback 
+                                );
+	
+  // C notation for function pointer type alias. 
+  typedef void(* GLFWkeyfun) (GLFWwindow *, int, int, int, int);
+
+  // C++ notation for function pointer type alias.  
+  using GLFWkeyfun = void (*) (GLFWwindow *, int, int, int, int);
+#+END_SRC
+
+
+File: _glfw_kbd_singleton.cpp_ 
+
+#+BEGIN_SRC cpp 
+  // Brief: Draw curve copying data to the GPU 
+  #include <iostream>
+  #include <vector> 
+  #include <array>
+  #include <functional>
+  #include <map>
+  #include <cmath>
+  #include <cassert>
+
+  // -------- OpenGL headers ---------//
+  #define GL_GLEXT_PROTOTYPES 1 // Necessary for OpenGL >= 3.0 functions
+  #define GL3_PROTOTYPES      1 // Necessary for OpenGL >= 3.0 functions
+
+  #include <GL/gl.h>
+  #include <GLFW/glfw3.h>
+
+  // #include <GL/glew.h>
+  #include <GL/glu.h>
+  #include <GL/glut.h>
+
+  // Singleton object for registering lambda event handlers for GLFW keyboard typing events.
+  class KeyboardManager
+  {
+  public:
+      using KeyCallback = std::function<void (GLFWwindow* window)>;
+      using KeyCallbackDB = std::map<int, KeyCallback>;
+  private:
+      KeyCallbackDB m_keydb{};
+      GLFWwindow*   m_window = nullptr;
+    
+      // Private constructor for not allowing client code creating more 
+      // than one instance.
+      KeyboardManager()
+      {
+         std::cerr << " [TRACE] KeyboardManager - Singleton initialized." << "\n";
+      }   
+      // Forbid client code from creating a copy or using the
+      // copy constructor.
+      KeyboardManager(const KeyboardManager&){}     
+  public:
+      ~KeyboardManager() = default;
+
+      // This is the unique way to get singleton instance. 
+      static KeyboardManager& getInstance()
+      {
+          static KeyboardManager instance{};
+          return instance;
+      }
+
+      KeyboardManager& 
+      set_window(GLFWwindow* window)
+      {
+          m_window = window;
+
+          // =>> Note: This lambda must be non-capturing. Otherwise, it will result 
+          // in compile-time error. 
+          // 
+          // =>> Note: All this redundancy and boilerplate code is need because 
+          //     the function glfwSetKeyCallback() lacks an extra void* pointer 
+          //     for passing custom user data.
+          ::glfwSetKeyCallback(m_window 
+              ,[](GLFWwindow* window, int key, int scancode, int action, int mods)
+              {
+                  std::cerr << " [TRACE] glfwSetKeyCallback() key = " 
+                            << key << " / char " << (char) key <<  '\n';
+                  // Get singletion instance 
+                  KeyboardManager& instance = KeyboardManager::getInstance();
+                  auto it = instance.m_keydb.find(key);
+                  if(it == instance.m_keydb.end()){ return; }
+                  // Call callback functions.
+                  it->second(window);
+              });         
+           return *this;
+      }
+
+      KeyboardManager& 
+      add_keyCallback(int key, KeyCallback callback)
+      {
+          this->m_keydb[key] = callback;
+          return *this;
+      }    
+
+  };
+
+
+  int main(int argc, char** argv)
+  {
+      // Initialize GLFW 
+      if ( !glfwInit() ){ return -1; }
+
+      glutInit(&argc, argv);
+
+      /* Create a windowed mode window and its OpenGL context */
+      GLFWwindow* window = glfwCreateWindow(640, 480, "Simple triangle draw", NULL, NULL);
+      if (!window)
+      {
+          glfwTerminate();
+          return -1;
+      }
+     .... ...    .... ...    .... ...    .... ... 
+     .... ...    .... ...    .... ...    .... ... 
+
+      // Get singleton instance and set window.
+      KeyBoardMager& kdb = KeyboardManager::getInstance().set_window(window);
+
+      GLenum draw_type = GL_TRIANGLES;
+
+      // Register events 
+      kdb.add_keyCallback('A', [&draw_type](GLFWwindow* win){ draw_type = GL_TRIANGLES; });    
+      kdb.add_keyCallback('B', [&draw_type](GLFWwindow* win){ draw_type = GL_LINE_LOOP; });
+
+      kdb.add_keyCallback('C', [&draw_type](GLFWwindow* win){ draw_type = GL_LINES;      });
+      kdb.add_keyCallback('D', [&draw_type](GLFWwindow* win){ draw_type = GL_LINE_STRIP; });
+      kdb.add_keyCallback('F', [&draw_type](GLFWwindow* win){ draw_type = GL_LINE;       }); 
+
+
+      // Positive rotatation of 10 degrees around Z axis (counter - clockwise)
+      kdb.add_keyCallback(GLFW_KEY_RIGHT, [&](GLFWwindow* win)
+          {  
+              std::cerr << " [TRACE] Postive rotation around Z axis " << '\n';
+              angle = angle + 10.0;
+              glUniform1f(uniform_angle, angle);
+          });   
+
+     ...    ...    ...    ...    ...    ... 
+     ...    ...    ...    ...    ...    ... 
+
+      // ============== R E N D E R - L O O P ===========================//
+      //
+
+      /* Loop until the user closes the window */
+      while (!glfwWindowShouldClose(window))
+      {
+         ....        ....        ....        ....        .... 
+         ....        ....        ....        ....        .... 
+      } 
+
+  } // ------ End of main() ---------------------------------------------//
+
+#+END_SRC
 ** Named constructor - static factory method
 
 The named constructor or static factory design pattern uses static
