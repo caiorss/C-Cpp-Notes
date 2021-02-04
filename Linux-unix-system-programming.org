@@ -7243,7 +7243,7 @@ Notes and limitations:
   * LD_PRELOAD trick cannot intercept functions of executables owned
     by root and with SETUID bit set. 
 
-*** Sample code and experiment 
+*** Intercepting open() and fopen() library calls 
 
 All sources available at GIST: 
 
@@ -7661,6 +7661,165 @@ of free RAM memory in megabytes in the current machine:
    DirectMap2M:    12916736 kB
    DirectMap1G:     4194304 kB
 
+#+END_SRC
+*** Intercepting dlopen() library calls 
+
+The subroutine dlopen() is used for loading shared libraries, plugins
+and native libraries, in the case of languages such as Python, Ruby,
+Java, TCL and so on. By intercepting library calls to dlopen(), it is
+possible check the shared libraries loaded by a given process. 
+
+File: _dlopen_hook.cpp_ 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <cassert>
+  // Equivalent to C-header <stdint.h> std::uint32_t ... and so on.
+  #include <cstdint>  
+
+  // ----- Unix-specific headers ------- //
+
+  #include <dlfcn.h>
+
+  // Annotation for defining functions with C-linkage
+  // that must conform to C ABI and calling conventions.
+  #define EXTERN_C extern "C"
+
+  // This symbol will be resolved at linking-time by the Linker 
+  extern "C" pid_t getpid(void);
+
+  __attribute__((constructor)) static 
+  void init_library1()
+  {
+      std::fprintf(stderr, " [TRACE] Library loaded on process =>> pid = %d \n\n", getpid());
+  }
+
+
+  /** Intercept dlopen() library call. 
+   ,*
+   ,********************************************/
+  #if 1
+  EXTERN_C
+  void* dlopen(const char* filename, int flags)
+  {
+     // Function type signature - must have the same type signature of
+     // the intercepted function. 
+     using fun_t = void* (*) (const char* filename, int flags);
+
+        // Load old symbol of original C function that was overriden
+     fun_t dlopen_real = (fun_t) dlsym(RTLD_NEXT, "dlopen");
+
+     std::fprintf(  stderr, " [TRACE] dlopen() [PID = %d] - library = '%s'  Ok \n"
+                              , getpid(), filename);
+
+     return dlopen_real(filename, flags);
+  }
+  #endif 
+#+END_SRC
+
+Build: 
+
+#+BEGIN_SRC sh 
+   $ >> g++ dlopen_hook.cpp -o dlopen_hook.so -fpic -Wl,--soname=./dlopen_hook.so -shared -Wall -ldl     
+
+   # Identify binary format 
+   $ >> file dlopen_hook.so 
+  dlopen_hook.so: ELF 64-bit LSB shared object, x86-64, version 1 (SYSV), dynamically linked
+  , BuildID[sha1]=e31a1a84b50c2a4e8c72f4de484f8e245be59b67, not stripped
+
+   #  View dependencies 
+   $ >> ldd dlopen_hook.so 
+          linux-vdso.so.1 (0x00007ffcb6da7000)
+          libdl.so.2 => /lib/x86_64-linux-gnu/libdl.so.2 (0x00007f64bb201000)
+          libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007f64bb020000)
+          libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007f64bae2e000)
+          /lib64/ld-linux-x86-64.so.2 (0x00007f64bb227000)
+          libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007f64bacdf000)
+          libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007f64bacc4000)
+#+END_SRC
+
+Experiment 1: View shared libraries loaded by a Python process (python
+rpl - read-print-eval-loop). 
+
+#+BEGIN_SRC sh 
+    $ >> env LD_PRELOAD=$PWD/dlopen_hook.so python3
+    [TRACE] Library loaded on process =>> pid = 53633 
+
+   Python 3.8.5 (default, Jul 28 2020, 12:59:40) 
+   [GCC 9.3.0] on linux
+   Type "help", "copyright", "credits" or "license" for more information.
+    [TRACE] dlopen() [PID = 53633] - library = '/usr/lib/python3.8/lib-dynload/readline.cpython-38-x86_64-linux-gnu.so'  Ok 
+   >>> 
+
+
+   >>> import os 
+   >>> 
+   >>> os.getpid()
+   53633
+
+   >>> import dbus
+    [TRACE] dlopen() [PID = 53633] - library = '/usr/lib/python3/dist-packages/_dbus_bindings.cpython-38-x86_64-linux-gnu.so'  Ok 
+   >>> 
+
+   >>> import numpy
+    [TRACE] dlopen() [PID = 53633] - library = '/home/h03f8/.local/lib/python3.8/site-packages/numpy/core/_multiarray_umath.cpython-38-x86_64-linux-gnu.so'  Ok 
+    [TRACE] dlopen() [PID = 53633] - library = '/home/h03f8/.local/lib/python3.8/site-packages/numpy/core/_multiarray_tests.cpython-38-x86_64-linux-gnu.so'  Ok 
+    [TRACE] dlopen() [PID = 53633] - library = '/usr/lib/python3.8/lib-dynload/_ctypes.cpython-38-x86_64-linux-gnu.so'  Ok 
+    [TRACE] dlopen() [PID = 53633] - library = '(null)'  Ok 
+    [TRACE] dlopen() [PID = 53633] - library = '/home/h03f8/.local/lib/python3.8/site-packages/numpy/linalg/lapack_lite.cpython-38-x86_64-linux-gnu.so'  Ok 
+    [TRACE] dlopen() [PID = 53633] - library = '/home/h03f8/.local/lib/python3.8/site-packages/numpy/linalg/_umath_linalg.cpython-38-x86_64-linux-gnu.so'  Ok 
+    [TRACE] dlopen() [PID = 53633] - library = '/home/h03f8/.local/lib/python3.8/site-packages/numpy/fft/_pocketfft_internal.cpython-38-x86_64-linux-gnu.so'  Ok 
+    [TRACE] dlopen() [PID = 53633] - library = '/home/h03f8/.local/lib/python3.8/site-packages/numpy/random/mtrand.cpython-38-x86_64-linux-gnu.so'  Ok 
+    [TRACE] dlopen() [PID = 53633] - library = '/home/h03f8/.local/lib/python3.8/site-packages/numpy/random/bit_generator.cpython-38-x86_64-linux-gnu.so'  Ok 
+    [TRACE] dlopen() [PID = 53633] - library = '/home/h03f8/.local/lib/python3.8/site-packages/numpy/random/_common.cpython-38-x86_64-linux-gnu.so'  Ok 
+    [TRACE] dlopen() [PID = 53633] - library = '/home/h03f8/.local/lib/python3.8/site-packages/numpy/random/_bounded_integers.cpython-38-x86_64-linux-gnu.so'  Ok 
+    [TRACE] dlopen() [PID = 53633] - library = '/home/h03f8/.local/lib/python3.8/site-packages/numpy/random/_mt19937.cpython-38-x86_64-linux-gnu.so'  Ok 
+    [TRACE] dlopen() [PID = 53633] - library = '/home/h03f8/.local/lib/python3.8/site-packages/numpy/random/_philox.cpython-38-x86_64-linux-gnu.so'  Ok 
+    [TRACE] dlopen() [PID = 53633] - library = '/home/h03f8/.local/lib/python3.8/site-packages/numpy/random/_pcg64.cpython-38-x86_64-linux-gnu.so'  Ok 
+    [TRACE] dlopen() [PID = 53633] - library = '/home/h03f8/.local/lib/python3.8/site-packages/numpy/random/_sfc64.cpython-38-x86_64-linux-gnu.so'  Ok 
+    [TRACE] dlopen() [PID = 53633] - library = '/home/h03f8/.local/lib/python3.8/site-packages/numpy/random/_generator.cpython-38-x86_64-linux-gnu.so'  Ok 
+    [TRACE] dlopen() [PID = 53633] - library = '/usr/lib/python3.8/lib-dynload/_opcode.cpython-38-x86_64-linux-gnu.so'  Ok 
+
+#+END_SRC
+
+Experiment 2: View shared libraries loaded by a Ruby process (Rubyrepl irb).
+
+#+BEGIN_SRC sh 
+   $ >> env LD_PRELOAD=$PWD/dlopen_hook.so irb
+   [TRACE] Library loaded on process =>> pid = 53705 
+
+   [TRACE] dlopen() [PID = 53705] - library = '/usr/lib/x86_64-linux-gnu/ruby/2.7.0/enc/encdb.so'  Ok 
+   [TRACE] dlopen() [PID = 53705] - library = '/usr/lib/x86_64-linux-gnu/ruby/2.7.0/enc/trans/transdb.so'  Ok 
+   [TRACE] dlopen() [PID = 53705] - library = '/usr/lib/x86_64-linux-gnu/ruby/2.7.0/monitor.so'  Ok 
+   [TRACE] dlopen() [PID = 53705] - library = '/usr/lib/x86_64-linux-gnu/ruby/2.7.0/ripper.so'  Ok 
+   [TRACE] dlopen() [PID = 53705] - library = '/usr/lib/x86_64-linux-gnu/ruby/2.7.0/readline.so'  Ok 
+   [TRACE] dlopen() [PID = 53705] - library = '/usr/lib/x86_64-linux-gnu/ruby/2.7.0/io/console.so'  Ok 
+   [TRACE] dlopen() [PID = 53705] - library = '/usr/lib/x86_64-linux-gnu/ruby/2.7.0/pathname.so'  Ok 
+   [TRACE] dlopen() [PID = 53705] - library = '/usr/lib/x86_64-linux-gnu/ruby/2.7.0/etc.so'  Ok 
+  irb(main):001:0> 
+#+END_SRC
+
+Experiment 2: View shared libraries loaded by Kate editor 
+
+#+BEGIN_SRC sh 
+ $ >> env LD_PRELOAD=$PWD/dlopen_hook.so kate
+ [TRACE] Library loaded on process =>> pid = 54041 
+
+ [TRACE] dlopen() [PID = 54041] - library = '/usr/lib/x86_64-linux-gnu/qt5/plugins/platforms/libqxcb.so.avx2'  Ok 
+ [TRACE] dlopen() [PID = 54041] - library = '/usr/lib/x86_64-linux-gnu/qt5/plugins/platforms/libqxcb.so'  Ok 
+ [TRACE] dlopen() [PID = 54041] - library = 'libXcursor.so.1'  Ok 
+ [TRACE] dlopen() [PID = 54041] - library = '/usr/lib/x86_64-linux-gnu/qt5/plugins/platformthemes/KDEPlasmaPlatformTheme.so.avx2'  Ok 
+ [TRACE] dlopen() [PID = 54041] - library = '/usr/lib/x86_64-linux-gnu/qt5/plugins/platformthemes/KDEPlasmaPlatformTheme.so'  Ok 
+
+ ...  ...  ...  ...  ...  ...  ...  ...  ...  ...  ...  ...  ...  ... 
+ ...  ...  ...  ...  ...  ...  ...  ...  ...  ...  ...  ...  ...  ... 
+
+ [TRACE] dlopen() [PID = 54041] - library = 'libGLX_mesa.so.0'  Ok 
+ [TRACE] dlopen() [PID = 54041] - library = 'libGLX_mesa.so.0'  Ok 
+ [TRACE] dlopen() [PID = 54041] - library = '/usr/lib/x86_64-linux-gnu/dri/tls/iris_dri.so'  Ok 
+ [TRACE] dlopen() [PID = 54041] - library = '/usr/lib/x86_64-linux-gnu/dri/iris_dri.so'  Ok 
+ [TRACE] dlopen() [PID = 54041] - library = '/usr/lib/x86_64-linux-gnu/qt5/plugins/konsolepart.so.avx2'  Ok 
+ [TRACE] dlopen() [PID = 54041] - library = '/usr/lib/x86_64-linux-gnu/qt5/plugins/konsolepart.so'  Ok 
 #+END_SRC
 ** Launching processes with exec and fork system-call wrappers 
 
