@@ -91,9 +91,15 @@
   + [[https://linuxhint.com/vulkan-for-linux-users/][Vulkan for Linux Users – Linux Hint]] 
 
   + [[https://stackoverflow.com/questions/56766983/what-can-vulkan-do-specifically-that-opengl-4-6-cannot][What can Vulkan do specifically that OpenGL 4.6+ cannot? - Stack]]
+
+  + [[https://softwareengineering.stackexchange.com/questions/380832/opengl-and-global-state][design - OpenGL and global state - Software Engineering Stack Exchange]]
 ** OpenGL Terminology
 
-  + _OpenGL_ - Open Graphics Library 
+  + _OpenGL_ - Open Graphics Library
+
+  + [[http://glew.sourceforge.net/index.html][GLEW]] - OpenGL Extension Wrangler
+
+  + ARB - Architecture Review Board 
 
   + OpenGL _Immediate Mode_ (Fixed-Function Pipeline, Legacy OpenGL)
     * Also known as: Legacy OpenGL, Fixed-Function Pipeline 
@@ -231,6 +237,14 @@ OpenGL Loaders:
   + [[https://github.com/imakris/glatter][GitHub - imakris/glatter]]
     + "An OpenGL loading library, with support for GL, GLES, EGL, GLX and WGL"
 
+  + [[https://galogen.gpfault.net/][Galogen OpenGL Loader Generator]]
+    + "Galogen is an OpenGL loader generator. Given an API version and
+      a list of extensions, Galogen will produce corresponding headers
+      and code that load the exact OpenGL entry points you need. The
+      produced code can then be used directly by your C or C++
+      application, without having to link against any additional
+      libraries." 
+
   + [[https://github.com/SFML/SFML-glLoadGen][GitHub - SFML/SFML-glLoadGen]]
     + Customized glLoadGen for SFML
 
@@ -297,3 +311,318 @@ OpenGL Math and Matrix Transformations:
   + [[https://www.libsdl.org/release/SDL-1.2.15/docs/html/guidevideoopengl.html][Using OpenGL With SDL]] - LibSDL
 
   + [[https://www.khronos.org/opengl/wiki/Tutorial1:_Creating_a_Cross_Platform_OpenGL_3.2_Context_in_SDL_(C_/_SDL)][Tutorial1: Creating a Cross Platform OpenGL 3.2 Context in SDL (C / SDL) - OpenGL Wiki]]
+** Simple 2D drawing with modern OpenGL 
+
+This sample code draws a square, triangle and a chart using 2D
+coordinates and ignoring the Z axis. 
+
+Unlike legacy OpenGL (fixed-pipeline) that requires the calling code
+to call primitive rendering subroutines on every frame, which has a
+significant overhead, Modern OpenGL or retained-mode, uses buffer
+objects for storing data on the GPU memory and shaders, programs that
+runs on the GPU-side for processing vertexes and colors. The following
+code uses _VertexBufferObject_ class for encapsulating VBO - Vertex
+Buffer Objects. The challenging of dealing with VBOs is that, many of
+subroutines applicable to VBO modify global state and assumes that
+some global state is set, such as that the buffer object is bound. The
+effect of calling the subroutines depends on the state and the order
+that they were called.
+
+The code was tested on Ubuntu Linux 64 bits. On Windows, it requires
+GLEW for loading OpenGL function pointers. 
+
+ *Screenshot:*
+
+#+CAPTION: OpenGL simple 2D redering with VBO. 
+[[file:images/opengl-draw2d.png][file:images/opengl-draw2d.png]]
+
+
+ *Source Code* 
+
+
+File: _CMakeLists.txt_ 
+
+#+BEGIN_SRC cmake 
+  cmake_minimum_required(VERSION 3.5)
+  project(GLFW_project)
+
+  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_CXX_STANDARD_REQUIRED ON)
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+
+  #================ GLFW Settings  ===============#
+
+  find_package(OpenGL REQUIRED)
+
+  include(FetchContent)
+
+  # Set GLFW Options before FectchContent_MakeAvailable 
+  set( GLFW_BUILD_EXAMPLES OFF CACHE BOOL  "GLFW lib only" )
+  set( GLFW_BUILD_TESTS    OFF CACHE BOOL  "GLFW lib only" )
+  set( GLFW_BUILD_DOCS     OFF CACHE BOOL  "GLFW lib only" )
+  set( GLFW_BUILD_INSTALL  OFF CACHE BOOL  "GLFW lib only" )
+
+  # Donwload GLFW library
+  FetchContent_Declare(
+    glfwlib
+    URL   https://github.com/glfw/glfw/releases/download/3.3.2/glfw-3.3.2.zip
+  )
+  FetchContent_MakeAvailable(glfwlib)
+
+         add_executable( draw2d  draw2d.cpp )
+  target_link_libraries( draw2d  glfw OpenGL::GL GLU glut)
+#+END_SRC
+
+File: _draw2d.cpp_ 
+
+#+BEGIN_SRC cpp 
+  // Draw curve mapping buffer to the GPU.
+  #include <iostream>
+  #include <vector> 
+  #include <array>
+  #include <cmath>
+
+  // -------- OpenGL headers ---------//
+  //
+  #define GL_GLEXT_PROTOTYPES 1 // Necessary for OpenGL >= 3.0 functions
+  #define GL3_PROTOTYPES      1 // Necessary for OpenGL >= 3.0 functions
+
+  #include <GL/gl.h>
+  #include <GLFW/glfw3.h>
+
+  // #include <GL/glew.h>
+  #include <GL/glu.h>
+  #include <GL/glut.h>
+
+  // Makes a class non copiable. 
+  // Auomates the boilerplate code for 
+  // declaring a class as non-copiable 
+  #define CL_NON_COPIABLE( className )                  \
+      public:                                           \
+      className( className const&) = delete;            \
+      className& operator= (className const&) = delete; \
+      private:
+
+
+  // Class for encapsulating VBO - Vertex-Buffer Objects 
+  class VertexBufferObject
+  {
+      // Handle for Vertex-Buffer Object (Allocated on GPU memory)
+      GLuint  m_vbo = 0;
+      // Shader attribute location variable 
+      GLuint m_attr_location;
+
+      // Type of single component 
+      GLenum  m_type;
+      // Number of elements m_type of single component 
+      GLsizei m_size;    
+
+      CL_NON_COPIABLE(VertexBufferObject)
+  public:
+
+      VertexBufferObject(GLuint shader_attr_loc = 0)
+      { 
+          m_attr_location = shader_attr_loc;
+          ::glGenBuffers(1, &m_vbo);  
+
+          // --- Buffer Object Data Layout parameters ------//
+          //
+          // Type of single component 
+          GLenum  m_type;
+          // Number of elements m_type of single component 
+          GLsizei m_size;        
+      }
+
+      // Destructor 
+      ~VertexBufferObject(){ this->dispose();  }
+
+      GLuint id() const { return m_vbo; }
+
+      // Delete current buffer when no longer in use 
+      void dispose() 
+      {
+          ::glDeleteBuffers(1, &m_vbo);
+          m_vbo = 0;
+      }
+
+      // Make this buffer active only one buffer can be active at a time.
+      void bind() 
+      { 
+          glBindBuffer(GL_ARRAY_BUFFER, m_vbo); 
+          glEnableVertexAttribArray(m_attr_location);
+       }
+
+      // Unbind current buffer in order to avoid unintended behavior 
+      // due to the global state. 
+      void unbind() 
+      { 
+          glBindBuffer(GL_ARRAY_BUFFER, 0); 
+          glDisableVertexAttribArray(m_attr_location);
+      }
+
+      // Upload data to GPU - the data is often an array of POD types 
+      // POD (Plain-Old-Data) - any contiguous data without any internal pointer.
+      void send_data(void* pData, GLsizeiptr size)
+      {
+          this->bind();    
+          glBufferData(GL_ARRAY_BUFFER, size, pData, GL_STATIC_DRAW);
+          this->unbind();
+      }
+
+      // Map buffer to GPU memory. This method allows sending data directly 
+      // to the VBO by writing to the returned pointer.
+      // 
+      // @param size - Byte amount of memory allocated on the GPU-side.
+      void* map_buffer(GLsizeiptr size)
+      {
+          this->bind();
+          // Just reserver data, do not copy vertex points to GPU memory. 
+          glBufferData(GL_ARRAY_BUFFER, size, nullptr, GL_STATIC_DRAW);   
+          // Obtain pointer to buffer mapped to GPU memory.
+          void* ptr = glMapBuffer( GL_ARRAY_BUFFER, GL_WRITE_ONLY );
+          this->unbind();
+          return ptr;
+      }
+
+      template<typename T>
+      T* map_buffer_t(GLsizeiptr size)
+      { 
+          return reinterpret_cast<T*>(this->map_buffer(size));
+      }
+
+      // Note: It is assumed that shader program is bound before 
+      // calling this function. 
+      //
+      // shader_attr_location => Is attribute location of the Vertex Shader
+      // that will process the vertices.
+      void set_data_layout( GLenum type, GLint size) 
+      {
+          m_type = type; 
+          m_size = size;
+      }
+
+      void draw_arrays(GLenum draw_type, GLuint count)
+      {
+          this->bind();
+          // Describe data layout - binary format.
+          glVertexAttribPointer( m_attr_location, m_size, m_type, GL_FALSE, 0, nullptr);
+          // Performs drawing 
+          glDrawArrays( draw_type, 0, count);
+          this->unbind();
+      }
+  };
+
+  struct Vertex2D
+  {
+      GLfloat x;
+      GLfloat y;
+  };
+
+  int main(int argc, char** argv)
+  {
+      GLFWwindow* window;
+
+      /* Initialize the library */
+      if (!glfwInit())
+          return -1;
+
+      glutInit(&argc, argv);
+
+      /* Create a windowed mode window and its OpenGL context */
+      window = glfwCreateWindow(640, 480, "Sample 2D Drawing", NULL, NULL);
+      if (!window)
+      {
+          glfwTerminate();
+          return -1;
+      }
+
+      /* Make the window's context current */
+      glfwMakeContextCurrent(window);
+      // glClearColor(0.0f, 0.5f, 0.6f, 1.0f);
+      glClearColor(0.0f, 0.0f, 0.0, 1.0f);
+
+      constexpr size_t NPOINTS = 2000;
+
+      //------------- Vertex Buffer Object 1 -----------//
+      // => Note: anything vertex should be within the range -1.0 to 1.0 
+
+      VertexBufferObject vbo_chart{};
+      // Describe layout.
+      // Each vertex has 2 components (X, Y) of type GL_FLOAT 
+      vbo_chart.set_data_layout(GL_FLOAT, 2);
+
+      Vertex2D* chart = vbo_chart.map_buffer_t<Vertex2D>( NPOINTS * sizeof(Vertex2D) );
+
+      float x = 0.0;
+
+      //  Write data directly on GPU memory without copying any 
+      //  pre-allocated buffer on main-memory.
+      for(size_t k = 0; k < NPOINTS; k++)
+      {
+          x = (k - 1000.0) / 100.0;
+          chart[k].x = x;
+          chart[k].y = sin(x * 10.0) / (1.0 + x * x);
+      }
+
+      // ------------- Triangle / Vertex Buffer Object 2 ------------//
+      //      
+    
+      Vertex2D triangle_points[3] = {
+          Vertex2D{-0.25,   -0.25 }
+        , Vertex2D{ 0.00,    0.25 }
+        , Vertex2D{ 0.25,   -0.25 }
+      };
+
+      VertexBufferObject vbo_triangle{};
+      // Each vertex has 2 coordinates of type GL_FLOAT 
+      vbo_triangle.set_data_layout(GL_FLOAT, 2);
+      // Upload data to GPU 
+      vbo_triangle.send_data(triangle_points, sizeof(triangle_points));
+
+
+      // ---------- Square / Vertex Buffer Object 2 ------------//
+      //      
+    
+      Vertex2D square_points[4] = {
+          { -0.3,  -0.3 }
+        , { -0.3,   0.3 }
+        , {  0.3,   0.3 }
+        , {  0.3,  -0.3 }
+      };
+
+      auto vbo_square = VertexBufferObject{};
+      vbo_square.set_data_layout(GL_FLOAT, 2);
+      // Upload data to GPU 
+      vbo_square.send_data(square_points, sizeof(square_points));
+
+
+      //  ======= R E N D E R  - L O O P ============//
+      //
+      while ( !glfwWindowShouldClose(window) )
+      {
+          glClear(GL_COLOR_BUFFER_BIT);
+
+          // ====== BEGIN RENDERING ============//
+        
+          vbo_chart.draw_arrays(GL_LINE_STRIP, NPOINTS);
+          vbo_triangle.draw_arrays(GL_TRIANGLES, 3);
+          vbo_square.draw_arrays(GL_LINE_LOOP, 4);
+
+          // ====== END RENDERING ==============//
+
+          /* Swap front and back buffers */
+          glfwSwapBuffers(window);
+          /* Poll for and process events */
+          glfwPollEvents();
+
+          if( glfwGetKey(window, 'Q' ) == GLFW_PRESS )
+          {
+               std::cout << " [TRACE] User typed Q =>> Shutdown program. Ok. " << '\n';
+               break;
+          }
+      }
+
+      glfwTerminate();
+      return 0;
+  }
+#+END_SRC
