@@ -310,6 +310,429 @@ immediate-mode.
     + glPush()
     + glPushMatrix()
     + glPopMatrix()
+** Library GLM - OpenGL Math 
+
+The library GLM (OpenGL math library) contains many classes and
+subroutines for computer graphics computations, such as: homogeneous
+coordinates; quaternios; 1D, 2D, 3D and homogeneous coordinates
+vectors; vector-matrix operations and so on. Aside those facilities,
+the library also provides the subroutines _glm::lookAt()_, for computing
+view matrix transform, that turns world coordinates into camera
+coordinates; _glm::perspective()_ - for computing the projection matrix,
+that turns camera coordinates into clip-space coordinates (NDC
+coordinates with range -1.0 to 1.0) and also _glm::ortho_ for computing
+the orthogonal perspective matrix.
+
+Web Site: 
+
+  + [[https://glm.g-truc.net/0.9.9/index.html][OpenGL Mathematics]] 
+
+Repository:
+
+  + https://github.com/g-truc/glm
+
+
+Type signature of most relevant GLM functions: 
+
+#+BEGIN_SRC cpp 
+   // ------ Basic Matrix Transformation =>> Useful for model matrix ---------------//
+   float     glm::radians(foat  degrees);
+   glm::mat4 glm::rotate   ( glm::mat4 const & m, float angle, glm::vec3 const & axis );
+   glm::mat4 glm::scale    ( glm::mat4 const & m, glm::vec3 const & factors           );
+   glm::mat4 glm::translate( glm::mat4 const & m, glm::vec3 const & translation       );
+
+
+   // ---- Camera and  Perspective transformation matrices -------------//
+   glm::mat4 glm::lookAt( glm::vec3 const & eye, glm::vec3 const & look, glm::vec3 const & up ); 
+   glm::mat4 glm::ortho( float left, float right, float bottom, float top, float near, float far );
+   glm::mat4 glm::ortho( float left, float right, float bottom, float top );
+   glm::mat4 glm::frustum( float left, float right, float bottom, float top, float near, float far );
+   glm::mat4 glm::perspective( float fovy, float aspect, float near, float far);
+#+END_SRC
+
+
+ *Downloading* 
+
+#+BEGIN_SRC sh 
+   $ mkdir -p /tmp/temp && cd /temp
+  
+   # Download source code archive 
+   $ >> curl -o glm.zip -L https://github.com/g-truc/glm/archive/master.zip
+
+   # Extract code 
+   $ >> unzip  glm.zip
+ 
+   # Enter the in the extracted directory 
+   $ >> cd glm-master/
+
+   # List directory content 
+   $ >> ls
+   cmake/  CMakeLists.txt  copying.txt  doc/  glm/  manual.md  readme.md  test/  util/
+#+END_SRC
+
+ *Load the library in CERN's ROOT repl* 
+
+#+BEGIN_SRC cpp 
+    $ >> ~/Applications/root/bin/root 
+   ERROR in cling::CIFactory::createCI(): cannot extract standard library include paths!
+   Invoking:
+     LC_ALL=C ccache  -O2 -DNDEBUG -xc++ -E -v /dev/null 2>&1 | sed -n -e '/^.include/,${' -e '/^ \/.*++/p' -e '}'
+   Results was:
+   With exit code 0
+      ------------------------------------------------------------------
+     | Welcome to ROOT 6.22/02                        https://root.cern |
+     | (c) 1995-2020, The ROOT Team; conception: R. Brun, F. Rademakers |
+     | Built for linuxx8664gcc on Aug 17 2020, 12:46:52                 |
+     | From tags/v6-22-02@v6-22-02                                      |
+     | Try '.help', '.demo', '.license', '.credits', '.quit'/'.q'       |
+      ------------------------------------------------------------------
+
+   root [0] 
+
+   root [0] .I . 
+
+   root [0] .I . 
+   root [1] #include <glm/glm.hpp>
+   root [2] #include <glm/gtc/matrix_transform.hpp>
+   root [3] #include <glm/gtc/type_ptr.hpp>
+   root [4] #include <glm/gtx/string_cast.hpp>
+
+   // Note: GLM matrices are stored in Column-major order 
+   void show_matrix(const char* label, glm::mat4 const& m){
+       std::cout << "\n [MATRIX] " << label << " = " << '\n';
+       std::cout << std::fixed << std::setprecision(3);
+       for(size_t i = 0; i < 4; i++)
+       {
+           for(size_t j = 0; j < 4; j++)
+           {
+               std::cout << std::setw(8) << m[j][i];
+           }
+           std::cout << '\n';
+       }
+   }
+#+END_SRC
+
+Define a 4x4 homogenous coordinate matrix: 
+
+#+BEGIN_SRC cpp 
+   root [18] glm::mat4 mat{ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 };
+   root [19] 
+   root [19] mat
+   (glm::mat4 &) @0x7f904e6c2008
+
+
+   // Matrix is not what user expects as it is written in Column-major order 
+   root [20] show_matrix("mat", mat)
+
+    [MATRIX] mat = 
+      1.000   5.000   9.000  13.000
+      2.000   6.000  10.000  14.000
+      3.000   7.000  11.000  15.000
+      4.000   8.000  12.000  16.000
+   root [21] 
+
+   root [21] mat[0][0]
+   (float) 1.00000f
+
+   root [22] mat[0][1]
+   (float) 2.00000f
+
+   root [23] mat[0][2]
+   (float) 3.00000f
+
+   root [24] mat[0][3]
+   (float) 4.00000f
+
+   root [25] mat[3][3]
+   (float) 16.0000f
+
+   root [26] mat[2][0]
+   (float) 9.00000f
+
+   root [27] mat[2][1]
+   (float) 10.0000f
+#+END_SRC
+
+Obtain transpose matrix: 
+
+#+BEGIN_SRC cpp 
+  root [28] auto tmat = glm::transpose(mat)
+  (glm::mat<4, 4, float, glm::qualifier::packed_highp> &) @0x7f904e6c2058
+
+  root [29] show_matrix("tmat", tmat)
+
+   [MATRIX] tmat = 
+     1.000   2.000   3.000   4.000
+     5.000   6.000   7.000   8.000
+     9.000  10.000  11.000  12.000
+    13.000  14.000  15.000  16.000
+
+  root [33] tmat[0][0]
+  (float) 1.00000f
+
+  root [34] tmat[1][0]
+  (float) 2.00000f
+
+  root [35] tmat[2][0]
+  (float) 3.00000f
+
+  root [36] tmat[3][0]
+  (float) 4.00000f
+
+
+  root [37] tmat[0][0]
+  (float) 1.00000f
+
+  root [38] tmat[0][1]
+  (float) 5.00000f
+
+  root [39] tmat[0][2]
+  (float) 9.00000f
+
+  root [40] tmat[0][3]
+  (float) 13.0000f
+#+END_SRC
+
+Get pointer to first element: 
+
+#+BEGIN_SRC cpp 
+  root [41] float* ptr = glm::value_ptr(tmat)
+  (float *) 0x7f904e6c2058
+
+  root [42] ptr[0]
+  (float) 1.00000f
+
+  root [43] ptr[1]
+  (float) 5.00000f
+
+  root [44] ptr[2]
+  (float) 9.00000f
+
+  root [45] ptr[3]
+  (float) 13.0000f
+
+  root [46] ptr[4]
+  (float) 2.00000f
+
+  root [47] ptr[5]
+  (float) 6.00000f
+
+  root [48] ptr[6]
+  (float) 10.0000f
+
+  root [49] ptr[7]
+  (float) 14.0000f
+
+  root [50] ptr[8]
+  (float) 3.00000f
+#+END_SRC
+
+Null 4x4 matrix: 
+
+#+BEGIN_SRC cpp 
+   root [53] auto zero_4x4 = glm::mat4()
+   (glm::mat<4, 4, float, glm::qualifier::packed_highp> &) @0x7f904e6c20e0
+
+   root [54] show_matrix("zero_4x4", zero_4x4)
+
+    [MATRIX] zero_4x4 = 
+      0.000   0.000   0.000   0.000
+      0.000   0.000   0.000   0.000
+      0.000   0.000   0.000   0.000
+      0.000   0.000   0.000   0.000
+#+END_SRC
+
+Identity matrix: 
+
+#+BEGIN_SRC cpp 
+  root [55] auto id_4x4 = glm::mat4(1.0)
+  (glm::mat<4, 4, float, glm::qualifier::packed_highp> &) @0x7f904e6c2120
+  root [56] 
+  root [56] show_matrix("id_4x4", id_4x4)
+
+   [MATRIX] id_4x4 = 
+     1.000   0.000   0.000   0.000
+     0.000   1.000   0.000   0.000
+     0.000   0.000   1.000   0.000
+     0.000   0.000   0.000   1.000
+#+END_SRC
+
+Matrix translation coordinate transform: 
+
+#+BEGIN_SRC cpp 
+  root [58] auto t1 = glm::translate(id_4x4, glm::vec3(2.0, 10.0, 30.0))
+  (glm::mat<4, 4, float, glm::qualifier::packed_highp> &) @0x7f904e6c2160
+
+  root [59] show_matrix("t1", t1)
+
+   [MATRIX] t1 = 
+     1.000   0.000   0.000   2.000
+     0.000   1.000   0.000  10.000
+     0.000   0.000   1.000  30.000
+     0.000   0.000   0.000   1.000
+
+
+  root [62] auto t2 = glm::translate(t1, glm::vec3(-10, 100.0, 200.0))
+  (glm::mat<4, 4, float, glm::qualifier::packed_highp> &) @0x7f904e6c21a0
+
+  root [63] show_matrix("t2", t2)
+
+   [MATRIX] t2 = 
+     1.000   0.000   0.000  -8.000
+     0.000   1.000   0.000 110.000
+     0.000   0.000   1.000 230.000
+     0.000   0.000   0.000   1.000
+#+END_SRC
+
+Rotation around Z axis of 90 degrees: 
+
+  + glm::mat4 glm::rotate(glm::mat4 const& matrix, float angle_radians, glm::vec3 const& axis)
+  + Rotate around a given axis. The angle is given in radians.
+
+#+BEGIN_SRC cpp 
+  root [65] const auto axis_z = glm::vec3(0.0f, 0.0f, 1.0f);
+  root [66] const auto axis_y = glm::vec3(0.0f, 1.0f, 0.0f);
+  root [67] const auto axis_x = glm::vec3(1.0f, 0.0f, 0.0f);
+
+
+  /*          | cos(t)  -sin(t)   0   0  |
+   *          | sin(t)   cos(t)   0   0  |
+   *  Rz(t) = |  0        0       1   0  |
+   *          |  0        0       0   1  |
+   * 
+   *  
+   *  t_rotZ = Rz(90) x id_4x4 = Rz(90)
+   */
+  root [71] auto t_rotZ = glm::rotate(id_4x4, glm::radians(90.0f), axis_z)
+  (glm::mat<4, 4, float, glm::qualifier::packed_highp> &) @0x7f904e6c2204
+
+  root [72] show_matrix("t_rotZ", t_rotZ)
+
+   [MATRIX] t_rotZ = 
+    -0.000  -1.000   0.000   0.000
+     1.000  -0.000   0.000   0.000
+     0.000   0.000   1.000   0.000
+     0.000   0.000   0.000   1.000
+  root [73] 
+
+   root [96] glm::to_string(t_rotZ)
+   (std::string) "mat4x4((-0.000000, 1.000000, 0.000000, 0.000000), ... "
+   root [97] 
+#+END_SRC
+
+Scaling transformation: 
+
+#+BEGIN_SRC cpp 
+   root [75] auto s1 = glm::scale(id_4x4, glm::vec3(2.0, 2.0, 2.0))
+   (glm::mat<4, 4, float, glm::qualifier::packed_highp> &) @0x7f904e6c2244
+
+   root [76] show_matrix("s1", s1)
+
+    [MATRIX] s1 = 
+      2.000   0.000   0.000   0.000
+      0.000   2.000   0.000   0.000
+      0.000   0.000   2.000   0.000
+      0.000   0.000   0.000   1.000
+
+   root [78] s1 = glm::scale(s1, glm::vec3(5.0, 5.0, 5.0))
+   (glm::mat &) @0x7f904e6c2244
+
+   root [79] show_matrix("s1", s1)
+
+    [MATRIX] s1 = 
+     10.000   0.000   0.000   0.000
+      0.000  10.000   0.000   0.000
+      0.000   0.000  10.000   0.000
+      0.000   0.000   0.000   1.000
+   root [80] 
+
+   // Apply transform to vector: 
+
+   root [82] auto res = s1 * glm::vec4(2.0, 5.0, 10.0, 1.0)
+   (glm::vec<4, float, glm::qualifier::packed_highp> &) @0x7f904e6c2284
+
+   root [91] glm::to_string(res)
+   (std::string) "vec4(20.000000, 50.000000, 100.000000, 1.000000)"
+
+   root [92] res[0]
+   (float) 20.0000f
+
+   root [93] res[1]
+   (float) 50.0000f
+
+   root [94] res[2]
+   (float) 100.000f
+
+   root [95] res[3]
+   (float) 1.00000f
+#+END_SRC
+
+Scaling transformation: 
+
+#+BEGIN_SRC cpp 
+   root [97] auto s = glm::scale(id_4x4, glm::vec3(4.0, 5.0, 6.0))
+   (glm::mat<4, 4, float, glm::qualifier::packed_highp> &) @0x7f904e6c22a4
+
+   root [98] show_matrix("s", s)
+
+    [MATRIX] s = 
+      4.000   0.000   0.000   0.000
+      0.000   5.000   0.000   0.000
+      0.000   0.000   6.000   0.000
+      0.000   0.000   0.000   1.000
+   root [99] 
+   root [99] s = glm::translate(s, glm::vec3(4, -5, 9))
+   (glm::mat &) @0x7f904e6c22a4
+
+
+   root [100] show_matrix("s", s)
+
+    [MATRIX] s = 
+      4.000   0.000   0.000  16.000
+      0.000   5.000   0.000 -25.000
+      0.000   0.000   6.000  54.000
+      0.000   0.000   0.000   1.000
+   root [101] 
+
+
+   root [105] s = glm::scale(s, glm::vec3(5.0, 2.0, 3.0))
+   (glm::mat &) @0x7f904e6c22a4
+
+
+   root [106] show_matrix("s", s)
+
+    [MATRIX] s = 
+     25.000   0.000   0.000  20.000
+      0.000   4.000   0.000 -10.000
+      0.000   0.000   9.000  27.000
+      0.000   0.000   0.000   1.000
+#+END_SRC
+
+Inverse matrix: 
+
+#+BEGIN_SRC cpp 
+   root [111] show_matrix("s", s)
+
+    [MATRIX] s = 
+     25.000   0.000   0.000  20.000
+      0.000   4.000   0.000 -10.000
+      0.000   0.000   9.000  27.000
+      0.000   0.000   0.000   1.000
+
+   root [112] inv_s = glm::inverse(s)
+   (glm::mat<4, 4, float, glm::qualifier::packed_highp> &) @0x7f904e6c2324
+
+   root [113] show_matrix("inv_s", inv_s)
+
+    [MATRIX] inv_s = 
+      0.040  -0.000   0.000  -0.800
+     -0.000   0.250  -0.000   2.500
+      0.000  -0.000   0.111  -3.000
+     -0.000   0.000  -0.000   1.000
+   root [114] 
+   root [114] 
+
+#+END_SRC
 ** Simple 2D draphics - no VBO abstraction 
 
 The following code draws a square and a triangle using the OpenGL
