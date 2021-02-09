@@ -1050,7 +1050,7 @@ File: _CMakeLists.txt_
 
 #+BEGIN_SRC cmake 
   cmake_minimum_required(VERSION 3.5)
-  project(GLFW_project)
+  project(draw2d)
 
   set(CMAKE_CXX_STANDARD 17)
   set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -1330,5 +1330,404 @@ File: _draw2d.cpp_
 
       glfwTerminate();
       return 0;
+  }
+#+END_SRC
+** Simple 2D graphics - using VAO 
+
+A VAO (Vertex Array Object) is an object that stores all the
+information necessary to render a VBO (Vertex Buffer Object). For
+instance, a VAO allows rendering the data, by performing the following
+set of operations only once: 1 - binding the VAO; 2 - binding the
+buffer via glBindBuffer() call; 3 - enabling the vertex attribute via
+glEnableVertexAttribArray(); 4 - setting the data layout by calling
+glVertexAttribPointer() subroutine. Without a VAO, all those
+subroutines would need to be called on every frame rendering.
+
+Algorithm for VAO usage: 
+
+ + Setup 
+
+#+BEGIN_SRC cpp 
+   // Shader attribute location 
+   GLint shader_attr = 1;
+
+   // -------------- Setup VAO --------------------// 
+   // 
+   GLuint vao;
+   glGenVertexArrays(1, &vao); // Instantiate VAO 
+
+   GLuint vbo;
+   glGenBuffers(1, &vbo);              
+   // Bind VBO (Recorded by VAO)
+   glBindBuffer(GL_ARRAY_BUFFER, vbo); 
+
+   // Upload data to GPU 
+   glBufferData(GL_ARRAY_BUFFER, buffer_size, buffer, GL_STATIC_DRAW);  
+
+   glEnableVertexAttribArray(shader_attr);
+
+   // Set buffer data layout (Recorded by VAO)
+   glVertexAttribPointer(shader_attr, size, type, GL_FALSE, 0, nullptr);    
+
+   // ------- Disable Global state ---------// 
+
+   // Unbind VAO 
+   glBindVertexArray(0);
+   // Unbind VBO 
+   glBindBuffer(GL_ARRAY_BUFFER, vbo);
+   // Disable current shader attribute 
+   glDisableVertexAttribArray(shader_attr);
+#+END_SRC
+
+ + Rendering loop 
+
+#+BEGIN_SRC cpp 
+         ... ...         ... ...         ... ...
+         ... ...         ... ...         ... ...      
+
+    //  ======= R E N D E R  - L O O P ============//
+    //                                             //
+    while ( !glfwWindowShouldClose(window) )
+    {
+        glClear(GL_COLOR_BUFFER_BIT);
+         ... ...         ... ...         ... ...
+         ... ...         ... ...         ... ...
+
+         glBindVertexArray(vao);
+         glDrawArrays(GL_LINE_LOOP, 0, NUMBER_OF_VERTICES);
+
+         glBindVertexArray(vao1);
+         glDrawArrays(GL_LINE_TRIANGLES, 0, NUMBER_OF_VERTICES_1);
+
+         glBindVertexArray(vao2);
+         glDrawArrays(GL_LINES, 0, NUMBER_OF_VERTICES_2);
+
+         ... ...         ... ...         ... ...
+         ... ...         ... ...         ... ...
+
+        /* Swap front and back buffers */
+        glfwSwapBuffers(window);
+        /* Poll for and process events */
+        glfwPollEvents();
+    }
+#+END_SRC
+
+
+ *Further Reading* 
+
+  + [[https://www.khronos.org/opengl/wiki/Tutorial2:_VAOs,_VBOs,_Vertex_and_Fragment_Shaders_(C_/_SDL)][Tutorial2: VAOs, VBOs, Vertex and Fragment Shaders (C / SDL) - OpenGL Wiki]]
+
+  + [[https://stackoverflow.com/questions/28270954/process-of-setting-up-a-vao-in-opengl][c++ - Process of setting up a VAO in OpenGL - Stack Overflow]]
+
+  + [[https://stackoverflow.com/questions/8923174/opengl-vao-best-practices][OpenGL VAO best practices - Stack Overflow]]
+
+  + [[https://computergraphics.stackexchange.com/questions/5895/what-is-an-opengl-vao-in-a-nutshell][vertex buffer object - What is an OpenGL VAO in a nutshell?]]  -
+    Computer Graphics Stack Exchange 
+
+  + [[https://gamedev.stackexchange.com/questions/92832/in-opengl-whats-quicker-lots-of-smaller-vaos-or-one-large-one-updated-each-fr][performance - In OpenGL what's quicker]] - , lots of smaller VAOs,
+    or one large one updated each frame? - Game Development Stack
+    Exchange.
+
+  + [[https://stackoverflow.com/questions/18485381/opengl-how-many-vaos][OpenGL How Many VAOs - Stack Overflow]] 
+
+ 
+  *Screenshot* 
+
+#+CAPTION: 2D OpenGL draw using VAO - Vertex Array Object 
+[[file:images/opengl-draw2-vao.png][file:images/opengl-draw2-vao.png]]
+ 
+  *Sample Code* 
+
+File: CMakeLists.txt 
+
+#+BEGIN_SRC cmake 
+    cmake_minimum_required(VERSION 3.5)
+    project(draw2d)
+
+    set(CMAKE_CXX_STANDARD 17)
+    set(CMAKE_CXX_STANDARD_REQUIRED ON)
+    set(CMAKE_VERBOSE_MAKEFILE ON)
+
+    #================ GLFW Settings  ===============#
+
+    find_package(OpenGL REQUIRED)
+
+    include(FetchContent)
+
+    # Set GLFW Options before FectchContent_MakeAvailable 
+    set( GLFW_BUILD_EXAMPLES OFF CACHE BOOL  "GLFW lib only" )
+    set( GLFW_BUILD_TESTS    OFF CACHE BOOL  "GLFW lib only" )
+    set( GLFW_BUILD_DOCS     OFF CACHE BOOL  "GLFW lib only" )
+    set( GLFW_BUILD_INSTALL  OFF CACHE BOOL  "GLFW lib only" )
+
+    # Donwload GLFW library
+    FetchContent_Declare(
+      glfwlib
+      URL   https://github.com/glfw/glfw/releases/download/3.3.2/glfw-3.3.2.zip
+    )
+    FetchContent_MakeAvailable(glfwlib)
+
+           add_executable( draw2d-vao  draw2d-vao.cpp )
+    target_link_libraries( draw2d-vao  glfw OpenGL::GL GLU)
+#+END_SRC
+
+File: _draw2d-vao.cpp_ 
+
+#+BEGIN_SRC cpp 
+  // Draw curve mapping buffer to the GPU.
+  #include <iostream>
+  #include <vector> 
+  #include <array>
+  #include <cmath>
+  #include <cassert>
+
+  // -------- OpenGL headers ---------//
+  //
+  #define GL_GLEXT_PROTOTYPES 1 // Necessary for OpenGL >= 3.0 functions
+  #define GL3_PROTOTYPES      1 // Necessary for OpenGL >= 3.0 functions
+
+  #include <GL/gl.h>
+  #include <GLFW/glfw3.h>
+
+  // #include <GL/glew.h>
+  #include <GL/glu.h>
+  #include <GL/glut.h>
+
+
+  struct Vertex2D
+  {
+      GLfloat x;
+      GLfloat y;
+  };
+
+  // Upload buffer from main memory to GPU VBO 
+  // =>> Parameters VAO, VBO are allocated by the caller. 
+  void send_buffer(   GLuint* pVao        // Pointer to VAO (Vertex Array Object) - allocated by caller 
+                    , GLuint* pVbo        // Pointer to VBO (Vertex Buffer Object) - allocated by caller
+                    , GLsizei sizeBuffer  // Total buffer size in bytes
+                    , void*   pBufffer    // Pointer to buffer 
+                    , GLint   shader_attr // Shader attribute location 
+                    , GLint   size        // Number of coordinates of a given vertex                  
+                    , GLenum  type        // Type of each element coordinate 
+                    );
+
+  void* map_buffer( GLuint* pVao         // Pointer to VAO - allocated by calling code.
+                  , GLuint* pVbo         // Pointer to VBO - allocated by calling code.
+                  , GLsizei data_size    // Total size in bytes that is allocated to buffer 
+                  , GLint   shader_attr  // Shadder attribute location id (0 - zero) is there is no shader.
+                  , GLint   size         // Number of component of each vertex 
+                  , GLenum  type         // Type of each vertex element 
+                  );
+
+
+  int main(int argc, char** argv)
+  {
+      GLFWwindow* window;
+
+      /* Initialize the library */
+      if (!glfwInit())
+          return -1;
+
+      glutInit(&argc, argv);
+
+      /* Create a windowed mode window and its OpenGL context */
+      window = glfwCreateWindow(640, 480, "2D Drawing using VAO", NULL, NULL);
+      if (!window)
+      {
+          glfwTerminate();
+          return -1;
+      }
+
+      /* Make the window's context current */
+      glfwMakeContextCurrent(window);
+      // glClearColor(0.0f, 0.5f, 0.6f, 1.0f);
+      glClearColor(0.0f, 0.0f, 0.0, 1.0f);
+
+      // Shader attribute location (default 0)
+      GLint shader_attr = 0;
+
+    
+      // ================ Square / Vertex Buffer Object 2 ==================//
+      //      
+
+      Vertex2D square_points[4] = {
+          { -0.3,  -0.3 }
+        , { -0.3,   0.3 }
+        , {  0.3,   0.3 }
+        , {  0.3,  -0.3 }
+      };
+
+      GLuint vao_square = 0; 
+      GLuint vbo_square = 0;
+
+      // Upload square_points buffer data to GPU 
+      send_buffer( &vao_square, &vbo_square, sizeof(square_points)
+                  , square_points, shader_attr, 2, GL_FLOAT );
+    
+      assert( vao_square != 0 );
+      assert( vbo_square != 0 );    
+    
+      std::fprintf( stderr, " [TRACE] vao_square = %d, vbo_square = %d \n"
+                   , vao_square, vbo_square);
+
+
+      // ============== Circle / Vertex Buffer Object 3 ==================//
+      //      
+      GLuint vao_circle = 0; 
+      GLuint vbo_circle = 0;
+    
+      // Number of vertices to used to render the circle. 
+      constexpr size_t N_CIRCLE = 100;
+      constexpr float  PI       = 3.1415927;
+      const     float  radius   = 0.75;
+
+      // C-style cast should not be used here 
+      Vertex2D* pCursor = (Vertex2D*) map_buffer( &vao_circle, &vbo_circle, N_CIRCLE * sizeof(Vertex2D)
+                                                , shader_attr, 2, GL_FLOAT );
+
+      float angle = 0.0;
+      const float step = 2 * PI / N_CIRCLE;
+
+      for(size_t n = 0; n < N_CIRCLE; n++)
+      {
+          pCursor[n].x = radius * cosf( angle );
+          pCursor[n].y = radius * sinf( angle );
+          angle = angle + step;
+      }
+ 
+
+      //  ======= R E N D E R  - L O O P ============//
+      //                                             //
+      while ( !glfwWindowShouldClose(window) )
+      {
+          glClear(GL_COLOR_BUFFER_BIT);
+
+          // ====== BEGIN RENDERING ============//
+
+              //------------ Draw Square -------------------------//
+              //            
+               glBindVertexArray(vao_square);
+              // Plot 4 vertices 
+              glDrawArrays(GL_LINE_LOOP, 0, 4);
+              // Unbind vao (restore global state to default value)
+              glBindVertexArray(0);
+
+              //------------ Draw Circle -------------------------//
+              //            
+              glBindVertexArray(vao_circle);
+              glDrawArrays(GL_LINE_LOOP, 0, N_CIRCLE);
+              glBindVertexArray(0);
+
+          // ====== END RENDERING ==============//
+
+          /* Swap front and back buffers */
+          glfwSwapBuffers(window);
+          /* Poll for and process events */
+          glfwPollEvents();
+
+          if( glfwGetKey(window, 'Q' ) == GLFW_PRESS )
+          {
+               std::cout << " [TRACE] User typed Q =>> Shutdown program. Ok. " << '\n';
+               break;
+          }
+      }
+
+      // ---------- Dispose Buffer Objects ---------// 
+      glDeleteBuffers(1, &vbo_square);
+      glDeleteBuffers(1, &vbo_circle);
+
+      glfwTerminate();
+      return 0;
+  }
+
+  // ---------- I M P L E M E N T A T I O N S ------------------// 
+  //                                                            // 
+
+  // Upload buffer from main memory to GPU VBO 
+  // =>> Parameters VAO, VBO are allocated by the caller. 
+  void send_buffer(   GLuint* pVao        // Pointer to VAO (Vertex Array Object) - allocated by caller 
+                    , GLuint* pVbo        // Pointer to VBO (Vertex Buffer Object) - allocated by caller
+                    , GLsizei sizeBuffer  // Total buffer size in bytes
+                    , void*   pBufffer    // Pointer to buffer 
+                    , GLint   shader_attr // Shader attribute location id 
+                    , GLint   size        // Number of coordinates of a given vertex
+                    , GLenum  type        // Type of each element coordinate                   
+                    )
+  {
+      assert(pVao != nullptr);
+      assert(pVbo != nullptr);
+      GLuint& vao = *pVao;
+      GLuint& vbo = *pVbo;
+
+      // Generate and bind current VAO (Vertex Array Object)
+      glGenVertexArrays(1, &vao);
+      glBindVertexArray(vao);
+
+      // Generate and bind current VBO (Vertex Buffer Object)
+      glGenBuffers(1, &vbo);
+      glBindBuffer(GL_ARRAY_BUFFER, vbo);
+
+      // Upload data to current VBO buffer in GPU 
+      glBufferData(GL_ARRAY_BUFFER, sizeBuffer, pBufffer, GL_STATIC_DRAW);   
+
+      glEnableVertexAttribArray(shader_attr);
+    
+      // Set data layout - how data will be interpreted.
+      glVertexAttribPointer(shader_attr, size, type, GL_FALSE, 0, nullptr);
+
+      // ------ Disable Global state set by this function -----//
+      // 
+      // Unbind VAO 
+      glBindVertexArray(0);
+      // Unbind VBO 
+      glBindBuffer(GL_ARRAY_BUFFER, vbo);
+      // Disable current shader attribute 
+      glDisableVertexAttribArray(shader_attr);
+
+  }
+
+  void* map_buffer( GLuint* pVao         // Pointer to VAO - allocated by calling code.
+                  , GLuint* pVbo         // Pointer to VBO - allocated by calling code.
+                  , GLsizei data_size    // Total size in bytes that is allocated to buffer 
+                  , GLint   shader_attr  // Shadder attribute location id (0 - zero) is there is no shader.
+                  , GLint   size         // Number of component of each vertex 
+                  , GLenum  type         // Type of each vertex element 
+                  )
+  {
+      GLuint& vao = *pVao;
+      GLuint& vbo = *pVbo;
+
+      // Generate and bind current VAO (Vertex Array Object)
+      glGenVertexArrays(1, &vao);
+      glBindVertexArray(vao);
+
+      // Generate and bind current VBO (Vertex Buffer Object)
+      glGenBuffers(1, &vbo);
+      glBindBuffer(GL_ARRAY_BUFFER, vbo);
+
+      /** See: https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/glMapBuffer.xhtml
+       ,*  Khronos Group: "glMapBuffer and glMapNamedBuffer map the entire data store of 
+       ,*  a specified buffer object into the client's address space. The data can then be directly 
+       ,*  read and/or written relative to the returned pointer, 
+       ,*  depending on the specified access policy."
+       ,*/
+      glBufferData(GL_ARRAY_BUFFER, data_size, nullptr, GL_STATIC_DRAW);   
+      void* pbuffer = glMapBuffer( GL_ARRAY_BUFFER, GL_WRITE_ONLY );
+
+      glEnableVertexAttribArray(shader_attr);
+      // Set data layout - how data will be interpreted.
+      glVertexAttribPointer(shader_attr, size, type, GL_FALSE, 0, nullptr);    
+
+      // ------ Disable Global state set by this function -----//
+      // 
+      // Unbind VAO 
+      glBindVertexArray(0);
+      // Unbind VBO 
+      glBindBuffer(GL_ARRAY_BUFFER, vbo);
+      // Disable current shader attribute 
+      glDisableVertexAttribArray(shader_attr);
+
+      // ------- Return --------------------------------------//
+      return pbuffer;
   }
 #+END_SRC
