@@ -200,7 +200,6 @@ immediate-mode.
     + glPushMatrix()
     + glPopMatrix()
 
-  
 ** OpenGL companion libraries 
 
   *OpenGL Companion Libraries* 
@@ -311,7 +310,238 @@ OpenGL Math and Matrix Transformations:
   + [[https://www.libsdl.org/release/SDL-1.2.15/docs/html/guidevideoopengl.html][Using OpenGL With SDL]] - LibSDL
 
   + [[https://www.khronos.org/opengl/wiki/Tutorial1:_Creating_a_Cross_Platform_OpenGL_3.2_Context_in_SDL_(C_/_SDL)][Tutorial1: Creating a Cross Platform OpenGL 3.2 Context in SDL (C / SDL) - OpenGL Wiki]]
-** Simple 2D drawing with modern OpenGL 
+** Simple 2D draphics - no VBO abstraction 
+
+The following code draws a square and a triangle using the OpenGL
+retained mode API. Before the rendering takes place, data must be
+upload to the VBO (Vertex Buffer Object), allocated on the GPU-side,
+via _glBufferData()_ call that sends the data to the previous bound VBO
+through _glBindBuffer()_ call. Then, on the rendering loop and on every
+frame, the buffer data layout must described with
+_glVertexAttribPointer()_ before drawing via call to _glDrawArrays()_
+subroutine, which draw vertices from the current bound buffer. 
+
+Subroutines that modifies global state may cause unintended behavior,
+so it is a good practice to unset the affected global state when the
+current global state is no longer needed. For instance, if the current
+VBO no longer needs to be bound, this global state can be disabled by
+calling /glBindBuffer(GL_ARRAY_BUFFER, 0)/.
+
+
+  *Screenshot* 
+
+[[file:images/opengl-draw2d-raw.png][file:images/opengl-draw2d-raw.png]]
+
+  *Source Code* 
+
+File: _CMakeLists.txt_ 
+
+#+BEGIN_SRC cmake 
+  cmake_minimum_required(VERSION 3.5)
+  project(GLFW_project)
+
+  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_CXX_STANDARD_REQUIRED ON)
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+
+  #================ GLFW Settings  ===============#
+
+  find_package(OpenGL REQUIRED)
+
+  include(FetchContent)
+
+  # Set GLFW Options before FectchContent_MakeAvailable 
+  set( GLFW_BUILD_EXAMPLES OFF CACHE BOOL  "GLFW lib only" )
+  set( GLFW_BUILD_TESTS    OFF CACHE BOOL  "GLFW lib only" )
+  set( GLFW_BUILD_DOCS     OFF CACHE BOOL  "GLFW lib only" )
+  set( GLFW_BUILD_INSTALL  OFF CACHE BOOL  "GLFW lib only" )
+
+  # Donwload GLFW library
+  FetchContent_Declare(
+    glfwlib
+    URL   https://github.com/glfw/glfw/releases/download/3.3.2/glfw-3.3.2.zip
+  )
+  FetchContent_MakeAvailable(glfwlib)
+
+         add_executable( draw2d-raw  draw2d-raw.cpp )
+  target_link_libraries( draw2d-raw  glfw OpenGL::GL GLU)
+#+END_SRC
+
+File: _draw2d-raw.cpp_ 
+
+#+BEGIN_SRC cpp 
+  // Draw curve mapping buffer to the GPU.
+  #include <iostream>
+  #include <vector> 
+  #include <array>
+  #include <cmath>
+  #include <cassert>
+
+  // -------- OpenGL headers ---------//
+  //
+  #define GL_GLEXT_PROTOTYPES 1 // Necessary for OpenGL >= 3.0 functions
+  #define GL3_PROTOTYPES      1 // Necessary for OpenGL >= 3.0 functions
+
+  #include <GL/gl.h>
+  #include <GLFW/glfw3.h>
+
+  // #include <GL/glew.h>
+  #include <GL/glu.h>
+  #include <GL/glut.h>
+
+
+  struct Vertex2D
+  {
+      GLfloat x;
+      GLfloat y;
+  };
+
+  int main(int argc, char** argv)
+  {
+      GLFWwindow* window;
+
+      /* Initialize the library */
+      if (!glfwInit())
+          return -1;
+
+      glutInit(&argc, argv);
+
+      /* Create a windowed mode window and its OpenGL context */
+      window = glfwCreateWindow(640, 480, "2D Drawing raw VBO buffers", NULL, NULL);
+      if (!window)
+      {
+          glfwTerminate();
+          return -1;
+      }
+
+      /* Make the window's context current */
+      glfwMakeContextCurrent(window);
+      // glClearColor(0.0f, 0.5f, 0.6f, 1.0f);
+      glClearColor(0.0f, 0.0f, 0.0, 1.0f);
+
+
+      Vertex2D triangle_points[3] = {
+          Vertex2D{-0.25,   -0.25}
+        , Vertex2D{ 0.00,   0.25}
+        , Vertex2D{ 0.25,  -0.25}
+      };
+
+      Vertex2D square_points[4] = {
+          { -0.3,  -0.3 }
+        , { -0.3,   0.3 }
+        , {  0.3,   0.3 }
+        , {  0.3,  -0.3 }
+      };
+
+      // ================== Triangle Buffer ====================//
+      //
+
+      GLuint vbo_triangle_ = 0;
+    
+      // Create an OpenGL VBO buffer 
+      // =>> void glGenBuffers (GLsizei n, GLuint *buffers);
+      glGenBuffers(  1                // Number of buffers that will be instantiated
+                   , &vbo_triangle_   // Address of first element or address of array 
+                                      // that results will be written to.
+                   );
+      assert( vbo_triangle_ != 0 );
+
+      // Set this buffer as the current buffer - Only one buffer can be bound at a time. 
+      // =>> void glBindBuffer (GLenum target, GLuint buffer)
+      glBindBuffer(GL_ARRAY_BUFFER, vbo_triangle_);
+
+      // Upload data to current VBO buffer in GPU 
+      glBufferData(GL_ARRAY_BUFFER, sizeof(triangle_points), triangle_points, GL_STATIC_DRAW);   
+
+      // Unbind current buffer in order to avoid unintended behaviors
+      // as the subroutine glBindBuffer() modifies has a global state.
+      glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+      // ================ Square / Vertex Buffer Object 2 ==================//
+      //      
+
+      GLuint vbo_square_ = 0;
+      // Instiate buffer - gets a handle or token for 
+      // a buffer allocated on GPU-side.
+      glGenBuffers(1, &vbo_square_);
+      // Check for error 
+      assert( vbo_square_ != 0);
+      // Bind Current buffer (Affects global state)
+      glBindBuffer(GL_ARRAY_BUFFER, vbo_square_);
+      // Upload data to the GPU 
+      glBufferData(GL_ARRAY_BUFFER, sizeof(square_points), square_points, GL_STATIC_DRAW);   
+      // Unbind buffer 
+      glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+      GLint shader_attr = 0;
+
+      //  ======= R E N D E R  - L O O P ============//
+      //
+      while ( !glfwWindowShouldClose(window) )
+      {
+          glClear(GL_COLOR_BUFFER_BIT);
+
+          // ====== BEGIN RENDERING ============//
+
+              // ------------ Draw triangle --------------//
+              //
+              glBindBuffer(GL_ARRAY_BUFFER, vbo_triangle_);
+              glEnableVertexAttribArray(shader_attr);
+
+              // Describe buffer data layout (binary layout)
+              // =>> glVertexAttribPointer ( GLuint index, GLint size, GLenum type
+              //                           , GLboolean normalized, GLsizei stride, const void *pointer);
+              //
+              glVertexAttribPointer(shader_attr // GLint  index         => Shader attribute location, 0 for now 
+                                  , 2           // GLint  size          => 2 components (X, Y) of type GLfloat
+                                  , GL_FLOAT    // GLemum type          => Type of each component  
+                                  , GL_FALSE    // GLboolean normalized  
+                                  , 0           // GLsizei stride
+                                  , nullptr     // const void* pointer 
+                                  );
+              // Draw arrays using the content of buffer 
+              // Plot 1 triangle (each triangle has 3 vertices)
+              glDrawArrays(GL_TRIANGLES, 0, 3);
+
+              // Disable global state 
+              glBindBuffer(GL_ARRAY_BUFFER, 0);
+              glDisableVertexAttribArray(0);
+            
+              //------------ Draw Square -------------------------//
+              //
+            
+              #if 1
+              glBindBuffer(GL_ARRAY_BUFFER, vbo_square_);
+              glEnableVertexAttribArray(shader_attr);
+              glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
+              // Plot 4 vertices 
+              glDrawArrays(GL_LINE_LOOP, 0, 4);
+
+              // Disable global state 
+              glBindBuffer(GL_ARRAY_BUFFER, 0);
+              glDisableVertexAttribArray(shader_attr);            
+              #endif 
+
+          // ====== END RENDERING ==============//
+
+          /* Swap front and back buffers */
+          glfwSwapBuffers(window);
+          /* Poll for and process events */
+          glfwPollEvents();
+
+          if( glfwGetKey(window, 'Q' ) == GLFW_PRESS )
+          {
+               std::cout << " [TRACE] User typed Q =>> Shutdown program. Ok. " << '\n';
+               break;
+          }
+      }
+
+      glfwTerminate();
+      return 0;
+  }
+#+END_SRC
+
+** Simple 2D graphics - using VBO abstraction
 
 This sample code draws a square, triangle and a chart using 2D
 coordinates and ignoring the Z axis. 
@@ -323,10 +553,10 @@ objects for storing data on the GPU memory and shaders, programs that
 runs on the GPU-side for processing vertexes and colors. The following
 code uses _VertexBufferObject_ class for encapsulating VBO - Vertex
 Buffer Objects. The challenging of dealing with VBOs is that, many of
-subroutines applicable to VBO modify global state and assumes that
-some global state is set, such as that the buffer object is bound. The
-effect of calling the subroutines depends on the state and the order
-that they were called.
+subroutines applicable to VBO modify global state or assume that some
+global state should be set before calling the subroutine. The effect
+of calling the many OpenGL subroutines depends on the state and the
+order that they were called.
 
 The code was tested on Ubuntu Linux 64 bits. On Windows, it requires
 GLEW for loading OpenGL function pointers. 
@@ -370,7 +600,7 @@ File: _CMakeLists.txt_
   FetchContent_MakeAvailable(glfwlib)
 
          add_executable( draw2d  draw2d.cpp )
-  target_link_libraries( draw2d  glfw OpenGL::GL GLU glut)
+  target_link_libraries( draw2d  glfw OpenGL::GL GLU)
 #+END_SRC
 
 File: _draw2d.cpp_ 
