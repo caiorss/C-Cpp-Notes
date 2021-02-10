@@ -104,6 +104,14 @@
    * [[https://www.khronos.org/registry/OpenGL/index_gl.php][Khronos OpenGL® Registry]]
      * OpenGL Official Specification.
 
+   * [[https://www.khronos.org/opengl/wiki/Core_Language_(GLSL)][Core Language (GLSL) - OpenGL Wiki]] / Khronos Group 
+     * Official Documentation of OpenGL shading language.
+
+   * [[https://www.khronos.org/opengl/wiki/Data_Type_(GLSL)][Data Type (GLSL) - OpenGL Wiki]] / Khronos Group
+     * Data types of GLSL - OpenGL Shading Language.
+
+   * [[https://thebookofshaders.com/][The Book of Shaders]] - (Patricio Gonzalez and Jen Love)
+
    * [[https://web.archive.org/web/20190629031543/http://antongerdelan.net/teaching/3dprog1/maths_cheat_sheet.pdf][3D Maths Cheat Sheet]] - Reference Card for computer graphics
      linear algebra. (homogeneous coordinates, rotation matrices,
      translation matrices and etc.)
@@ -376,10 +384,12 @@ Non-categorized / Miscellaneous:
 
   + [[https://www.khronos.org/opengl/wiki/Tutorial1:_Creating_a_Cross_Platform_OpenGL_3.2_Context_in_SDL_(C_/_SDL)][Tutorial1: Creating a Cross Platform OpenGL 3.2 Context in SDL (C / SDL) - OpenGL Wiki]]
 
-** Legacy OpenGL Subroutines
+** Legacy/Obsolete OpenGL Subroutines
 
-The following OpenGL subroutines are from the OpenGL immediate mode
-(fixed-function pipeline), which are obsolute and should not be used.
+The following OpenGL subroutines are from the OpenGL _immediate mode_
+(fixed-function pipeline), which are obsolete and should be avoided as
+they incur on a significant overhead and they lack portability due to
+not be available at OpenGL ES.
 
   + Vertex:
     + => Modern OpenGL replacement: VBO (Vertex Buffer Object) and VAO (Vertex Array Object)
@@ -523,7 +533,8 @@ Define a 4x4 homogenous coordinate matrix:
    (glm::mat4 &) @0x7f904e6c2008
 
 
-   // Matrix is not what user expects as it is written in Column-major order 
+   // This matrix is not in the way the user expects as it is stored in column-major order 
+   // (data layout used by Fortran) and not row-major order (data layout used by C and C++).
    root [20] show_matrix("mat", mat)
 
     [MATRIX] mat = 
@@ -835,7 +846,7 @@ Inverse matrix:
    root [114] 
 
 #+END_SRC
-** Simple 2D draphics - no VBO abstraction 
+** 2D graphics - no VBO abstraction 
 
 The following code draws a square and a triangle using the OpenGL
 retained mode API. Before the rendering takes place, data must be
@@ -1119,7 +1130,7 @@ File: _draw2d-raw.cpp_
   }
 #+END_SRC
 
-** Simple 2D graphics - using VBO abstraction
+** 2D graphics - using VBO abstraction
 
 This sample code draws a square, triangle and a chart using 2D
 coordinates and ignoring the Z axis. 
@@ -1434,7 +1445,7 @@ File: _draw2d.cpp_
       return 0;
   }
 #+END_SRC
-** Simple 2D graphics - using VAO 
+** 2D graphics - using VAO 
 
 A VAO (Vertex Array Object) is an object that stores all the
 information necessary to render a VBO (Vertex Buffer Object). For
@@ -1837,3 +1848,650 @@ File: _draw2d-vao.cpp_
       return pbuffer;
   }
 #+END_SRC
+** 2D graphics - using shaders
+
+OpenGL retained mode (programmable pipeline) uses shaders, which are
+programs that uses GLSL (OpenGL shading language) programming
+language, runs on the GPU (Graphics Processing Unit). A vertex shader
+performs vertex coordinate transformations on all vertices and colors
+received from VBO - Vertex Buffer Objects. The fragment shader runs
+after the vertex shader and deals with vertice texture and color
+computations.
+
+A vertex shader has the following features: 
+
+ + Data types:
+   + float => Float IEEE754 32 bits floating point scalar. 
+   + vec2 => Vector of 2 coordinates
+   + vec3 => Vector of 3 coordinates 
+   + vec4 => Vector of 4 coordinates 
+   + mat2 => 2x2 matrix 
+   + mat4 => 4x4 homogeneous coordinate matrix
+   + mat3 => 3x3 matrix
+
+ + _uniform variables_ => Shader variables declared with _uniform_ storage
+   qualifier. They allow passing data, such as transformation
+   matrices, vectors or scalar values, from the C++-side to the shader
+   program. Uniform variables can be used for passing the model matrix,
+   camera matrix and projection matrix to the shader.
+   * Declaration example: 'uniform mat4 u_model;' 
+
+ + _attribute variables_ => Used for passing vertices or color
+   coordinates from VBOs (Vertex Buffer Objects). Those variables are
+   only accessible in the shader.
+   * Declaration example: 'layout ( location = 2)  in vec2 position;'
+
+ + _Output_ => Shader programs uses pre-defined global variables for
+   output, for instance, _gl_Position_, which sets the current vertex
+   position in clip-space (NDC - Normalized Device Coordinates). 
+
+
+
+ *Documentation*
+
+  + [[https://www.khronos.org/opengl/wiki/Core_Language_(GLSL)][Core Language (GLSL) - OpenGL Wiki]] / Khronos Group.
+    + Syntax of GLSL (OpenGL shading language)
+
+  + [[https://www.khronos.org/opengl/wiki/Data_Type_(GLSL)][Data Type (GLSL) - OpenGL Wiki]] / Khronos Group
+
+  + [[https://en.wikipedia.org/wiki/OpenGL_Shading_Language][OpenGL Shading Language - Wikipedia]]
+
+  + [[https://www.khronos.org/opengl/wiki/Shader][Shader - OpenGL Wiki]] / Khronos Group
+
+  + [[https://www.khronos.org/opengl/wiki/Vertex_Shader][Vertex Shader - OpenGL Wiki]] / Khronos Group
+
+  + [[https://www.khronos.org/opengl/wiki/Fragment_Shader][Fragment Shader - OpenGL Wiki]] / Khronos Group
+
+  + [[https://www.khronos.org/opengl/wiki/Uniform_(GLSL)][Uniform (GLSL) - OpenGL Wiki]] / Khronos Group
+    + Discusses shader uniform variables.
+
+  + [[https://www.khronos.org/opengl/wiki/Layout_Qualifier_(GLSL)][Layout Qualifier (GLSL) - OpenGL Wiki]] / Khronos Group
+    + Shader attribute index (attribute location)
+
+  + [[https://www.khronos.org/opengl/wiki/Geometry_Shader][Geometry Shader - OpenGL Wiki]] / Khronos Group.
+
+  + [[https://www.khronos.org/opengl/wiki/Shader_Compilation][Shader Compilation - OpenGL Wiki]] / Khronos Group.
+
+  + [[https://www.khronos.org/opengl/wiki/Vertex_Rendering][Vertex Rendering - OpenGL Wiki]]
+
+  + [[https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/Data][Data in WebGL - Web APIs | MDN]] / Mozilla 
+    + Explanation of shader's attribute variables and shader's uniform
+      variables. 
+
+  *Source Code*  
+
+Summary:
+
+ + This sample application, draws many 4 triangles from a 2 VBO
+   (Vertex Buffer Object) and a single VAO (Vertex Array Object). The
+   application uses a vertex shader for performing coordinate
+   transformation for every triangle and drawing them at different
+   position with different rotation angles around Z axis. The triangle
+   'triangleD' follows the mouse position while the triangle
+   'triangleB' rotates acoording to the mouse position.
+
+ + The vertex shader has two attributes variables ('position' and
+   'color') and two uniform variables u_model, that contains the model
+   matrix from every rendered object, and u_projection, which contains
+   the projection matrix. 
+
+Screenshot: 
+
+[[file:images/opengl-draw2d-shader.png][file:images/opengl-draw2d-shader.png]]
+
+
+_Vertex Shader_ - Source Code (Extraced from _draw2d-shader.cpp_)
+
+#+BEGIN_SRC cpp 
+    #version 330 core 
+
+    // Supplied by GPU - attribute location (id = 2) 
+    // contains a (X, Y) vertex
+    layout ( location = 2)  in vec2 position;
+    layout ( location = 1 ) in vec3 color;     // Contains (Red, Green, Blue) components
+
+    // Output to fragment shader 
+    out vec3 out_color;
+
+    // Model matrix => projection coordinates from the local space (model space)
+    // to view space .
+    // Transform 4x4 matrix - supplied by the C++ side. 
+    uniform mat4 u_model;
+
+    // Projection matrix => projections camera-space coordinates 
+    // to clip-space coordinates. (-1.0 to 1.0) range.
+    uniform mat4 u_projection;
+
+    void main()
+    {
+        // gl_Position => Global output variable that holds the 
+        // the current vertex position. It is a vector of 
+        // components (X, Y, Z = 0, W = ignored)
+        gl_Position = u_projection * u_model * vec4(position, 0, 1.0);
+
+        // Forward to fragment shader 
+        out_color = color;
+    }
+#+END_SRC
+
+_Fragment Shader_ -  Source Code (Extracted from _draw2d-shader.cpp_)
+
+
+#+BEGIN_SRC cpp 
+   #version 330 
+
+   // This color comes from Vertex shader 
+   in vec3 out_color;
+
+   void main()
+   {
+       // Set vertex colors
+       gl_FragColor = vec4(out_color, 1.0);
+
+   }
+#+END_SRC
+
+File: _CMakeLists.txt_
+
+#+BEGIN_SRC cmake 
+   cmake_minimum_required(VERSION 3.5)
+   project(GLFW_project)
+
+   set(CMAKE_CXX_STANDARD 17)
+   set(CMAKE_CXX_STANDARD_REQUIRED ON)
+   set(CMAKE_VERBOSE_MAKEFILE ON)
+
+   #================ GLFW Settings  ===============#
+
+   find_package(OpenGL REQUIRED)
+
+   include(FetchContent)
+
+   # Set GLFW Options before FectchContent_MakeAvailable 
+   set( GLFW_BUILD_EXAMPLES OFF CACHE BOOL  "GLFW lib only" )
+   set( GLFW_BUILD_TESTS    OFF CACHE BOOL  "GLFW lib only" )
+   set( GLFW_BUILD_DOCS     OFF CACHE BOOL  "GLFW lib only" )
+   set( GLFW_BUILD_INSTALL  OFF CACHE BOOL  "GLFW lib only" )
+
+   # Donwload GLFW library
+   FetchContent_Declare(
+     glfwlib
+     URL   https://github.com/glfw/glfw/releases/download/3.3.2/glfw-3.3.2.zip
+   )
+   FetchContent_MakeAvailable(glfwlib)
+
+   # Download GLM (OpenGL math library for matrix and vectors transformation)
+   FetchContent_Declare(
+     glm  
+     URL  https://github.com/g-truc/glm/archive/0.9.8.zip
+   )
+   FetchContent_MakeAvailable(glm)
+
+   message( [DEBUG] " glm_SOURCE_DIR = ${glm_SOURCE_DIR} ")
+   include_directories(${glm_SOURCE_DIR})
+
+     # ======= TARGETS ===========================#
+
+          add_executable( draw2d-shader  draw2d-shader.cpp   )
+   target_link_libraries( draw2d-shader  glfw OpenGL::GL GLU )
+#+END_SRC
+
+File: _draw2d-shader.cpp_ 
+
+#+BEGIN_SRC cpp 
+  // Draw many colored triangles from a single VBO (Vertex Buffer Object)
+  #include <iostream>
+  #include <vector> 
+  #include <array>
+  #include <cmath>
+  #include <functional>
+
+  // -------- OpenGL headers ---------//
+  //
+  #define GL_GLEXT_PROTOTYPES 1 // Necessary for OpenGL >= 3.0 functions
+  #define GL3_PROTOTYPES      1 // Necessary for OpenGL >= 3.0 functions
+
+  #include <GL/gl.h>
+  #include <GLFW/glfw3.h>
+
+  // #include <GL/glew.h>
+  #include <GL/glu.h>
+
+  // --------- OpenGL Math Librar ------------//
+  #include <glm/glm.hpp>
+  #include <glm/gtc/matrix_transform.hpp>
+  #include <glm/gtc/type_ptr.hpp>
+  #include <glm/gtx/string_cast.hpp>
+
+
+  // Compile some  shader 
+  void compile_shader(GLuint m_program, const char* code, GLenum type);
+
+  // Send data from memory to GPU VBO memory 
+  void send_buffer(   GLuint* pVao        // Pointer to VAO (Vertex Array Object) - allocated by caller 
+                    , GLuint* pVbo        // Pointer to VBO (Vertex Buffer Object) - allocated by caller
+                    , GLsizei sizeBuffer  // Total buffer size in bytes
+                    , void*   pBufffer    // Pointer to buffer 
+                    , GLint   shader_attr // Shader attribute location id 
+                    , GLint   size        // Number of coordinates of a given vertex
+                    , GLenum  type        // Type of each element coordinate                   
+                    );
+
+  // ------------ Basic Data Structures -----------// 
+
+  // Wrapper for 2D vertex coordinates 
+  struct Vertex2D{  GLfloat x, y;  };
+  // Wrapper for RGB colors 
+  struct ColorRGB { GLfloat r, g, b; };
+
+  constexpr ColorRGB COLOR_R = { 1.0, 0.0, 0.0  }; // Red 
+  constexpr ColorRGB COLOR_G = { 0.0, 1.0, 0.0  }; // Green 
+  constexpr ColorRGB COLOR_B = { 0.0, 0.0, 1.0  }; // Blue 
+
+
+  class Model_Triangle
+  {
+      // Object position in World Coordinates
+      float _x = 0.0, _y = 0.0; 
+      // Scale 
+      float _scale = 1.0;
+      // Rotation angle around z axis
+      float _angle = 0.0;
+    
+  public:
+      Model_Triangle(float scale = 1.0){   }
+      void rotate(float angle)          { _angle = angle; }
+      void translate(float x , float y) { _x = x; _y = y; }
+      void scale(float scale)           { _scale = scale; }
+      void zoom(float factor)           {  _scale = factor + _scale; }
+
+      // Render/draw this object 
+      void render(GLuint vao, GLint  u_model)
+      {
+        
+          // Reset model matrix to indentiy matrix 
+          glm::mat4 _model(1.0);
+          // Scale object (increase or decrease object size)
+          _model =  glm::scale( _model, glm::vec3(_scale, _scale, _scale) );
+          // Move to (X, Y) position 
+          _model = glm::translate( _model, glm::vec3(_x, _y, 0.0)  ); 
+          // Rotate from a given angle around Z axis at current object X, Y  postion
+          _model = glm::rotate( _model, glm::radians(_angle), glm::vec3(0, 0, 1) );
+
+          // Set shader uniform variable.
+          glUniformMatrix4fv( 
+              // Shader uniform variable location 
+              u_model  
+              // Number of matrices that will be set 
+              , 1
+              // GL_FALSE => Matrix is in column-major order (Fortran matrix layout)
+              // GL_TRUE  => Matrix is in row-major order (C, C++ array, matrix layout)
+              , GL_FALSE
+              // Pointer to first element transform matrix (homogeneous coordinate)
+              , glm::value_ptr(_model) 
+          );
+          glBindVertexArray(vao);        
+          // Draw 3 vertices 
+          glDrawArrays(GL_TRIANGLES, 0, 3);        
+          // Disable global state 
+          glBindVertexArray(0);        
+      }
+  };
+
+
+  // Global variable [WARNING] - Vulnerable to global "initialization fiasco" 
+  // undefined behavior.
+  auto Cursor_Callback = std::function<void (GLFWwindow* window, double xpos, double ypos)>();
+
+  int main(int argc, char** argv)
+  {
+
+      /* Initialize the library */
+      if (!glfwInit()){ return -1; }
+
+      // OpenGL Core Profile 
+      glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+      glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+      glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
+      glfwSetErrorCallback([](int error, const char* description)
+                           {
+                              std::cerr << " [GLFW ERROR] " << error 
+                                        << ": " << description 
+                                        << std::endl;
+                           });
+
+      GLFWwindow* window = glfwCreateWindow(640, 480, "2D Drawing with Shader", NULL, NULL);
+      if (!window){ glfwTerminate(); return -1; }
+
+      // OpenGL context 
+      glfwMakeContextCurrent(window);
+      glClearColor(0.0f, 0.5f, 0.6f, 1.0f);
+
+      // Mouse move callback 
+      // Note: It is only possible to pass non-capturing lambda to this callback.
+      glfwSetCursorPosCallback( window
+                              , [](GLFWwindow* window, double xpos, double ypos)
+                                {
+                                    // Forward call to global variable std::function<> 
+                                    // (Function object)
+                                    Cursor_Callback(window, xpos, ypos);
+                                });
+
+      // ====== S H A D E R - C O M P I L A T I O N ====//
+      //                                                // 
+
+      // Note: The shader source code is at the end of file.
+      extern const char* code_vertex_shader;
+      extern const char* code_frag_shader;
+
+      GLuint prog = glCreateProgram();
+      // Compile shader code 
+      compile_shader(prog, code_vertex_shader, GL_VERTEX_SHADER  ) ;    
+      compile_shader(prog, code_frag_shader,   GL_FRAGMENT_SHADER );
+
+      // Bind current shader (enable it). Only one shader of the same type can 
+      // be bound at a time. For instance, only a single vertex shader can 
+      // be enabled at a time
+      glUseProgram(prog);
+
+      // Get shader uniform variable location for projection matrix
+      // See shader code: "uniform mat4 projection;"
+      const GLint u_proj  = glGetUniformLocation(prog, "u_projection");
+      assert( u_proj >= 0 && "Failed to find uniform variable" );
+
+      // Get shader uniform variable  location for model matrix.
+      const GLint u_model  = glGetUniformLocation(prog, "u_model");
+      assert( u_model >= 0 && "Failed to find uniform variable" );    
+
+      // Get shader attribute location - the function glGetAttribLocation - returns (-1) on error.
+      const GLint attr_position = glGetAttribLocation(prog, "position");
+      assert( attr_position >= 0 && "Failed to get attribute location" );
+      std::fprintf(stderr, " [TRACE] Attribute location attr_position = %d \n"
+                  , attr_position);
+
+      // Get shader index of color attribute variable.
+      const GLint attr_color = glGetAttribLocation(prog, "color");
+      assert( attr_color >= 0);
+
+
+      // ====== U P L O A D - TO - G P U =========================// 
+      //                                                          //
+
+      constexpr size_t NUM_VERTICES = 3;
+
+      // Array of triangle vertex coordinates (X, Y)
+      Vertex2D vertices[NUM_VERTICES] = { 
+        {  0.0,   0.2} // Vertex 0  (x =  0.0 ; y =  0.5)
+      , { -0.2,  -0.2} // Vertex 1  (x = -0.5 ; y = -0.5)
+      , {  0.2,  -0.2} // Vertex 2  (x =  0.5 ; y = -0.5)
+      };
+
+      ColorRGB colors[NUM_VERTICES] = { 
+            COLOR_R   // Color of vertex 0
+          , COLOR_B   // Color of vertex 1 
+          , COLOR_G   // Color of vertex 2 
+      };
+
+      // Always initialize with zero (0), otherwise, the values
+      // of those variables will be undefined. (Undefine Behavior)
+      GLuint vao_triangle = 0;
+      GLuint vbo_vertices = 0;
+      GLuint vbo_colors   = 0;
+
+      // Send vertices to GPU VBO (vbo_vertices)
+      send_buffer(  &vao_triangle    // Ponter to VAO [OUTPUT]
+                  , &vbo_vertices    // Pointer VBO   [OUTPUT]
+                  , sizeof(vertices) // Size of buffer sent to GPU (VBO memory)
+                  , vertices         // Pointer to buffer 
+                  , attr_position    // Shader attribute location 
+                  , 2                // Each vertex has 2 coordinates (X, Y)
+                  , GL_FLOAT         // Each vertex coordinate has type GLfloat (float)
+                  );
+
+      // Send colors to GPU VBO (vbo_colors)
+      send_buffer(  &vao_triangle   // Pointer Vertex Array object
+                  , &vbo_colors     // Pointer Vertex buffer object handle (aka token)
+                  , sizeof(colors)  // Buffer size 
+                  , colors          // Pointer to buffer (fist buffer element)
+                  , attr_color      // Shader attribute th
+                  , 3               // Each color has 3 coordinates (R, G, B)
+                  , GL_FLOAT        // Each color coordiante has type GLfloat
+                  );
+
+      // ============== Set Shader Uniform Variables =============// 
+      //                                                          // 
+
+      int width, height;
+      glfwGetWindowSize(window, &width, &height);
+    
+      // Window aspect ratio
+      float aspect = static_cast<float>(width) / height;
+
+      // Identity matrix 
+      const auto identity = glm::mat4(1.0);
+    
+      // Projection matrix - orthogonal projection for compensating 
+      // the aspect ratio.
+      glm::mat4 Tproj = glm::ortho(-aspect, aspect, -1.0f, 1.0f, -1.0f, 1.0f);
+
+      // Set projection matrix uniform variable
+      glUniformMatrix4fv(u_proj, 1, GL_FALSE, glm::value_ptr(Tproj) );
+      // Set model matrix uniform variable
+      glUniformMatrix4fv(u_model, 1, GL_FALSE, glm::value_ptr(identity) );
+
+      // Instatiate objects that will be rendered 
+      auto triangleA = Model_Triangle{};
+      triangleA.scale(0.50);
+      triangleA.rotate(122);
+
+      auto triangleB = Model_Triangle{};
+      triangleB.translate(-0.20, 0.30);
+      triangleB.rotate(50);
+      triangleB.scale(1.8);
+
+      auto triangleC = Model_Triangle{};
+      triangleC.translate(0.20, 0.20);
+      triangleC.rotate(35);
+
+      // Follows mouse coordinate 
+      auto triangleD = Model_Triangle{};
+      triangleD.translate(-0.60, -0.50);
+      triangleD.scale(1.50);
+      // triangleD.scale(1.2);
+      // triangleD.rotate(40);    
+
+      // --------- Set mouse callback ----------// 
+
+      constexpr float PI = 3.1415926536f;
+      constexpr float FACTOR_RAD_TO_DEG = 180.0 / PI;
+
+      Cursor_Callback = [&](GLFWwindow* window, double xpos, double ypos)
+      {
+          // Mouse normalized coordinate 
+          // =>> see: https://stackoverflow.com/questions/23870750/
+          float xMouse = -1.0f + 2.0f * xpos / width;
+          float yMouse =  1.0f - 2.0f * ypos / height;
+
+          // Angle in degrees between X axis vector(1, 0, 0) and poit (xMouse, yMouse, 0) position.
+          // Note: atan2f() returns angle in radians. 
+          float angle = atan2f(yMouse, xMouse) * FACTOR_RAD_TO_DEG ;
+          fprintf(stderr, " [TRACE] Angle = %f \n", angle);
+
+          // Triangle D follows mouse position
+          triangleD.translate(xMouse, yMouse);
+          triangleD.rotate(angle);
+
+          triangleB.rotate(angle);
+        
+          // Show mouse position
+           // std::fprintf(stderr, " [MOUSE] x = %f ; y = %f \n", xMouse, yMouse);
+      };
+
+      //  ======= R E N D E R  - L O O P ============//
+      //                                             //
+      while ( !glfwWindowShouldClose(window) )
+      {
+          glClear(GL_COLOR_BUFFER_BIT);
+
+          // ====== BEGIN RENDERING ============//
+        
+              triangleA.render(vao_triangle, u_model);
+              triangleB.render(vao_triangle, u_model);
+              triangleC.render(vao_triangle, u_model);
+              triangleD.render(vao_triangle, u_model);
+
+              //std::fprintf(stderr, " [TRACE] Redraw screen \n");
+
+          // ====== END RENDERING ==============//
+
+          /* Swap front and back buffers */
+          glfwSwapBuffers(window);
+          /* Poll for and process events */
+          glfwPollEvents();
+
+          if( glfwGetKey(window, 'Q' ) == GLFW_PRESS )
+          {
+               std::cout << " [TRACE] User typed Q =>> Shutdown program. Ok. " << '\n';
+               break;
+          }
+
+          // Increase scale by 10%
+          if( glfwGetKey(window, 'A' ) == GLFW_PRESS ){ triangleD.zoom(+0.10); }
+          // Decrease scale by 10%
+          if( glfwGetKey(window, 'B' ) == GLFW_PRESS ){ triangleD.zoom(-0.10); }
+
+
+      }
+
+      glfwTerminate();
+      return 0;
+
+  } // --- End of main() -----//
+
+
+  // Minimal vertex shader =>> Runs on the GPU and processes each vertex.
+  const char* code_vertex_shader = R"(    
+      #version 330 core 
+
+      // Supplied by GPU - attribute location (id = 2) 
+      // contains a (X, Y) vertex
+      layout ( location = 2)  in vec2 position;
+      layout ( location = 1 ) in vec3 color;     // Contains (Red, Green, Blue) components
+
+      // Output to fragment shader 
+      out vec3 out_color;
+
+      // Model matrix => projection coordinates from the local space (model space)
+      // to view space .
+      // Transform 4x4 matrix - supplied by the C++ side. 
+      uniform mat4 u_model;
+
+      // Projection matrix => projections camera-space coordinates 
+      // to clip-space coordinates. (-1.0 to 1.0) range.
+      uniform mat4 u_projection;
+
+      void main()
+      {
+          // gl_Position => Global output variable that holds the 
+          // the current vertex position. It is a vector of 
+          // components (X, Y, Z = 0, W = ignored)
+          gl_Position = u_projection * u_model * vec4(position, 0, 1.0);
+
+          // Forward to fragment shader 
+          out_color = color;
+      }
+
+  )";
+
+  // Fragment shader source code 
+  const char* code_frag_shader = R"(
+      #version 330 
+
+      // This color comes from Vertex shader 
+      in vec3 out_color;
+
+      void main()
+      {
+          // Set vertex colors
+          gl_FragColor = vec4(out_color, 1.0);
+
+      }
+  )";
+
+      // ====== I M P L E M E N T A T I O N S ==========// 
+
+  void compile_shader(GLuint m_program, const char* code, GLenum type)
+  {
+      GLint shader_id = glCreateShader( type );
+      glShaderSource(shader_id, 1, &code, nullptr);
+      glCompileShader(shader_id);
+    
+      GLint is_compiled = GL_FALSE;
+      // Check shader compilation result 
+      glGetShaderiv(shader_id, GL_COMPILE_STATUS, &is_compiled);
+
+      // If there is any shader compilation result, 
+      // print the error message.
+      if( is_compiled == GL_FALSE)
+      {
+          GLint length;
+          glGetShaderiv(shader_id, GL_INFO_LOG_LENGTH, &length);
+          assert( length > 0 );
+
+          std::string out(length + 1, 0x00);
+          GLint chars_written;
+          glGetShaderInfoLog(shader_id, length, &chars_written, out.data());
+          std::cerr << " [SHADER ERROR] = " << out << '\n';
+          // Abort the exection of current process. 
+          std::abort();
+      }          
+
+      glAttachShader(m_program, shader_id);   
+      glDeleteShader(shader_id);
+      glLinkProgram(m_program);
+      GLint link_status = GL_FALSE;
+      glGetProgramiv(m_program, GL_LINK_STATUS, &link_status);
+      assert( link_status != GL_FALSE );   
+      // glUseProgram(m_program);         
+  }
+
+  // Upload buffer from main memory to GPU VBO 
+  // =>> Parameters VAO, VBO are allocated by the caller. 
+  void send_buffer( GLuint* pVao, GLuint* pVbo, GLsizei sizeBuffer
+                  , void* pBufffer, GLint   shader_attr, GLint size
+                  , GLenum type)
+  {
+      assert(pVao != nullptr);
+      assert(pVbo != nullptr);
+      GLuint& vao = *pVao;
+      GLuint& vbo = *pVbo;
+
+      // Generate and bind current VAO (Vertex Array Object)
+      if(vao == 0){ glGenVertexArrays(1, &vao); }
+      glBindVertexArray(vao);
+
+      // Generate and bind current VBO (Vertex Buffer Object)
+      glGenBuffers(1, &vbo);
+      glBindBuffer(GL_ARRAY_BUFFER, vbo);
+
+      // Upload data to current VBO buffer in GPU 
+      glBufferData(GL_ARRAY_BUFFER, sizeBuffer, pBufffer, GL_STATIC_DRAW);   
+
+      glEnableVertexAttribArray(shader_attr);
+    
+      // Set data layout - how data will be interpreted.
+      glVertexAttribPointer(shader_attr, size, type, GL_FALSE, 0, nullptr);
+
+      // ------ Disable Global state set by this function -----//
+      // 
+      // Unbind VAO 
+      glBindVertexArray(0);
+      // Unbind VBO 
+      glBindBuffer(GL_ARRAY_BUFFER, vbo);
+      // Disable current shader attribute 
+      glDisableVertexAttribArray(shader_attr);
+
+  }
+#+END_SRC
+
