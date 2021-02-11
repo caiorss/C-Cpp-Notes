@@ -1,3 +1,5 @@
+#+HTML_MATHJAX: align:left font:Neo-Euler scale:100  path:"https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-AMS_SVG"
+
 #+INCLUDE: theme/style.org
 #+TITLE: Computer Graphics 
 #+DESCRIPTION: cpp/c++ interoperability ffi shim qt5 widgets gui library wrapper julia dlang
@@ -422,6 +424,512 @@ not be available at OpenGL ES.
     + glPush()
     + glPushMatrix()
     + glPopMatrix()
+** Computer Graphics Math 
+*** Vector Algebra 
+
+Given 2 3D vectors $\vec{A} = [ x_A, y_A, z_A ]$ and $\vec{B} = [ x_B, y_B, z_B ]$ 
+, the following properties can be defined: 
+
+
+ *Vector Norm* 
+
+The _norm_ or _magnitude_ of A, $|| \vec{A} ||$ is given by: 
+
+\begin{equation}
+   || \vec{A} || = \sqrt{ x_A^2 + y_A^2 + z_A^2 }
+\end{equation}
+
+
+\begin{equation}
+   || \vec{A} ||^2 = \vec{A} \cdot \vec{A}
+\end{equation}
+
+ *Normalized Vector / Unit Vector* 
+
+A _normalized vector_, is a vector with the same direction than a given
+vector, but with norm equal to one. A normalized vector of A can be
+computed as: 
+
+\begin{equation}
+    \text{normalized}( \vec{A} ) 
+       = \frac{ \vec{A} }{ || A || }  
+       = \frac{1}{ \sqrt{ x_A^2 + y_A^2 + z_A^2 } } . \vec{A}
+\end{equation}
+
+\begin{equation}
+    || \text{normalized}( \vec{A} ) || = 1 
+\end{equation}
+
+ *Dot Product* 
+
+The vector _dot product_ is:  
+
+  + Where:
+    + $|| \vec{A} ||$ is the norm of vector A
+    + $|| \vec{B} ||$ is the norm of vector B
+    + $\theta$ is the angle between vectors A and B.
+
+  + The vectros $\vec{A}$ and $\vec{B}$ are _orthogonal_, the angle
+    between them is 90 degrees, when the dot product is zero. 
+
+\begin{equation} 
+  \text{dot}( \vec{A}, \vec{B} ) 
+    = \vec{A} \cdot \vec{B} 
+    = x_A \cdot x_B + y_A \cdot y_B + z_A \cdot z_B 
+    = || \vec{A} || \cdot || \vec{B} || \cdot \cos \theta 
+\end{equation}
+
+If the vectors $\vec{A}$ and $\vec{B}$ are expressed as column
+matrices, the product can be computed as a matrix multiplication.
+
+  + In the following equations. $A^T$ is the transpose of matrix A. 
+
+\begin{equation}
+  A = \begin{bmatrix} x_A \\ y_A \\ z_A  \end{bmatrix}
+\end{equation}
+
+\begin{equation}
+  B = \begin{bmatrix} x_B \\ y_B \\ z_B  \end{bmatrix}
+\end{equation}
+
+
+\begin{equation}
+  dot(\vec{A}, \vec{B})  
+     = \vec{A} \cdot \vec{B}
+     = A^T \cdot B 
+     =  
+        \begin{bmatrix} x_A & y_A & z_A  \end{bmatrix}
+        \cdot 
+        \begin{bmatrix} x_B \\ y_B \\ z_B  \end{bmatrix}
+\end{equation}
+
+ *Cross Product* 
+
+The cross product between two vectors $\vec{A}$ and $\vec{B}$ results
+in a vector which is perpendicular (orthogonal) to both A and B. 
+
+\begin{equation}
+   \text{cross}( \vec{A}, \vec{B} ) 
+        = \vec{A} \times \vec{B} 
+        = \begin{bmatrix} 
+             x_A \cdot z_B - z_A \cdot y_B   \\
+             z_A \cdot x_B - x_A \cdot z_B   \\
+             x_A \cdot y_B - y_A \cdot x_B   \\
+          \end{bmatrix}
+\end{equation}
+
+The cross product have the following properties: 
+
+  + Where:
+    + $\vec{n}$ is unit vector with the same direction as the cross
+      product vector.
+    + $\theta$ is the angle between the two underlying vectors. 
+
+\begin{equation}
+   \vec{A} \times \vec{B} = || \vec{A} || \cdot || \vec{B} || \cdot \sin \theta \times \vec{n}
+\end{equation}
+
+\begin{equation}
+   \vec{A} \times \vec{B} = - \vec{B} \times \vec{A}
+\end{equation}
+
+
+*** 2D Affine Transforms
+
+A generic 2D affine transform in homogenous coordinates has the
+following form: 
+
+\begin{equation}
+  A = 
+   \begin{bmatrix} 
+     a_{11}   & a_{12}   &  a_{13} \\
+     a_{21}   & a_{22}   &  a_{23} \\  
+     0        & 0        &  1 \\  
+   \end{bmatrix}
+\end{equation}
+
+This affine transform performs the coordinate transformation from the
+coordinate frame C2 (which axis are x, y), which could an object
+local-space coordinate, to coordinate frame C1 (which axis are x', y')
+which could be a world-coordinate system. The matrix transforms
+homogenous coordinates, which are coordinates with an extra parameter
+w = 1 for allowing translation transformation to be expressed in the
+same way as rotation transformations.
+
+
+\begin{equation}
+     \begin{bmatrix} 
+       x' \\ y' \\ w' = 1
+      \end{bmatrix}
+  = 
+    \begin{bmatrix} 
+      a_{11}   & a_{12}   &  a_{13} \\
+      a_{21}   & a_{22}   &  a_{23} \\
+      0        & 0        &  1      \\
+   \end{bmatrix}
+
+     \cdot 
+
+     \begin{bmatrix} 
+       x \\ y \\ w = 1
+     \end{bmatrix}
+
+    = 
+
+    \begin{bmatrix} 
+        a_{11} \cdot x + a_{12}  \cdot y + a_{13}  \\
+        a_{21} \cdot x + a_{22}  \cdot y + a_{23}  \\
+        1 
+    \end{bmatrix}
+\end{equation}
+
+
+
+  *Standard Affine Transforms* 
+
+Identity matrix
+
+\begin{equation}
+  I = 
+   \begin{bmatrix} 
+     1   & 0   &  0 \\
+     0   & 1   &  0 \\  
+     0   & 0   &  1 \\  
+   \end{bmatrix}
+\end{equation}
+
+Translation: 
+
+\begin{equation}
+  T = 
+   \begin{bmatrix} 
+     1   & 0   &  \Delta_x \\
+     0   & 1   &  \Delta_y \\  
+     0   & 0   &  1        \\  
+   \end{bmatrix}
+\end{equation}
+
+
+\begin{equation}
+     \begin{bmatrix} 
+       x' \\ y' \\ 1 
+      \end{bmatrix}
+  = 
+
+   \begin{bmatrix} 
+     1   & 0   &  \Delta_x \\
+     0   & 1   &  \Delta_y \\  
+     0   & 0   &  1        \\  
+   \end{bmatrix}
+
+     \cdot 
+
+   \begin{bmatrix} 
+       x \\ y \\ w = 1
+   \end{bmatrix}
+
+  = 
+   \begin{bmatrix} 
+       x + \Delta_x \\ y + \Delta_y \\ 1
+   \end{bmatrix}
+\end{equation}
+
+
+Scaling:
+ 
+  + Where: $s_x$ is the scale for X axis and $s_y$ is the scale for
+    the y axis.
+
+\begin{equation}
+  S = 
+   \begin{bmatrix} 
+     s_x   & 0     &  0 \\
+     0     & s_y   &  0 \\  
+     0     & 0     &  1 \\  
+   \end{bmatrix}
+\end{equation}
+
+
+\begin{equation}
+     \begin{bmatrix} 
+       x' \\ y' \\ 1 
+      \end{bmatrix}
+  = 
+
+   \begin{bmatrix} 
+     s_x   & 0     &  0 \\
+     0     & s_y   &  0 \\  
+     0     & 0     &  1 \\  
+   \end{bmatrix}
+     \cdot 
+
+   \begin{bmatrix} 
+       x \\ y \\ w = 1
+   \end{bmatrix}
+
+  = 
+   \begin{bmatrix} 
+       s_x \cdot x \\ s_y \cdot y \\ 1
+   \end{bmatrix}
+\end{equation}
+
+
+Shear: 
+
+\begin{equation}
+  H = 
+   \begin{bmatrix} 
+     1     & h_x  &  0 \\
+     h_y   & 1    &  0 \\  
+     0     & 0    &  1 \\  
+   \end{bmatrix}
+\end{equation}
+
+
+Rotation around Z axis: 
+
+  + Where $\theta$ is the angle of counterclockwise rotation around Z
+    axis. 
+
+\begin{equation}
+  R  = 
+   \begin{bmatrix} 
+     \cos \theta     & -\sin \theta  &  0 \\
+     \sin \theta     &  \cos \theta  &  0 \\  
+     0               &  0            &  1 \\  
+   \end{bmatrix}
+\end{equation}
+
+*** 3D Affine Transforms 
+
+A generic 3D affine transform in homogenous coordinates has the form: 
+
+\begin{equation}
+  A = 
+   \begin{bmatrix} 
+     a_{11}   & a_{12}   &  a_{13} & a_{14}  \\
+     a_{21}   & a_{22}   &  a_{23} & a_{24}  \\
+     a_{32}   & a_{32}   &  a_{33} & a_{34}  \\
+     0        & 0        &  0      & 1       \\
+   \end{bmatrix}
+\end{equation}
+
+An affine transformation maps the coordinate system (X, Y, Z), which
+could be an object local coordinate system, to the coordinate system
+(X', Y', Z'), which could be a world coordinate system. In a similar
+manner to 2D homogeneous coordinates, an extra pseudo-coordinate w = 1
+is added for expressing translations transformations as matrix
+multiplications, in the same way as rotations.
+
+
+\begin{equation}
+     \begin{bmatrix} 
+       x' \\ y' \\ z' \\ w' = 1
+      \end{bmatrix}
+  = 
+    \begin{bmatrix} 
+      a_{11}   & a_{12}   &  a_{13} & a_{14} \\
+      a_{21}   & a_{22}   &  a_{23} & a_{24} \\
+      a_{31}   & a_{32}   &  a_{33} & a_{34} \\
+      0        & 0        &  0      &   1    \\
+   \end{bmatrix}
+
+     \cdot 
+
+     \begin{bmatrix} 
+       x \\ y \\ z \\ w = 1
+     \end{bmatrix}
+
+    = 
+
+    \begin{bmatrix} 
+        a_{11} \cdot x + a_{12}  \cdot y + a_{13} \cdot z + a_{14}  \\
+        a_{21} \cdot x + a_{22}  \cdot y + a_{23} \cdot z + a_{24}  \\
+        a_{31} \cdot x + a_{32}  \cdot y + a_{33} \cdot z + a_{34}  \\
+        1
+    \end{bmatrix}
+\end{equation}
+
+ *Standard Affine Transforms* 
+
+Translation: 
+  + Where: $T^{-1}$ is the inverse transform. 
+
+\begin{equation}
+  T = 
+   \begin{bmatrix} 
+     1   & 0   &  0 &  \Delta_x \\
+     0   & 1   &  0 &  \Delta_y \\  
+     0   & 0   &  1 &  \Delta_z \\  
+     0   & 0   &  0 &   1      \\
+   \end{bmatrix}
+\end{equation}
+
+
+\begin{equation}
+     \begin{bmatrix} 
+       x' \\ y' \\ z' \\ w' = 1
+      \end{bmatrix}
+  = 
+
+   \begin{bmatrix} 
+     1   & 0   & 0 &  \Delta_x \\
+     0   & 1   & 0 &  \Delta_y \\  
+     0   & 0   & 1 &  \Delta_z \\  
+     0   & 0   & 0 &    1      \\
+   \end{bmatrix}
+
+     \cdot 
+
+   \begin{bmatrix} 
+       x \\ y \\ z \\ w = 1
+   \end{bmatrix}
+
+  = 
+   \begin{bmatrix} 
+       x + \Delta_x \\ y + \Delta_y \\ z + \Delta_z \\ 1
+   \end{bmatrix}
+\end{equation}
+
+
+\begin{equation}
+  T^{-1} = 
+   \begin{bmatrix} 
+     1   & 0   &  0 &  -\Delta_x \\
+     0   & 1   &  0 &  -\Delta_y \\  
+     0   & 0   &  1 &  -\Delta_z \\  
+     0   & 0   &  0 &   1        \\
+   \end{bmatrix}
+\end{equation}
+
+Scaling: 
+
+  + Where: $s_x$,  $s_y$, $s_z$ are the scale factors for axis x, y, z
+    and  $S^{-1}$ is the inverse transform (inverse matrix). 
+
+\begin{equation}
+  S = 
+   \begin{bmatrix} 
+     s_x   & 0     &  0   &  0 \\
+     0     & s_y   &  0   &  0 \\  
+     0     & 0     &  s_z &  0 \\  
+     0     & 0     &  0   &  1  \\
+   \end{bmatrix}
+\end{equation}
+
+
+\begin{equation}
+  S^{-1} = 
+   \begin{bmatrix} 
+     1 / s_x   & 0     &  0       &  0 \\
+     0     & 1 / s_y   &  0       &  0 \\  
+     0     &    0      &  1 / s_z &  0 \\  
+     0     &    0      &  0       &  1 \\
+   \end{bmatrix}
+\end{equation} 
+
+
+Rotation around x axis 
+
+ + $R_x^{-1} = R_x^T$ => The inverse is equal to the transpose.
+
+\begin{equation}
+ R_x(\alpha) = 
+   \begin{bmatrix} 
+     1   & 0            &  0              & 0  \\ 
+     0   & \cos{\alpha} & -\sin{\alpha}   & 0  \\ 
+     0   & \sin{\alpha} &  \cos{\alpha}   & 0  \\ 
+     0   & 0            &  0              & 1  \\ 
+   \end{bmatrix}
+\end{equation}
+
+Rotation around y axis
+
+  + $R_y^{-1} = R_y^T$ 
+
+\begin{equation}
+ R_y(\beta) = 
+   \begin{bmatrix} 
+     \cos{\beta}    & 0   & \sin{\beta} & 0 \\ 
+     0              & 1   & 0           & 0 \\
+    -\sin{\beta}    & 0   & \sin{\beta} & 0 \\
+    0               & 0   & 0           & 1 
+   \end{bmatrix}
+\end{equation}
+
+Rotation around z axis 
+
+  + $R_z^{-1} = R_z^T$ 
+
+\begin{equation}
+ R_z(\theta) = 
+   \begin{bmatrix} 
+      \cos{\theta}  & -\sin{\theta} &  0 & 0 \\ 
+      \sin{\theta}  &  \cos{\theta} &  0 & 0 \\ 
+     0              & 0             &  1 & 0 \\
+     0              & 0             &  0 & 1 \\
+   \end{bmatrix}
+\end{equation}
+
+*** Further Reading 
+
+  + [[https://en.m.wikipedia.org/wiki/Coordinate_system][Coordinate system - Wikipedia]]
+    + Brief: "n geometry, a coordinate system is a system that uses
+      one or more numbers, or coordinates, to uniquely determine the
+      position of the points or other geometric elements on a manifold
+      such as Euclidean space."
+
+  + [[https://en.m.wikipedia.org/wiki/Homogeneous_coordinates][Homogeneous coordinates - Wikipedia]]
+    + Brief: "Homogeneous coordinates have a range of applications,
+      including computer graphics and 3D computer vision, where they
+      allow affine transformations and, in general, projective
+      transformations to be easily represented by a matrix." 
+
+  + [[https://en.m.wikipedia.org/wiki/Right-hand_rule][Right-hand rule - Wikipedia]]
+    + Brief: "In mathematics and physics, the right-hand rule is a
+      common mnemonic for understanding orientation of axes in
+      three-dimensional space."
+
+  + [[https://en.m.wikipedia.org/wiki/Rotation_matrix][Rotation matrix - Wikipedia]]
+    + Brief: "In linear algebra, a rotation matrix is a transformation
+      matrix that is used to perform a rotation in Euclidean space."
+
+  + [[https://en.m.wikipedia.org/wiki/Rotation_formalisms_in_three_dimensions][Rotation formalisms in three dimensions - Wikipedia]]
+    + Brief: "In geometry, various formalisms exist to express a
+      rotation in three dimensions as a mathematical
+      transformation. In physics, this concept is applied to classical
+      mechanics where rotational (or angular) kinematics is the
+      science of quantitative description of a purely rotational
+      motion."
+
+  + [[https://en.m.wikipedia.org/wiki/Axes_conventions][Axes conventions - Wikipedia]]
+    + Brief: "In ballistics and flight dynamics, axes conventions are
+      standardized ways of establishing the location and orientation
+      of coordinate axes for use as a frame of reference." 
+
+  + [[https://en.m.wikipedia.org/wiki/Euler_angles][Euler angles - Wikipedia]]
+    + Brief: "The Euler angles are three angles introduced by Leonhard
+      Euler to describe the orientation of a rigid body with respect
+      to a fixed coordinate system."
+
+  + [[https://en.m.wikipedia.org/wiki/Aircraft_principal_axes][Yaw, Pitch, Roll angles - Aircraft principal axes - Wikipedia]]
+    + Brief: Rotation angles convention for aircrafts.
+
+  + [[https://en.m.wikipedia.org/wiki/Celestial_coordinate_system][Celestial coordinate system - Wikipedia]]
+    + Brief: "In astronomy, a celestial coordinate system (or
+      celestial reference system) is a system for specifying positions
+      of satellites, planets, stars, galaxies, and other celestial
+      objects relative to physical reference points available to a
+      situated observer (e.g. the true horizon and north cardinal
+      direction to an observer situated on the Earth's surface)"
+
+  + [[https://en.m.wikipedia.org/wiki/Conversion_between_quaternions_and_Euler_angles][Conversion between quaternions and Euler angles - Wikipedia]]
+    + Brief: "Spatial rotations in three dimensions can be
+      parametrized using both Euler angles and unit quaternions. This
+      article explains how to convert between the two
+      representations. Actually this simple use of "quaternions" was
+      first presented by Euler some seventy years earlier than
+      Hamilton to solve the problem of magic squares." 
 ** Library GLM - OpenGL Math 
 
 The library GLM (OpenGL math library) contains many classes and
