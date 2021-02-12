@@ -510,12 +510,25 @@ in a vector which is perpendicular (orthogonal) to both A and B.
 
 \begin{equation}
    \text{cross}( \vec{A}, \vec{B} ) 
+
         = \vec{A} \times \vec{B} 
+
         = \begin{bmatrix} 
-             x_A \cdot z_B - z_A \cdot y_B   \\
+             y_A \cdot z_B - z_A \cdot y_B   \\
              z_A \cdot x_B - x_A \cdot z_B   \\
              x_A \cdot y_B - y_A \cdot x_B   \\
           \end{bmatrix}
+
+       = \begin{bmatrix}
+             0   & -z_A  &  y_A  \\
+             z_A &  0    & -x_A  \\
+            -y_A &  x_A  &  0    \\
+         \end{bmatrix}
+
+         \cdot 
+         \begin{bmatrix}
+            x_B  \\ y_B \\ z_B
+         \end{bmatrix}
 \end{equation}
 
 The cross product have the following properties: 
@@ -532,7 +545,6 @@ The cross product have the following properties:
 \begin{equation}
    \vec{A} \times \vec{B} = - \vec{B} \times \vec{A}
 \end{equation}
-
 
 *** 2D Affine Transforms
 
@@ -829,6 +841,7 @@ Scaling:
 \end{equation} 
 
 
+
 Rotation around x axis 
 
  + $R_x^{-1} = R_x^T$ => The inverse is equal to the transpose.
@@ -871,6 +884,555 @@ Rotation around z axis
    \end{bmatrix}
 \end{equation}
 
+*** Quaternions Introduction [DRAFT]
+
+Quaternions are a generalization of complex numbers, that was proposed
+and formulated by the irish mathematician and physicist William Rowan
+Hamilton, in 1843. This mathematical construct provides a convenient
+notation for expressing rotation and has a broad range of
+applications, including computer graphics, computer vision, robotics,
+orbital mechanics, aerospace and flight dynamics.
+
+A quaternion *q* is defined as: 
+ 
+  + Where:
+    + w, x, y, z are real numbers.
+    + w => is the quaternion's real (scalar) component.
+    + [x, y, z] => is the quaternion's vector componet 
+    + i, j, k are unit vectors (basis elements) that satisfies a set
+      of properties. 
+
+\begin{equation}
+   q = w + x \cdot i + y \cdot j + z \cdot k
+\end{equation}
+
+The quaternion *q* can be represented as: 
+
+   + Where:
+     + $\vec{v} = [x, y, z]$ is the quaternion vector component.
+
+\begin{align*}
+    q &= [w, x, y, z]  \quad & \text{Tuple representation}         \\
+    q &= (u, \vec{v})  \quad & \text{Scalar/vector representation} \\
+\end{align*}
+
+
+The quaternion unit vectors or basis elements satifies the following
+properties: 
+
+\begin{equation}
+   i^1 = j^2 = k^2 = i \cdot j \cdot k = -1 
+\end{equation}
+
+And also:
+
+\begin{align*}
+    i \cdot j = k  & \quad & j \cdot i =  k  \\
+    j \cdot k = i  & \quad & k \cdot j = -i  \\
+    k \cdot i = j  & \quad & i \cdot k = -j  \\
+\end{align*}
+
+ *Quaternion Conjugate* 
+
+The conjugate of a quaternion, $q^*$, is defined as:
+
+\begin{equation}
+  q^{*} = w - \vec{v} 
+        = w - (x \cdot i + y \cdot j + z \cdot k)
+        = w + (-x) i + (-y) j + (-z) k         
+\end{equation}
+ 
+ *Inverse Quaternion* $q^{-1}$
+
+\begin{equation}
+  q^{-1} = \frac{q^{*}}{ || q ||^2 }
+\end{equation}
+
+The inverse quaternion satifies the following equality: 
+
+\begin{equation}
+  q^{-1} \cdot q = q \cdot q^{-1} = 1 
+\end{equation}
+
+ *Quaternion Norm* 
+
+The norm (magnitude) of a quaternion is given by: 
+
+\begin{equation}
+   || q ||^2 = q \cdot q^{*} =  w^2 + x^2 + y^2 + z^2
+\end{equation}
+
+ *Unit quaternion* 
+
+An unit quaternion $q_u$ has norm equal to one.
+
+\begin{equation}
+   || q_u || = 1 
+\end{equation}
+
+An unit quaternion is equal to its conjugate: 
+
+\begin{equation} 
+   q^* = q^{-1}
+\end{equation}
+
+ *Quaternion Sum* 
+
+The sum of two quaternions q1 and q2 is: 
+
+\begin{equation}
+   q_1 + q_2 = (w_1 + w_2) + (x_1 + x_2) i + (y_1 + y_2)j + (z_1 + z_2) k
+\end{equation}
+
+ *Quaternion Product* (a.k.a Hamilton Product)
+
+The product *p* of two quaternons q1 and q2 can be computed as: 
+
+  + Where:
+    + p is the quaternion product between q1 and q2
+    + $\vec{v_1} \cdot \vec{v_2}$ is the scalar product between $\vec{v_1}$ and $\vec{v_2}$.
+    + $\vec{v1} \times \vec{v_2}$ is the cross product between  $\vec{v_1}$ and $\vec{v_2}$.
+    + $p_v$ is the vector component of p
+    + $p_w$ is the scalar/real component of p.
+
+\begin{equation}
+  p = q_1 \cdot q_2 = ( w_1 \cdot w_2 - \vec{v_1} \cdot \vec{v_2} \quad ; \quad
+                       w_1 \cdot \vec{v_2} + w_2 \cdot \vec{v_1} + \vec{v1} \times \vec{v_2} )
+\end{equation}
+
+The components of vector p are: 
+
+\begin{align*}
+    p_w &= w_1 \cdot w_2 - \vec{v_1} \cdot \vec{v_2}                             \\
+    p_v &= w_1 \cdot \vec{v_2} + w_2 \cdot \vec{v_1} + \vec{v1} \times \vec{v_2} \\
+\end{align*}
+
+The quaternion product is non commuative, as a result, the following
+holds: 
+
+\begin{equation}
+      q_1 \cdot q_2 \neq q_2 \cdot q_2 
+\end{equation}
+
+The quaternion product satifies the following properties: 
+
+\begin{align*}
+    || q_1 \cdot q_2 ||  &= ||q_1|| \cdot || q_2 ||   \\
+     (q_1 \cdot q_2)^* &= q_2^* \cdot q_1^*
+\end{align*}
+
+  *Quaternion product using matrices* 
+
+The product of two quaternions q1 and q2 can be computed 
+in a more convenient and faster way by using matrices and column
+vectors multiplication, instead of dot product and cross product. 
+
+Let $[q]_v$ be the vector column representation of a quaternion: 
+
+\begin{equation} 
+  [q]_v = \begin{bmatrix} w \\ x \\ y \\ z  \end{bmatrix}
+\end{equation}
+
+Let $[q]_m$ be the following matrix representation of a quaternion: 
+
+\begin{equation} 
+  [q]_m = \begin{bmatrix} 
+               w  & -x & -y & -z  \\ 
+               x  &  w & -z &  y  \\
+               y  &  z &  w & -x  \\
+               z  & -y &  x &  w  \\
+          \end{bmatrix}
+\end{equation}
+
+The quaternion product between q1 and q2, designated by $[q_r]_v$, can
+be expressed in the following way, which is more convenient for
+computer implementation as the whole algorithm becomes a single
+vector-matrix multiplication step.
+
+\begin{equation} 
+  [q_r]_v = q_1 \cdot q_2 = [q_1]_m \cdot [q_2]_v 
+          =           
+          \begin{bmatrix} 
+               w_1  & -x_1 & -y_1 & -z_1  \\ 
+               x_1  &  w_1 & -z_1 &  y_1  \\
+               y_1  &  z_1 &  w_1 & -x_1  \\
+               z_1  & -y_1 &  x_1 &  w_1  \\
+          \end{bmatrix}
+
+          \begin{bmatrix} 
+              w_2 \\ x_2 \\ y_2 \\ z_2 \\
+          \end{bmatrix}
+\end{equation}
+
+By performing the previous matrix multiplication, the quaternion
+product becomes: 
+
+\begin{equation} 
+     [q_r]_v = q_1 \cdot q_2 = 
+       \begin{bmatrix} 
+            w_1 \cdot w_2 - x_1 \cdot x_2 - y_1 \cdot y_2 - z_1 \cdot z_2  \\ 
+            w_1 \cdot x_2 + w_2 \cdot x_1 + y_1 \cdot z_2 - y_2 \cdot z_1  \\
+            w_1 \cdot y_2 + w_2 \cdot y_1 - x_1 \cdot z_2 + x_2 \cdot z_1  \\ 
+            w_1 \cdot z_2 + w_2 \cdot z_1 + x_1 \cdot y_2 - x_2 \cdot y_1  \\
+       \end{bmatrix}
+\end{equation}
+
+  *Quaternion for expressing rotation* 
+
+A rotation around an axis $\hat{n}$ (unit vector) by angle $\theta$
+can be encoded by quaternion $q_r$: 
+
+\begin{equation} 
+   q_r = \cos \frac{\theta}{2}  + \sin \frac{\theta}{2} \cdot \hat{n}
+       = \cos \frac{\theta}{2}  + \sin \frac{\theta}{2} ( x_n \cdot i + y_n \cdot j + z_n \cdot k  )
+\end{equation}
+
+ + Where:
+   + $\hat{n}$ is a unit vector.
+   + $\hat{n} = x_n \cdot i + y_n \cdot j + z_n \cdot k$ 
+   + $|| \hat{n} || = 1$
+
+The norm of quaternion $q_r = 1$, thus the following holds: 
+
+\begin{equation} 
+  || q_r || = 1 
+\end{equation}
+
+The coordinate transformation from a vector in reference frame A to a
+reference frame B, obtained by the rotation of coordinate frame A
+around a unit vector $\hat{n}$ can be computed as:
+
+\begin{equation} 
+   q_B = q_r \cdot q_A \cdot q_r^{-1}
+       = q_r \cdot q_A \cdot q_r^{*}
+\end{equation}
+
+Where: 
+  + $q_A$ is the coordinate of a vector in the reference frame A (aka
+    coordinate system, aka coordinate frame).
+  + $q_B$ is the coordinate of a the same vector in the reference frame B.  
+  + $q_A = 0 + x_A \cdot i + y_A \cdot j + z_A \cdot k$
+  + $q_B = 0 + x_B \cdot i + y_B \cdot j + z_B \cdot k$
+
+
+  *Quaternion to rotation matrix* 
+
+The rotation matrix that transforms coordinates from reference frame A
+to reference frame B can be computed as:  [[https://www.weizmann.ac.il/sci-tea/benari/sites/sci-tea.benari/files/uploads/softwareAndLearningMaterials/quaternion-tutorial-2-0-1.pdf][(Moti Ben-Ari - Wizmann)]], [[http://barbic.usc.edu/cs520-s12/quaternions/quaternions-cs520.pdf][(Jernej Barbic)]]
+
+\begin{equation} 
+   R_n = \begin{bmatrix}
+
+             a^2 + b^2 - c^2 - d^2  
+          &  2 (b \cdot c -  a \cdot d)
+          &  2 (b \cdot d +  a \cdot c)  \\
+
+             2 (b \cdot c +  a \cdot d )
+          &  a^2 - b^2 + c^2 -d^2                   
+          &  2 ( c \cdot d -  a \cdot b ) \\
+
+             2 ( b \cdot d -  a \cdot c  )
+          &  2 ( c \cdot d +  a \cdot b )
+          &  a^2 - b^2 - c^2 + d^2     \\
+
+         \end{bmatrix}
+\end{equation}
+
+Where: 
+  + a, b, c, d are the components of the unit quaternion $q_r$ 
+  + $a = \cos( \theta / 2)$
+  + $b = x_n \cdot \sin (\theta / 2)$
+  + $c = y_n \cdot \sin (\theta / 2)$
+  + $d = z_n \cdot \sin (\theta / 2)$
+
+The matrix $R_n$ can also be simplified to: [[https://www.weizmann.ac.il/sci-tea/benari/sites/sci-tea.benari/files/uploads/softwareAndLearningMaterials/quaternion-tutorial-2-0-1.pdf][(Moti Ben-Ari - Wizmann)]]
+
+\begin{equation} 
+   R_n = 2 \begin{bmatrix}
+              a^2 + b^2 - 1/2  & 
+              b \cdot c - a \cdot d  & 
+              a \cdot c + b \cdot d  \\ 
+
+              a \cdot d + b \cdot c  &
+              a^2  + c^2 - 1/2 & 
+              c \cdot d - a \cdot b  \\
+
+              b \cdot d - a \cdot c &
+              a \cdot b + c \cdot d &
+              a^2 + d^2 - 1/2 \\
+           
+          \end{bmatrix}
+\end{equation}
+
+Coordinates from frame A can be turned into coordinates from frame B
+by performing the following  matrix multiplication.
+
+\begin{equation} 
+    \begin{bmatrix} x_B \\ y_B \\ z_B \end{bmatrix}
+    = R_n  \begin{bmatrix} x_A \\ y_A \\ z_A \end{bmatrix}
+\end{equation}
+
+
+  *Quaternion to homogeneous coordinate rotation matrix* 
+
+The matrix $R_n$ can be converted to a homogenous coordinate form,
+$T_n$, which is more convenient, since homogenous coordinate allows
+expressing translations in a similar fashion to rotation
+transformations, just as vector-matrix multiplication.
+
+
+\begin{equation} 
+   T_n = \begin{bmatrix}
+
+             a^2 + b^2 - c^2 - d^2  
+          &  2 (b \cdot c -  a \cdot d)
+          &  2 (b \cdot d +  a \cdot c)  
+          &  0                            \\
+
+             2 (b \cdot c +  a \cdot d )
+          &  a^2 - b^2 + c^2 -d^2                   
+          &  2 ( c \cdot d -  a \cdot b ) 
+          &  0                            \\
+
+             2 ( b \cdot d -  a \cdot c  )
+          &  2 ( c \cdot d +  a \cdot b )
+          &  a^2 - b^2 - c^2 + d^2     
+          &  0                            \\
+
+             0 & 0 & 0 & 1 \\ 
+         \end{bmatrix}
+\end{equation}
+
+
+\begin{equation} 
+   T_n = 2 \begin{bmatrix}
+              a^2 + b^2 - 1/2  & 
+              b \cdot c - a \cdot d  & 
+              a \cdot c + b \cdot d  & 
+              0                      \\ 
+
+              a \cdot d + b \cdot c  &
+              a^2  + c^2 - 1/2       & 
+              c \cdot d - a \cdot b  & 
+              0                     \\ 
+
+              b \cdot d - a \cdot c &
+              a \cdot b + c \cdot d &
+              a^2 + d^2 - 1/2       & 
+              0                     \\ 
+
+              0 & 0 & 0 & 1 \\
+           
+          \end{bmatrix}
+\end{equation}
+
+Homogeneous coordinates from frame A can be turned into coordinates of
+frame B by using the following expression: 
+
+\begin{equation} 
+    \begin{bmatrix} x_B \\ y_B \\ z_B \\ 1 \end{bmatrix}
+    = T_n  \begin{bmatrix} x_A \\ y_A \\ z_A \\ 1 \end{bmatrix}
+\end{equation}
+
+
+ *References* 
+
+   + [[https://en.wikipedia.org/wiki/Quaternion][Quaternions]] - Wikipedia
+
+   + [[https://en.wikipedia.org/wiki/Quaternions_and_spatial_rotation][Quaternions and spatial rotation]] 
+
+   + [[https://en.wikipedia.org/wiki/History_of_quaternions][History of Quaternions]]
+
+   + [[https://arxiv.org/pdf/2009.00425.pdf][An algorithm for dividing quaternions]] [PAPER]
+
+   + [[http://www.chrobotics.com/library/understanding-quaternions][Understanding Quaternions]]  - ChRobotics
+
+   + [[http://www.chrobotics.com/library/understanding-euler-angles][Understanding Euler Angles]] - ChRobotics
+
+   + [[https://www.energid.com/resources/orientation-calculator][Quaternion Calculator]] - Energid / Actin Advanced Control For Robotics
+     + Note: Online calculator for Quaternions.
+
+   + [[https://www.weizmann.ac.il/sci-tea/benari/sites/sci-tea.benari/files/uploads/softwareAndLearningMaterials/quaternion-tutorial-2-0-1.pdf][A Tutorial on Euler Angles and Quaternions]] - Weizmann Institute of Science
+
+   + [[http://wiki.ogre3d.org/Quaternion+and+Rotation+Primer][Quaternion Rotation Primer / Ogre3D Game Engine]]
+
+   + https://web.cs.ucdavis.edu/~amenta/3dphoto/quaternion.pdf
+
+
+  *Quaternion Test Cases* 
+
+
+  + From: https://www.maplesoft.com/applications/view.aspx?SID=4886&view=html
+    + q1 = (-6)  + (-8)i  + ( -5)j +     7k
+    + q2 = (-14) + (-12)i + (-19)k + (-17)k
+    + q1 * q2 = 12 +   402i + (-36)j + 96k
+    + q2 * q1 = 12 + (-34)i +   404j + (-88)k
+*** Quaternion Implementation and Validation in Julia Language
+
+
+  *Quaternion Multiplication - Implementation in Julia Language* 
+
+#+BEGIN_SRC julia 
+  # Dot product of two column vectors 
+  function dot(v1, v2)
+     v1[1] * v2[1] + v1[2] * v2[2] + v1[3] * v2[3]
+  end
+
+  # Cross product of two column vectors 
+  function cross(v1, v2)
+     x1, y1, z1 = v1 
+     T = [ 0 -z1 y1 ; z1 0 -x1 ; -y1 x1 0 ]
+     T * v2 
+  end 
+
+  # Product between two quaternions 
+  function prodq(q1, q2)
+     w1, v1 = q1 
+     w2, v2 = q2 
+     wp = w1 * w2 - dot(v1, v2)
+     vp = w1 * v2 + w2 * v1 + cross(v1, v2)
+     (wp, vp)
+  end
+
+  # Convert quaternion to complex-matrix representation 
+  function quat_to_cplmat(q)
+      w, v = q 
+      x, y, z = v 
+      i = sqrt(Complex(-1.0))
+      [ (w + x * i) (y + z * i) ; (-y + z * i) (w - x * i) ]
+   end
+
+   # Convert quaternion complex-matrix representation to scalar-vector representation. 
+   function cplmat_to_quat(mat)
+       w = real( mat[1, 1] )
+       x = imag( mat[1, 1] )
+       y = real( mat[1, 2] )
+       z = imag( mat[1, 2] )
+       ( w, [x y z]' )
+   end
+
+   # Convert quaternion to 4x4 matrix representation 
+   function quat_to_mat4x4(q)
+       w, v    = q 
+       x, y, z = v
+       [ w -x -y -z ; x w -z y ; y z w -x ; z -y x w ] 
+    end
+
+
+  # ------------ Test vector cross product -------------------#
+
+   julia> v1 = [3.0 4.0 5.0]'
+   3×1 LinearAlgebra.Adjoint{Float64,Array{Float64,2}}:
+    3.0
+    4.0
+    5.0
+
+   julia> v2 = [8.0 9.0 10.0]'
+   3×1 LinearAlgebra.Adjoint{Float64,Array{Float64,2}}:
+     8.0
+     9.0
+    10.0
+
+   julia> cross(v1, v2)
+   3×1 Array{Float64,2}:
+    -5.0
+    10.0
+    -5.0
+
+   julia> cross(v2, v1)
+   3×1 Array{Float64,2}:
+      5.0
+    -10.0
+      5.0
+
+   julia> dot(cross(v1, v2), v1)
+   0.0
+
+   julia> dot(cross(v1, v2), v2)
+   0.0
+
+  # ========= Test quaternion product multiplication =============#
+  
+  # Test case from: 
+  # https://www.mathworks.com/help/aerotbx/ug/quatmultiply.html
+
+  julia> q1 = (1, [0 1 0]')
+  (1, [0; 1; 0])
+
+  julia> q2 = (1, [0.5 0.5 0.75]')
+  (1, [0.5; 0.5; 0.75])
+
+  julia> prodq(q1, q2) # OK 
+  (0.5, [1.25; 1.5; 0.25])
+
+
+ ## ======= Complex Matrix Representation =======================## 
+
+   julia> mat1 = quat_to_cplmat(q1)
+   2×2 Array{Complex{Float64},2}:
+     1.0+0.0im  1.0+0.0im
+    -1.0+0.0im  1.0-0.0im
+
+   julia> mat2 = quat_to_cplmat(q2)
+   2×2 Array{Complex{Float64},2}:
+     1.0+0.5im   0.5+0.75im
+    -0.5+0.75im  1.0-0.5im
+
+   julia> rmat = mat1 * mat2
+   2×2 Array{Complex{Float64},2}:
+     0.5+1.25im  1.5+0.25im
+    -1.5+0.25im  0.5-1.25im
+
+   # OK! Works
+   julia> cplmat_to_quat(rmat)
+   (0.5, [1.25; 1.5; 0.25])
+
+  # ------ Test 4x4 real matrix representation ---------------------# 
+
+  julia> m1 = quat_to_mat4x4(q1)
+  4×4 Array{Int64,2}:
+   1   0  -1  0
+   0   1   0  1
+   1   0   1  0
+   0  -1   0  1
+
+  julia> m2 = quat_to_mat4x4(q2)
+  4×4 Array{Float64,2}:
+   1.0   -0.5   -0.5   -0.75
+   0.5    1.0   -0.75   0.5
+   0.5    0.75   1.0   -0.5
+   0.75  -0.5    0.5    1.0
+
+  julia> rm = m1 * m2 
+  4×4 Array{Float64,2}:
+   0.5   -1.25  -1.5   -0.25
+   1.25   0.5   -0.25   1.5
+   1.5    0.25   0.5   -1.25
+   0.25  -1.5    1.25   0.5
+
+  # The result is the first matrix column 
+  julia> w, x, y, z = q_result
+  4-element Array{Float64,1}:
+   0.5
+   1.25
+   1.5
+   0.25
+
+  julia> t = [1 0.5 0.5 0.75]' 
+  4×1 LinearAlgebra.Adjoint{Float64,Array{Float64,2}}:
+   1.0
+   0.5
+   0.5
+   0.75
+
+  julia> m1 * t
+  4×1 Array{Float64,2}:
+   0.5
+   1.25
+   1.5
+   0.25
+
+#+END_SRC
 *** Further Reading 
 
   + [[https://en.m.wikipedia.org/wiki/Coordinate_system][Coordinate system - Wikipedia]]
