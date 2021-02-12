@@ -1258,16 +1258,14 @@ frame B by using the following expression:
 
    + https://web.cs.ucdavis.edu/~amenta/3dphoto/quaternion.pdf
 
-
-  *Quaternion Test Cases* 
-
-
-  + From: https://www.maplesoft.com/applications/view.aspx?SID=4886&view=html
-    + q1 = (-6)  + (-8)i  + ( -5)j +     7k
-    + q2 = (-14) + (-12)i + (-19)k + (-17)k
-    + q1 * q2 = 12 +   402i + (-36)j + 96k
-    + q2 * q1 = 12 + (-34)i +   404j + (-88)k
 *** Quaternion Implementation in Julia Language
+
+It is worth prototyping quaternion math in a numerically-oriented programming
+language such as [[https://en.wikipedia.org/wiki/Julia_(programming_language)][Julia Language]] is helpful for understanding and
+validating the inner works of quaternion computations. This
+implementation of quaternion math represents quaternion as an array of
+four elements and uses a matrix representation for implemeting
+quaternion multiplication. 
 
 #+BEGIN_SRC julia 
    # Struct for storing quaternion 
@@ -1318,10 +1316,10 @@ frame B by using the following expression:
      return quat(q.w, -q.x, -q.y, -q.z)
    end 
 
-   # Inverse of quaternion 
+   # Inverse of quaternion q^-1
    function Base.:inv(q::quatp)
       w, x, y, z = q.arr 
-      norm_square =  x * x + y * y + z * z 
+      norm_square =  w * w +  x * x + y * y + z * z 
       return  quat(w, -x, -y, -z) / norm_square
    end 
 
@@ -1349,6 +1347,47 @@ frame B by using the following expression:
    const i = quat(0.0, 1.0, 0.0, 0.0)
    const j = quat(0.0, 0.0, 1.0, 0.0)
    const k = quat(0.0, 0.0, 0.0, 1.0)
+
+
+   # Obtain a rotation quaternion that represents a rotation 
+   # by some angle around some direction (normalized vector 'vec') 
+   # => The angle is given in degrees.
+   function rot_quat(angle::Float64, vec)
+      # Normalize vector vec and store the result in v
+      xv, yv, zv = vec 
+      x, y, z = vec / sqrt( xv * xv + yv * yv + zv * zv )
+      S = cosd(angle / 2)
+      C = sind(angle / 2)
+      return quat(C, S * x, S * y, S * z)   
+   end 
+
+
+   # Obtain a rotation matrix - that represents rotation
+   # around an arbitrary axis (vector)
+   # Note: The angle is should be in degrees.
+   # 
+   function make_rotmat(angle::Float64, vec)
+      # Normalize vector vec and store components in x, y, z
+      x, y, z = vec 
+      x, y, z = vec / sqrt( x * x + y * y + z * z )
+      # sin and cos caching 
+      C = cosd(angle / 2)
+      S = sind(angle / 2)
+      # Parameters a, b, c, d => Components of the rotation 
+      # quaternion 
+      a = C 
+      b = x * S 
+      c = y * S 
+      d = z * S 
+      # rotation matrix 
+      mat = [
+           ( a^2 + b^2 - c^2 - d^2 )  ( 2 * (b * c - a * d )  ) ( 2 * (b * d + a * c)   )  0 
+        ;  ( 2 * (b * c + a * d)   )  ( a^2 - b^2 + c^2 - d^2 ) ( 2 * (c * d - a * b)   )  0
+        ;  ( 2 * (b * d - a * c)   )  ( 2 * (c * d + a * b)   ) ( a^2 - b^2 - c^2 + d^2 )  0 
+        ;  0                          0                         0                          1
+      ] 
+      return mat 
+   end 
 #+END_SRC
 
 Quaternion components: 
@@ -1385,7 +1424,42 @@ Quaternion components:
      5.6
 #+END_SRC
 
-Test case 1: 
+Quaternion conjugate and inverse: 
+
+#+BEGIN_SRC julia 
+   julia> q = quat(1.0, 2.0, 3.0, 4.0)
+   quatp([1.0, 2.0, 3.0, 4.0])
+
+   julia> inv(q)
+   quatp([0.03333333333333333, -0.06666666666666667, -0.1, -0.13333333333333333])
+   
+   # Expected (-1.0)
+   julia> q * inv(q)
+   quatp([1.0, 0.0, 0.0, 0.0])
+
+   # Expected (-1.0)
+   julia> inv(q) * q
+   quatp([1.0, -5.551115123125783e-17, -6.938893903907228e-18, 5.551115123125783e-17])
+#+END_SRC
+
+Normalize a quaternion: 
+
+#+BEGIN_SRC julia 
+  # Expected normalized to be: (w = 0.18257, x = 0.36515, y = 0.54772, z = 0.7303)
+  # Test case from: Matlab Robotics Toolbox - https://www.mathworks.com/help/robotics/ref/quaternion.normalize.html
+
+   julia> q = quat(1.0, 2.0, 3.0, 4.0)
+   quatp([1.0, 2.0, 3.0, 4.0])
+
+   julia> qn = normalize(q)
+   quatp([0.18257418583505536, 0.3651483716701107, 0.5477225575051661, 0.7302967433402214])
+
+   julia> norm(qn)
+   0.9999999999999999
+
+#+END_SRC
+
+Test case 1 - for quaternion multiplication: 
 
   + Test quaternion laws:
   + Expected: i * i = j * j = k * k = -1
@@ -1434,7 +1508,7 @@ Test case 1:
 
 #+END_SRC
 
-Test case 2: 
+Test case 2 - for quaternion multiplication: 
 
   + From:  [[https://www.mathworks.com/help/aerotbx/ug/quatmultiply.html][Matlab Aerospace Toolbox]]
   + q1 = [ 1.0 0.0 1.0 0.00 ]
@@ -1461,7 +1535,7 @@ Test case 2:
   quatp([0.5, 1.25, 1.5, 0.25])
 #+END_SRC
 
-Test case 3: 
+Test case 3 - for quaternion multiplication:
 
   + From: [[https://www.maplesoft.com/applications/view.aspx?SID=4886&view=html][Maplesoft - Quaternion]]
   + q1 = ( -6) +  (-8)i +  (-5)j +     7k
@@ -1489,6 +1563,149 @@ Test case 3:
   julia> q2 + q1
   quatp([-20.0, -20.0, -24.0, -10.0])
 
+
+#+END_SRC
+
+ *Test algorithm - make_rotmat* that computes rotation matrices around
+ an arbitrary axis: 
+
+Define functions for computing rotation matrices: 
+
+#+BEGIN_SRC julia
+   # Rotation around X axis 
+   function rot_x(angle::Float64) 
+      C = cosd(angle)
+      S = sind(angle)
+      return [  1   0   0  0
+              ; 0   C  -S  0 
+              ; 0   S   C  0 
+              ; 0   0   0  1
+             ]
+   end
+
+   # Rotation around X axis 
+   function rot_y(angle::Float64) 
+      c = cosd(angle)
+      s = sind(angle)
+      return [  c   0   s  0
+              ; 0   1   0  0 
+              ;-s   0   c  0 
+              ; 0   0   0  1
+             ]
+   end
+
+   # Returns homogeneous rotation matrix around Z axis 
+   # => The angle must be in degrees, not radians
+   function rot_z(angle::Float64) 
+      c = cosd(angle)
+      s = sind(angle)
+      return [  c  -s  0  0
+              ; s   c  0  0 
+              ; 0   0  1  0 
+              ; 0   0  0  1
+             ]
+   end
+#+END_SRC  
+
+Test rotation matrices: 
+
+#+BEGIN_SRC julia 
+   const axis_x = [1.0 0.0 0.0]';
+   const axis_y = [0.0 1.0 0.0]';
+   const axis_z = [0.0 0.0 1.0]';
+
+   # -------- Rotation around Z axis ---------- #
+   # 
+
+   julia> rot_z(90.0)
+   4×4 Array{Float64,2}:
+    0.0  -1.0  0.0  0.0
+    1.0   0.0  0.0  0.0
+    0.0   0.0  1.0  0.0
+    0.0   0.0  0.0  1.0
+
+   julia> make_rotmat(90.0, axis_z)
+   4×4 Array{Float64,2}:
+    0.0  -1.0  0.0  0.0
+    1.0   0.0  0.0  0.0
+    0.0   0.0  1.0  0.0
+    0.0   0.0  0.0  1.0
+
+
+   julia> rot_z(45.0)
+   4×4 Array{Float64,2}:
+    0.707107  -0.707107  0.0  0.0
+    0.707107   0.707107  0.0  0.0
+    0.0        0.0       1.0  0.0
+    0.0        0.0       0.0  1.0
+
+   julia> make_rotmat(45.0, axis_z)
+   ]4×4 Array{Float64,2}:
+    0.707107  -0.707107  0.0  0.0
+    0.707107   0.707107  0.0  0.0
+    0.0        0.0       1.0  0.0
+    0.0        0.0       0.0  1.0
+
+   julia> rot_z(125.0)
+   4×4 Array{Float64,2}:
+    -0.573576  -0.819152  0.0  0.0
+     0.819152  -0.573576  0.0  0.0
+     0.0        0.0       1.0  0.0
+     0.0        0.0       0.0  1.0
+
+   julia> make_rotmat(125.0, axis_z)
+   4×4 Array{Float64,2}:
+    -0.573576  -0.819152  0.0  0.0
+     0.819152  -0.573576  0.0  0.0
+     0.0        0.0       1.0  0.0
+     0.0        0.0       0.0  1.0
+
+
+   # ----- Rotation around X axis ------------#
+   # 
+   julia> rot_x(0.0)
+   4×4 Array{Float64,2}:
+    1.0  0.0   0.0  0.0
+    0.0  1.0  -0.0  0.0
+    0.0  0.0   1.0  0.0
+    0.0  0.0   0.0  1.0
+
+   julia> make_rotmat(0.0, axis_x)
+   4×4 Array{Float64,2}:
+    1.0  0.0  0.0  0.0
+    0.0  1.0  0.0  0.0
+    0.0  0.0  1.0  0.0
+    0.0  0.0  0.0  1.0
+
+
+   julia> rot_x(45.0)
+   4×4 Array{Float64,2}:
+    1.0  0.0        0.0       0.0
+    0.0  0.707107  -0.707107  0.0
+    0.0  0.707107   0.707107  0.0
+    0.0  0.0        0.0       1.0
+
+   julia> make_rotmat(45.0, axis_x)
+   4×4 Array{Float64,2}:
+    1.0  0.0        0.0       0.0
+    0.0  0.707107  -0.707107  0.0
+    0.0  0.707107   0.707107  0.0
+    0.0  0.0        0.0       1.0
+
+
+   julia> rot_x(90.0)
+   4×4 Array{Float64,2}:
+    1.0  0.0   0.0  0.0
+    0.0  0.0  -1.0  0.0
+    0.0  1.0   0.0  0.0
+    0.0  0.0   0.0  1.0
+
+   julia> make_rotmat(90.0, axis_x)
+   4×4 Array{Float64,2}:
+    1.0  0.0   0.0  0.0
+    0.0  0.0  -1.0  0.0
+    0.0  1.0   0.0  0.0
+    0.0  0.0   0.0  1.0
 
 #+END_SRC
 
