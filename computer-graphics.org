@@ -1267,172 +1267,231 @@ frame B by using the following expression:
     + q2 = (-14) + (-12)i + (-19)k + (-17)k
     + q1 * q2 = 12 +   402i + (-36)j + 96k
     + q2 * q1 = 12 + (-34)i +   404j + (-88)k
-*** Quaternion Implementation and Validation in Julia Language
-
-
-  *Quaternion Multiplication - Implementation in Julia Language* 
+*** Quaternion Implementation in Julia Language
 
 #+BEGIN_SRC julia 
-  # Dot product of two column vectors 
-  function dot(v1, v2)
-     v1[1] * v2[1] + v1[2] * v2[2] + v1[3] * v2[3]
-  end
+   # Struct for storing quaternion 
+   # q = w + x·i + y·j + z·k 
+   struct quatp
+      arr::Array{Float64,1}
+   end 
 
-  # Cross product of two column vectors 
-  function cross(v1, v2)
-     x1, y1, z1 = v1 
-     T = [ 0 -z1 y1 ; z1 0 -x1 ; -y1 x1 0 ]
-     T * v2 
-  end 
+   function quat(x, y, z, w)
+     return quatp([x ; y; z; w])
+   end 
 
-  # Product between two quaternions 
-  function prodq(q1, q2)
-     w1, v1 = q1 
-     w2, v2 = q2 
-     wp = w1 * w2 - dot(v1, v2)
-     vp = w1 * v2 + w2 * v1 + cross(v1, v2)
-     (wp, vp)
-  end
+   # Turns a quaternion into 4x4 matrix representation
+   function quat_to_mat4x4(q::quatp)
+       w, x, y, z  = q.arr 
+       mat = [  w -x -y -z 
+              ; x  w -z  y 
+              ; y  z  w -x 
+              ; z -y x w ] 
+       return mat 
+    end 
 
-  # Convert quaternion to complex-matrix representation 
-  function quat_to_cplmat(q)
-      w, v = q 
-      x, y, z = v 
-      i = sqrt(Complex(-1.0))
-      [ (w + x * i) (y + z * i) ; (-y + z * i) (w - x * i) ]
+   function Base.getproperty(q::quatp, sym::Symbol)
+       if sym == :arr 
+           return getfield(q, :arr)
+       elseif sym == :w 
+           return getfield(q, :arr)[1]
+       elseif sym == :x 
+           return getfield(q, :arr)[2]
+       elseif sym == :y
+           return getfield(q, :arr)[3]
+       elseif sym == :z 
+           return getfield(q, :arr)[4]
+       elseif sym == :v  
+           # Return only the quaternion (vector part)
+           return getfield(q, :arr)[2:end]
+       end 
    end
 
-   # Convert quaternion complex-matrix representation to scalar-vector representation. 
-   function cplmat_to_quat(mat)
-       w = real( mat[1, 1] )
-       x = imag( mat[1, 1] )
-       y = real( mat[1, 2] )
-       z = imag( mat[1, 2] )
-       ( w, [x y z]' )
-   end
+   # Norm - quaternion magnitude, akin to vector norm 
+   function norm(q::quatp)
+      w, x, y, z = q.arr 
+      return sqrt(w * w + x * x + y * y + z * z)
+   end 
 
-   # Convert quaternion to 4x4 matrix representation 
-   function quat_to_mat4x4(q)
-       w, v    = q 
-       x, y, z = v
-       [ w -x -y -z ; x w -z y ; y z w -x ; z -y x w ] 
-    end
+   # Conjugate of a quaternion 
+   function conj(q::quatp)
+     return quat(q.w, -q.x, -q.y, -q.z)
+   end 
 
+   # Inverse of quaternion 
+   function Base.:inv(q::quatp)
+      w, x, y, z = q.arr 
+      norm_square =  x * x + y * y + z * z 
+      return  quat(w, -x, -y, -z) / norm_square
+   end 
 
-  # ------------ Test vector cross product -------------------#
+   # Quaternion sum 
+   Base.:+(q1::quatp, q2::quatp) = quat(q1.w + q2.w, q1.x + q2.x, q1.y + q2.y, q1.z + q2.z) 
+   Base.:-(q1::quatp, q2::quatp) = quat(q1.w - q2.w, q1.x - q2.x, q1.y - q2.y, q1.z - q2.z) 
 
-   julia> v1 = [3.0 4.0 5.0]'
-   3×1 LinearAlgebra.Adjoint{Float64,Array{Float64,2}}:
-    3.0
-    4.0
-    5.0
+   Base.:+(q::quatp,   w::Float64) = quat(w + q.w, q.x, q.y, q.z)
+   Base.:+(w::Float64, q::quatp  ) = quat(w + q.w, q.x, q.y, q.z)
+   Base.:-(q::quatp,   w::Float64) = quat(q.w - w, q.x, q.y, q.z)
 
-   julia> v2 = [8.0 9.0 10.0]'
-   3×1 LinearAlgebra.Adjoint{Float64,Array{Float64,2}}:
-     8.0
-     9.0
-    10.0
+   # Mutliplication => scalar X quaternion 
+   Base.:*(a::Float64, q::quatp) = quat( a * q.w, a * q.x, a * q.y, a * q.z)
+   Base.:*(q::quatp, a::Float64) = quat( a * q.w, a * q.x, a * q.y, a * q.z)
 
-   julia> cross(v1, v2)
-   3×1 Array{Float64,2}:
-    -5.0
-    10.0
-    -5.0
+   Base.:/(q::quatp, a::Float64) = quat( q.w / a, q.x / a, q.y / a, q.z / a)
 
-   julia> cross(v2, v1)
-   3×1 Array{Float64,2}:
-      5.0
-    -10.0
-      5.0
+   # Quaternion multiplication / product
+   Base.:*(q1::quatp, q2::quatp) = begin 
+        A = quat_to_mat4x4(q1)
+        return quatp( A * q2.arr )
+   end 
 
-   julia> dot(cross(v1, v2), v1)
-   0.0
+   # Unit quaternions i, j, k 
+   const i = quat(0.0, 1.0, 0.0, 0.0)
+   const j = quat(0.0, 0.0, 1.0, 0.0)
+   const k = quat(0.0, 0.0, 0.0, 1.0)
+#+END_SRC
 
-   julia> dot(cross(v1, v2), v2)
-   0.0
+Quaternion components: 
 
-  # ========= Test quaternion product multiplication =============#
-  
-  # Test case from: 
-  # https://www.mathworks.com/help/aerotbx/ug/quatmultiply.html
+#+BEGIN_SRC julia 
+  # Construct a quaternion 
 
-  julia> q1 = (1, [0 1 0]')
-  (1, [0; 1; 0])
+  julia> q = quat(10.5, -25.1, 4.5, 5.6)
+  quatp([10.5, -25.1, 4.5, 5.6])
 
-  julia> q2 = (1, [0.5 0.5 0.75]')
-  (1, [0.5; 0.5; 0.75])
+  julia> q.w # Real part 
+  10.5
 
-  julia> prodq(q1, q2) # OK 
-  (0.5, [1.25; 1.5; 0.25])
+  julia> q.x # Imaginary part - i axis component
+  -25.1
 
+  julia> q.y # Imaginary part - j axis component
+  4.5
 
- ## ======= Complex Matrix Representation =======================## 
+  julia> q.z # Imaginary part - k axis component (Z axis)
+  5.6
 
-   julia> mat1 = quat_to_cplmat(q1)
-   2×2 Array{Complex{Float64},2}:
-     1.0+0.0im  1.0+0.0im
-    -1.0+0.0im  1.0-0.0im
-
-   julia> mat2 = quat_to_cplmat(q2)
-   2×2 Array{Complex{Float64},2}:
-     1.0+0.5im   0.5+0.75im
-    -0.5+0.75im  1.0-0.5im
-
-   julia> rmat = mat1 * mat2
-   2×2 Array{Complex{Float64},2}:
-     0.5+1.25im  1.5+0.25im
-    -1.5+0.25im  0.5-1.25im
-
-   # OK! Works
-   julia> cplmat_to_quat(rmat)
-   (0.5, [1.25; 1.5; 0.25])
-
-  # ------ Test 4x4 real matrix representation ---------------------# 
-
-  julia> m1 = quat_to_mat4x4(q1)
-  4×4 Array{Int64,2}:
-   1   0  -1  0
-   0   1   0  1
-   1   0   1  0
-   0  -1   0  1
-
-  julia> m2 = quat_to_mat4x4(q2)
-  4×4 Array{Float64,2}:
-   1.0   -0.5   -0.5   -0.75
-   0.5    1.0   -0.75   0.5
-   0.5    0.75   1.0   -0.5
-   0.75  -0.5    0.5    1.0
-
-  julia> rm = m1 * m2 
-  4×4 Array{Float64,2}:
-   0.5   -1.25  -1.5   -0.25
-   1.25   0.5   -0.25   1.5
-   1.5    0.25   0.5   -1.25
-   0.25  -1.5    1.25   0.5
-
-  # The result is the first matrix column 
-  julia> w, x, y, z = q_result
+  julia> q.arr # Internal array data representation
   4-element Array{Float64,1}:
-   0.5
-   1.25
-   1.5
-   0.25
+    10.5
+   -25.1
+     4.5
+     5.6
 
-  julia> t = [1 0.5 0.5 0.75]' 
-  4×1 LinearAlgebra.Adjoint{Float64,Array{Float64,2}}:
-   1.0
-   0.5
-   0.5
-   0.75
+  julia> q.v # Vector component (i, j, k) components only
+  3-element Array{Float64,1}:
+   -25.1
+     4.5
+     5.6
+#+END_SRC
 
-  julia> m1 * t
-  4×1 Array{Float64,2}:
-   0.5
-   1.25
-   1.5
-   0.25
+Test case 1: 
+
+  + Test quaternion laws:
+  + Expected: i * i = j * j = k * k = -1
+  + Expected: i * j = k
+  + Expected: j * k = i
+  + Expected: k * i = j
+  + Expected: j * i = -k
+
+#+BEGIN_SRC julia 
+   # ---- Show components i, j, k --------#
+
+   julia> i 
+   quatp([0.0, 1.0, 0.0, 0.0])
+
+   julia> j
+   quatp([0.0, 0.0, 1.0, 0.0])
+
+   julia> k
+   quatp([0.0, 0.0, 0.0, 1.0])
+
+   # ----- Check multiplication of i, j, k by themselves -----------#
+   # 
+
+   julia> i * i # Expected -1 or (-1) + 0·i + 0·j + 0·k
+   quatp([-1.0, 0.0, 0.0, 0.0])
+
+   julia> j * j # Expected -1 
+   quatp([-1.0, 0.0, 0.0, 0.0])
+
+   julia> k * k # Expected -1 
+   quatp([-1.0, 0.0, 0.0, 0.0])
+
+   #------- Check multiplication i * j, j * k, k * i and j * i 
+   #
+   julia> i * j # Expected k 
+   quatp([0.0, 0.0, 0.0, 1.0])
+
+   julia> j * i # Expected -k 
+   quatp([0.0, 0.0, 0.0, -1.0])
+
+   julia> k * i # Expected j 
+   quatp([0.0, 0.0, 1.0, 0.0])
+
+   julia> i * k # Expected -j
+   quatp([0.0, 0.0, -1.0, 0.0])
 
 #+END_SRC
+
+Test case 2: 
+
+  + From:  [[https://www.mathworks.com/help/aerotbx/ug/quatmultiply.html][Matlab Aerospace Toolbox]]
+  + q1 = [ 1.0 0.0 1.0 0.00 ]
+  + q2 = [ 1.0 0.5 0.5 0.75 ]
+  + Expected result =>> q1 * q2 = [ 0.5 1.25 1.5 0.25 ]
+
+#+BEGIN_SRC julia 
+  # -------- Test A ------------------------#
+  julia> q1 = quat(1.0, 0.0, 1.0, 0.0) 
+  quatp([1.0, 0.0, 1.0, 0.0])
+
+  julia> q2 = quat(1.0, 0.5, 0.5, 0.75)
+  quatp([1.0, 0.5, 0.5, 0.75])
+ 
+  # ------- Test B ---------------------#
+
+  julia> q1 = 1.0 + 0.0i + 1.0j + 0.0k
+  quatp([1.0, 0.0, 1.0, 0.0])
+
+  julia> q2 = 1.0 + 0.5i + 0.5j + 0.75k
+  quatp([1.0, 0.5, 0.5, 0.75])
+
+  julia> q1 * q2
+  quatp([0.5, 1.25, 1.5, 0.25])
+#+END_SRC
+
+Test case 3: 
+
+  + From: [[https://www.maplesoft.com/applications/view.aspx?SID=4886&view=html][Maplesoft - Quaternion]]
+  + q1 = ( -6) +  (-8)i +  (-5)j +     7k
+  + q2 = (-14) + (-12)i + (-19)j + (-17)k
+  + Expected: q1 * q2 = 12 +   402i + (-36)j +   96k
+  + Expected: q2 * q1 = 12 + (-34)i +   404j + (-88)k
+  + Expected: q2 + q1 = (-20) + (-20)i + (-24)j + (-10)k
+
+#+BEGIN_SRC julia 
+  julia> q1 = -6.0 + -8.0i + -5.0j + 7.0k
+  quatp([-6.0, -8.0, -5.0, 7.0])
+
+  julia> q2 = -14.0 + -12.0i + -19.0j + -17.0k
+  quatp([-14.0, -12.0, -19.0, -17.0])
+
+  julia> q1 * q2
+  quatp([12.0, 402.0, -36.0, 96.0])
+
+  julia> q2 * q1
+  quatp([12.0, -34.0, 404.0, -88.0])
+
+  julia> q1 + q2
+  quatp([-20.0, -20.0, -24.0, -10.0])
+
+  julia> q2 + q1
+  quatp([-20.0, -20.0, -24.0, -10.0])
+
+
+#+END_SRC
+
 *** Further Reading 
 
   + [[https://en.m.wikipedia.org/wiki/Coordinate_system][Coordinate system - Wikipedia]]
