@@ -460,6 +460,19 @@ computed as:
     || \text{normalized}( \vec{A} ) || = 1 
 \end{equation}
 
+
+ *Distance between two position (point) vectors* 
+
+Given two vectors A and B which represent the position relative to the
+coordinate system origin or point. (0, 0, 0). The distance between A
+and B, or the length of the vector difference between A and B is
+determined by the following relation. 
+
+\begin{eqnarray*} 
+   \text{distance}( \vec{A}, \vec{B}) &=& || \vec{A}  - \vec{B} || = || \vec{B}  - \vec{A} || \\
+   \text{distance}( \vec{A}, \vec{B}) &=& \sqrt{ (x_A - x_B)^2 + (y_A - y_B)^2 + (z_A - z_B)^2 }
+\end{eqnarray*}
+
  *Dot Product* 
 
 The vector _dot product_ is:  
@@ -503,7 +516,7 @@ matrices, the product can be computed as a matrix multiplication.
         \begin{bmatrix} x_B \\ y_B \\ z_B  \end{bmatrix}
 \end{equation}
 
- *Cross Product* 
+ *Cross Product* / *Vector product* 
 
 The cross product between two vectors $\vec{A}$ and $\vec{B}$ results
 in a vector which is perpendicular (orthogonal) to both A and B. 
@@ -519,16 +532,19 @@ in a vector which is perpendicular (orthogonal) to both A and B.
              x_A \cdot y_B - y_A \cdot x_B   \\
           \end{bmatrix}
 
-       = \begin{bmatrix}
-             0   & -z_A  &  y_A  \\
-             z_A &  0    & -x_A  \\
-            -y_A &  x_A  &  0    \\
-         \end{bmatrix}
+       = [A]_{\times} \cdot B       
+\end{equation}
 
-         \cdot 
-         \begin{bmatrix}
-            x_B  \\ y_B \\ z_B
-         \end{bmatrix}
+
+Where $[A]_{\times}$ is the following matrix: 
+
+\begin{equation} 
+  [A]_{\times} =
+     \begin{bmatrix}
+          0   & -z_A  &  y_A  \\
+          z_A &  0    & -x_A  \\
+         -y_A &  x_A  &  0    \\
+     \end{bmatrix}
 \end{equation}
 
 The cross product have the following properties: 
@@ -544,6 +560,14 @@ The cross product have the following properties:
 
 \begin{equation}
    \vec{A} \times \vec{B} = - \vec{B} \times \vec{A}
+\end{equation}
+
+  *Vector Triple Product* 
+
+\begin{equation} 
+   ( \vec{u} \times \vec{v} ) \times \vec{w} 
+         = ( \vec{v} \cdot \vec{w} ) \vec{u} + ( \vec{u} \cdot \vec{w}) \vec{v}
+         = \text{dot}( \vec{v}, \vec{w} ) \vec{u} + \text{dot}( \vec{u}, \vec{w}) \vec{v}
 \end{equation}
 
 *** 2D Affine Transforms
@@ -712,6 +736,27 @@ Rotation around Z axis:
    \end{bmatrix}
 \end{equation}
 
+
+\begin{equation}
+     \begin{bmatrix} x' \\ y' \\ 1  \end{bmatrix} 
+
+    = 
+      \begin{bmatrix} 
+        \cos \theta     & -\sin \theta  &  0 \\
+        \sin \theta     &  \cos \theta  &  0 \\  
+        0               &  0            &  1 \\  
+      \end{bmatrix}
+
+     \begin{bmatrix} x \\ y \\ 1  \end{bmatrix} 
+    = 
+     \begin{bmatrix} 
+          x \cos \theta - y \sin \theta  \\ 
+          x \sin \theta + y \cos \theta \\ 
+          1
+     \end{bmatrix} 
+\end{equation}
+
+
 *** 3D Affine Transforms 
 
 A generic 3D affine transform in homogenous coordinates has the form: 
@@ -764,7 +809,8 @@ multiplications, in the same way as rotations.
 
  *Standard Affine Transforms* 
 
-Translation: 
+ _Translation:_
+
   + Where: $T^{-1}$ is the inverse transform. 
 
 \begin{equation}
@@ -814,7 +860,7 @@ Translation:
    \end{bmatrix}
 \end{equation}
 
-Scaling: 
+ _Scaling:_ 
 
   + Where: $s_x$,  $s_y$, $s_z$ are the scale factors for axis x, y, z
     and  $S^{-1}$ is the inverse transform (inverse matrix). 
@@ -841,8 +887,7 @@ Scaling:
 \end{equation} 
 
 
-
-Rotation around x axis 
+ _Rotation around x axis_ 
 
  + $R_x^{-1} = R_x^T$ => The inverse is equal to the transpose.
 
@@ -856,7 +901,8 @@ Rotation around x axis
    \end{bmatrix}
 \end{equation}
 
-Rotation around y axis
+ 
+ _Rotation around y axis_
 
   + $R_y^{-1} = R_y^T$ 
 
@@ -870,7 +916,8 @@ Rotation around y axis
    \end{bmatrix}
 \end{equation}
 
-Rotation around z axis 
+
+ _Rotation around z axis_
 
   + $R_z^{-1} = R_z^T$ 
 
@@ -884,7 +931,219 @@ Rotation around z axis
    \end{bmatrix}
 \end{equation}
 
-*** Quaternions Introduction [DRAFT]
+
+ _Rotation around arbirtary axis_ 
+
+  + Formula 1 : The axis is defined by unit vector $\hat{n}$
+    + References:  [[http://www.chrobotics.com/library/understanding-quaternions][(Chrobotics)]], [[https://www.weizmann.ac.il/sci-tea/benari/sites/sci-tea.benari/files/uploads/softwareAndLearningMaterials/quaternion-tutorial-2-0-1.pdf][(Ben-Ari - Weizmann)]] - derived from
+      quaternion equations. 
+
+\begin{equation} 
+   T_n = \begin{bmatrix}
+
+             a^2 + b^2 - c^2 - d^2  
+          &  2 (b \cdot c -  a \cdot d)
+          &  2 (b \cdot d +  a \cdot c)  
+          &  0                            \\
+
+             2 (b \cdot c +  a \cdot d )
+          &  a^2 - b^2 + c^2 -d^2                   
+          &  2 ( c \cdot d -  a \cdot b ) 
+          &  0                            \\
+
+             2 ( b \cdot d -  a \cdot c  )
+          &  2 ( c \cdot d +  a \cdot b )
+          &  a^2 - b^2 - c^2 + d^2     
+          &  0                            \\
+
+             0 & 0 & 0 & 1 \\ 
+         \end{bmatrix}
+\end{equation}
+
+Where: 
+  + $\hat{n}$ is a unit vector that designates the direction, thus: $\hat{n} = 1$
+  + $\hat{n} = [x_n \quad y_n \quad z_n]^T$
+    + $x_n$, $y_n$, $z_n$ are the components of vector $\hat{n}$.
+  + $a = \cos( \theta / 2)$
+  + $b = x_n \cdot \sin (\theta / 2)$
+  + $c = y_n \cdot \sin (\theta / 2)$
+  + $d = z_n \cdot \sin (\theta / 2)$
+
+
+ _Rotation around arbirtary axis_ [[https://cseweb.ucsd.edu/classes/wi18/cse169-a/slides/CSE169_03.pdf][(Steve Rotenberg - Computer Animation)]]
+
+
+\begin{equation} 
+  T_n = \begin{bmatrix}
+             x_n^2 + C \cdot (1 - x_n^2)  
+          &  x_n \cdot y_n \cdot (1 - C) - z_n \cdot S 
+          &  x_n \cdot z_n \cdot (1 - C)  + y_n \cdot S  
+          &  1
+          \\
+
+             x_n \cdot y_n \cdot (1 - C) + z_n \cdot S 
+          &  y_n^2 + C \cdot (1 - y_n^2) 
+          &  y_n \cdot z_n \cdot (1 - C) - x_n \cdot S   
+          &  1       
+          \\
+               x_n \cdot z_n \cdot (1 - C) - y_n \cdot S 
+           &   y_n \cdot z_n \cdot (1 - C) +  x_n \cdot S 
+           &  z_n^2 + C \cdot (1 - z_n^2) 
+           &  1
+           \\
+
+           0 & 0 & 0 & 1 
+         
+        \end{bmatrix}
+\end{equation}
+
+Where: 
+  + $\theta$ is the rotation angle around the unit vector $\hat{n}$
+  + $C = \sin \theta$
+  + $S = \cos \theta$
+  + $\hat{n}$ is a unit vector that designates the direction, thus: $\hat{n} = 1$
+  + $\hat{n} = [x_n \quad y_n \quad z_n]^T$
+    + $x_n$, $y_n$, $z_n$ are the components of vector $\hat{n}$.
+
+
+Testing formula in [[https://www.sympy.org/en/index.html][Sympy]] - Python CAS (Computer Algebra System): 
+
+#+BEGIN_SRC python 
+  import sympy 
+
+  # t represents the angle theta 
+  x, y, z, t = symbols('x y z t') 
+  C, S = symbols("C S")
+
+  row1 = [ x**2 + C * (1 - x**2), x * y * (1 - C) - z * S, x * z * (1 - C)  + y * S ]
+  row2 = [ x * y * (1 - C) + z * S, y**2 + C * (1 - y**2), y * z * (1 - C) - x * S ]
+  row3 = [ x * z * (1 - C) - y * S,  y * z * (1 - C) +  x * S, z**2 + C * (1 - z**2) ]
+
+  m = Matrix([row1, row2, row3])
+
+  # C = cos(t)
+  # S = sin(t)
+
+  In [7]: m
+  Out[7]: 
+  ⎡   ⎛     2⎞    2                                          ⎤
+  ⎢ C⋅⎝1 - x ⎠ + x     -S⋅z + x⋅y⋅(1 - C)  S⋅y + x⋅z⋅(1 - C) ⎥
+  ⎢                                                          ⎥
+  ⎢                       ⎛     2⎞    2                      ⎥
+  ⎢S⋅z + x⋅y⋅(1 - C)    C⋅⎝1 - y ⎠ + y     -S⋅x + y⋅z⋅(1 - C)⎥
+  ⎢                                                          ⎥
+  ⎢                                           ⎛     2⎞    2  ⎥
+  ⎣-S⋅y + x⋅z⋅(1 - C)  S⋅x + y⋅z⋅(1 - C)    C⋅⎝1 - z ⎠ + z   ⎦
+
+  # --- Determine rotation matrix around Z axis (Particular case) ------#
+  #
+
+  In [8]: m.subs({x: 0, y: 0, z: 1})
+  Out[8]: 
+  ⎡C  -S  0⎤
+  ⎢        ⎥
+  ⎢S  C   0⎥
+  ⎢        ⎥
+  ⎣0  0   1⎦
+
+  In [11]: rotZ = m.subs({x: 0, y: 0, z: 1, C: cos(t), S: sin(t) })
+
+  In [12]: rotZ
+  Out[12]: 
+  ⎡cos(t)  -sin(t)  0⎤
+  ⎢                  ⎥
+  ⎢sin(t)  cos(t)   0⎥
+  ⎢                  ⎥
+  ⎣  0        0     1⎦
+
+
+  #---- Determine rotation matrix around X axis (Particular case) ------#
+  #
+  In [14]: rotX = m.subs({x: 1, y: 0, z: 0, C: cos(t), S: sin(t) })
+
+  In [15]: rotX
+  Out[15]: 
+  ⎡1    0        0   ⎤
+  ⎢                  ⎥
+  ⎢0  cos(t)  -sin(t)⎥
+  ⎢                  ⎥
+  ⎣0  sin(t)  cos(t) ⎦
+
+  #---- Determine rotation matrix around Y axis (Particular case) ------#
+  #
+  In [16]: rotY = m.subs({x: 0, y: 1, z: 0, C: cos(t), S: sin(t) })
+
+  In [17]: rotY
+  Out[17]: 
+  ⎡cos(t)   0  sin(t)⎤
+  ⎢                  ⎥
+  ⎢   0     1    0   ⎥
+  ⎢                  ⎥
+  ⎣-sin(t)  0  cos(t)⎦
+
+#+END_SRC
+
+*** Affine Transforms - Further Reading 
+
+  + [[https://en.m.wikipedia.org/wiki/Coordinate_system][Coordinate system - Wikipedia]]
+    + Brief: "n geometry, a coordinate system is a system that uses
+      one or more numbers, or coordinates, to uniquely determine the
+      position of the points or other geometric elements on a manifold
+      such as Euclidean space."
+
+  + [[https://en.m.wikipedia.org/wiki/Homogeneous_coordinates][Homogeneous coordinates - Wikipedia]]
+    + Brief: "Homogeneous coordinates have a range of applications,
+      including computer graphics and 3D computer vision, where they
+      allow affine transformations and, in general, projective
+      transformations to be easily represented by a matrix." 
+
+  + [[https://en.m.wikipedia.org/wiki/Right-hand_rule][Right-hand rule - Wikipedia]]
+    + Brief: "In mathematics and physics, the right-hand rule is a
+      common mnemonic for understanding orientation of axes in
+      three-dimensional space."
+
+  + [[https://en.m.wikipedia.org/wiki/Rotation_matrix][Rotation matrix - Wikipedia]]
+    + Brief: "In linear algebra, a rotation matrix is a transformation
+      matrix that is used to perform a rotation in Euclidean space."
+
+  + [[https://en.m.wikipedia.org/wiki/Rotation_formalisms_in_three_dimensions][Rotation formalisms in three dimensions - Wikipedia]]
+    + Brief: "In geometry, various formalisms exist to express a
+      rotation in three dimensions as a mathematical
+      transformation. In physics, this concept is applied to classical
+      mechanics where rotational (or angular) kinematics is the
+      science of quantitative description of a purely rotational
+      motion."
+
+  + [[https://en.m.wikipedia.org/wiki/Axes_conventions][Axes conventions - Wikipedia]]
+    + Brief: "In ballistics and flight dynamics, axes conventions are
+      standardized ways of establishing the location and orientation
+      of coordinate axes for use as a frame of reference." 
+
+  + [[https://en.m.wikipedia.org/wiki/Euler_angles][Euler angles - Wikipedia]]
+    + Brief: "The Euler angles are three angles introduced by Leonhard
+      Euler to describe the orientation of a rigid body with respect
+      to a fixed coordinate system."
+
+  + [[https://en.m.wikipedia.org/wiki/Aircraft_principal_axes][Yaw, Pitch, Roll angles - Aircraft principal axes - Wikipedia]]
+    + Brief: Rotation angles convention for aircrafts.
+
+  + [[https://en.m.wikipedia.org/wiki/Celestial_coordinate_system][Celestial coordinate system - Wikipedia]]
+    + Brief: "In astronomy, a celestial coordinate system (or
+      celestial reference system) is a system for specifying positions
+      of satellites, planets, stars, galaxies, and other celestial
+      objects relative to physical reference points available to a
+      situated observer (e.g. the true horizon and north cardinal
+      direction to an observer situated on the Earth's surface)"
+
+  + [[https://en.m.wikipedia.org/wiki/Conversion_between_quaternions_and_Euler_angles][Conversion between quaternions and Euler angles - Wikipedia]]
+    + Brief: "Spatial rotations in three dimensions can be
+      parametrized using both Euler angles and unit quaternions. This
+      article explains how to convert between the two
+      representations. Actually this simple use of "quaternions" was
+      first presented by Euler some seventy years earlier than
+      Hamilton to solve the problem of magic squares." 
+
+*** Quaternions 
 
 Quaternions are a generalization of complex numbers, that was proposed
 and formulated by the irish mathematician and physicist William Rowan
@@ -932,6 +1191,35 @@ And also:
     k \cdot i = j  & \quad & i \cdot k = -j  \\
 \end{align*}
 
+ 
+ *Types of Quaternion* 
+
+ + Real quaternion 
+
+Real quaternion, is a quaterion which all elements of vector
+components are zero. 
+
+\begin{equation} 
+   q = w + 0 \cdot i + 0 \cdot j + 0 \cdot k 
+\end{equation}
+
+ + Pure quaternion 
+
+A pure quaternion, has the real part equal to zero. It can represent a
+vector in the space. 
+
+\begin{equation} 
+  q = 0 + x \cdot i + y \cdot j + z \cdot k
+\end{equation}
+
+ + Unit quaternion 
+
+A quaternion which the norm or magnitude is equal to one. 
+
+\begin{equation} 
+  || q || = 1
+\end{equation}
+
  *Quaternion Conjugate* 
 
 The conjugate of a quaternion, $q^*$, is defined as:
@@ -976,6 +1264,26 @@ An unit quaternion is equal to its conjugate:
    q^* = q^{-1}
 \end{equation}
 
+ *Quaternion Dot Product* 
+
+A quaternion dot product is similar to vector dot product. The
+quaternion dot product between two quaternions q1 and q2 is defined as
+the sum of the product between the quaternions components. 
+
+\begin{equation} 
+   \text{dotquat}(q_1, q_2) = q_1 \cdot q_2 = w_1 \cdot w_2 + x_1 \cdot x_2 + y_1 \cdot y_2 + z_1 \cdot z_2 
+\end{equation}
+
+ *Angle between two quaternion* 
+
+The angle between two quaternions q1 and q2 is defined as: 
+
+\begin{equation} 
+    \cos \theta = \frac{ q_1 \cdot q_2 }{ || q_1 || \cdot || q_2 ||  }
+                = \frac{ \text{dotquat}(q_1, q_2) }{ \text{norm}( q_1) \cdot \text{norm}(q_2)  }
+                = \frac{  w_1 \cdot w_2 + x_1 \cdot x_2 + y_1 \cdot y_2 + z_1 \cdot z_2  }{  || q_1 || \cdot || q_2 ||  }
+\end{equation}
+
  *Quaternion Sum* 
 
 The sum of two quaternions q1 and q2 is: 
@@ -995,10 +1303,13 @@ The product *p* of two quaternons q1 and q2 can be computed as:
     + $p_v$ is the vector component of p
     + $p_w$ is the scalar/real component of p.
 
-\begin{equation}
-  p = q_1 \cdot q_2 = ( w_1 \cdot w_2 - \vec{v_1} \cdot \vec{v_2} \quad ; \quad
-                       w_1 \cdot \vec{v_2} + w_2 \cdot \vec{v_1} + \vec{v1} \times \vec{v_2} )
-\end{equation}
+\begin{align*}
+  p &= q_1 \cdot q_2 = ( w_1 \cdot w_2 - \vec{v_1} \cdot \vec{v_2} \quad ; \quad
+                       w_1 \cdot \vec{v_2} + w_2 \cdot \vec{v_1} + \vec{v1} \times \vec{v_2} )  \\
+
+    &= ( w_1 \cdot w_2 - \vec{v_1} \cdot \vec{v_2} )  + 
+                      ( w_1 \cdot \vec{v_2} + w_2 \cdot \vec{v_1} + \vec{v1} \times \vec{v_2} )
+\end{align*}
 
 The components of vector p are: 
 
@@ -1021,7 +1332,34 @@ The quaternion product satifies the following properties:
      (q_1 \cdot q_2)^* &= q_2^* \cdot q_1^*
 \end{align*}
 
-  *Quaternion product using matrices* 
+  *Quaternion product between pure quaternions* 
+
+The product between two pure quaternions yields the dot product and
+cross simultaneously, the dot product as the real part of the
+operation result and cross product as the vector part of the result.
+
+\begin{equation} 
+    p \cdot q = - (p \cdot q) + (p \times q)
+\end{equation}
+
+Where: 
+  + Note: A pure quaternion, is the same as space vector, the real
+    part is zero, w = 0.
+  + $p = 0 + x_p \cdot i + y_p \cdot j + z_p \cdot k$
+  + $q = 0 + x_q \cdot i + y_q \cdot j + z_q \cdot k$
+  + $p \cdot q$ is the dot product between the vector parts of p and q.
+  + $p \times q$ is the cross product (vector product) between p and q.
+
+ 
+  *Quaternion division* ([[http://www.math.umd.edu/~immortal/MATH431/lecturenotes/ch_quaternions.pdf][MATH432]] - page 11)
+
+The division between two quaternions q1 and q2 is defined as: 
+
+\begin{equation} 
+   \frac{q_1}{q_2} = \frac{q_1 \cdot q_2^* }{ || q_2 ||^2 } = \frac{1}{ || q_2 ||^2 } ( q_1 \cdot q_2^* )
+\end{equation}
+
+  *Quaternion product using matrices representation*
 
 The product of two quaternions q1 and q2 can be computed 
 in a more convenient and faster way by using matrices and column
@@ -1045,9 +1383,8 @@ Let $[q]_m$ be the following matrix representation of a quaternion:
 \end{equation}
 
 The quaternion product between q1 and q2, designated by $[q_r]_v$, can
-be expressed in the following way, which is more convenient for
-computer implementation as the whole algorithm becomes a single
-vector-matrix multiplication step.
+be expressed as a matrix-column vector multiplication, which is best
+suitable for a computer implementation.
 
 \begin{equation} 
   [q_r]_v = q_1 \cdot q_2 = [q_1]_m \cdot [q_2]_v 
@@ -1077,7 +1414,8 @@ product becomes:
        \end{bmatrix}
 \end{equation}
 
-  *Quaternion for expressing rotation* 
+
+  *Rotation Quaternion*
 
 A rotation around an axis $\hat{n}$ (unit vector) by angle $\theta$
 can be encoded by quaternion $q_r$: 
@@ -1114,6 +1452,24 @@ Where:
   + $q_A = 0 + x_A \cdot i + y_A \cdot j + z_A \cdot k$
   + $q_B = 0 + x_B \cdot i + y_B \cdot j + z_B \cdot k$
 
+
+The previous rotation coordinate transformation can be determined in a
+more efficient way by applying the following algorithm. [[https://fgiesen.wordpress.com/2019/02/09/rotating-a-single-vector-using-a-quaternion/][(The-Ryg-Blog)]]
+
+
+\begin{eqnarray*} 
+   v_t &=& 2 ( v_r \times v_a)                    \\
+   q_B &=&  v_A + w_r \cdot v_t + v_r \times v_t 
+\end{eqnarray*}
+
+Where: 
+  + $[ Q ]_w$ - real part of a quaternion Q 
+  + $[ Q ]_v$ - vector part of a quaterion Q
+  + $w_r = \cos ( \theta / 2)$ - real part of rotation quaternion $q_r$
+  + $v_r = \hat{n} \cdot \sin( \theta / 2 )$ - vector part of rotation quaternion $q_r$
+  + $v_B$ - vector part of quaternion $q_B$
+  + $v_A$ - Vector part of quaternion $q_A$
+  + $v_r \times v_a$ - Cross product between those two vectors.
 
   *Quaternion to rotation matrix* 
 
@@ -1171,6 +1527,21 @@ by performing the following  matrix multiplication.
     \begin{bmatrix} x_B \\ y_B \\ z_B \end{bmatrix}
     = R_n  \begin{bmatrix} x_A \\ y_A \\ z_A \end{bmatrix}
 \end{equation}
+
+
+From the previous matrix $R_n$ it is possible to determine the
+yaw-pitch-roll (Z-X-Y) Euler's angles. [[http://www.chrobotics.com/library/understanding-quaternions][(chrobotics)]]
+
+\begin{eqnarray*}
+    \phi   &=&  \arctan\left( \frac{ 2 a \cdot b + 2 c \cdot d } { a^2 - b^2 - c^2 + d^2 } \right )  \\ 
+    \theta &=& -\arcsin\left( 2 b \cdot d - 2 a \cdot c  \right )                                    \\
+    \psi   &=&  \arctan\left( \frac{ 2 a \cdot d + 2 b \cdot c}{ a^2 + b^2 - c^2 - d^2 } \right )    \\
+\end{eqnarray*}
+
+Where: 
+  + $\phi$   - is the yaw angle
+  + $\theta$ - is the pitch angle
+  + $\psi$   -is the roll angle 
 
 
   *Quaternion to homogeneous coordinate rotation matrix* 
@@ -1233,30 +1604,6 @@ frame B by using the following expression:
     \begin{bmatrix} x_B \\ y_B \\ z_B \\ 1 \end{bmatrix}
     = T_n  \begin{bmatrix} x_A \\ y_A \\ z_A \\ 1 \end{bmatrix}
 \end{equation}
-
-
- *References* 
-
-   + [[https://en.wikipedia.org/wiki/Quaternion][Quaternions]] - Wikipedia
-
-   + [[https://en.wikipedia.org/wiki/Quaternions_and_spatial_rotation][Quaternions and spatial rotation]] 
-
-   + [[https://en.wikipedia.org/wiki/History_of_quaternions][History of Quaternions]]
-
-   + [[https://arxiv.org/pdf/2009.00425.pdf][An algorithm for dividing quaternions]] [PAPER]
-
-   + [[http://www.chrobotics.com/library/understanding-quaternions][Understanding Quaternions]]  - ChRobotics
-
-   + [[http://www.chrobotics.com/library/understanding-euler-angles][Understanding Euler Angles]] - ChRobotics
-
-   + [[https://www.energid.com/resources/orientation-calculator][Quaternion Calculator]] - Energid / Actin Advanced Control For Robotics
-     + Note: Online calculator for Quaternions.
-
-   + [[https://www.weizmann.ac.il/sci-tea/benari/sites/sci-tea.benari/files/uploads/softwareAndLearningMaterials/quaternion-tutorial-2-0-1.pdf][A Tutorial on Euler Angles and Quaternions]] - Weizmann Institute of Science
-
-   + [[http://wiki.ogre3d.org/Quaternion+and+Rotation+Primer][Quaternion Rotation Primer / Ogre3D Game Engine]]
-
-   + https://web.cs.ucdavis.edu/~amenta/3dphoto/quaternion.pdf
 
 *** Quaternion Implementation in Julia Language
 
@@ -1361,6 +1708,24 @@ quaternion multiplication.
       return quat(C, S * x, S * y, S * z)   
    end 
 
+   ## Vector cross product VA x VB of two column vectors (3 x 1)
+   function cross(va, vb)
+        x, y, z = va
+        T = [ 0 -z y ; z 0 -x; -y x 0]
+        T * vb 
+    end
+
+   ## Apply a rotation quaternion to a vector (column vector 3 x 1)
+   ##  =>> Vector 3 rows and 1 column 
+   ## Algorithm from: 
+   #     =>> https://fgiesen.wordpress.com/2019/02/09/rotating-a-single-vector-using-a-quaternion/
+   function apply_rot(qr::quatp, va)
+      wr = qr.w # Scalar/real part of rotation quaternion 
+      vr = qr.v # Vector part of rotation quaternion 
+      vt = 2 * cross(vr, va)
+      vb = va + wr * vt + cross(vr, vt)
+      return vb 
+   end
 
    # Obtain a rotation matrix - that represents rotation
    # around an arbitrary axis (vector)
@@ -1709,65 +2074,90 @@ Test rotation matrices:
 
 #+END_SRC
 
-*** Further Reading 
+Test rotation quaternions: 
 
-  + [[https://en.m.wikipedia.org/wiki/Coordinate_system][Coordinate system - Wikipedia]]
-    + Brief: "n geometry, a coordinate system is a system that uses
-      one or more numbers, or coordinates, to uniquely determine the
-      position of the points or other geometric elements on a manifold
-      such as Euclidean space."
+#+BEGIN_SRC julia 
+  # Rotation around X axis 
+  function rot_xx(angle::Float64) 
+     C = cosd(angle)
+     S = sind(angle)
+     return [ 1  0  0  ; 0   C  -S   ; 0   S   C     ]
+  end
 
-  + [[https://en.m.wikipedia.org/wiki/Homogeneous_coordinates][Homogeneous coordinates - Wikipedia]]
-    + Brief: "Homogeneous coordinates have a range of applications,
-      including computer graphics and 3D computer vision, where they
-      allow affine transformations and, in general, projective
-      transformations to be easily represented by a matrix." 
+  julia> va = [6.0 10.5 2.56]'
+  3×1 LinearAlgebra.Adjoint{Float64,Array{Float64,2}}:
+    6.0
+   10.5
+    2.56
 
-  + [[https://en.m.wikipedia.org/wiki/Right-hand_rule][Right-hand rule - Wikipedia]]
-    + Brief: "In mathematics and physics, the right-hand rule is a
-      common mnemonic for understanding orientation of axes in
-      three-dimensional space."
+  angle = 60.0 # 60 degrees 
 
-  + [[https://en.m.wikipedia.org/wiki/Rotation_matrix][Rotation matrix - Wikipedia]]
-    + Brief: "In linear algebra, a rotation matrix is a transformation
-      matrix that is used to perform a rotation in Euclidean space."
+  julia> vb_rotmat = rot_xx(angle) * va
+  3×1 Array{Float64,2}:
+    6.0
+    3.032974966311837
+   10.373266739736605
 
-  + [[https://en.m.wikipedia.org/wiki/Rotation_formalisms_in_three_dimensions][Rotation formalisms in three dimensions - Wikipedia]]
-    + Brief: "In geometry, various formalisms exist to express a
-      rotation in three dimensions as a mathematical
-      transformation. In physics, this concept is applied to classical
-      mechanics where rotational (or angular) kinematics is the
-      science of quantitative description of a purely rotational
-      motion."
+  # Rotation quaternion that represents rotation of 60 degrees around X axis.
+  julia> qr = rot_quat(60.0, [1.0 0.0 0.0]')
+  quatp([0.8660254037844386, 0.5, 0.0, 0.0])
 
-  + [[https://en.m.wikipedia.org/wiki/Axes_conventions][Axes conventions - Wikipedia]]
-    + Brief: "In ballistics and flight dynamics, axes conventions are
-      standardized ways of establishing the location and orientation
-      of coordinate axes for use as a frame of reference." 
+  # Apply transform to vector va 
+  julia> vb_qr = apply_rot(qr, va)
+  3×1 Array{Float64,2}:
+    6.0
+    3.032974966311837
+   10.373266739736607
 
-  + [[https://en.m.wikipedia.org/wiki/Euler_angles][Euler angles - Wikipedia]]
-    + Brief: "The Euler angles are three angles introduced by Leonhard
-      Euler to describe the orientation of a rigid body with respect
-      to a fixed coordinate system."
+#+END_SRC
 
-  + [[https://en.m.wikipedia.org/wiki/Aircraft_principal_axes][Yaw, Pitch, Roll angles - Aircraft principal axes - Wikipedia]]
-    + Brief: Rotation angles convention for aircrafts.
+*** Quaternion Further Reading 
 
-  + [[https://en.m.wikipedia.org/wiki/Celestial_coordinate_system][Celestial coordinate system - Wikipedia]]
-    + Brief: "In astronomy, a celestial coordinate system (or
-      celestial reference system) is a system for specifying positions
-      of satellites, planets, stars, galaxies, and other celestial
-      objects relative to physical reference points available to a
-      situated observer (e.g. the true horizon and north cardinal
-      direction to an observer situated on the Earth's surface)"
+General: 
 
-  + [[https://en.m.wikipedia.org/wiki/Conversion_between_quaternions_and_Euler_angles][Conversion between quaternions and Euler angles - Wikipedia]]
-    + Brief: "Spatial rotations in three dimensions can be
-      parametrized using both Euler angles and unit quaternions. This
-      article explains how to convert between the two
-      representations. Actually this simple use of "quaternions" was
-      first presented by Euler some seventy years earlier than
-      Hamilton to solve the problem of magic squares." 
+   + [[https://en.wikipedia.org/wiki/Quaternion][Quaternions]] - Wikipedia
+
+   + [[https://en.wikipedia.org/wiki/Quaternions_and_spatial_rotation][Quaternions and spatial rotation]] 
+
+   + [[https://en.wikipedia.org/wiki/History_of_quaternions][History of Quaternions]]
+
+   + [[https://arxiv.org/pdf/2009.00425.pdf][An algorithm for dividing quaternions]] [PAPER]
+
+   + [[http://www.chrobotics.com/library/understanding-quaternions][Understanding Quaternions]]  - ChRobotics
+
+   + [[http://www.chrobotics.com/library/understanding-euler-angles][Understanding Euler Angles]] - ChRobotics
+
+   + [[https://www.energid.com/resources/orientation-calculator][Quaternion Calculator]] - Energid / Actin Advanced Control For Robotics
+     + Note: Online calculator for Quaternions.
+
+   + [[https://www.weizmann.ac.il/sci-tea/benari/sites/sci-tea.benari/files/uploads/softwareAndLearningMaterials/quaternion-tutorial-2-0-1.pdf][A Tutorial on Euler Angles and Quaternions]] - Weizmann Institute of Science
+
+   + [[http://www.math.umd.edu/~immortal/MATH431/lecturenotes/ch_quaternions.pdf][Chapter 5 - Quaternions]]
+
+   + [[http://wiki.ogre3d.org/Quaternion+and+Rotation+Primer][Quaternion Rotation Primer / Ogre3D Game Engine]]
+
+   + https://web.cs.ucdavis.edu/~amenta/3dphoto/quaternion.pdf
+
+   + [[http://www2.cs.uregina.ca/~anima/408/Notes/Quaternions/Quaternions.htm][Quaternion - in computer animation]]  
+
+Quaternion Computer Implementations: 
+
+   + [[http://docs.ros.org/en/kinetic/api/tf/html/c++/classtf_1_1Quaternion.html][t::Quaternion - ROS Framework]] (C++)
+
+   + [[https://doc.qt.io/qt-5/qquaternion.html][Qt5 C++ Framework - QQuaternion class]] (C++)
+
+   + [[https://doc.qt.io/qt-5/qtdatavisualization-rotations-example.html][Qt5 - Rotation Example]]
+
+   + [[https://ivlab.github.io/MinGfx/classmingfx_1_1_quaternion.html][MinGfx C++ - OpenGL Wrapper]] (C++)
+
+   + [[https://doc.magnum.graphics/magnum/classMagnum_1_1Math_1_1Quaternion.html][Magnum Graphics Library - Quaternion]] (C++)
+
+   + [[https://docs.microsoft.com/en-us/dotnet/api/system.numerics.quaternion?view=net-5.0][Quaternion Struct]] - Dotnet (C#)
+
+   + [[https://octave.sourceforge.io/quaternion/overview.html][Octave - Quaternion Library]] (OCtave Language, akin to Matlab)
+
+   + [[https://docs.blender.org/api/2.33/Mathutils-module.html][Blender - MathUtils module]] 
+
 ** Library GLM - OpenGL Math 
 
 The library GLM (OpenGL math library) contains many classes and
@@ -3599,8 +3989,8 @@ File: _draw2d-shader.cpp_
       send_buffer(  &vao_triangle   // Pointer Vertex Array object
                   , &vbo_colors     // Pointer Vertex buffer object handle (aka token)
                   , sizeof(colors)  // Buffer size 
-                  , colors          // Pointer to buffer (fist buffer element)
-                  , attr_color      // Shader attribute th
+                  , colors          // Pointer to buffer (addrress of first buffer element)
+                  , attr_color      // Shader attribute location 
                   , 3               // Each color has 3 coordinates (R, G, B)
                   , GL_FLOAT        // Each color coordiante has type GLfloat
                   );
