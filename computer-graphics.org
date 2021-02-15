@@ -118,6 +118,8 @@
      linear algebra. (homogeneous coordinates, rotation matrices,
      translation matrices and etc.)
 
+   * [[https://www.khronos.org/opengl/wiki/Common_Mistakes][Common Mistakes]] (Khronos Group) =>> Useful for debugging.
+
  *WebGL:*
 
    * [[https://www.khronos.org/webgl/][WebGL Overview - The Khronos Group Inc]]
@@ -361,6 +363,14 @@ Non-categorized / Miscellaneous:
       examples, are distributed under the MIT License."
 
 
+WebGL Companion Libraries: (OpenGL on the WEB)
+
+  + [[https://threejs.org/][Three.JS]] - High level wrapper library around WebGL, that provides
+    many high level features that includes: camera objects; scene graphs;
+    geometry; perspective; forward kinematics, inverse kinematics;
+    graphics math library containing, matrices, vectors, quaternions;
+    image loaders; animation and more. 
+
  *See also:*
 
   + [[https://www.khronos.org/opengl/wiki/OpenGL_Loading_Library][OpenGL Loading Library - OpenGL Wiki]] / Khronos Group
@@ -398,10 +408,12 @@ they incur on a significant overhead and they lack portability due to
 not be available at OpenGL ES.
 
   + Vertex:
-    + => Modern OpenGL replacement: VBO (Vertex Buffer Object) and VAO (Vertex Array Object)
+    + => Modern OpenGL replacement: VBO (Vertex Buffer Object) and VAO
+      (Vertex Array Object) and shader program.
     + glVertex2f() 
     + glVertex2f()
     + glVertex3f()
+    + glColor3f()
 
   + Begin/End:
     + glEnd()
@@ -413,6 +425,10 @@ not be available at OpenGL ES.
     + glVertexPointer() 
 
   + Coordinate Transformation
+    + Modern OpenGL Replacement: shader model matrix _uniform variable_
+      which is set by the calling code. Since the matrix math (linear
+      algebra) functionality is no longer provided by OpenGL, a third
+      party math library is necessary.
     + glLoadIdentity()  => Modern OpenGL replacement: glm::mat4(1.0);
     + glRotate()        => Modern OpenGL replacement: glm::rotate();
     + glTranslate()     => Modern OpenGL replacement: glm::translate();
@@ -421,13 +437,41 @@ not be available at OpenGL ES.
     + glMatrixMode()
     + glFrustum()       => Modern OpenGL replacement: glm::frustum();
     + gluLookAt()       => Modern OpenGL replacement: glm::lookAt();
-    + gluPerspective()  => Modern OpenGL replacement: glm::perspective(); 
+    + gluPerspective()  => Modern OpenGL replacement: glm::perspective();
+    + glMatrixMode()
+    + glViewPort()
+    + glOrtho()
+    + glMultMatrix()
 
   + Save Context 
     + glPop()          
     + glPush()
+
+  + Matrix Stack [DEPRECATED!]
+    + Modern OpenGL replacement: OpenGL since 3.0, no longer provides
+      a matrix stack. Now the calling code that has to keep track of
+      transformation state. 
     + glPushMatrix()
     + glPopMatrix()
+
+  + Miscellaneous / Non Categorized
+    + glEnableClientState()
+    + glColorPointer()
+    + glVertexPointer(*) 
+    + glLight*...
+    + glMaterial*...
+    + glDrawPixels()
+    + glPixelZoom()
+    + glRasterPos2i()
+
+See:  
+
+  + [[https://stackoverflow.com/questions/13647108/matrix-stacks-in-opengl-deprecated][Matrix stacks in OpenGL deprecated?]]
+
+  + [[https://stackoverflow.com/questions/3755998/what-is-the-point-of-the-matrix-stack-in-opengl][What is the point of the matrix stack in OpenGL?]]
+
+  + [[http://edeleastar.github.io/opengl-programming/topic05/pdf/3.MatrixStacks.pdf][OpenGL Matrix Stacks {PDF}]]
+
 ** Computer Graphics Math 
 *** Vector Algebra 
 
@@ -1045,7 +1089,7 @@ Rotation around Z axis:
    \begin{bmatrix} 
      \cos{\beta}    & 0   & \sin{\beta} & 0 \\ 
      0              & 1   & 0           & 0 \\
-    -\sin{\beta}    & 0   & \sin{\beta} & 0 \\
+    -\sin{\beta}    & 0   & \cos{\beta} & 0 \\
     0               & 0   & 0           & 1 
    \end{bmatrix}
 \end{equation}
@@ -1896,7 +1940,8 @@ Where:
   + $v_A$ - Vector part of quaternion $q_A$
   + $v_r \times v_a$ - Cross product between those two vectors.
 
-  *Quaternion to rotation matrix* 
+
+  *Quaternion to rotation matrix conversion* 
 
 The rotation matrix that transforms coordinates from reference frame A
 to reference frame B can be computed as:  [[https://www.weizmann.ac.il/sci-tea/benari/sites/sci-tea.benari/files/uploads/softwareAndLearningMaterials/quaternion-tutorial-2-0-1.pdf][(Moti Ben-Ari - Wizmann)]], [[http://barbic.usc.edu/cs520-s12/quaternions/quaternions-cs520.pdf][(Jernej Barbic)]]
@@ -2030,9 +2075,36 @@ frame B by using the following expression:
     = T_n  \begin{bmatrix} x_A \\ y_A \\ z_A \\ 1 \end{bmatrix}
 \end{equation}
 
+
+  *Useful Normalized Quaternions (Rotation Quaternions)* - [[http://wiki.ogre3d.org/Quaternion+and+Rotation+Primer][(Ogre3D Game Engine)]]
+
+|--------------+---------------+---------------+---------------+----------------------------------------------|
+| w            |             x |             y |             z | Description                                  |
+|--------------+---------------+---------------+---------------+----------------------------------------------|
+| 1            |             0 |             0 |             0 | Identity quaternion, represents no rotation. |
+| 0            |             1 |             0 |             0 | 180°  (π radians) rotation around X axis     |
+| 0            |             0 |             1 |             0 | 180° rotation around Y axis                  |
+| 0            |             0 |             0 |             1 | 180° rotation around Z axis.                 |
+|              |               |               |               |                                              |
+| $\sqrt{1/2}$ |  $\sqrt{1/2}$ |             0 |             0 | 90° rotation around X axis.                  |
+| $\sqrt{1/2}$ |             0 |  $\sqrt{1/2}$ |             0 | 90° rotation around Y axis.                  |
+| $\sqrt{1/2}$ |             0 |             0 |  $\sqrt{1/2}$ | 90° rotation around Z axis.                  |
+|              |               |               |               |                                              |
+| $\sqrt{1/2}$ | $-\sqrt{1/2}$ |             0 |             0 | -90° rotation around X axis.                 |
+| $\sqrt{1/2}$ |             0 | $-\sqrt{1/2}$ |             0 | -90° rotation around Y axis.                 |
+| $\sqrt{1/2}$ |             0 |             0 | $-\sqrt{1/2}$ | -90° rotation around Z axis.                 |
+|              |               |               |               |                                              |
+|--------------+---------------+---------------+---------------+----------------------------------------------|
+
+Note: 
+  + $\sqrt{1/2} = \sqrt{0.5} \approx 0.70710$
+  + $pi \approx 3.14159265$
+
+
   *Further Reading* 
 
-General: 
+
+Quaternions: 
 
    + [[https://en.wikipedia.org/wiki/Quaternion][Quaternions]] - Wikipedia
 
@@ -2057,7 +2129,25 @@ General:
 
    + https://web.cs.ucdavis.edu/~amenta/3dphoto/quaternion.pdf
 
-   + [[http://www2.cs.uregina.ca/~anima/408/Notes/Quaternions/Quaternions.htm][Quaternion - in computer animation]]  
+   + [[http://www2.cs.uregina.ca/~anima/408/Notes/Quaternions/Quaternions.htm][Quaternion - in computer animation]]
+
+   + [[http://web.archive.org/web/20130116192343/https://www.crytek.com/download/izfrey_siggraph2011.pdf][Spherical Skinning withDual-Quaternions and QTangents]] - Spherical Skinning withDual-Quaternions and QTangentsIvo Zoltan FreyCrytek R&D
+
+
+Dual Quaternion: 
+
+   + Dual quaternions are a combination of quaternions and dual
+     numbers. Unlike ordinary quaternions, which can only express
+     rotation, dual quaternions can express both rotation and
+     translation in a more concise and efficient way than
+     transformation matrices. Some applications of this mathematical
+     construct are: computer graphics; robotics; aerospace engineering
+     and more.
+
+   + [[https://en.m.wikipedia.org/wiki/Dual_quaternion][Dual Quaternions]]
+
+   + [[https://doc.magnum.graphics/magnum/transformations.html][Feature guide » 2D and 3D transformations]] - Magnum Engine
+
 
 Quaternion Computer Implementations: 
 
@@ -2077,7 +2167,7 @@ Quaternion Computer Implementations:
 
    + [[https://docs.blender.org/api/2.33/Mathutils-module.html][Blender - MathUtils module]] 
 
-*** Quaternion Implementation in Julia Language
+*** Quaternion in Julia Language
 
 It is worth prototyping quaternion math in a numerically-oriented programming
 language such as [[https://en.wikipedia.org/wiki/Julia_(programming_language)][Julia Language]] is helpful for understanding and
