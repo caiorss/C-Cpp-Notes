@@ -741,7 +741,7 @@ format.
    \begin{bmatrix} 
      a_{11}   & a_{12}   &  a_{13} & a_{14}  \\
      a_{21}   & a_{22}   &  a_{23} & a_{24}  \\
-     a_{32}   & a_{32}   &  a_{33} & a_{34}  \\
+     a_{31}   & a_{32}   &  a_{33} & a_{34}  \\
      0        & 0        &  0      & 1       \\
    \end{bmatrix}
 \end{equation}
@@ -2169,7 +2169,7 @@ Quaternion Computer Implementations:
 
    + [[https://docs.blender.org/api/2.33/Mathutils-module.html][Blender - MathUtils module]] 
 
-*** Concatenating Quaternions and Vectors 
+*** Quaternions, Scale and Position
 
 Quaternions (non-dual quaternions) can only encode and represent
 rotations around some orientation, which is not enough to specify
@@ -2290,7 +2290,7 @@ transforms:
    \end{bmatrix}
 \end{equation}
 
-Finally T is: 
+Finally, the model transform can be computed as: 
 
 \begin{equation} 
 
@@ -2327,7 +2327,6 @@ by the transform T, could be written as the following pseudo-code:
        return rotation_matrix;
    }
 #+END_SRC
-
 
 
 
@@ -3370,6 +3369,215 @@ Inverse matrix:
    root [114] 
 
 #+END_SRC
+
+  *GLM Quaternions* 
+
+Create an identity quaternion, which represents no rotation. 
+
+#+BEGIN_SRC cpp 
+   root [26] auto q = glm::quat(1.0, 0.0, 0.0, 0.0)
+   (glm::qua<float, glm::qualifier::packed_highp> &) @0x7fc8b47e6020
+
+   root [27] q.x
+   (float) 0.00000f
+   root [28] 
+   root [28] q.y
+   (float) 0.00000f
+   root [29] 
+   root [29] q.z
+   (float) 0.00000f
+   root [30] 
+   root [30] q.w
+   (float) 1.00000f
+   root [31] 
+   root [31] 
+#+END_SRC
+
+Create a quaternion that represents a rotation of 90 degrees around Z
+axis: 
+
+#+BEGIN_SRC cpp 
+   root [39] auto qrot_z = glm::angleAxis(glm::radians(90.0f), glm::vec3{0.0f, 0.0f, 1.0f} )
+   (glm::qua<float, glm::qualifier::packed_highp> &) @0x7fc8b47e6050
+
+   root [40] glm::to_string(qrot_z)
+   (std::string) "quat(0.707107, {0.000000, 0.000000, 0.707107})"
+
+   root [42] qrot_z.w
+   (float) 0.707107f
+
+   root [43] qrot_z.x
+   (float) 0.00000f
+
+   root [44] qrot_z.y
+   (float) 0.00000f
+
+   root [45] qrot_z.z
+   (float) 0.707107f
+#+END_SRC
+
+Get quaternion angle: 
+
+#+BEGIN_SRC cpp 
+
+  // Angle in radians.
+  root [61] glm::angle(qrot_z)
+  (float) 1.57080f
+
+  // Angle in degrees 
+  root [62] glm::angle(qrot_z) * 180.0 / M_PI
+  (double) 90.000003
+#+END_SRC
+
+Get quaternion rotation axis vector: 
+
+#+BEGIN_SRC cpp 
+   root [63] auto axis = glm::axis(qrot_z)
+   (glm::vec<3, float, glm::qualifier::packed_highp> &) @0x7fc8b47e6150
+
+   root [64] glm::to_string(axis)
+   (std::string) "vec3(0.000000, 0.000000, 1.000000)"
+#+END_SRC
+
+Determine quaternion conjugate: 
+
+#+BEGIN_SRC cpp 
+   // Conjugate
+   root [68] auto res = glm::conjugate(qrot_z)
+   (glm::qua<float, glm::qualifier::packed_highp> &) @0x7fc8b47e616c
+
+   root [69] glm::to_string(res)
+   (std::string) "quat(0.707107, {-0.000000, -0.000000, -0.707107})"
+
+   root [71] glm::to_string( qrot_z * res )
+   (std::string) "quat(1.000000, {0.000000, 0.000000, 0.000000})"
+#+END_SRC
+
+Determin quaternion inverse: 
+
+#+BEGIN_SRC cpp 
+  root [72] glm::to_string( glm::inverse(qrot_z) )
+  (std::string) "quat(0.707107, {-0.000000, -0.000000, -0.707107})"
+#+END_SRC
+
+Computer quaternion norm (aka magnitude):
+
+#+BEGIN_SRC cpp 
+  root [74] glm::length(qrot_z)
+  (float) 1.00000f
+#+END_SRC
+
+
+Turn the previous quaternion in to a rotation matrix: 
+
+#+BEGIN_SRC cpp 
+   root [47] auto TrotZ1 = glm::mat4_cast(qrot_z)
+
+   root [48] show_matrix("TrotZ1", TrotZ1)
+
+    [MATRIX] TrotZ1 = 
+      0.000  -1.000   0.000   0.000
+      1.000   0.000   0.000   0.000
+      0.000   0.000   1.000   0.000
+      0.000   0.000   0.000   1.000
+
+   // ------------ Confirm result ------------//
+   //
+
+   root [51] auto TrotZ2 = glm::rotate(glm::mat4(1.0), glm::radians(90.0f), glm::vec3(0.0, 0.0, 1.0))
+
+   root [52] show_matrix("TrotZ2", TrotZ2)
+
+    [MATRIX] TrotZ2 = 
+     -0.000  -1.000   0.000   0.000
+      1.000  -0.000   0.000   0.000
+      0.000   0.000   1.000   0.000
+      0.000   0.000   0.000   1.000
+
+#+END_SRC
+
+Rotate a vector with the quaternion _qrot_z_: 
+
+#+BEGIN_SRC cpp 
+   root [57] auto v = glm::vec3{1.0f, 0.0f, 0.0f}
+   (glm::vec<3, float, glm::qualifier::packed_highp> &) @0x7fc8b47e6138
+
+   // Rotating a vector just requires multiplication.
+   root [59] auto rotated_v = qrot_z * v
+   (glm::vec<3, float, glm::qualifier::packed_highp> &) @0x7fc8b47e6144
+
+   root [60] glm::to_string(rotated_v)
+   (std::string) "vec3(0.000000, 1.000000, 0.000000)"
+
+
+   // Rotate the same vector with a rotation matrix. 
+   root [79] glm::to_string( TrotZ2 * glm::vec4(1.0, 0.0, 0.0, 0.0) )
+   (std::string) "vec4(-0.000000, 1.000000, 0.000000, 0.000000)"
+#+END_SRC
+
+New rotation around Y axis about 60 degrees. 
+
+#+BEGIN_SRC cpp 
+   root [80] auto q = qrot_z
+   (glm::qua<float, glm::qualifier::packed_highp> &) @0x7fc8b47e617c
+
+   // ---------- Before rotation ------------
+   //
+   root [81] glm::to_string( q )
+   (std::string) "quat(0.707107, {0.000000, 0.000000, 0.707107})"
+
+   // -------- After rotation ----------------//
+   //
+   root [84] q = q * glm::angleAxis(glm::radians(60.0f), glm::vec3{0.0, 0.1, 0.0})
+   (glm::qua<float, (qualifier)0U> &) @0x7fc8b47e617c
+
+   root [85] glm::to_string( q )
+   (std::string) "quat(0.612372, {-0.035355, 0.035355, 0.612372})"
+
+   // --------- Get Rotation Matrix -----------// 
+
+   root [86] auto m = glm::mat4_cast(q)
+
+   root [88] show_matrix("m", m)
+
+    [MATRIX] m = 
+      0.248  -0.752   0.000   0.000
+      0.747   0.248   0.087   0.000
+     -0.087   0.000   0.995   0.000
+      0.000   0.000   0.000   1.000
+
+   // -------- Get total rotation angle and axis ---------//
+   // 
+
+   // Get new rotation axis 
+   root [89] auto axis = glm::axis(q)
+   (glm::vec<3, float, glm::qualifier::packed_highp> &) @0x7fc8b47e61cc
+
+   root [90] glm::to_string( axis )
+   (std::string) "vec3(-0.044721, 0.044721, 0.774597)"
+
+   // Get rotation angle around new axis in radians
+   root [91] glm::angle(q)
+   (float) 1.82348f
+
+   // Get rotation angle around new axis in degrees 
+   root [92] glm::angle(q) * 180.0 / M_PI
+   (double) 104.47752
+
+
+   //--------- Get Yaw, Pitch and Roll angles --------------------//
+   //
+   root [94] glm::yaw(q) * 180.0 / M_PI
+   (double) 4.9681836
+
+   root [95] glm::pitch(q) * 180.0 / M_PI
+   (double) 0.0000000
+
+   root [96] glm::roll(q) * 180.0 / M_PI
+   (double) 90.000003
+
+#+END_SRC
+
 ** 2D graphics - no VBO abstraction 
 
 The following code draws a square and a triangle using the OpenGL
