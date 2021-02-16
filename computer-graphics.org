@@ -103,6 +103,8 @@
      + Allows searching and quickly browsing the OpenGL
        documentation.
 
+   * https://www.opengl.org/
+
    * [[https://www.khronos.org/registry/OpenGL/index_gl.php][Khronos OpenGL® Registry]]
      * OpenGL Official Specification.
 
@@ -2076,7 +2078,7 @@ frame B by using the following expression:
 \end{equation}
 
 
-  *Useful Normalized Quaternions (Rotation Quaternions)* - [[http://wiki.ogre3d.org/Quaternion+and+Rotation+Primer][(Ogre3D Game Engine)]]
+  *Table with Useful Normalized Quaternions (Rotation Quaternions)* - [[http://wiki.ogre3d.org/Quaternion+and+Rotation+Primer][(Ogre3D Game Engine)]]
 
 |--------------+---------------+---------------+---------------+----------------------------------------------|
 | w            |             x |             y |             z | Description                                  |
@@ -2098,7 +2100,7 @@ frame B by using the following expression:
 
 Note: 
   + $\sqrt{1/2} = \sqrt{0.5} \approx 0.70710$
-  + $pi \approx 3.14159265$
+  + $\pi = pi = \approx 3.14159265$
 
 
   *Further Reading* 
@@ -2166,6 +2168,170 @@ Quaternion Computer Implementations:
    + [[https://octave.sourceforge.io/quaternion/overview.html][Octave - Quaternion Library]] (OCtave Language, akin to Matlab)
 
    + [[https://docs.blender.org/api/2.33/Mathutils-module.html][Blender - MathUtils module]] 
+
+*** Concatenating Quaternions and Vectors 
+
+Quaternions (non-dual quaternions) can only encode and represent
+rotations around some orientation, which is not enough to specify
+position and scaling. As a result, quaternions rotation matrices need
+to be concatenated with translation and scaling transform matrices for
+computing an object's model transform matrix, which is often passed to
+a shader program via uniform variables.
+
+Assuming that a rendered object has a transform member containing a
+a quaternion, for representing rotation; a scale vector and a
+position vector. The objective is to compute the object transform
+matrix, which is the contenation of rotation, scaling and translation
+transforms, that can be passed to a shader uniform variable. 
+
+#+BEGIN_SRC cpp 
+   struct RenderTransform
+   {
+         // Rotation quaternion
+         // Set to identity quaternion by default. 
+         // Members. The quaternion has the fields (w, x, y, z)
+         quaternion rotation {1.0, 0.0, 0.0};
+
+         // Scale vector containing scales of axis (sx, sy, sz)
+         vec3 scale(sx, sy, sz);      
+
+         // Contains object's position 
+         vec3 position(tx, ty, tz);
+         
+         // ??? Get overall (end result) transform matrix that 
+         // will be passed to shader uniform variable.
+         mat4 get_transform() const; 
+   };
+#+END_SRC
+
+The transforms are often applied in the following sequence, first
+scaling, then rotation and finally translation. 
+
+\begin{equation} 
+   T = T_t \cdot \times T_r \cdot T_s
+\end{equation}
+
+Where: 
+  + T is the total transform matrix, which is the product between
+    intermediate transforms and later can be passed to a shader
+    uniform variable.
+  + $T_s$ - is the scale transform, determined from the scale vector.
+  + $T_t$ - is the translation transform, computed from the position vector.
+  + $T_r$ - is the quaternion rotation transform. 
+
+
+Intermediate transforms: 
+
+ + Transform form position vector. 
+
+\begin{equation}
+  T_t = 
+   \begin{bmatrix} 
+     1   & 0   &  0 &  t_x \\
+     0   & 1   &  0 &  t_y \\  
+     0   & 0   &  1 &  t_z \\  
+     0   & 0   &  0 &   1  \\
+   \end{bmatrix}
+\end{equation}
+
+ + Transform from scale vector. 
+
+\begin{equation}
+  T_s = 
+   \begin{bmatrix} 
+     s_x   & 0     &  0   &  0 \\
+     0     & s_y   &  0   &  0 \\  
+     0     & 0     &  s_z &  0 \\  
+     0     & 0     &  0   &  1  \\
+   \end{bmatrix}
+\end{equation}
+
+ + Quaternion rotation matrix transform. 
+
+\begin{equation}
+  T_r = 
+   \begin{bmatrix} 
+     a_{11}   & a_{12}   &  a_{13} & 0  \\
+     a_{21}   & a_{22}   &  a_{23} & 0  \\
+     a_{32}   & a_{32}   &  a_{33} & 0  \\
+     0        & 0        &  0      & 1  \\
+   \end{bmatrix}
+\end{equation}
+
+The end transform T is determined by concatenating all intermediate
+transforms: 
+
+\begin{equation} 
+     T = T_t \cdot  T_r \cdot T_s
+\end{equation}
+
+
+\begin{equation} 
+     T = 
+  \begin{bmatrix} 
+     1   & 0   &  0 &  t_x \\
+     0   & 1   &  0 &  t_y \\  
+     0   & 0   &  1 &  t_z \\  
+     0   & 0   &  0 &   1  \\
+   \end{bmatrix}
+
+   \begin{bmatrix} 
+     a_{11}   & a_{12}   &  a_{13} & 0  \\
+     a_{21}   & a_{22}   &  a_{23} & 0  \\
+     a_{31}   & a_{32}   &  a_{33} & 0  \\
+     0        & 0        &  0      & 1  \\
+   \end{bmatrix}
+
+   \begin{bmatrix} 
+     s_x   & 0     &  0   &  0 \\
+     0     & s_y   &  0   &  0 \\  
+     0     & 0     &  s_z &  0 \\  
+     0     & 0     &  0   &  1  \\
+   \end{bmatrix}
+\end{equation}
+
+Finally T is: 
+
+\begin{equation} 
+
+  T = 
+   \begin{bmatrix} 
+     s_x \cdot a_{11} & s_y \cdot a_{12}  & s_z \cdot a_{13}  &  t_x \\
+     s_x \cdot a_{21} & s_y \cdot a_{22}  & s_z \cdot a_{23}  &  t_y \\
+     s_x \cdot a_{31} & s_y \cdot a_{32}  & s_z \cdot a_{33}  &  t_z \\
+      0               &   0               &   0               &   1  \\ 
+   \end{bmatrix}  
+
+\end{equation}
+
+Then, the algorithm for determing the object model matrix, designated
+by the transform T, could be written as the following pseudo-code:
+
+#+BEGIN_SRC cpp 
+   mat4 RenderTransform::get_transform() const 
+   {
+       // Convert quaternion to matrix column 
+       mat4 rotation_matrix = quaterion_to_rotation_matrix( this->quaternion );
+
+       float sx = scale.x, sy = scale.y, sz = scale.z;
+
+       // Multiply all elements of first column by sx
+       rotation_matrix.comlumn[0] = sx * rotation_matrix.comlumn[0];
+       // Multiply all elemnts of second column by sy 
+       rotation_matrix.comlumn[1] = sy * rotation_matrix.comlumn[1];
+       // Multiply all elemnts of third column by sz
+       rotation_matrix.comlumn[2] = sz * rotation_matrix.comlumn[2];
+
+       rotation_matrix.column[4] = vec4( position.x, position.y, position.z, 1.0f );
+
+       return rotation_matrix;
+   }
+#+END_SRC
+
+
+
+
+
 
 *** Quaternion in Julia Language
 
@@ -2673,7 +2839,7 @@ Test rotation quaternions:
 
 #+END_SRC
 
-** Library GLM - OpenGL Math 
+** Library GLM - OpenGL Mathematics 
 *** Overview 
 
 The library GLM (OpenGL math library) contains many classes and
@@ -2712,7 +2878,7 @@ Repository:
    glm::mat4 glm::translate( glm::mat4 const & m, glm::vec3 const & translation       );
 
 
-   // ---- Camera and  Perspective transformation matrices -------------//
+   // ---- Camera View matrix and Camera's matrix -------------//
    glm::mat4 glm::lookAt( glm::vec3 const & eye, glm::vec3 const & look, glm::vec3 const & up ); 
    glm::mat4 glm::ortho( float left, float right, float bottom, float top, float near, float far );
    glm::mat4 glm::ortho( float left, float right, float bottom, float top );
@@ -2720,7 +2886,51 @@ Repository:
    glm::mat4 glm::perspective( float fovy, float aspect, float near, float far);
 #+END_SRC
 
- *GLM functions - transform matrix order*  
+ *Subroutines for vector computations* 
+
+  * glm::normalize()
+    + => Normalize a vector.
+
+  * glm::dot(vec1, vec2)
+    + => Vector dot product.
+
+  * glm::length(vec)
+    + => Vector norm, aka magnitude.
+
+  * glm::distance(vec1, vec2)
+    + => Distance between two vectors thatrepresents position.
+
+  * glm::cross(vec1, vec2)
+    + => Returns the cross product between two vectors.
+
+ *Subroutine for Camera Implementation*
+
+Camera's View Matrix:
+
+  * glm::mat4 _glm::lookAt_ ( glm::vec3 const & eye, glm::vec3 const & look, glm::vec3 const & up );
+    + Brief: Return *View matrix transform* - which transforms world coordinates to camera's space coordinates.
+    + eye  => Vector containing the camera's current position in world coordinates.
+    + look => Vector (Position) to where camera is looking at.
+    + up   => Camera orientation. Suitable fault value Y axis or (x =  0, y = 1, z = 0).
+
+Camera's Projection Matrix:
+
+  * glm::mat4 _glm::perspective_ ( float fovy, float aspect, float near, float far);
+    + Returns projection matrix that transforms camera-space
+      coordinates to clip-space coordinates (NDC - Normalized Device
+      Coordinates within range -1.0 to 1.0). Anything out of the _near_,
+      _far_ range is not visible. 
+    + fovy => Field view angle in radians.
+    + near => Distance to near plane.
+    + far  => Distance to far plane. 
+
+  * glm::mat4 _glm::ortho_ ( float left, float right, float bottom, float top );
+    + Returns a projection matrix for ortographic projection. This
+      type projection is most suitable for 2D drawing; CAD - Computer
+      Aided Design; Technical drawing view and on. 
+
+
+ *GLM functions - transform matrix multiplication order*  
 
 Consider the subroutine, glm::translate() - which translate a
 coordinate system.
@@ -2730,9 +2940,9 @@ coordinate system.
    glm::mat4 OUTPUT_MATRIX =  glm::translate( SOURCE_MATRIX, glm::vec3(DX, DY, DZ));
 #+END_SRC
 
-GLM computes the OUTPUT_MATRIX by performming affine matrix
-multiplication in the following way. The same logic is applicable to
-the subroutines: glm::rotate, glm::scale and so on.
+GLM computes the OUTPUT_MATRIX by performing the matrix multiplication
+in the following way. The same logic is applicable to the subroutines:
+glm::rotate, glm::scale and so on.
 
 #+BEGIN_SRC cpp
     OUTPUT_MATRIX = SOURCE_MATRIX * Translate_Transform(DX, DY, DZ)
