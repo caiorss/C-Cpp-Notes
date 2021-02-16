@@ -5589,3 +5589,774 @@ File: _draw2d-shader.cpp_
   }
 #+END_SRC
 
+** 3D graphics - Rotating cube 
+
+This sample application contains: two cubes; two grid planes for
+visual reference; a coordinate axis for visual debugging and a camera
+that always points to the origin. The camera has the following
+controls: right arrow, rotates the camera's position in a
+counterclockwise way around Y axis (red line); if left arrow is typed,
+the camera position rotates in a clockwise way around Y axis (red
+line). If up arrow is typed, the camera position moves in the positive
+direction of Y axis. If down arrow is typed, the reverse
+happens. 
+
+ *Screenshots* 
+
+[[file:images/opengl-draw3d-rotating-cube1.png][file:images/opengl-draw3d-rotating-cube1.png]]
+ 
+[[file:images/opengl-draw3d-rotating-cube2.png][file:images/opengl-draw3d-rotating-cube2.png]]
+
+  *Project Files* 
+
+Vertex Shader Code: 
+
+#+BEGIN_SRC cpp 
+   #version 330 core 
+
+   layout ( location = 0)  in vec3 position;
+   layout ( location = 1) in vec3 color;   
+   out vec3 out_color;
+   uniform mat4 u_model;       // Model matrix 
+   uniform mat4 u_view;        // Camera's view matrix    
+   uniform mat4 u_projection;  // Camera's projection matrix 
+
+   void main()
+   {
+       gl_Position = u_projection * u_view * u_model * vec4(position, 1.0);
+
+       // Forward to fragment shader 
+       out_color = color; // vec3(0.56, 0.6, 0.0);
+   }
+#+END_SRC
+
+Fragment Shader Code: 
+
+#+BEGIN_SRC cpp 
+   #version 330 
+
+   // This color comes from Vertex shader 
+   in vec3 out_color;
+
+   void main()
+   {
+       // Set vertex colors
+       gl_FragColor =  vec4(out_color, 1.0);
+       // gl_FragColor = vec4(0.3, 0.6, 0.0, 1.0);
+   }
+#+END_SRC
+
+File: CmakeLists.txt 
+
+#+BEGIN_SRC cmake 
+   cmake_minimum_required(VERSION 3.5)
+   project(GLFW_project)
+
+   set(CMAKE_CXX_STANDARD 17)
+   set(CMAKE_CXX_STANDARD_REQUIRED ON)
+   set(CMAKE_VERBOSE_MAKEFILE ON)
+
+   #================ GLFW Settings  ===============#
+
+   find_package(OpenGL REQUIRED)
+
+   include(FetchContent)
+
+   # Set GLFW Options before FectchContent_MakeAvailable 
+   set( GLFW_BUILD_EXAMPLES OFF CACHE BOOL  "GLFW lib only" )
+   set( GLFW_BUILD_TESTS    OFF CACHE BOOL  "GLFW lib only" )
+   set( GLFW_BUILD_DOCS     OFF CACHE BOOL  "GLFW lib only" )
+   set( GLFW_BUILD_INSTALL  OFF CACHE BOOL  "GLFW lib only" )
+
+   # Donwload GLFW library
+   FetchContent_Declare(
+     glfwlib
+     URL   https://github.com/glfw/glfw/releases/download/3.3.2/glfw-3.3.2.zip
+   )
+   FetchContent_MakeAvailable(glfwlib)
+
+   # Download GLM (OpenGL math library for matrix and vectors transformation)
+   FetchContent_Declare(
+     glm  
+     URL  https://github.com/g-truc/glm/archive/0.9.8.zip
+   )
+   FetchContent_MakeAvailable(glm)
+
+   message( [DEBUG] " glm_SOURCE_DIR = ${glm_SOURCE_DIR} ")
+   include_directories(${glm_SOURCE_DIR})
+
+     # ======= TARGETS ===========================#
+
+          add_executable( draw3d-cube  draw2d-cube.cpp   )
+   target_link_libraries( draw3d-cube  glfw OpenGL::GL GLU )
+#+END_SRC
+
+File: draw3d-cube.cpp 
+
+#+BEGIN_SRC cpp 
+  // Draw many colored triangles from a single VBO (Vertex Buffer Object)
+  #include <iostream>
+  #include <vector> 
+  #include <array>
+  #include <cmath>
+  #include <functional>
+
+  // -------- OpenGL headers ---------//
+  //
+  #define GL_GLEXT_PROTOTYPES 1 // Necessary for OpenGL >= 3.0 functions
+  #define GL3_PROTOTYPES      1 // Necessary for OpenGL >= 3.0 functions
+
+  #include <GL/gl.h>
+  #include <GLFW/glfw3.h>
+
+  // #include <GL/glew.h>
+  #include <GL/glu.h>
+
+  // --------- OpenGL Math Librar ------------//
+  #include <glm/glm.hpp>
+  #include <glm/gtc/matrix_transform.hpp>
+  #include <glm/gtc/type_ptr.hpp>
+  #include <glm/gtx/string_cast.hpp>
+
+  // #define GLUT_ENABLED 
+
+  #if defined(GLUT_ENABLED)
+      #include <GL/glut.h>
+  #endif 
+
+  #define GL_CHECK(funcall)\
+      do { \
+          (funcall); \
+          GLint error = glGetError();  \
+          if(error == GL_NO_ERROR){ break; } \
+          std::fprintf(stderr, " [OPENGL ERROR] Error code = %d ; line = %d ; call = '%s'  \n" \
+                        , error, __LINE__, #funcall ); \
+          abort(); \
+      } while(0)
+
+  GLFWwindow* make_glfwWindowi(int  width, int height, const char* title);
+
+  // Compile some  shader 
+  void compile_shader(GLuint m_program, const char* code, GLenum type);
+
+  // Send data from memory to GPU VBO memory 
+  void send_buffer(   GLuint* pVao        // Pointer to VAO (Vertex Array Object) - allocated by caller 
+                    , GLuint* pVbo        // Pointer to VBO (Vertex Buffer Object) - allocated by caller
+                    , GLsizei sizeBuffer  // Total buffer size in bytes
+                    , void*   pBufffer    // Pointer to buffer 
+                    , GLint   shader_attr // Shader attribute location id 
+                    , GLint   size        // Number of coordinates of a given vertex
+                    , GLenum  type        // Type of each element coordinate                   
+                    );
+
+  // ------------ Basic Data Structures -----------// 
+
+  // Wrapper for 2D vertex coordinates 
+  struct Vertex3D{  GLfloat x, y, z;  };
+  // Wrapper for RGB colors 
+  struct ColorRGB { GLfloat r, g, b; };
+
+  struct Geometry {
+      std::vector<Vertex3D> vertices;
+      std::vector<ColorRGB> colors;
+  };
+
+  struct RenderObject {
+      GLuint     u_model;     // Shader uniform variable for model matrix 
+      GLuint     vao;         // Vertex Array object
+      glm::mat4  model;       // Object model matrix 
+      GLenum     draw_type;   // Draw type 
+      GLint      n_vertices;  // Number of vertices
+
+      RenderObject(){ model = glm::mat4(1.0);  }
+      // Explicit copy constructor
+      RenderObject(const RenderObject&) = default;
+      // Explicit copy assignment operator
+      RenderObject& operator=(const RenderObject&) = default;
+
+      void render() 
+      {
+          glUniformMatrix4fv(u_model, 1, GL_FALSE, glm::value_ptr(model) );
+          glBindVertexArray(vao);            
+          glDrawArrays(draw_type, 0, n_vertices);        
+      }
+  };
+
+
+  Geometry make_grid_geometry(size_t n_grid, float dx, const ColorRGB& color);
+  Geometry make_cube_geometry(float w);
+
+  constexpr ColorRGB color_red   = {1.0, 0.0, 0.0};
+  constexpr ColorRGB color_green = {0.0, 1.0, 0.0};        
+  constexpr ColorRGB color_blue  = {0.0, 0.0, 1.0};
+  constexpr ColorRGB color_yelllow    = { 0.80,  1.000, 0.100 };
+  constexpr ColorRGB color_gray       = { 0.47,  0.390, 0.380 };
+  constexpr ColorRGB color_dark_green = { 0.027, 0.392, 0.050 };
+  constexpr ColorRGB color_dark_blue  = { 0.109, 0.066, 0.411 };
+
+  // Send vertices to GPU 
+  void send_vertices( GLuint* pVao, GLuint* pVbo,  GLint shader_attr
+                  ,   std::vector<Vertex3D>& vertices )
+  { 
+      send_buffer(pVao, pVbo, sizeof(Vertex3D) * vertices.size(), vertices.data(), shader_attr, 3, GL_FLOAT ); 
+  }
+
+  // Send color coordinates to GPU 
+  void send_colors( GLuint* pVao, GLuint* pVbo,  GLint shader_attr
+                  ,   std::vector<ColorRGB>& vertices )
+  {
+      send_buffer(pVao, pVbo, sizeof(Vertex3D) * vertices.size(), vertices.data(), shader_attr, 3, GL_FLOAT );
+  }
+
+  struct Camera{
+      // Current location of camera in world coordinates
+      glm::vec3 cam_eye  = { 2.0, 4.0, 5.0 };
+      // Point to where the camera is looking at in world coordinates. 
+      glm::vec3 cam_targ = { 0.0, 0.0, 0.0  };
+      // Current  camera up vector (orientation) - Y axis (default)
+      glm::vec3 cam_up = { 0.0, 1.0, 0.0 };    
+
+      // Field of view
+      float fov_angle = glm::radians(60.0); 
+      // Aspect ratio 
+      float aspect   = 1.0;
+      float zFar     = 20.0;
+      float zNear    = 0.1; 
+
+      // ID of shader's view uniform variable - for setting view matrix
+      GLuint shader_uniform_view;
+      // ID of shader's projection uniform variable for setting projection matrix.
+      GLuint shader_uniform_proj;
+
+      Camera(GLuint uniform_view, GLuint uniform_proj, float aspect):
+          shader_uniform_view(uniform_view)
+        , shader_uniform_proj(uniform_proj)
+        , aspect(aspect)
+      {  update_view();  }
+
+      void update_view() 
+      {
+          // Create View matrix that maps from world-space coordinates to 
+          // camera-space coordinates
+          auto Tview = glm::lookAt(cam_eye, cam_targ, cam_up);
+
+          // Create projection matrix coordinates that maps from 
+          // camera-space coordinates to NDC (Normalized Device Coordinates).
+          auto Tproj = glm::perspective( fov_angle
+                                       , aspect
+                                       , zNear
+                                       , zFar );      
+          // Set shader uniform variables.
+          glUniformMatrix4fv(shader_uniform_view, 1, GL_FALSE, glm::value_ptr(Tview) );
+          glUniformMatrix4fv(shader_uniform_proj, 1, GL_FALSE, glm::value_ptr(Tproj) );
+          
+      }
+
+      // Rotate camera around Y axis 
+      void rotate_y(float angle)
+      {
+          float a = glm::radians(angle);
+          float C = cosf(a), S = sinf(a);
+          float x = this->cam_eye.x;
+          float y = this->cam_eye.y;
+          float z = this->cam_eye.z;
+          // Apply Y-axis rotation matrix directly to Y axis.
+          this->cam_eye.x = x * C + z * S;
+          this->cam_eye.y = y;
+          this->cam_eye.z = -x * S + z * C;
+          this->update_view();
+      }
+
+  };
+
+  int main(int argc, char** argv)
+  {
+
+      /* Initialize the library */
+      if (!glfwInit()){ return -1; }
+
+      #if defined(GLUT_ENABLED)
+          glutInit(&argc, argv);
+      #endif
+
+      // ====== S H A D E R - C O M P I L A T I O N ====//
+      //                                                // 
+    
+      GLFWwindow* window = make_glfwWindowi(640, 480, "Draw Cube 3D");
+
+      // Note: The shader source code is at the end of file.
+      extern const char* code_vertex_shader;
+      extern const char* code_frag_shader;
+
+      GLuint prog = glCreateProgram();
+      // Compile shader code 
+      compile_shader(prog, code_vertex_shader, GL_VERTEX_SHADER  ) ;    
+      compile_shader(prog, code_frag_shader,   GL_FRAGMENT_SHADER );
+      glUseProgram(prog);
+
+      // Get shader uniform variable location for projection matrix
+      // See shader code: "uniform mat4 projection;"
+      const GLint u_proj  = glGetUniformLocation(prog, "u_projection");
+      assert( u_proj >= 0 && "Failed to find u_projection uniform variable" );
+
+      const GLint u_view = glGetUniformLocation(prog, "u_view");
+      assert( u_proj >= 0 && "Failed to find u_view uniform variable" );
+
+      // Get shader uniform variable  location for model matrix.
+      const GLint u_model  = glGetUniformLocation(prog, "u_model");
+      assert( u_model >= 0 && "Failed to find uniform variable" );    
+
+      // Get shader attribute location - the function glGetAttribLocation - returns (-1) on error.
+      const GLint attr_position = glGetAttribLocation(prog, "position");
+      assert( attr_position >= 0 && "Failed to get attribute location" );
+
+      // Get shader attribute of color 
+      const GLint attr_color = glGetAttribLocation(prog, "color");
+      if( attr_color < 0){ std::fprintf(stderr, " [WARNING] Shader color attribute location not found. \n"); };
+
+
+      // ====== U P L O A D - TO - G P U =========================// 
+      //                                                          //
+
+      // ----- Upload Cube vertices and colors ----------------//
+          Geometry cube_geometry = make_cube_geometry(0.3);
+      GLuint vao_cube     = 0;
+      GLuint vbo_vertices = 0;
+      GLuint vbo_colors   = 0;
+      // Upload geometry cube data to GPU
+      send_vertices(&vao_cube, &vbo_vertices, attr_position, cube_geometry.vertices);
+      send_colors(&vao_cube, &vbo_colors, attr_color, cube_geometry.colors);    
+      std::fprintf(stderr, " [TRACE] vao_cube = %d \n", vao_cube );    
+
+      // ------- Upload grid vertices and colors ------------------//
+      Geometry grid_geometry = make_grid_geometry(20, 0.1f, ColorRGB{0.0f, 0.9f, 0.5f});
+      GLuint vao_grid = 0;
+      GLuint vbo_grid_vertices = 0;
+      send_vertices(&vao_grid, &vbo_grid_vertices, attr_position, grid_geometry.vertices);
+      send_colors(&vao_grid, &vbo_grid_vertices, attr_color, grid_geometry.colors);
+
+      // ----- X, Y, Z axis for visual debugging ----------------
+      // X axis (GREEN) ; Y axis (RED); Z axis (BLUE)
+      GLuint vao_axis = 0; 
+      GLuint vbo_axis_vertices = 0;
+      GLuint vbo_axis_colors = 0;
+      float axis_len = 5.0;
+
+      // Each two points represents a unconnected line (GL_LINES)
+      std::vector<Vertex3D> axis_vertices {        
+          // Line for X axis - from (0.0, 0.0, 0.0) to (axis_len, 0.0, 0.0)
+            Vertex3D{0.0f, 0.0f, 0.0f}, Vertex3D{axis_len, 0.0f, 0.0f}
+          // Line for Y axis 
+          , Vertex3D{0.0f, 0.0f, 0.0f}, Vertex3D{0.0f, axis_len, 0.0f}
+          // Line for Z axis 
+          , Vertex3D{0.0f, 0.0f, 0.0f}, Vertex3D{0.0f, 0.0, axis_len}
+      };
+
+      auto axis_colors = std::vector<ColorRGB>{
+            // Color of X axis line 
+            color_green, color_green
+            // Color of Y axis line 
+           , color_red,  color_red
+            // Color of Z axis line 
+           , color_blue, color_blue
+      };
+
+      send_vertices(&vao_axis, &vbo_axis_vertices, attr_position, axis_vertices);
+      send_colors(&vao_axis,   &vbo_axis_colors,   attr_color,    axis_colors  );
+
+      // ============== Set Shader Uniform Variables =============// 
+      //                                                          // 
+
+      int width, height;
+      glfwGetWindowSize(window, &width, &height);
+      // Window aspect ratio
+      float aspect = static_cast<float>(width) / height;
+      // Identity matrix 
+      const auto identity = glm::mat4(1.0);
+
+
+      // Set projection matrix uniform variable
+      glUniformMatrix4fv(u_proj, 1, GL_FALSE, glm::value_ptr(identity) );
+    
+      // ==== R E N D E R I N G - O B J E C T S ==========================//
+      //                                                                  //
+
+      RenderObject cube1{};
+      cube1.vao        = vao_cube;
+      cube1.u_model    = u_model;    
+      cube1.draw_type  = GL_QUADS;
+      cube1.n_vertices = 24;
+      // cube1.model = glm::scale(cube1.model, glm::vec3(0.5, 0.5, 0.5));
+      cube1.model = glm::translate(cube1.model, glm::vec3(0.2, 1.20, +0.4));        
+      cube1.model = glm::rotate(cube1.model, glm::radians(45.0f), glm::vec3(1.0, 1.0, 0.0));
+
+      // Call copy constructor (copy all data from cube1)
+      RenderObject cube2 = cube1;
+      cube2.model = glm::mat4(1.0);
+      cube2.model = glm::translate(cube2.model, glm::vec3(-1.20, 1.2, 0.4));        
+      cube2.model = glm::scale(cube2.model, glm::vec3(1.5, 1.5, 1.5));        
+      // cube2.model = glm::rotate(cube2.model, glm::radians(60.0f), glm::vec3(1.0, 0.0, 1.0));     
+
+
+      // Grid in the plane containing the axis X and Y 
+      RenderObject grid_xy{};
+      grid_xy.vao        = vao_grid;
+      grid_xy.u_model    = u_model;
+      grid_xy.draw_type  = GL_LINES; // Unconnected lines
+      grid_xy.n_vertices = grid_geometry.vertices.size();
+      grid_xy.model = glm::translate(grid_xy.model, glm::vec3(0.0, 1.5, -2.2));
+      //grid_xy.model = glm::scale(grid_xy.model, glm::vec3(4.0, 4.0, 4.0));
+
+      // Grid in the plane which contains the axis X and Z 
+      RenderObject grid_xz = grid_xy;
+      grid_xz.model = glm::mat4(1.0);
+      grid_xz.model = glm::rotate(grid_xz.model, glm::radians(-90.0f), glm::vec3(1.0, 0.0, 0.0)); 
+       // grid_xz.model = glm::scale(grid_xz.model, glm::vec3(4.0, 4.0, 4.0));
+    
+    
+      // Axis which is positioned at the origin of WCS (World Coordinate System)
+      RenderObject axis_world;
+      axis_world.u_model   = u_model;
+      axis_world.vao       = vao_axis;
+      axis_world.draw_type = GL_LINES;
+      axis_world.n_vertices = axis_vertices.size();   
+
+
+      Camera camera(u_view, u_proj, width / height);
+
+      //  ======= R E N D E R  - L O O P ============//
+      //                                             //
+      while ( !glfwWindowShouldClose(window) )
+      {
+          glClear(GL_COLOR_BUFFER_BIT  | GL_DEPTH_BUFFER_BIT);
+
+          // ====== BEGIN RENDERING ============//
+
+              // GL_CHECK( ::glutWireTeapot(0.50) );
+            
+              // ------ Draw Grid ----------
+              axis_world.render();
+              grid_xy.render();
+              grid_xz.render();        
+              cube1.render();
+              cube2.render();
+            
+          // ====== END RENDERING ==============//
+
+          /* Swap front and back buffers */
+          glfwSwapBuffers(window);
+          /* Poll for and process events */
+          glfwWaitEvents();
+
+          if( glfwGetKey(window, 'Q' ) == GLFW_PRESS )
+          {
+               std::cout << " [TRACE] User typed Q =>> Shutdown program. Ok. " << '\n';
+               break;
+          }
+
+          if( glfwGetKey(window, GLFW_KEY_RIGHT ) == GLFW_PRESS ){ camera.rotate_y(+10.0); }
+          if( glfwGetKey(window, GLFW_KEY_LEFT  ) == GLFW_PRESS ){ camera.rotate_y(-10.0); }
+
+          // Move camera up (positive Y axis)
+          if( glfwGetKey(window, GLFW_KEY_UP  ) == GLFW_PRESS ){ 
+              camera.cam_eye.y += 0.5; 
+              camera.update_view();
+          }
+
+          // Move camera down (negative Y axis)
+          if( glfwGetKey(window, GLFW_KEY_DOWN  ) == GLFW_PRESS )
+          { 
+              camera.cam_eye.y -= 0.5; 
+              camera.update_view();            
+          }
+
+          // Rotate cube 1 in counter counter clockwise way around Y axis
+          if( glfwGetKey(window, 'A'  ) == GLFW_PRESS )
+          {  
+              cube1.model = glm::rotate( cube1.model, glm::radians(+10.0f), glm::vec3(0.0, 1.0, 0.0) );
+          }        
+          // Rotate cube 1 in counter clockwise way around Y axis
+          if( glfwGetKey(window, 'S'  ) == GLFW_PRESS )
+          {     
+              cube1.model = glm::rotate( cube1.model, glm::radians(-10.0f), glm::vec3(0.0, 1.0, 0.0) );
+          }    
+
+          // Rotate cube 1 in counter counter clockwise way around X axis (positive rotation)
+          if( glfwGetKey(window, 'Z'  ) == GLFW_PRESS )
+          {  
+              cube1.model = glm::rotate( cube1.model, glm::radians(+10.0f), glm::vec3(1.0, 0.0, 0.0) );
+          }           
+          // Rotate cube 1 in counter counter clockwise way around X axis (negative rotation)
+          if( glfwGetKey(window, 'X'  ) == GLFW_PRESS )
+          {  
+              cube1.model = glm::rotate( cube1.model, glm::radians(-10.0f), glm::vec3(1.0, 0.0, 0.0) );
+          }           
+
+
+      }
+
+      glfwTerminate();
+      return 0;
+
+  } // --- End of main() -----//
+
+
+  // ---------- S H A D E R - P R O G R A M S  -------------------------//
+  //
+
+  // Minimal vertex shader =>> Runs on the GPU and processes each vertex.
+  const char* code_vertex_shader = R"(    
+      #version 330 core 
+
+      layout ( location = 0)  in vec3 position;
+      layout ( location = 1) in vec3 color;   
+      out vec3 out_color;
+      uniform mat4 u_model;       // Model matrix 
+      uniform mat4 u_view;        // Camera's view matrix    
+      uniform mat4 u_projection;  // Camera's projection matrix 
+
+      void main()
+      {
+          gl_Position = u_projection * u_view * u_model * vec4(position, 1.0);
+
+          // Forward to fragment shader 
+          out_color = color; // vec3(0.56, 0.6, 0.0);
+      }
+
+  )";
+
+  // Fragment shader source code 
+  const char* code_frag_shader = R"(
+      #version 330 
+
+      // This color comes from Vertex shader 
+      in vec3 out_color;
+
+      void main()
+      {
+          // Set vertex colors
+          gl_FragColor =  vec4(out_color, 1.0);
+          // gl_FragColor = vec4(0.3, 0.6, 0.0, 1.0);
+      }
+  )";
+
+
+      // ====== I M P L E M E N T A T I O N S ==========// 
+
+  GLFWwindow* 
+  make_glfwWindowi(int  width, int height, const char* title)
+  {
+
+      glfwSetErrorCallback([](int error, const char* description)
+                           { std::fprintf( stderr, " [GLFW ERROR] Error = %d ; Description = %s \n"
+                                          , error, description);
+                           });
+
+      GLFWwindow* window = glfwCreateWindow(width, height, title, NULL, NULL);
+      assert( window != nullptr && "Failed  to create Window");
+
+      // OpenGL context 
+      glfwMakeContextCurrent(window);
+      // Pain whole screen as black - dark screen colors are better 
+      // for avoding eye strain due long hours staring on monitor.
+      glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+
+      // Set - OpenGL Core Profile - version 3.3
+      GL_CHECK( glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3) ); 
+      GL_CHECK( glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3) );
+      GL_CHECK( glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE) );
+
+      GL_CHECK( glEnable(GL_COLOR_MATERIAL) );
+      GL_CHECK( glEnable(GL_DEPTH_TEST)     );
+      GL_CHECK( glEnable(GL_BLEND)          );
+
+      return window;
+  }
+
+  void compile_shader(GLuint m_program, const char* code, GLenum type)
+  {
+      GLint shader_id = glCreateShader( type );
+      glShaderSource(shader_id, 1, &code, nullptr);
+      glCompileShader(shader_id);
+    
+      GLint is_compiled = GL_FALSE;
+      // Check shader compilation result 
+      glGetShaderiv(shader_id, GL_COMPILE_STATUS, &is_compiled);
+
+      // If there is any shader compilation result, 
+      // print the error message.
+      if( is_compiled == GL_FALSE)
+      {
+          GLint length;
+          glGetShaderiv(shader_id, GL_INFO_LOG_LENGTH, &length);
+          assert( length > 0 );
+
+          std::string out(length + 1, 0x00);
+          GLint chars_written;
+          glGetShaderInfoLog(shader_id, length, &chars_written, out.data());
+          std::cerr << " [SHADER ERROR] = " << out << '\n';
+          // Abort the exection of current process. 
+          std::abort();
+      }          
+
+      glAttachShader(m_program, shader_id);   
+      glDeleteShader(shader_id);
+      glLinkProgram(m_program);
+      GLint link_status = GL_FALSE;
+      glGetProgramiv(m_program, GL_LINK_STATUS, &link_status);
+      assert( link_status != GL_FALSE );   
+      // glUseProgram(m_program);         
+  }
+
+  // Upload buffer from main memory to GPU VBO 
+  // =>> Parameters VAO, VBO are allocated by the caller. 
+  void send_buffer( GLuint* pVao, GLuint* pVbo, GLsizei sizeBuffer
+                  , void* pBufffer, GLint   shader_attr, GLint size
+                  , GLenum type)
+  {
+      assert(pVao != nullptr);
+      assert(pVbo != nullptr);
+      GLuint& vao = *pVao;
+      GLuint& vbo = *pVbo;
+      // Generate and bind current VAO (Vertex Array Object)
+      if(vao == 0){ glGenVertexArrays(1, &vao); }
+      glBindVertexArray(vao);
+      // Generate and bind current VBO (Vertex Buffer Object)
+      glGenBuffers(1, &vbo);
+      glBindBuffer(GL_ARRAY_BUFFER, vbo);
+      // Upload data to current VBO buffer in GPU 
+      glBufferData(GL_ARRAY_BUFFER, sizeBuffer, pBufffer, GL_STATIC_DRAW);   
+      glEnableVertexAttribArray(shader_attr);    
+      // Set data layout - how data will be interpreted.
+      glVertexAttribPointer(shader_attr, size, type, GL_FALSE, 0, nullptr);
+      // ------ Disable Global state set by this function -----//
+      // Unbind VAO 
+      glBindVertexArray(0);
+      // Unbind VBO 
+      glBindBuffer(GL_ARRAY_BUFFER, vbo);
+      // Disable current shader attribute 
+      glDisableVertexAttribArray(shader_attr);
+
+  }
+
+
+  Geometry
+  make_grid_geometry(size_t n_grid, float dx, const ColorRGB& color)
+  {
+      std::vector<Vertex3D> grid_vertices;
+      std::vector<ColorRGB> grid_colors ;
+
+      float dy = dx;
+      float grid_w  = n_grid * dx;
+      float grid_h  = n_grid * dy;
+
+      // Draw horizontal lines - parallel to X axis 
+      for(size_t n = 0; n < 2 * n_grid; n++)
+      {
+          // Line Vertex A (BEGIN)
+          grid_vertices.push_back( Vertex3D{ -grid_w, dy * n - grid_h, 0 } );
+          // Color of vertex A 
+          grid_colors.push_back(color);
+          // Line Vertex B (END)
+          grid_vertices.push_back( Vertex3D{ +grid_w, dy * n - grid_h, 0  } );
+          // Color of vertex B
+          grid_colors.push_back(color);
+      }
+
+       // Draw horizontal lines - parallel to Y axis 
+      for(size_t n = 0; n < 2 * n_grid; n++)
+      {
+          // Line point A (BEGIN)
+          grid_vertices.push_back( Vertex3D{ dx * n - grid_w, -grid_h, 0 } );
+          // Color of Vertex A 
+          grid_colors.push_back(color);
+          // Line pojnt B (END)
+          grid_vertices.push_back( Vertex3D{ dx * n - grid_w, +grid_h, 0  } );
+          // Color of Vertex B 
+          grid_colors.push_back(color);
+
+      }    
+
+      return Geometry{ grid_vertices, grid_colors };
+    
+  }
+
+  Geometry 
+  make_cube_geometry(float w)
+  {	
+      // Array of cube vertex coordinates (X, Y)
+      auto vertices = std::vector<Vertex3D> {
+          // Top face {y = w}
+          { w, w, -w}
+        , {-w, w, -w}
+        , {-w, w,  w}
+        , { w, w,  w}
+ 
+        // Bottom face , {y = -w}
+        , { w, -w,  w}
+        , {-w, -w,  w}
+        , {-w, -w, -w}
+        , { w, -w, -w}
+ 
+        // Front face  , {z = w}
+        , { w,  w, w}
+        , {-w,  w, w}
+        , {-w, -w, w}
+        , { w, -w, w}
+ 
+        // Back face , {z = -w}
+        , { w, -w, -w}
+        , {-w, -w, -w}
+        , {-w,  w, -w}
+        , { w,  w, -w}
+ 
+        // Left face , {x = -w}
+        , {-w,  w,  w}
+        , {-w,  w, -w}
+        , {-w, -w, -w}
+        , {-w, -w,  w}
+ 
+        // Right face , {x = w}
+        , {w,  w, -w}
+        , {w,  w,  w}
+        , {w, -w,  w}
+        , {w, -w, -w}
+      };
+
+      // std::fprintf(stderr, " [TRACE] Number of cube vertices = %zu \n", cube_vertices.size() );
+
+      auto colors = std::vector<ColorRGB> { 
+             color_red
+          ,  color_red
+          ,  color_red
+          ,  color_red
+
+          , color_blue
+          , color_blue
+          , color_blue
+          , color_blue
+
+          , color_green
+          , color_green
+          , color_green
+          , color_green
+
+          , color_gray
+          , color_gray
+          , color_gray
+          , color_gray
+
+          , color_dark_green
+          , color_dark_green
+          , color_dark_green
+          , color_dark_green
+
+          , color_dark_blue
+          , color_dark_blue
+          , color_dark_blue
+          , color_dark_blue
+      };
+
+      return Geometry{ vertices, colors };
+  }
+#+END_SRC
