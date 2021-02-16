@@ -228,7 +228,7 @@
   + _HLSL_ (High-Level Shader Language) - Microsft DirectX shading language.
 
 ** OpenGL companion libraries 
-**** OpenGL Companion Libraries
+*** OpenGL Companion Libraries
 
 Core Libraries:
 
@@ -395,16 +395,27 @@ Non-categorized / Miscellaneous:
       approximately like the MIT license in permissivity. The parts of
       the SDK responsible for maintaining the build, as well as all
       examples, are distributed under the MIT License."q
-**** WebGL Companion Libraries 
+*** WebGL Companion Libraries 
 
 WebGL Companion Libraries: (OpenGL on the WEB)
+
+  + [[https://glmatrix.net/][glMatrix]] - GLM math library ported to Javascript. Computer
+    graphics math library, similar to OpenGL GLM math library.
+
+  + [[https://math.gl/docs][Math.GL]] - "math.gl is JavaScript math library focused on
+    geospatial and 3D use cases, designed as a composable, modular
+    toolbox. math.gl provides a core module with classic vector and
+    matrix classes, and a suite of optional modules implementing
+    various aspects of geospatial and 3D math. While the math.gl is
+    highly optimized for use with the WebGL and WebGPU APIs, math.gl
+    itself has no WebGL dependencies." 
 
   + [[https://threejs.org/][Three.JS]] - High level wrapper library around WebGL, that provides
     many high level features that includes: camera objects; scene graphs;
     geometry; perspective; forward kinematics, inverse kinematics;
     graphics math library containing, matrices, vectors, quaternions;
-    image loaders; animation and more. 
-**** See also
+    image loaders; animation and more.
+*** See also
 
   + [[https://www.khronos.org/opengl/wiki/OpenGL_Loading_Library][OpenGL Loading Library - OpenGL Wiki]] / Khronos Group
     + Brief: "An OpenGL Loading Library is a library that loads
@@ -475,6 +486,9 @@ not be available at OpenGL ES.
     + glViewPort()
     + glOrtho()
     + glMultMatrix()
+
+  + Camera affine transforms: 
+    + gluLookAt() => Replacement: glm::lookAt() 
 
   + Save Context 
     + glPop()          
@@ -1295,6 +1309,217 @@ Testing formula in [[https://www.sympy.org/en/index.html][Sympy]] - Python CAS (
 
 #+END_SRC
 
+*** Camera View Transform 
+
+The camera view transform matrix transforms world-space coordinates to
+camera-space coordinates. On old OpenGL versions, this matrix was
+can be constructed through the OpenGL routine _gluLookAt_ or the GLM
+(OpenGL Mathematics) library routine glm::lookAt. 
+
+The GLM function glm::lookAt() has the following type signature. 
+
+#+BEGIN_SRC cpp 
+   glm::mat4 glm::lookAt( 
+                   // Eye vector - camera position in world-space coordinates
+                   glm::vec3 const& at
+
+                   // At vector - point to where camera is looking at 
+                   // in world-space coordinates. 
+                 , glm::vec3 const& at
+
+                   // Up vector - camera's orientation. Often set to vertical axis
+                   // or Y axis up = (x = 0, y = 1, z = 0) by default.
+                 , glm::vec3 const& up 
+                 );
+#+END_SRC
+
+
+This function has the following algorithm: 
+
+\begin{equation} 
+    T_{\text{view}} = 
+          \begin{bmatrix}
+              X_x & X_y & X_z & -\vec{X} \cdot \vec{\text{eye}}  \\
+              Y_x & Y_y & Y_z & -\vec{Y} \cdot \vec{\text{eye}}  \\
+              Z_x & Z_y & Z_z & -\vec{Z} \cdot \vec{\text{eye}}  \\
+              0   & 0   & 0   &  1   
+          \end{bmatrix}
+
+     = 
+          \begin{bmatrix}
+              X_x & X_y & X_z & - \text{dot}(\vec{X}, \vec{\text{eye}})  \\
+              Y_x & Y_y & Y_z & - \text{dot}(\vec{Y}, \vec{\text{eye}})  \\
+              Z_x & Z_y & Z_z & - \text{dot}(\vec{Z}, \vec{\text{eye}})  \\
+              0   & 0   & 0   &  1   
+          \end{bmatrix}
+\end{equation}
+
+And the unit vectors, X, Y and Z are computed in the following manner:
+
+\begin{eqnarray*} 
+    \vec{Z} &=  \frac{ \vec{eye} - \vec{at} }{\left\| \vec{eye} - \vec{at}  \right\| }  \\
+
+    \vec{X} &=  \frac{ \vec{up} \times \vec{Z} }{\left\| \vec{up} \times \vec{Z}  \right\| }  \\
+
+    \vec{Y} &=  \frac{ \vec{Z} \times \vec{X} }{\left\| \vec{Z} \times \vec{Z}  \right\| }  \\
+\end{eqnarray*}
+
+The vector $\vec{Z}$ is the opposite direction, represented by a unit
+vector, to where the camera is looking at. If this vector was an
+input, and was directly set by the calling code, rotating that camera,
+would require just rotating this vector.
+
+Where: 
+  + INPUTS: 
+    + $\vec{eye}$ (Eye vector) => Camera's position in world-space coordinates.
+    + $\vec{at}$  (At vector) => Point in world-space coordinate where the camera is lookin at.
+    + $\vec{up}$  (Up vector) => Camera orientation, often set by default to Y axis.
+  + Intermediate Outputs:
+    + $\vec{X} = [X_x \quad X_y \quad X_z]$
+    + $\vec{Y} = [Y_x \quad Y_y \quad Y_z]$
+    + $\vec{Z} = [Z_x \quad Z_y \quad Z_z]$
+  + Notation Used:
+    + $\left\| \vec{vector}  \right\|$ - means the vector norm
+    + $\vec{A} \times \vec{B}$ - means vector cross product
+    + $\vec{A} \cdot \vec{B}$ - means vector dot product.
+
+
+ *Algorithm Validation* 
+
+Testing GLM (OpenGL Mathematic Library) in CERN's root REPL: 
+
+#+BEGIN_SRC cpp 
+   // -------------- Case  1 --------------------- //
+   // 
+   auto eye = glm::vec3(3.0, 10.0, 20.0);
+   auto at  = glm::vec3(50.0, 25.0, 10.0);
+   auto up  = glm::vec3(0.0, 1.0, 0.0);
+
+   root [108] auto view_matrix = glm::lookAt(eye, at, up);
+   root [109] 
+   root [109] show_matrix("view = ", view_matrix)
+
+    [MATRIX] view =  = 
+      0.208  -0.000   0.978 -20.186
+     -0.291   0.955   0.062  -9.912
+     -0.934  -0.298   0.199   1.808
+      0.000   0.000   0.000   1.000
+   root [110] 
+
+   // ------------ Case 2 --------------------------// 
+   auto eye = glm::vec3(50.0, -10.0, 0.0);
+   auto up = glm::vec3(0.0, 1.0, 0.0);
+   auto at = glm::vec3(25.0, 5.615, -200.0);
+   auto view_matrix = glm::lookAt(eye, at, up);
+
+   root [114] 
+   root [114] show_matrix("view = ", view_matrix)
+
+    [MATRIX] view =  = 
+      0.992   0.000  -0.124 -49.614
+      0.010   0.997   0.077   9.491
+      0.124  -0.077   0.989  -6.956
+      0.000   0.000   0.000   1.000
+
+#+END_SRC
+
+Implement glm::lookAt() algorithm in Julia programming language: 
+
+#+BEGIN_SRC julia 
+  # Return vector v normalized =>> Returns column vector 
+  normalize(v) = begin 
+     x, y, z = v
+     mag = sqrt(x * x + y * y + z * z)
+     [ (x / mag) (y / mag) (z / mag)]'
+  end
+
+  # Vector cross product =>> Returns column vector 
+  function cross(va, vb)
+     x, y, z = va
+     T = [ 0 -z y ; z 0 -x; -y x 0]
+     return T * vb
+  end
+
+  # Vector Dot product via vector column X transpose multiplication
+  dot(va, vb) = va' * vb
+
+  # Note: The inputs must be column vectors
+  function lookAt(eye, at, up)
+     # The vector Z is the direction to where the camera is looking at.
+     Z = normalize( eye - at      )
+     X = normalize( cross(up, Z)  )
+     Y = normalize( cross(Z, X )  )
+     t = [ dot(eye, X)  dot(eye, Y)  dot(eye, Z) ]
+
+     # Define identity matrix 
+     matrix = [ 1.0 0.0 0.0 0.0 ; 0.0 1.0 0.0 0.0 ; 0.0 0.0 1.0 0.0; 0.0 0.0 0.0 1.0]   
+
+     # Assign vector X to matrix's first row 
+     matrix[1, 1:3] = X
+     # Assign vector Y to matrix's second row
+     matrix[2, 1:3] = Y
+     # Assign vector Z to matrix's third row 
+     matrix[3, 1:3] = Z
+     # Assign forth (last) column to vector t 
+     matrix[1:3, 4] = -t
+     return matrix 
+  end
+#+END_SRC
+
+Test implementation: 
+
+#+BEGIN_SRC julia 
+   #  --------- Test Case 1 --------------------------#
+   # =================================================#
+   eye = [3.0 10.0 20.0  ]'
+   at  = [50.0 25.0 10.0 ]'
+   up  = [0.0   1.0 0.00 ]' # Y axis
+
+   julia> eye
+   3×1 LinearAlgebra.Adjoint{Float64,Array{Float64,2}}:
+     3.0
+    10.0
+    20.0
+
+   # Camera's view transform matrix 
+   julia> Tview = lookAt(eye, at, up)
+   4×4 Array{Float64,2}:
+    -0.208108  0.0       -0.978106   20.1864
+    -0.291457  0.954572   0.062012   -9.91159
+     0.933672  0.297981  -0.198654  -52.1466
+     0.0       0.0        0.0         1.0
+
+   # Camera's view transform matrix rounded with 3 decimal digits
+   julia> map(x -> round(x, digits=3), Tview)
+   4×4 Array{Float64,2}:
+     0.208   0.0    0.978  -20.186
+    -0.291   0.955  0.062   -9.912
+    -0.934  -0.298  0.199    1.808
+     0.0     0.0    0.0      1.0
+
+   #  --------- Test Case 2 --------------------------#
+   # =================================================#
+   eye = [50.0 -10.0 0.0 ]'
+   up  = [0.0 1.0 0.0 ]'
+   at  = [25.0 5.615 -200.0]'
+
+   Tview = lookAt(eye, at, up)
+
+   julia> map(x -> round(x, digits=3), Tview)
+   4×4 Array{Float64,2}:
+    0.992   0.0    -0.124  -49.614
+    0.01    0.997   0.077    9.491
+    0.124  -0.077   0.989   -6.956
+    0.0     0.0     0.0      1.0
+
+#+END_SRC
+
+
+ *References* 
+
+  + [[http://ivl.calit2.net/wiki/images/2/2c/03_CoordinateSystemsS15.pdf][CSE 167: Introduction to Computer Graphics]] - Lecture 3 - Coordinate Systems.
+
+  + [[https://www.cs.utexas.edu/~fussell/courses/cs354/lectures/lecture11.pdf][Viewing and Modelling - CS354]]  
 *** Concatenating Affine Transforms 
 
   *Concatenating / Combinating of affine transforms* 
