@@ -1968,8 +1968,8 @@ scaling; 3rd - translation:
 *** Quaternions 
 
 Quaternions are a generalization of complex numbers, that was proposed
-and formulated by the irish mathematician and physicist William Rowan
-Hamilton, in 1843. This mathematical construct provides a convenient
+and formulated by the irish mathematician and physicist William Rowan 
+[[https://en.wikipedia.org/wiki/William_Rowan_Hamilton][Hamilton]], in 1843. This mathematical construct provides a convenient
 notation for expressing rotation and has a broad range of
 applications, including computer graphics, computer vision, robotics,
 orbital mechanics, aerospace and flight dynamics. 
@@ -3322,7 +3322,8 @@ view matrix transform, that turns world coordinates into camera
 coordinates; _glm::perspective()_ - for computing the projection matrix,
 that turns camera coordinates into clip-space coordinates (NDC
 coordinates with range -1.0 to 1.0) and also _glm::ortho_ for computing
-the orthogonal perspective matrix.
+the orthogonal perspective matrix. The GLM library is designed with
+syntax based on GLSL (OpenGL shading language). 
 
 Web Site: 
 
@@ -3331,6 +3332,10 @@ Web Site:
 Repository:
 
   + https://github.com/g-truc/glm
+
+Other Documentations: 
+
+ + https://openframeworks.cc/documentation/glm/
 
 
   *Type signature of most relevant GLM functions:*
@@ -3519,120 +3524,218 @@ affine transforms:
    }
 #+END_SRC
 
-Define a 4x4 homogenous coordinate matrix: 
+
+
+Construct a matrix from column vectors: 
+
+\begin{equation}
+   \text{colum}_0 = \begin{bmatrix}  25   \\ 40 \\   7 \\ 0    \end{bmatrix} \quad 
+   \text{colum}_1 = \begin{bmatrix}   8   \\ 9  \\  10 \\ 0    \end{bmatrix} \quad 
+   \text{colum}_2 = \begin{bmatrix}  -5   \\ 6  \\   9 \\ 0    \end{bmatrix} \quad 
+   \text{colum}_3 = \begin{bmatrix} 100   \\ 50 \\  20 \\ 1    \end{bmatrix}
+\end{equation}
+
+
+\begin{equation}
+   M = \begin{bmatrix} \text{colum}_0  &\text{colum}_1 & \text{colum}_2 & \text{colum}_3 \end{bmatrix}
+\end{equation}
+
+\begin{equation}
+   M = \begin{bmatrix} 
+            25  &  8  & -5  &  100 \\
+            40  &  9  & 10  &   50 \\
+             7  & 10  &  9  &   20 \\  
+             0  &  0  &  0  &    1 \\            
+       \end{bmatrix}
+\end{equation}
+
 
 #+BEGIN_SRC cpp 
-   root [18] glm::mat4 mat{ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 };
-   root [19] 
-   root [19] mat
-   (glm::mat4 &) @0x7f904e6c2008
+   auto col0 = glm::vec4(25, 40, 7, 0)
+   auto col1 = glm::vec4(8, 9, 10, 0)
+   auto col2 = glm::vec4(-5, 6, 9, 0)
+   auto col3 = glm::vec4(100, 50, 20, 1)
 
+   root [9] auto M = glm::mat4(col0, col1, col2, col3)
 
-   // This matrix is not in the way the user expects as it is stored in column-major order 
-   // (data layout used by Fortran) and not row-major order (data layout used by C and C++).
-   root [20] show_matrix("mat", mat)
+   root [24] show_matrix("M", M)
 
-    [MATRIX] mat = 
-      1.000   5.000   9.000  13.000
-      2.000   6.000  10.000  14.000
-      3.000   7.000  11.000  15.000
-      4.000   8.000  12.000  16.000
-   root [21] 
-
-   root [21] mat[0][0]
-   (float) 1.00000f
-
-   root [22] mat[0][1]
-   (float) 2.00000f
-
-   root [23] mat[0][2]
-   (float) 3.00000f
-
-   root [24] mat[0][3]
-   (float) 4.00000f
-
-   root [25] mat[3][3]
-   (float) 16.0000f
-
-   root [26] mat[2][0]
-   (float) 9.00000f
-
-   root [27] mat[2][1]
-   (float) 10.0000f
+    [MATRIX] M = 
+     25.000   8.000  -5.000 100.000
+     40.000   9.000   6.000  50.000
+      7.000  10.000   9.000  20.000
+      0.000   0.000   0.000   1.000
 #+END_SRC
+
+This matrix could also be constructed in the following mode: 
+
+#+BEGIN_SRC cpp 
+    auto MM = glm::mat4(25, 40, 7, 0  ,8, 9, 10, 0  ,-5, 6, 9, 0 ,100, 50, 20, 1)
+
+   root [27] show_matrix("MM", MM)
+
+    [MATRIX] MM = 
+     25.000   8.000  -5.000 100.000
+     40.000   9.000   6.000  50.000
+      7.000  10.000   9.000  20.000
+      0.000   0.000   0.000   1.000
+
+   // Note: It shows the matrix columns, not the matix rows.
+   root [39] glm::to_string(M)
+   (std::string) "mat4x4((25.000000, 40.000000, 7.000000, 0.000000), (8.000000, 9.000000, 10.000000, 0.000000), (-5.000000, 6.000000, 9.000000, 0.000000), (100.000000, 50.000000, 20.000000, 1.000000))"
+   root [40] 
+
+#+END_SRC
+
+Extract columns from matrix MM:
+
+#+BEGIN_SRC cpp 
+   #include <glm/gtc/matrix_access.hpp>
+
+   auto col0 = glm::column(MM, 0)
+   auto col1 = glm::column(MM, 1)
+   auto col2 = glm::column(MM, 2)
+   auto col3 = glm::column(MM, 3)
+
+   root [58] glm::to_string(col0)
+   (std::string) "vec4(25.000000, 40.000000, 7.000000, 0.000000)"
+
+   root [60] glm::to_string(col1)
+   (std::string) "vec4(8.000000, 9.000000, 10.000000, 0.000000)"
+
+   root [62] glm::to_string(col2)
+   (std::string) "vec4(-5.000000, 6.000000, 9.000000, 0.000000)"
+
+   root [64] glm::to_string(col3)
+   (std::string) "vec4(100.000000, 50.000000, 20.000000, 1.000000)"
+  
+   // Get elements from column 0 (col0)
+   root [65] col0[0]
+   (float) 25.0000f
+
+   root [66] col0[1]
+   (float) 40.0000f
+
+   root [67] col0[2]
+   (float) 7.00000f
+
+   root [68] col0[3]
+   (float) 0.00000f
+#+END_SRC
+
+Extract rows from matrix MM: 
+
+#+BEGIN_SRC cpp 
+   auto row0 = glm::row(MM, 0)
+   auto row1 = glm::row(MM, 1)
+   auto row2 = glm::row(MM, 2)
+   auto row3 = glm::row(MM, 3)
+
+   root [73] glm::to_string(row0)
+   (std::string) "vec4(25.000000, 8.000000, -5.000000, 100.000000)"
+
+   root [74] glm::to_string(row1)
+   (std::string) "vec4(40.000000, 9.000000, 6.000000, 50.000000)"
+
+   root [75] glm::to_string(row2)
+   (std::string) "vec4(7.000000, 10.000000, 9.000000, 20.000000)"
+
+   root [76] glm::to_string(row3)
+   (std::string) "vec4(0.000000, 0.000000, 0.000000, 1.000000)"
+#+END_SRC
+
+Modify matrix columns: 
+
+#+BEGIN_SRC cpp 
+   root [77] show_matrix("MM", MM)
+
+    [MATRIX] MM = 
+     25.000   8.000  -5.000 100.000
+     40.000   9.000   6.000  50.000
+      7.000  10.000   9.000  20.000
+      0.000   0.000   0.000   1.000
+
+   root [80] MM[0] = glm::vec4(-90.f, 50.0f, 32.5f, 26.0f)
+
+
+   root [81] show_matrix("MM", MM)
+
+    [MATRIX] MM = 
+    -90.000   8.000  -5.000 100.000
+     50.000   9.000   6.000  50.000
+     32.500  10.000   9.000  20.000
+     26.000   0.000   0.000   1.000
+#+END_SRC
+
 
 Obtain transpose matrix: 
 
 #+BEGIN_SRC cpp 
-  root [28] auto tmat = glm::transpose(mat)
-  (glm::mat<4, 4, float, glm::qualifier::packed_highp> &) @0x7f904e6c2058
-
-  root [29] show_matrix("tmat", tmat)
-
-   [MATRIX] tmat = 
-     1.000   2.000   3.000   4.000
-     5.000   6.000   7.000   8.000
-     9.000  10.000  11.000  12.000
-    13.000  14.000  15.000  16.000
-
-  root [33] tmat[0][0]
-  (float) 1.00000f
-
-  root [34] tmat[1][0]
-  (float) 2.00000f
-
-  root [35] tmat[2][0]
-  (float) 3.00000f
-
-  root [36] tmat[3][0]
-  (float) 4.00000f
+   root [82] auto tmat = glm::transpose(MM)
+   (glm::mat<4, 4, float, glm::qualifier::packed_highp> &) @0x7f7b71f0c20c
 
 
-  root [37] tmat[0][0]
-  (float) 1.00000f
+   root [83] show_matrix("tmat", tmat)
 
-  root [38] tmat[0][1]
-  (float) 5.00000f
+    [MATRIX] tmat = 
+    -90.000  50.000  32.500  26.000
+      8.000   9.000  10.000   0.000
+     -5.000   6.000   9.000   0.000
+    100.000  50.000  20.000   1.000
 
-  root [39] tmat[0][2]
-  (float) 9.00000f
+  // ----- Access first column elements (column 0) ----// 
+  //  =>> The matrix is column-major order (Fortran-like data layout),
+  //      not C or C++ data-layout, which is row-major order 
+  //
+  // Tmat[j column-number][i row-number] 
 
-  root [40] tmat[0][3]
-  (float) 13.0000f
+  // ----- Column 0 elements ----------// 
+
+  root [84] tmat[0][0]
+  (float) -90.0000f
+
+  root [85] tmat[1][0]
+  (float) 50.0000f
+
+  root [86] tmat[0][0]
+  (float) -90.0000f
+
+  root [87] tmat[0][1]
+  (float) 8.00000f
+
+  root [88] tmat[0][2]
+  (float) -5.00000f
+
+  root [89] tmat[0][3]
+  (float) 100.000f
 #+END_SRC
 
 Get pointer to first element: 
 
 #+BEGIN_SRC cpp 
-  root [41] float* ptr = glm::value_ptr(tmat)
-  (float *) 0x7f904e6c2058
+   root [90] float* ptr = glm::value_ptr(tmat)
+   (float *) 0x7f7b71f0c20c
 
-  root [42] ptr[0]
-  (float) 1.00000f
+   root [91] ptr[0]
+   (float) -90.0000f
 
-  root [43] ptr[1]
-  (float) 5.00000f
+   root [92] ptr[1]
+   (float) 8.00000f
 
-  root [44] ptr[2]
-  (float) 9.00000f
+   root [93] ptr[15]
+   (float) 1.00000f
 
-  root [45] ptr[3]
-  (float) 13.0000f
+   root [94] ptr[10]
+   (float) 9.00000f
 
-  root [46] ptr[4]
-  (float) 2.00000f
+   root [95] *(ptr + 1)
+   (float) 8.00000f
 
-  root [47] ptr[5]
-  (float) 6.00000f
+   root [96] *(ptr + 10)
+   (float) 9.00000f
 
-  root [48] ptr[6]
-  (float) 10.0000f
-
-  root [49] ptr[7]
-  (float) 14.0000f
-
-  root [50] ptr[8]
-  (float) 3.00000f
+   root [97] *(ptr + 15)
+   (float) 1.00000f
 #+END_SRC
 
 Null 4x4 matrix: 
@@ -3841,6 +3944,7 @@ Inverse matrix:
    root [114] 
 
 #+END_SRC
+
 
   *GLM Quaternions* 
 
