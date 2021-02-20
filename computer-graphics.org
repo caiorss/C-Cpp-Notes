@@ -1166,10 +1166,10 @@ Transform $R_x$ applied to a homogeneous vector (X, Y, Z, w = 1).
 
   = 
    \begin{bmatrix} 
-       x                              \\   
-       y \cos \alpha - z \sin \alpha  \\ 
-       y \sin \alpha + z \cos \alpha  \\ 
-       1                              \\
+       x                                            \\   
+       y \cdot \cos{\alpha} - z \cdot \sin{\alpha}  \\ 
+       y \cdot \sin{\alpha} + z \cdot \cos{\alpha}  \\ 
+       1                                            \\
    \end{bmatrix}
 \end{equation}
 
@@ -1206,9 +1206,9 @@ Transform $R_y$ applied to a homogeneous vector:
 
   = 
    \begin{bmatrix} 
-       x \cos{\beta} + z \sin{\beta} \\ 
+       x \cdot \cos{\beta} + z \cdot \sin{\beta} \\ 
        y                             \\
-     - x \sin{\beta} + z \cos{\beta} \\
+     - x \cdot \sin{\beta} + z \cdot \cos{\beta} \\
    \end{bmatrix}
 \end{equation}
 
@@ -1243,9 +1243,9 @@ Transform $R_z$ applied to a homogeneous vector:
 
   = 
    \begin{bmatrix} 
-       x \cos{\theta} - y \sin{\theta}   \\
-       x \sin{\theta} + y \cos{\theta}   \\
-       z                                \\
+       x \cdot \cos{\theta} - y \cdot \sin{\theta}   \\
+       x \cdot \sin{\theta} + y \cdot \cos{\theta}   \\
+       z                                             \\
        1 
    \end{bmatrix}
 \end{equation}
@@ -1460,9 +1460,9 @@ And the unit vectors, X, Y and Z are computed in the following manner:
 \end{eqnarray*}
 
 The vector $\vec{Z}$ is the opposite direction, represented by a unit
-vector, to where the camera is looking at. If this vector was an
-input, and was directly set by the calling code, rotating that camera,
-would require just rotating this vector.
+vector, to where the camera is looking at. If this vector were an
+input, and was directly set by the calling code, rotating that camera
+viewing direction  would require just rotating this vector.
 
 Where: 
   + INPUTS: 
@@ -1477,6 +1477,29 @@ Where:
     + $\left\| \vec{vector}  \right\|$ - means the vector norm
     + $\vec{A} \times \vec{B}$ - means vector cross product
     + $\vec{A} \cdot \vec{B}$ - means vector dot product.
+
+
+ *Point camera to specific direction* 
+
+The function lookAt() points the camera view to a specific point in
+the space _at_ vector in world-space coordinates. The following function
+could be defined for pointing the camera at specific direction (vector
+or normalized vector) instead of a point-vector. 
+
+#+BEGIN_SRC cpp 
+   glm::mat4 
+   lookAt_direction(glm::vec3 const& eye, glm::vec3 const& forward, glm::vec3 const& up  )
+   {
+       glm::vec3 at = eye + forward; 
+       return lookAt(eye, at, up);
+   }
+#+END_SRC
+
+Where: 
+
+  + _eye_ - (point-verctor) Camera position in world-space coordinates
+  + _forward_ - (vector) Direction to where camera is looking at. 
+  + _up_ (vector) Camera's orientation
 
 
  *Algorithm Validation* 
@@ -2314,17 +2337,34 @@ Where:
 Supposing that the components (w, x, y, z) of normalized quaternion *q*
 are known. The represented rotation angle, $\theta$ and rotation axis
 (a.k.a orientation) vector, $\hat{n} = [x_n \quad y_n \quad z_n]$, can
-be determined in this way.
+be determined in the following way.
+
+Rotation quaternion (known: x, y, z, w)
+
+\begin{eqnarray*} 
+  q  &=& w + x \cdot i + y \cdot j + z \cdot k  \\
+     &=& \cos \frac{\theta}{2} + \sin \frac{\theta}{2}  \hat{n} \\
+     &=& \cos \frac{\theta}{2} + \sin \frac{\theta}{2} (x_n \cdot i + y_n \cdot j + z_n \cdot k) \\
+\end{eqnarray*}
+
+Rotation angle $\theta$
+
+\begin{equation}
+  \theta  = 2 \text{atan2}( || \vec{v} ||, w  ) = 2 \text{atan2}( \sqrt{x^2 + y^2 + z^2} , w  ) 
+\end{equation}
+
+Rotation axis: $\hat{n} = x_n \cdot i + y_n \cdot j + z_n \cdot k$
 
 \begin{eqnarray*}
-   \theta &=& 2 \arccos w        \\
-   t      &=& \sin (\theta / 2)  \\
-   x_n    &=& x / t              \\
-   y_n    &=& y / t              \\
-   z_n    &=& z / t              \\
+   x_n &=& x / \sqrt{1 - w^2} \\
+   y_n &=& x / \sqrt{1 - w^2} \\
+   z_n &=& x / \sqrt{1 - w^2} \\
 \end{eqnarray*}
 
 Where: 
+
+  + [[https://en.wikipedia.org/wiki/Atan2][Atan2]](Y, X) is the 2-argument tangent function which determines
+    the angle quadrant.
 
   + $q = w + x \cdot i + y \cdot j + z \cdot k$ - is a unitary
     quaternion, which components x, y and z are assumed to be
@@ -2335,6 +2375,8 @@ Where:
   + $\hat{n}$ - is the rotation axis vector. Also assumed to be
     unknown, which components are $x_n$, $y_n$ and $z_n$.
     * $\hat{n} = 0 + x_n \cdot i + y_n + \cdot j + z_n \cdot k$
+
+
 
   *Quaternion to rotation matrix conversion* 
 
@@ -2546,21 +2588,35 @@ Dual Quaternion:
 
 Quaternion Computer Implementations: 
 
-   + [[http://docs.ros.org/en/kinetic/api/tf/html/c++/classtf_1_1Quaternion.html][t::Quaternion - ROS Framework]] (C++)
+   * [[http://docs.ros.org/en/kinetic/api/tf/html/c++/classtf_1_1Quaternion.html][t::Quaternion - ROS Framework]] (C++)
 
-   + [[https://doc.qt.io/qt-5/qquaternion.html][Qt5 C++ Framework - QQuaternion class]] (C++)
+   * [[https://doc.qt.io/qt-5/qquaternion.html][Qt5 C++ Framework - QQuaternion class]] (C++)
 
-   + [[https://doc.qt.io/qt-5/qtdatavisualization-rotations-example.html][Qt5 - Rotation Example]]
+   * [[https://doc.qt.io/qt-5/qtdatavisualization-rotations-example.html][Qt5 - Rotation Example]]
 
-   + [[https://ivlab.github.io/MinGfx/classmingfx_1_1_quaternion.html][MinGfx C++ - OpenGL Wrapper]] (C++)
+   * [[https://ivlab.github.io/MinGfx/classmingfx_1_1_quaternion.html][MinGfx C++ - OpenGL Wrapper]] (C++)
 
-   + [[https://doc.magnum.graphics/magnum/classMagnum_1_1Math_1_1Quaternion.html][Magnum Graphics Library - Quaternion]] (C++)
+   * [[https://docs.unrealengine.com/en-US/API/Runtime/Core/Math/FQuat/index.html][FQuat]] - Unreal Game Engine (C++)
+     + "Floating point quaternion that can represent a rotation about
+       an axis in 3-D space."
 
-   + [[https://docs.microsoft.com/en-us/dotnet/api/system.numerics.quaternion?view=net-5.0][Quaternion Struct]] - Dotnet (C#)
+   * [[https://docs.unrealengine.com/en-US/API/Runtime/Core/Math/FTransform/index.html][FTransform]] - Unreal Game Engine (C++)
+     + "Transform composed of Scale, Rotation (as a quaternion), and
+       Translation."
+     + Note: It has three member variables: Rotation (class FQaut),
+       Scale3D (FVector) and Translation (FVector).
 
-   + [[https://octave.sourceforge.io/quaternion/overview.html][Octave - Quaternion Library]] (OCtave Language, akin to Matlab)
+   * [[https://docs.unrealengine.com/en-US/API/Runtime/Core/Math/FRotator/index.html][FRotator]]  - Unreal Gamer Engine (C++)
+     + "Implements a container for rotation information. All rotation
+       values are stored in degrees." 
 
-   + [[https://docs.blender.org/api/2.33/Mathutils-module.html][Blender - MathUtils module]] 
+   * [[https://doc.magnum.graphics/magnum/classMagnum_1_1Math_1_1Quaternion.html][Magnum Graphics Library - Quaternion]] (C++)
+
+   * [[https://docs.microsoft.com/en-us/dotnet/api/system.numerics.quaternion?view=net-5.0][Quaternion Struct]] - Dotnet (C#)
+
+   * [[https://octave.sourceforge.io/quaternion/overview.html][Octave - Quaternion Library]] (OCtave Language, akin to Matlab)
+
+   * [[https://docs.blender.org/api/2.33/Mathutils-module.html][Blender - MathUtils module]]
 
 *** Quaternions - Combining Scale and Position
 
