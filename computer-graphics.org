@@ -144,7 +144,7 @@
 
    * [[https://webglfundamentals.org/][WebGL Fundamentals]]
 
-** OpenGL Terminology
+** Terminology related to OpenGL and  Computer Graphics
 
   + _OpenGL_ - Open Graphics Library
 
@@ -225,7 +225,11 @@
   + _GLSL_ - OpenGL shading programming language - for performing
     computer graphics calculations on the GPU hardware.
 
-  + _HLSL_ (High-Level Shader Language) - Microsft DirectX shading language.
+  + _HLSL_ (High-Level Shader Language) - Microsft's DirectX shading language.
+
+  + _CAD_ - Computer Aided Design
+
+  + _CAM_ - Computer Aided Manufacturing  
 
 ** OpenGL companion libraries 
 *** OpenGL Companion Libraries
@@ -317,6 +321,41 @@ OpenGL Math and Computer Graphics Math:
   + See: [[https://github.com/chunkyguy/Math-Library-Test][GitHub - chunkyguy/Math-Library-Test]] - A comparison of the
     various major math libraries for speed and ease of use. 
 
+Object loader / Asset import libraries: 
+
+  * [[http://www.assimp.org/][Assimp - The Open-Asset-Import Library]] [MOST-USED]
+    + "The Open Asset Import Library (short name: Assimp) is a
+      portable Open-Source library to import various well-known 3D
+      model formats in a uniform manner. The most recent version also
+      knows how to export 3d files and is therefore suitable as a
+      general-purpose 3D model converter. See the feature-list."
+    + Note: Allows importing blender-generated models/assets in OpenGL.
+    + Repository: https://github.com/assimp/assimp
+    + See: https://www.khronos.org/opengl/wiki/Tools/Open_Asset_Import
+
+  * [[https://github.com/Bly7/OBJ-Loader][OBJ-Loader]]
+    + "OBJ Loader is a simple, header only, .obj model file loader
+      that will take in a path to a file, load it into the Loader
+      class object, then allow you to get the data from each mesh
+      loaded. This will load each mesh within the model with the
+      corresponding data such as vertices, indices, and material. Plus
+      a large array of vertices, indices and materials which you can
+      do whatever you want with."
+
+  * [[https://github.com/tinyobjloader/tinyobjloader][tinyobjloader/tinyobjloader]] 
+    * "Tiny but powerful single file wavefront obj loader written in
+      C++03. No dependency except for C++ STL. It can parse over 10M
+      polygons with moderate memory and time. tinyobjloader is good
+      for embedding .obj loader to your (global illumination) renderer
+      ;-)."
+
+  * [[https://github.com/codelibs/libdxfrw][codelibs/libdxfrw]]
+    * "C++ library to read and write DXF/DWG (Autocad file format)
+      files. - libdxfrw is a free C++ library to read and write DXF
+      files in both formats, ascii and binary form. Also can read DWG
+      files from R14 to the last V2015. It is licensed under the terms
+      of the GNU General Public License version 2 (or at you option
+      any later version)."
 
 Text and Font Rendering: 
 
@@ -4210,7 +4249,7 @@ New rotation around Y axis about 60 degrees.
 
 #+END_SRC
 
-** 2D graphics - no VBO abstraction 
+** 2D Graphics - no VBO abstraction 
 
 The following code draws a square and a triangle using the OpenGL
 retained mode API. Before the rendering takes place, data must be
@@ -4494,7 +4533,7 @@ File: _draw2d-raw.cpp_
   }
 #+END_SRC
 
-** 2D graphics - using VBO abstraction
+** 2D Graphics - using VBO abstraction
 
 This sample code draws a square, triangle and a chart using 2D
 coordinates and ignoring the Z axis. 
@@ -4809,7 +4848,7 @@ File: _draw2d.cpp_
       return 0;
   }
 #+END_SRC
-** 2D graphics - using VAO 
+** 2D Graphics - using VAO 
 
 A VAO (Vertex Array Object) is an object that stores all the
 information necessary to render a VBO (Vertex Buffer Object). For
@@ -5212,7 +5251,7 @@ File: _draw2d-vao.cpp_
       return pbuffer;
   }
 #+END_SRC
-** 2D graphics - using shaders
+** 2D Graphics - using shaders
 
 OpenGL retained mode (programmable pipeline) uses shaders, which are
 programs that uses GLSL (OpenGL shading language) programming
@@ -5859,7 +5898,7 @@ File: _draw2d-shader.cpp_
   }
 #+END_SRC
 
-** 3D graphics - Rotating cube 
+** 3D Graphics - Rotating cube 
 
 This sample application contains: two cubes; two grid planes for
 visual reference; a coordinate axis for visual debugging and a camera
@@ -6630,3 +6669,760 @@ File: draw3d-cube.cpp
       return Geometry{ vertices, colors };
   }
 #+END_SRC
+** 3D Graphics - Quaternion 
+
+The class Transform has the fields, position for setting the object
+position in world-coordinates; scale for adjusting object size and
+rotation, which is a quaternion for encoding rotation around an
+arbitrary axis. The use of quaternions saves the usage of many matrix
+multiplications for each transform and also allows easier accumulation
+of intermediate rotations. 
+
+Quaternions are also used in the camera class for providing
+YRP (Yaw-Pitch-Roll) camera rotation and free movement in the
+space. The keys arrow-left, arrow-right rotates the direction to where
+camera is looking at to right or to the left. The key arrow-up, moves
+the camera position in the direction to where the camera is looking
+at. The key arrow-down moves the camera in the backward direction to
+where the camera is looking at. The key 'S' rotates the camera up, the
+key 'D' rotates the camera down. 
+
+The scene, has a blue square on the plane XY; a green square on plane
+XZ; a teapot and torus. The torus can be moved, scaled and rotated in
+the space by just changing its transform object parameters. By typing
+the key 'B', the teapot scale is increased, and by typing 'N' its
+scale is decrease. The keys 'J', 'L' rotates the teapot around the Y
+axis. The key 'P' moves the teapot up across Y axis. The key 'O' moves
+the teapot down across the Y axis. 
+
+Note: This code requires the GLUT library which provides the sample
+wireframe teapot and torus. 
+
+  *Screenshots* 
+
+ [[file:images/opengl-draw3d-camera1.png][file:images/opengl-draw3d-camera1.png]] 
+
+ [[file:images/opengl-draw3d-camera2.png][file:images/opengl-draw3d-camera2.png]]
+
+
+  *Code Highlights* 
+
+Transform class using quaternion: 
+
+#+BEGIN_SRC cpp 
+
+  // Transform object that combines - translation, scale and rotation (quaternion)
+  struct Transform
+  {
+      glm::vec4 position = {0.0, 0.0, 0.0, 1.0}; 
+      glm::vec3 scale    = {1.0, 1.0, 1.0};
+      glm::quat rotation = {1.0, 0.0, 0.0, 0.0};
+    
+      void set_scale(float k){ scale[0]  = k; scale[1] = k;  scale[2]  = k;  }
+      void add_scale(float k){ scale[0] += k; scale[1] += k; scale[2] += k;  }
+    
+      void set_position(float x, float y, float z)
+      {  this->position = glm::vec4(x, y, z, 1.0);  };
+    
+      void set_rotation(float angle, glm::vec3 const& axis)
+      { this->rotation = glm::angleAxis( glm::radians(angle), axis );  }
+
+      void translate(float dx, float dy, float dz)
+      { 
+          this->position[0] += dx; 
+          this->position[1] += dy; 
+          this->position[2] += dz; 
+      }
+
+      // Rotation increment. 
+      void rotate(float angle, glm::vec3 const& axis)
+      {
+          auto q = glm::angleAxis( glm::radians(angle), axis );
+          this->rotation = q * this->rotation;
+      }
+
+      // Get model affine transform - comprised of scale, translation and translation. 
+      glm::mat4 transform() 
+      {   
+          // Get transformation matrix from quaternion 
+          glm::mat4 trf = glm::mat4_cast(rotation);
+          // Multiply all elements of column X axis scale 
+          trf[0] = scale[0] * glm::column(trf, 0);
+          trf[1] = scale[1] * glm::column(trf, 1);
+          trf[2] = scale[2] * glm::column(trf, 2);
+          trf[3] = position;
+          return trf;
+      }
+  };
+#+END_SRC
+
+Camera class using quaternions for rotating the camera: 
+
+#+BEGIN_SRC cpp 
+  struct Camera
+  {
+      // Current location of camera in world coordinates
+      glm::vec3 eye  = { 2.0, 4.0, 5.0 };
+      // Direction to where camera is looking at.  
+      glm::vec3 forward =  {-1.0, 0.0, -1.0 };
+      // Current  camera up vector (orientation) - Y axis (default)
+      glm::vec3 up = { 0.0, 1.0, 0.0 };    
+
+      // Field of view
+      float fov_angle = glm::radians(60.0); 
+      // Aspect ratio 
+      float aspect   = 1.0;
+      float zFar     = 20.0;
+      float zNear    = 0.1; 
+
+      // ID of shader's view uniform variable - for setting view matrix
+      GLuint shader_uniform_view;
+      // ID of shader's projection uniform variable for setting projection matrix.
+      GLuint shader_uniform_proj;
+
+      Camera(GLuint uniform_view, GLuint uniform_proj, float aspect):
+          shader_uniform_view(uniform_view), shader_uniform_proj(uniform_proj), aspect(aspect)
+      {  update_view();  }
+
+      void update_view() 
+      {
+          // Point to where camera is looking at. 
+          auto cam_at = this->eye + this->forward;    
+          // Create View matrix (maps from world-space to camera-space)
+          auto Tview = glm::lookAt(eye, cam_at, up);
+          // Create projection matrix maps - camera-space to NDC (Normalized Device Coordinates).
+          auto Tproj = glm::perspective( fov_angle, aspect, zNear, zFar );      
+          // Set shader uniform variables.
+          glUniformMatrix4fv(shader_uniform_view, 1, GL_FALSE, glm::value_ptr(Tview) );
+          glUniformMatrix4fv(shader_uniform_proj, 1, GL_FALSE, glm::value_ptr(Tproj) );          
+      }
+
+      // Rotate around camera's Up vecto. 
+      void rotate_yaw(float angle)
+      {   
+          // Build quaternion from axis angle 
+          glm::quat q = glm::angleAxis(glm::radians(angle), this->up);
+          // Rotate current forward vector 
+          forward = forward * q; 
+          std::cout << " [FORWARD VECTOR ] " << glm::to_string(forward) << '\n';
+          this->update_view();
+      }
+
+      // Rotate around camera's pitch axis (X axis) elevate camera view.
+      void rotate_pitch(float angle)
+      {
+          glm::vec3 axis = glm::cross(this->up, this->forward);
+          // Build quaternion from axis angle 
+          glm::quat q = glm::angleAxis(glm::radians(angle), axis);   
+          forward = q * forward;      
+          this->update_view();
+      }
+
+      void rotate_roll(float angle)
+      {
+          glm::quat q = glm::angleAxis(glm::radians(angle), this->forward);
+          this->up = q * this->up;
+          this->update_view();
+      }
+    
+      // Move at forward vector direction (to where camera is looking at). 
+      void move_forward(float factor)
+      {
+          this->eye = this->eye + factor * this->forward;
+          this->update_view();
+      }
+      // Move camera to specific point in the space. 
+      void set_position(float dx, float dy, float dz)
+      {
+          this->eye = glm::vec3(dx, dy, dz); 
+          this->update_view();
+      }
+
+      // Set position to where camera is looking at. 
+      void look_at(const glm::vec3& at)
+      { 
+          this->forward = at - this->eye; 
+          this->update_view();  
+      }
+
+  };
+#+END_SRC
+
+
+  *Files* 
+
+Vertex Shader Code: 
+
+#+BEGIN_SRC cpp 
+  #version 330 core 
+
+  layout ( location = 0)  in vec3 position;
+  // layout ( location = 1) in vec3 color;   
+  out vec3 out_color;
+  uniform mat4 u_model;       // Model matrix 
+  uniform mat4 u_view;        // Camera's view matrix    
+  uniform mat4 u_projection;  // Camera's projection matrix 
+  uniform vec3 u_color;       // Unique color to all vertices set by the C++-side
+
+  void main()
+  {
+      gl_Position = u_projection * u_view * u_model * vec4(position, 1.0);
+      // Forward to fragment shader 
+      out_color = u_color;  // color; // vec3(0.56, 0.6, 0.0);
+  }
+#+END_SRC
+
+Fragment Shader Code:  
+
+#+BEGIN_SRC cpp 
+  #version 330 
+
+  in vec3 out_color;
+
+  void main()
+  {
+      // Set vertex colors
+      gl_FragColor =  vec4(out_color, 1.0);
+  }
+#+END_SRC
+
+File: _CMakeLists.txt_ 
+
+
+#+BEGIN_SRC cmake 
+   cmake_minimum_required(VERSION 3.5)
+   project(GLFW_project)
+
+   set(CMAKE_CXX_STANDARD 17)
+   set(CMAKE_CXX_STANDARD_REQUIRED ON)
+   set(CMAKE_VERBOSE_MAKEFILE ON)
+
+   #================ GLFW Settings  ===============#
+
+   find_package(OpenGL REQUIRED)
+
+   include(FetchContent)
+
+   # Set GLFW Options before FectchContent_MakeAvailable 
+   set( GLFW_BUILD_EXAMPLES OFF CACHE BOOL  "GLFW lib only" )
+   set( GLFW_BUILD_TESTS    OFF CACHE BOOL  "GLFW lib only" )
+   set( GLFW_BUILD_DOCS     OFF CACHE BOOL  "GLFW lib only" )
+   set( GLFW_BUILD_INSTALL  OFF CACHE BOOL  "GLFW lib only" )
+
+   # Donwload GLFW library
+   FetchContent_Declare(
+     glfwlib
+     URL   https://github.com/glfw/glfw/releases/download/3.3.2/glfw-3.3.2.zip
+   )
+   FetchContent_MakeAvailable(glfwlib)
+
+   # Download GLM (OpenGL math library for matrix and vectors transformation)
+   FetchContent_Declare(
+     glm  
+     URL  https://github.com/g-truc/glm/archive/0.9.8.zip
+   )
+   FetchContent_MakeAvailable(glm)
+
+   message( [DEBUG] " glm_SOURCE_DIR = ${glm_SOURCE_DIR} ")
+   include_directories(${glm_SOURCE_DIR})
+
+     # ======= TARGETS ===========================#
+
+          add_executable( draw3d-camera  draw3d-camera.cpp        )
+   target_link_libraries( draw3d-camera  glfw OpenGL::GL GLU glut )
+#+END_SRC
+
+
+File: _draw3d-camera.cpp_
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <vector> 
+  #include <array>
+  #include <cmath>
+  #include <functional>
+  #include <iomanip>
+
+  // -------- OpenGL headers ---------//
+  //
+  #define GL_GLEXT_PROTOTYPES 1 // Necessary for OpenGL >= 3.0 functions
+  #define GL3_PROTOTYPES      1 // Necessary for OpenGL >= 3.0 functions
+
+  #include <GL/gl.h>
+  #include <GLFW/glfw3.h>
+
+  // #include <GL/glew.h>
+  #include <GL/glu.h>
+
+  // --------- OpenGL Math Librar ------------//
+  #include <glm/glm.hpp>
+  #include <glm/gtc/matrix_transform.hpp>
+  #include <glm/gtc/type_ptr.hpp>
+  #include <glm/gtx/string_cast.hpp>
+  #include <glm/gtc/matrix_access.hpp>
+
+  #define GLUT_ENABLED 
+
+  #if defined(GLUT_ENABLED)
+      #include <GL/glut.h>
+  #endif 
+
+  GLFWwindow* make_glfwWindowi(int  width, int height, const char* title);
+  // Compile some  shader 
+  void compile_shader(GLuint m_program, const char* code, GLenum type);
+
+  // ------------ Basic Data Structures -----------// 
+
+  // Wrapper for 2D vertex coordinates 
+  struct Vertex3D{  GLfloat x, y, z;  };
+  // Wrapper for RGB colors 
+  struct ColorRGB { GLfloat r, g, b; };
+
+  // Transform object that combines - translation, scale and rotation (quaternion)
+  struct Transform
+  {
+      glm::vec4 position = {0.0, 0.0, 0.0, 1.0}; 
+      glm::vec3 scale    = {1.0, 1.0, 1.0};
+      glm::quat rotation = {1.0, 0.0, 0.0, 0.0};
+    
+      void set_scale(float k){ scale[0]  = k; scale[1] = k;  scale[2]  = k;  }
+      void add_scale(float k){ scale[0] += k; scale[1] += k; scale[2] += k;  }
+    
+      void set_position(float x, float y, float z)
+      {  this->position = glm::vec4(x, y, z, 1.0);  };
+    
+      void set_rotation(float angle, glm::vec3 const& axis)
+      { this->rotation = glm::angleAxis( glm::radians(angle), axis );  }
+
+      void translate(float dx, float dy, float dz)
+      { 
+          this->position[0] += dx; 
+          this->position[1] += dy; 
+          this->position[2] += dz; 
+      }
+
+      // Rotation increment. 
+      void rotate(float angle, glm::vec3 const& axis)
+      {
+          auto q = glm::angleAxis( glm::radians(angle), axis );
+          this->rotation = q * this->rotation;
+      }
+
+      // Get model affine transform - comprised of scale, translation and translation. 
+      glm::mat4 transform() 
+      {   
+          // Get transformation matrix from quaternion 
+          glm::mat4 trf = glm::mat4_cast(rotation);
+          // Multiply all elements of column X axis scale 
+          trf[0] = scale[0] * glm::column(trf, 0);
+          trf[1] = scale[1] * glm::column(trf, 1);
+          trf[2] = scale[2] * glm::column(trf, 2);
+          trf[3] = position;
+          return trf;
+      }
+  };
+
+  struct Camera
+  {
+      // Current location of camera in world coordinates
+      glm::vec3 eye  = { 2.0, 4.0, 5.0 };
+      // Direction to where camera is looking at.  
+      glm::vec3 forward =  {-1.0, -1.0, -1.0 };
+      // Current  camera up vector (orientation) - Y axis (default)
+      glm::vec3 up = { 0.0, 1.0, 0.0 };    
+
+      // Field of view
+      float fov_angle = glm::radians(60.0); 
+      // Aspect ratio 
+      float aspect   = 1.0;
+      float zFar     = 20.0;
+      float zNear    = 0.1; 
+
+      // ID of shader's view uniform variable - for setting view matrix
+      GLuint shader_uniform_view;
+      // ID of shader's projection uniform variable for setting projection matrix.
+      GLuint shader_uniform_proj;
+
+      Camera(GLuint uniform_view, GLuint uniform_proj, float aspect):
+          shader_uniform_view(uniform_view), shader_uniform_proj(uniform_proj), aspect(aspect)
+      {  update_view();  }
+
+      void update_view() 
+      {
+          // Point to where camera is looking at. 
+          auto cam_at = this->eye + this->forward;    
+          // Create View matrix (maps from world-space to camera-space)
+          auto Tview = glm::lookAt(eye, cam_at, up);
+          // Create projection matrix maps - camera-space to NDC (Normalized Device Coordinates).
+          auto Tproj = glm::perspective( fov_angle, aspect, zNear, zFar );      
+          // Set shader uniform variables.
+          glUniformMatrix4fv(shader_uniform_view, 1, GL_FALSE, glm::value_ptr(Tview) );
+          glUniformMatrix4fv(shader_uniform_proj, 1, GL_FALSE, glm::value_ptr(Tproj) );          
+      }
+
+      // Rotate around camera's Up vecto. 
+      void rotate_yaw(float angle)
+      {   
+          // Build quaternion from axis angle 
+          glm::quat q = glm::angleAxis(glm::radians(angle), this->up);
+          // Rotate current forward vector 
+          forward = forward * q; 
+          std::cout << " [FORWARD VECTOR ] " << glm::to_string(forward) << '\n';
+          this->update_view();
+      }
+
+      // Rotate around camera's pitch axis (X axis) elevate camera view.
+      void rotate_pitch(float angle)
+      {
+          glm::vec3 axis = glm::cross(this->up, this->forward);
+          // Build quaternion from axis angle 
+          glm::quat q = glm::angleAxis(glm::radians(angle), axis);   
+          forward = q * forward;      
+          this->update_view();
+      }
+
+      void rotate_roll(float angle)
+      {
+          glm::quat q = glm::angleAxis(glm::radians(angle), this->forward);
+          this->up = q * this->up;
+          this->update_view();
+      }
+    
+      // Move at forward vector direction (to where camera is looking at). 
+      void move_forward(float factor)
+      {
+          this->eye = this->eye + factor * this->forward;
+          this->update_view();
+      }
+      // Move camera to specific point in the space. 
+      void set_position(float dx, float dy, float dz)
+      {
+          this->eye = glm::vec3(dx, dy, dz); 
+          this->update_view();
+      }
+
+      // Set position to where camera is looking at. 
+      void look_at(const glm::vec3& at)
+      { 
+          this->forward = at - this->eye; 
+          this->update_view();  
+      }
+
+  };
+
+  void send_buffer( GLuint* pVao, GLuint* pVbo, GLsizei sizeBuffer
+          , void* pBufffer, GLint   shader_attr, GLint size, GLenum type);
+
+
+  constexpr ColorRGB color_red   = {1.0, 0.0, 0.0};
+  constexpr ColorRGB color_green = {0.0, 1.0, 0.0};        
+  constexpr ColorRGB color_blue  = {0.0, 0.0, 1.0};
+  constexpr ColorRGB color_yelllow    = { 0.80,  1.000, 0.100 };
+  constexpr ColorRGB color_gray       = { 0.47,  0.390, 0.380 };
+  constexpr ColorRGB color_dark_green = { 0.027, 0.392, 0.050 };
+  constexpr ColorRGB color_dark_blue  = { 0.109, 0.066, 0.411 };
+  constexpr ColorRGB color_white      = { 1.0, 1.0, 1.0 };
+
+  const glm::vec3 AXIS_X = { 1.0, 0.0, 0.0 };
+  const glm::vec3 AXIS_Y = { 0.0, 1.0, 0.0 };
+  const glm::vec3 AXIS_Z = { 0.0, 0.0, 1.0 };
+
+  int main(int argc, char** argv)
+  {
+
+      /* Initialize the library */
+      if (!glfwInit()){ return -1; }
+
+      #if defined(GLUT_ENABLED)
+          glutInit(&argc, argv);
+      #endif
+                                                // 
+      GLFWwindow* window = make_glfwWindowi(640, 480, "OpenGL quaternion");
+      // Note: The shader source code is at the end of file.
+      extern const char* code_vertex_shader;
+      extern const char* code_frag_shader;
+
+      // ====== S H A D E R - C O M P I L A T I O N ====//
+      //
+      GLuint prog = glCreateProgram();
+      // Compile shader code 
+      compile_shader(prog, code_vertex_shader, GL_VERTEX_SHADER  ) ;    
+      compile_shader(prog, code_frag_shader,   GL_FRAGMENT_SHADER );
+      glUseProgram(prog);
+
+      // --------- Shader Uniform Variables -------//
+      const GLint u_proj  = glGetUniformLocation(prog, "u_projection");
+      const GLint u_view  = glGetUniformLocation(prog, "u_view");
+      const GLint u_model = glGetUniformLocation(prog, "u_model");
+      const GLint u_color = glGetUniformLocation(prog, "u_color");
+      assert( u_color >= 0 );
+      // ------- Shader attribute locations -------//
+      const GLint attr_position = glGetAttribLocation(prog, "position");
+      const GLint attr_color    = glGetAttribLocation(prog, "color");
+
+
+      // ============== Set Shader Uniform Variables =============// 
+      //                                                          // 
+
+      int width, height;
+      glfwGetWindowSize(window, &width, &height);
+      // Window aspect ratio
+      float aspect = static_cast<float>(width) / height;
+      // Identity matrix 
+      const auto identity = glm::mat4(1.0);
+      // Set projection matrix uniform variable
+      glUniformMatrix4fv(u_proj, 1, GL_FALSE, glm::value_ptr(identity) );
+    
+      // ====== U P L O A D - TO - G P U =========================//  
+
+      Camera camera(u_view, u_proj, width / height);
+
+      // Plane XY grid (vertical) - contains axis X and Y 
+      Transform model_grid_xy;
+      model_grid_xy.set_position(0.0, 0.0, -2.0);
+    
+      // Plane XZ grid (horizontal) - contains axis X and Z
+      Transform model_grid_xz;
+      model_grid_xz.set_rotation(90.0f, AXIS_X);
+
+      Transform model_teapot;
+      model_teapot.set_scale(0.4);
+      model_teapot.set_position(0.0, 0.50, 0.2);
+      model_teapot.set_rotation(-90.0, glm::vec3(1.0, 0.0, 0.0) );
+
+
+      auto plane_vertices = std::vector<Vertex3D>{
+            {0.0, 0.0, 0.0}, {4.0, 0.0, 0.0}
+          , {4.0, 0.0, 4.0} ,{0.0, 0.0, 4.0}
+      };
+
+      GLuint vao_plane          = 0; 
+      GLuint vbo_plane_vertices = 0; 
+      send_buffer( &vao_plane, &vbo_plane_vertices, sizeof(Vertex3D) * plane_vertices.size()
+                  , plane_vertices.data(), attr_position, 3, GL_FLOAT );
+
+      Transform model_plane_xz; 
+      model_plane_xz.set_position(-2, 0, -2);
+
+      Transform model_plane_xy; 
+      model_plane_xy.set_position(-2, 0, -2);
+      model_plane_xy.set_rotation(-90.0, AXIS_X);
+
+      Transform model_torus;
+      model_torus.set_position(-3, 2, 0);
+      model_torus.rotate(90.0, AXIS_Y);
+
+      //  ======= R E N D E R  - L O O P ============//
+      //                                             //
+      while ( !glfwWindowShouldClose(window) )
+      {
+          glClear(GL_COLOR_BUFFER_BIT  | GL_DEPTH_BUFFER_BIT);
+
+          // ====== BEGIN RENDERING ============//
+
+              // ---- Draw horizontal plane XZ (square) ------------//
+              glUniformMatrix4fv(u_model, 1, GL_FALSE, glm::value_ptr(model_plane_xz.transform()) );
+              glUniform3fv(u_color, 1, &color_green.r );
+              glBindVertexArray(vao_plane);            
+              glDrawArrays(GL_QUADS, 0, 4 );     
+
+              // ---- Draw vertical plane XY (square) ------------//
+              glUniformMatrix4fv(u_model, 1, GL_FALSE, glm::value_ptr(model_plane_xy.transform()) );
+              glUniform3fv(u_color, 1, &color_blue.r );
+              glBindVertexArray(vao_plane);            
+              glDrawArrays(GL_QUADS, 0, 4 );    
+
+              // ----- Draw teapot over plane -----------------------//
+              glUniformMatrix4fv(u_model, 1, GL_FALSE, glm::value_ptr(model_teapot.transform()) );
+              glUniform3fv(u_color, 1, &color_red.r );
+              glutWireTeapot(2.5);
+
+              // ----- Draw Torus ------------------------------------//
+              glUniformMatrix4fv(u_model, 1, GL_FALSE, glm::value_ptr(model_torus.transform()) );
+              glUniform3fv(u_color, 1, &color_dark_green.r );
+              glutWireTorus(1.0f, 2.00f, 32, 32);
+            
+          // ====== END RENDERING ==============//
+
+          /* Swap front and back buffers */
+          glfwSwapBuffers(window);
+          /* Poll for and process events */
+          glfwWaitEvents();
+
+          if( glfwGetKey(window, 'Q' ) == GLFW_PRESS )
+          {
+               std::cout << " [TRACE] User typed Q =>> Shutdown program. Ok. " << '\n';
+               break;
+          }
+
+          // Rotate camera around its Z axis or forward vector
+          if( glfwGetKey(window, 'T') == GLFW_PRESS ){ camera.rotate_roll(+5.0);  }
+          if( glfwGetKey(window, 'Y') == GLFW_PRESS ){ camera.rotate_roll(-5.0); }
+
+          // Rotate camera around its local X axis 
+          if( glfwGetKey(window, 'S') == GLFW_PRESS ){ camera.rotate_pitch(+5.0); }
+          if( glfwGetKey(window, 'D') == GLFW_PRESS ){ camera.rotate_pitch(-5.0); }
+
+
+          // Rotate camera. 
+          if( glfwGetKey(window, GLFW_KEY_UP ) == GLFW_PRESS   ){ camera.move_forward(+0.2);  }
+          if( glfwGetKey(window, GLFW_KEY_DOWN ) == GLFW_PRESS ){ camera.move_forward(-0.2);  }
+          if( glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS  ){ camera.rotate_yaw(+10.0);   }
+          if( glfwGetKey(window, GLFW_KEY_LEFT ) == GLFW_PRESS  ){ camera.rotate_yaw(-10.0);   }
+
+          // Reset camera - look at origin  
+          if( glfwGetKey(window, 'R' ) == GLFW_PRESS  ){ 
+              camera.up = AXIS_Y;
+              camera.set_position(4.0, 3.0, 2.5);
+              camera.look_at( {0.0, 0.0, 0.0} );   
+          }
+
+          // Rotate teapot 
+          if( glfwGetKey(window,  'H' ) == GLFW_PRESS   ){ model_teapot.rotate(+10.0, AXIS_Y) ;  }
+          if( glfwGetKey(window,  'K' ) == GLFW_PRESS   ){ model_teapot.rotate(-10.0, AXIS_Y) ;  }
+          // Move teapot up and down across Y axis 
+          if( glfwGetKey(window,  'P' ) == GLFW_PRESS   ){ model_teapot.translate(0.0, +0.1, 0.0) ;  }
+          if( glfwGetKey(window,  'O' ) == GLFW_PRESS   ){ model_teapot.translate(0.0, -0.1, 0.0) ;  }
+
+          // Decrease or increase Teapot size 
+          if( glfwGetKey(window,  'B' ) == GLFW_PRESS   ){ model_teapot.add_scale(+0.1) ;  }
+          if( glfwGetKey(window,  'N' ) == GLFW_PRESS   ){ model_teapot.add_scale(-0.1) ;  }
+        
+      }
+
+      glfwTerminate();
+      return 0;
+
+  } // --- End of main() -----//
+
+  // ---------- S H A D E R - P R O G R A M S  -------------------------//
+  //
+
+  // Minimal vertex shader =>> Runs on the GPU and processes each vertex.
+  const char* code_vertex_shader = R"(    
+      #version 330 core 
+
+      layout ( location = 0)  in vec3 position;
+      // layout ( location = 1) in vec3 color;   
+      out vec3 out_color;
+      uniform mat4 u_model;       // Model matrix 
+      uniform mat4 u_view;        // Camera's view matrix    
+      uniform mat4 u_projection;  // Camera's projection matrix 
+      uniform vec3 u_color;       // Unique color to all vertices set by the C++-side
+
+      void main()
+      {
+          gl_Position = u_projection * u_view * u_model * vec4(position, 1.0);
+          // Forward to fragment shader 
+          out_color = u_color;  // color; // vec3(0.56, 0.6, 0.0);
+      }
+
+  )";
+
+  // Fragment shader source code 
+  const char* code_frag_shader = R"(
+      #version 330 
+
+      in vec3 out_color;
+
+      void main()
+      {
+          // Set vertex colors
+          gl_FragColor =  vec4(out_color, 1.0);
+      }
+  )";
+
+      // ====== I M P L E M E N T A T I O N S ==========// 
+
+  GLFWwindow* 
+  make_glfwWindowi(int  width, int height, const char* title)
+  {
+
+      glfwSetErrorCallback([](int error, const char* description)
+                           { std::fprintf( stderr, " [GLFW ERROR] Error = %d ; Description = %s \n"
+                                          , error, description);
+                           });
+
+      GLFWwindow* window = glfwCreateWindow(width, height, title, NULL, NULL);
+      assert( window != nullptr && "Failed  to create Window");
+
+      // OpenGL context 
+      glfwMakeContextCurrent(window);
+      // Pain whole screen as black - dark screen colors are better 
+      // for avoding eye strain due long hours staring on monitor.
+      glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+
+      // Set - OpenGL Core Profile - version 3.3
+      glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+      glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+      glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
+      glEnable(GL_COLOR_MATERIAL);
+      glEnable(GL_DEPTH_TEST);
+      glEnable(GL_BLEND);
+
+      return window;
+  }
+
+  void compile_shader(GLuint m_program, const char* code, GLenum type)
+  {
+      GLint shader_id = glCreateShader( type );
+      glShaderSource(shader_id, 1, &code, nullptr);
+      glCompileShader(shader_id);
+    
+      GLint is_compiled = GL_FALSE;
+      // Check shader compilation result 
+      glGetShaderiv(shader_id, GL_COMPILE_STATUS, &is_compiled);
+
+      // If there is any shader compilation result, 
+      // print the error message.
+      if( is_compiled == GL_FALSE)
+      {
+          std::cerr << " [ERROR] Shader compilation error. " << '\n';
+          std::abort();
+      }          
+
+      glAttachShader(m_program, shader_id);   
+      glDeleteShader(shader_id);
+      glLinkProgram(m_program);
+      GLint link_status = GL_FALSE;
+      glGetProgramiv(m_program, GL_LINK_STATUS, &link_status);
+      assert( link_status != GL_FALSE );   
+      // glUseProgram(m_program);         
+  }
+
+  // Upload buffer from main memory to GPU VBO 
+  // =>> Parameters VAO, VBO are allocated by the caller. 
+  void send_buffer( GLuint* pVao, GLuint* pVbo, GLsizei sizeBuffer
+                  , void* pBufffer, GLint   shader_attr, GLint size
+                  , GLenum type)
+  {
+      assert(pVao != nullptr);
+      assert(pVbo != nullptr);
+      GLuint& vao = *pVao;
+      GLuint& vbo = *pVbo;
+      // Generate and bind current VAO (Vertex Array Object)
+      if(vao == 0){ glGenVertexArrays(1, &vao); }
+      glBindVertexArray(vao);
+      // Generate and bind current VBO (Vertex Buffer Object)
+      glGenBuffers(1, &vbo);
+      glBindBuffer(GL_ARRAY_BUFFER, vbo);
+      // Upload data to current VBO buffer in GPU 
+      glBufferData(GL_ARRAY_BUFFER, sizeBuffer, pBufffer, GL_STATIC_DRAW);   
+      glEnableVertexAttribArray(shader_attr);    
+      // Set data layout - how data will be interpreted.
+      glVertexAttribPointer(shader_attr, size, type, GL_FALSE, 0, nullptr);
+      // ------ Disable Global state set by this function -----//
+      // Unbind VAO 
+      glBindVertexArray(0);
+      // Unbind VBO 
+      glBindBuffer(GL_ARRAY_BUFFER, vbo);
+      // Disable current shader attribute 
+      glDisableVertexAttribArray(shader_attr);
+
+  }q
+#+END_SRC
+
+
+
+
