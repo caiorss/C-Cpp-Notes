@@ -105,6 +105,8 @@
 
    * https://www.opengl.org/
 
+   * [[https://docs.microsoft.com/en-us/windows/win32/opengl/opengl][Microsoft Windows OpenGL Implementation - WGL]]
+
    * [[https://www.khronos.org/registry/OpenGL/index_gl.php][Khronos OpenGL® Registry]]
      * OpenGL Official Specification.
 
@@ -614,20 +616,37 @@ determined by the following relation.
 
 The vector _dot product_ is:  
 
-  + Where:
-    + $|| \vec{A} ||$ is the norm of vector A
-    + $|| \vec{B} ||$ is the norm of vector B
-    + $\theta$ is the angle between vectors A and B.
-
-  + The vectros $\vec{A}$ and $\vec{B}$ are _orthogonal_, the angle
-    between them is 90 degrees, when the dot product is zero. 
-
 \begin{equation} 
   \text{dot}( \vec{A}, \vec{B} ) 
     = \vec{A} \cdot \vec{B} 
     = x_A \cdot x_B + y_A \cdot y_B + z_A \cdot z_B 
+\end{equation}
+
+  + Where:
+    + $|| \vec{A} ||$ is the norm of vector A
+    + $|| \vec{B} ||$ is the norm of vector B
+
+  + The vectors $\vec{A}$ and $\vec{B}$ are _orthogonal_, the angle
+    between them is 90 degrees, when the dot product is zero. 
+
+
+The dot product has the property: 
+
+\begin{equation} 
+  \text{dot}( \vec{A}, \vec{B} ) 
+    = \vec{A} \cdot \vec{B} 
     = || \vec{A} || \cdot || \vec{B} || \cdot \cos \theta 
 \end{equation}
+
+And also: 
+
+\begin{equation}
+   \cos \theta =  \frac{ \vec{A} \cdot \vec{B}  }{ || \vec{A} || \cdot || \vec{B} ||  }
+\end{equation}
+
+Where: 
+   + $\theta$ is the angle between vectors A and B.
+
 
 If the vectors $\vec{A}$ and $\vec{B}$ are expressed as column
 matrices, the product can be computed as a matrix multiplication.
@@ -686,18 +705,20 @@ Where $[A]_{\times}$ is the _cross product matrix_.
 
 The cross product have the following properties: 
 
-  + Where:
-    + $\vec{n}$ is unit vector with the same direction as the cross
-      product vector.
-    + $\theta$ is the angle between the two underlying vectors. 
-
 \begin{equation}
-   \vec{A} \times \vec{B} = || \vec{A} || \cdot || \vec{B} || \cdot \sin \theta \times \vec{n}
+  || \vec{A} \times \vec{B} || = || \vec{A} || \cdot || \vec{B} || \cdot \sin \theta \times \vec{n}
 \end{equation}
 
 \begin{equation}
    \vec{A} \times \vec{B} = - \vec{B} \times \vec{A}
 \end{equation}
+
+
+  + Where:
+    + $\vec{n}$ is unit vector with the same direction as the cross
+      product vector.
+    + $\theta$ is the angle between the two underlying vectors. 
+
 
   *Vector Triple Product* 
 
@@ -707,6 +728,38 @@ The cross product have the following properties:
          = \text{dot}( \vec{v}, \vec{w} ) \vec{u} + \text{dot}( \vec{u}, \vec{w}) \vec{v}
 \end{equation}
 
+
+  *Relation between vectors* 
+
+ _Orthogonal (perpendicular) vectors:_ 
+
+Two vectors $\vec{A}$ and $\vec{B}$ are orthogonal, the angle between
+them is 90 degrees or PI/2 radians, if their dot product is zero.
+
+\begin{equation}
+   \vec{A} \cdot \vec{B} = 0 
+\end{equation}
+
+
+ _Parallel vectors_
+
+Two vectors $\vec{A}$ and $\vec{B}$ are parallel, the angle between
+them are zero or 180 degrees, if their cross product is zero. 
+
+\begin{equation}
+   \vec{A} \times \vec{B} = 0
+\end{equation}
+
+ 
+  _Angle between two vectors_ 
+
+The angle between two 3D vectors can be determined by using their dot
+product and cross product. 
+
+\begin{equation}
+  \theta = \text{atan2}( || \vec{A} \times \vec{B} ||, \vec{A} \cdot \vec{B}  )
+         = \text{atan2} \left( \text{norm}(  \text{cross}( \vec{A}, \vec{B})) , \text{dot}(\vec{A}, \vec{B})  \right)
+\end{equation}
 *** Affine Transforms
 
 Affine transforms, which are represented by matrices, are a particular
@@ -1725,8 +1778,155 @@ The camera's projection transform matrix turns camera-space
 coordinates into clip-space coordinates, which are normalized NDC
 (Normalized-Device Coordinates). Any coordinate in the clip-space
 coordinate out of the range (-1.0 to 1.0) in the three axis X, Y and Z
-will not be shown at the screen, they will be clipped. It is  worth
-noting that projection matrices are not affine transforms.
+will not be shown at the screen, they will be clipped. It is worth
+noting that some projection matrices are not affine transforms.
+
+
+ *Ortographic Projection Transform* - [[https://cseweb.ucsd.edu/classes/wi18/cse167-a/lec4.pdf][(CSE167 - page 25)]] ; [[https://docs.microsoft.com/en-us/windows/win32/opengl/glortho][(Microsoft- WGL)]]
+ 
+The orthographic perspective transformation preserves parallel lines
+and provides no sense of depth. This type of projection is used on 2D
+games, strategy games with top camera, charts, engineering drawing,
+blueprints, CADs (Computer Aided Design) and so on.
+
+  + Computed with subroutines:
+    + _glm::ortho_ (xmin, xmax, ymin, ymax, zNear, zFar)  => GLM math library
+    + _glm::ortho_ (left, right, bottom, top, near, far)
+    + glOrtho(left, right, bottom, top, near, far) => Legacy OpenGL 
+
+
+\begin{equation} 
+   T_{\text{ortho}} =  
+          \begin{bmatrix} 
+                  \frac{ 2 }{ x_{max} - x_{min} }  
+               &  0 
+               & 0
+               & -\frac{ x_{max} + x_{min} }{ x_{max} - x_{min} }   
+               \\ 
+
+                  0
+               &  \frac{ 2 }{ y_{max} - y_{min} }   
+               &  0
+               &  -\frac{ y_{max} + y_{min} }{ y_{max} - y_{min} }    
+               \\ 
+
+                  0
+               &  0
+               &  - \frac{ 2 }{ z_{far} - z_{near} }   
+               &  - \frac{ z_{far} + z_{near} }{ z_{far} - z_{near} }   
+               \\ 
+ 
+              0 & 0 & 0 & 1 
+          \end{bmatrix}
+\end{equation}
+
+Where: 
+  + $x_{min}$ (left)   
+  + $x_{max}$ (right)
+  + $y_{min}$ (bottom)
+  + $y_{max}$ (top)
+  + $z_{near}$  (near) => Distance from the camera coordinate system to the nearest clipping plane.
+  + $z_{far}$  (far)   => Distance from the camera coordinate system to the farthest clipping plane.
+
+Observations: 
+  + The axis Z points the opposite direction to where the camera is looking at.
+  + Any coordinate outside the range ($x_{min}$, $x_{max}$), ($y_{min}$, $y_{max}$) and ($z_{far}$, $z_{near}$) will not be visible.
+  + Those parameters are in the camera's coordinate system. 
+
+
+If a camera looking at the negative direction of Z axi is positioned
+at (x = 0, y = 0, z = 0) in world-coordinate origin. The ortographic
+projection for OpenGL's canonical view volume is the identity matrix.
+  
+  + $x_{min} = -1$, $x_{min} = +1$
+  + $y_{min} = -1$, $z_{min} = +1$
+  + $z_{near} = +1$
+  + $z_{far} =  -1$
+
+\begin{equation} 
+   T_{\text{ortho}} =  \text{ortho}(-1, +1, -1, +1, +1, -1) 
+        \\  = 
+          \begin{bmatrix} 
+                  \frac{ 2 }{ (+1) - (-1) }  
+               &  0 
+               & 0
+               & -\frac{ (+1) + (-1) }{ (+1) - (-1) }   
+               \\ 
+
+                  0
+               &  \frac{ 2 }{ (+1) - (-1) }   
+               &  0
+               &  -\frac{ (+1) +  (-1) }{ (+1) - (-1) }    
+               \\ 
+
+                  0
+               &  0
+               &  - \frac{ 2 }{ -(-1) + (+1) }   
+               &  - \frac{ (-1) + (+1) }{ (-1) - (+1) }   
+               \\ 
+ 
+              0 & 0 & 0 & 1 
+          \end{bmatrix}
+
+    \\ =   \begin{bmatrix}  
+            1 & 0 & 0 & 0 \\
+            0 & 1 & 0 & 0 \\
+            0 & 0 & 1 & 0 \\
+            0 & 0 & 0 & 1
+         \end{bmatrix}
+\end{equation}
+
+
+
+  *Ortographic Projection for 2D drawing* 
+
+The ortographic projection can be used 2D drawing by setting the
+coordinate Z of any vertex to zero, $z_{near} = -1$ and $z_{far} = +1$.  
+Then, the ortographic projection becomes: 
+
+
+\begin{equation} 
+   T_{\text{ortho2D}} =  
+          \begin{bmatrix} 
+                  \frac{ 2 }{ x_{max} - x_{min} }  
+               &  0 
+               & 0
+               & -\frac{ x_{max} + x_{min} }{ x_{max} - x_{min} }   
+               \\ 
+
+                  0
+               &  \frac{ 2 }{ y_{max} - y_{min} }   
+               &  0
+               &  -\frac{ y_{max} + y_{min} }{ y_{max} - y_{min} }    
+               \\ 
+
+                  0  &  0  &  1 &  0    \\ 
+                  0 & 0 & 0 & 1 
+          \end{bmatrix}
+\end{equation}
+
+If the transform is applied to any vertex with z = 0, the following
+outcome is achieved.
+
+\begin{equation}
+   \begin{bmatrix} x' \\ y' \\ z' \\ 1 \end{bmatrix}
+
+  = 
+ 
+  T_{ortho2D}
+
+   \begin{bmatrix} x \\ y \\ z = 0 \\ w = 1 \end{bmatrix}
+
+  = 
+
+   \begin{bmatrix} 
+        \frac{ 2 }{ x_{max} - x_{min} } \cdot x  -  \frac{ x_{max} + x_{min} }{ x_{max} - x_{min} }  \\
+        \frac{ 2 }{ y_{max} - y_{min} } \cdot y  -  \frac{ y_{max} + y_{min} }{ y_{min} - y_{min} }  \\
+         0  \\
+         1  \\
+   \end{bmatrix}
+\end{equation}
+
 
 
  *Perspective projection matrix* (with FOV - Field-of-View)
@@ -1788,44 +1988,6 @@ Where:
     range -1.0 to 1.0 on each axis will not be displayed on the
     screen.
 
- *Ortographic Perspective Transformation* - [[https://cseweb.ucsd.edu/classes/wi18/cse167-a/lec4.pdf][(CSE167 - page 25)]] ; [[https://docs.microsoft.com/en-us/windows/win32/opengl/glortho][(Microsoft- WGL)]]
- 
-The orthographic perspective transformation preserves parallel lines
-and provides no sense of depth. This type of projection is used on 2D
-games, strategy games with top camera, charts, engineering drawing,
-blueprints, CADs (Computer Aided Design) and so on.
-
-  + Computed with subroutines:
-    + _glm::ortho_ (xmin, xmax, ymin, ymax, zmin, zmax)  => GLM math library
-    + _glm::ortho_ (left, right, bottom, top, near, far)
-    + glOrtho(left, right, bottom, top, near, far) => Legacy OpenGL 
-
-
-\begin{equation} 
-   T_{\text{ortho}} =  
-          \begin{bmatrix} 
-                  \frac{ 2 }{ x_{max} - x_{min} }  
-               &  0 
-               & 0
-               & -\frac{ x_{max} + x_{min} }{ x_{max} - x_{min} }   
-               \\ 
-
-                  0
-               &  \frac{ 2 }{ y_{max} - y_{min} }   
-               &  0
-               &  -\frac{ y_{min} + y_{max} }{ y_{max} - y_{min} }    
-               \\ 
-
-                  0
-               &  0
-               &  - \frac{ 2 }{ z_{max} - z_{min} }   
-               &  - \frac{ z_{max} + z_{min} }{ z_{max} - z_{min} }   
-               \\ 
- 
-              0 & 0 & 0 & 1 
-          \end{bmatrix}
-\end{equation}
-
 
 
  *Perspective Projection Matrix* (defined from View frustum) - [[https://cseweb.ucsd.edu/classes/wi18/cse167-a/lec4.pdf][(CSE167)]], 
@@ -1844,22 +2006,22 @@ preserved by this transform and also this transform is not affine.
 \begin{equation} 
    T_{\text{perspective}} =  
           \begin{bmatrix} 
-                  \frac{ 2 \cdot z_{min} }{ x_{max} - x_{min} }  
+                  \frac{ 2 \cdot z_{near} }{ x_{max} - x_{min} }  
                &  0 
                & \frac{ x_{max} + x_{min} }{ x_{max} - x_{min} }  
                & 0 
                \\ 
 
                   0
-               &  \frac{ 2 \cdot z_{min} }{ y_{max} - y_{min} }   
+               &  \frac{ 2 \cdot z_{near} }{ y_{max} - y_{min} }   
                &  \frac{ y_{max} + y_{min} }{ y_{max} - y_{min} }   
                &  0 
                \\ 
 
                   0
                &  0
-               &  - \frac{ z_{max} + z_{min} }{ z_{max} - z_{min} }   
-               &  - \frac{ z_{max} \cdot z_{min} }{ z_{max} - z_{min} }   
+               &  - \frac{ z_{far} + z_{near} }{ z_{far} - z_{near} }   
+               &  - \frac{ z_{far} \cdot z_{near} }{ z_{far} - z_{near} }   
                \\ 
  
               0 & 0 & -1 & 0 
@@ -1887,16 +2049,19 @@ Where:
   + $y_{max}$ => (top)    - Maximum Y coordinate
     + Coordinate for the _top_ clipping plane. 
 
-  + $z_{min}$  => (near)
-    + Minimum Z coordinate - distance to the _near_ depth clipping plane. 
+  + $z_{near}$  => (near)
+    + Minimum Z coordinate - distance to the _near_ depth clipping
+      plane. The $z_{near}$ value should never be zero, in this case,
+      the $z_{near}$ value should as close as possible to zero.
 
-  + $z_{max}$  => (far)
+  + $z_{far}$  => (far)
     + Maximum Z coordinate  - distance to the _far_ depth clippling plane.
 
-Note: 
+Notes: 
+  + The camera is looking at the opposite direction of Z axis.
   + Any point in camera-space coordinate outside of the previous range
     will not be visible on the screen.
-  + The parameters $z_{min}$ and $z_{max}$ must be positive. 
+  + The parameters $z_{far}$ and $z_{near}$ must be positive. 
 
 
  *Perspective and orthogonal transform matrix formula validation - in Julia Language* 
