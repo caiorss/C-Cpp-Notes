@@ -175,6 +175,13 @@
 
   + _GPU_ - Graphics Processing Unit
 
+  + _iGPU_ - Integrated GPU - The GPU is in the same processor chip
+    silicon die. Most mobile GPUs are integrated.
+
+  + _dGPU_ - Dedicated GPU 
+
+  + _eGPU_ - External GPU
+
   + _GPGPU_ - General Purpose Computing on GPU
     + APIs: OpenGL, Cuda, and so on. 
     + Parallel non-graphics computations on GPU. GPGPU APIs take
@@ -228,6 +235,8 @@
     computer graphics calculations on the GPU hardware.
 
   + _HLSL_ (High-Level Shader Language) - Microsft's DirectX shading language.
+
+  + _COP_ - Center Of Projection 
 
   + _CAD_ - Computer Aided Design
 
@@ -492,16 +501,27 @@ WebGL Companion Libraries: (OpenGL on the WEB)
 
 The following OpenGL subroutines are from the OpenGL _immediate mode_
 (fixed-function pipeline), which are obsolete and should be avoided as
-they incur on a significant overhead and they lack portability due to
-not be available at OpenGL ES.
+they incur on a significant overhead and they lack portability since
+they are not be available on OpenGL ES.
+
+Note: The best way to check wether a OpenGL subroutine is obsolete is
+by searching for its name at http://docs.gl/. Subroutines without ES2,
+ES3 or GL4 hyperlinks are obsolete. For instance, by searching for
+'glLight' at this web site, there are no ES2, ES3 or GL4 hyperlinks,
+which indicates that this subroutine is outdated.
+
+
+Obsolete Subroutines: 
 
   + Vertex:
     + => Modern OpenGL replacement: VBO (Vertex Buffer Object) and VAO
       (Vertex Array Object) and shader program.
-    + glVertex2f() 
-    + glVertex2f()
-    + glVertex3f()
-    + glColor3f()
+    + glVertex2f()  => 2D coordinate of current vertex 
+    + glVertex3f()  => 3D Coordinate of current vertex 
+    + glNormal3f()  => Sets the surface normal vector for the current vertex.
+    + glColor3f()   => Sets the color for the current vertex.
+    + glColor4ub()  => Sets the color for the current vertex using RGB
+      in byte format from 0 to 255.
 
   + Begin/End:
     + glEnd()
@@ -545,6 +565,14 @@ not be available at OpenGL ES.
     + glPushMatrix()
     + glPopMatrix()
 
+  + Light and illumination:
+    + Modern OpenGL Replacement: Light and illumination model are
+      computed on fragment shader or vertex shader.
+    + glLight() 
+    + glLightModel()
+    + glMaterial()
+    + glNormal3f()  
+
   + Miscellaneous / Non Categorized
     + glEnableClientState()
     + glColorPointer()
@@ -555,6 +583,7 @@ not be available at OpenGL ES.
     + glPixelZoom()
     + glRasterPos2i()
 
+
 See:  
 
   + [[https://stackoverflow.com/questions/13647108/matrix-stacks-in-opengl-deprecated][Matrix stacks in OpenGL deprecated?]]
@@ -562,6 +591,64 @@ See:
   + [[https://stackoverflow.com/questions/3755998/what-is-the-point-of-the-matrix-stack-in-opengl][What is the point of the matrix stack in OpenGL?]]
 
   + [[http://edeleastar.github.io/opengl-programming/topic05/pdf/3.MatrixStacks.pdf][OpenGL Matrix Stacks {PDF}]]
+
+** Linux-Specific 
+
+  *Install OpenGL development dependencies* 
+ 
+Install OpenGL development dependencies on Ubuntu or Debian-like
+distributions:
+
+#+BEGIN_SRC sh 
+   $ sudo apt-get install -y libgl1-mesa-dev libglu1-mesa-dev freeglut3-dev  libgl1-mesa-dev libxrandr-dev 
+   $ sudo apt-get install -y libxinerama-dev libxcursor-dev libxi-dev
+#+END_SRC 
+
+ *Information about OpenGL and graphics card* 
+
+Vendor: 
+
+#+BEGIN_SRC sh 
+   $ >> glxinfo | grep -E "vendor"
+  server glx vendor string: SGI
+  client glx vendor string: Mesa Project and SGI
+  OpenGL vendor string: Intel
+#+END_SRC
+
+Rendering: 
+
+#+BEGIN_SRC sh 
+   $ >> glxinfo | grep -E "rendering"
+  direct rendering: Yes
+#+END_SRC
+
+Version: 
+
+#+BEGIN_SRC sh 
+   $ >> glxinfo | grep -E "version"
+  server glx version string: 1.4
+  client glx version string: 1.4
+  GLX version: 1.4
+      Max core profile version: 4.6
+      Max compat profile version: 4.6
+      Max GLES1 profile version: 1.1
+      Max GLES[23] profile version: 3.2
+  OpenGL core profile version string: 4.6 (Core Profile) Mesa 20.3.2
+  OpenGL core profile shading language version string: 4.60
+  OpenGL version string: 4.6 (Compatibility Profile) Mesa 20.3.2
+  OpenGL shading language version string: 4.60
+  OpenGL ES profile version string: OpenGL ES 3.2 Mesa 20.3.2
+  OpenGL ES profile shading language version string: OpenGL ES GLSL ES 3.20
+      GL_EXT_shader_implicit_conversions, GL_EXT_shader_integer_mix, 
+#+END_SRC
+
+Display: 
+
+#+BEGIN_SRC sh 
+   $ >> glxinfo | grep -E "display"
+  name of display: :1
+  display: :1  screen: 0
+#+END_SRC
 
 ** Computer Graphics Math 
 *** Vector Algebra 
@@ -2257,7 +2344,7 @@ vector containing the current vertice homogeneous coordinates.
 
 Those transforms can be combined in the following way: 
 
-  + Node: the symnol (·) means multiplication.
+  + Node: the symbol (·) means multiplication.
 
 #+BEGIN_SRC js 
     // Where:
@@ -6161,6 +6248,679 @@ File: _draw2d-shader.cpp_
   }
 #+END_SRC
 
+** 2D Graphics - Chart with orthogonal projection 
+
+This sample applications draws a 2D chart by plotting two curves, the
+functions f(x) and g(x). It is possible to adjust the range displayed
+by the chart by setting xmin, xmax, ymin and ymax using the
+console. By typing 'A' the chart is displayed adjusting the xmax or
+ymax for preserving the aspect ratio. By typing 'B' the chart does not
+preserve the aspect ratio and shows the full range xmin to xmax on the
+X axis, and ymin to ymax on the Y axis. 
+
+  + f(x) = 100.0 - x^2
+  + g(x) = 50 * sin(x / (2 * PI)) + 10
+
+The significant features on this sample code are: 
+
+  + Orthogonal projection transform which allows drawing using user-defined
+    coordinates (world-space coordinates), instead of NDC
+    normalized-device coordinates with range -1.0 to 1.0 on each
+    axis. 
+
+  + Sending interleaved vertex attributes, namely, positions and
+    colors, to GPU with a single call to glBufferData() and a single
+    VBO - Vertex Buffer Object.
+
+  + Usage of threads for allowing the user controlling the displayed
+    range by typing in the console (command line).
+
+ *Projection matrix* 
+
+The orthogonal projection matrix is used for allowing user-defined
+coordinates instead of normalized coordinates in the range -1.0 to
+1.0 on for each axis. The orthogonal matrix without aspect-ratio
+compensation is generated by using the following call to glm::ortho.
+
+#+BEGIN_SRC cpp 
+   glm::mat4 proj = ortho(xmin, xmax, ymin, ymax, zNear = +1.0, zFar = -1.0);
+#+END_SRC
+
+ *Algorithm for avoiding chart distortion* 
+
+Consider the following rations $u_x$ and $u_y$: 
+
+\begin{eqnarray*} 
+   u_x &=& \frac{w}{\Delta_x} = \frac{ w }{ x_{max} - x_{min} } \\
+   u_y &=& \frac{h}{\Delta_y} = \frac{ h }{ y_{max} - y_{min} } \\
+\end{eqnarray*}
+
+Where: 
+
+  + w - screen width in pixels.
+
+  + h - screen height in pixels.
+
+  + $\Delta_x$ screen width in world-space coordinates. 
+
+  + $\Delta_y$ screen height in world-space coordinates. 
+
+  + $u_y$ - The ratio $u_x$ represents how many pixels (real screen lenght)
+    each user-defined unit on world-space coordinate systems
+    represents across the X axis.
+
+  + $u_x$ - The ratio $u_y$, is similar to $u_x$, but it is applicable
+    to Y axis.
+
+For instance, if the screen has width of 500 pixels and height of 600
+pixels and $x_{min} = -50$,  $x_{max} = +50$,  $y_{min} = -200$, 
+$y_{max} = +200$. The ratios $u_x$ and $u_y$ will be: 
+
+\begin{eqnarray*} 
+   \Delta_x &=& x_{max} - x_{min} = 100 \\ 
+   \Delta_y &=& y_{max} - y_{min} = 400 \\ 
+
+   u_x &=& \frac{500}{100} = 5   \quad \text{pixels per X axis units} \\
+   u_y &=& \frac{600}{400} = 1.5 \quad \text{pixels per Y axis units} \\
+\end{eqnarray*}
+
+The result means that any curve, will appear distorted, for instance a
+square with side of 10, will be shown on the screen with the width of
+10 * ux = 50 pixels and the height of 10 * uy = 10 * 1.5 = 15
+pixels. As a result, the square will appear as rectangle. To avoid any
+distortion, the ratios $u_x$ and $u_y$ must be equal, which is
+expressed as: 
+
+\begin{eqnarray*} 
+   u_x                         &=& u_y                         \\
+  \frac{x_{max} - x_{min}}{w}  &=& \frac{y_{max} - y_{min}}{h} \\
+\end{eqnarray*}
+
+If the variables w, h, $x_{min}$ and $y_{min}$ are fixed. $x_{max}$ or
+$y_{max}$ must be adjusted for making the ratios $u_x$ and $u_y$
+equal and avoiding any distortion.  
+
+If the adjusting is choosen for $x_{max}$, then its new value will be:
+
+\begin{equation} 
+   x_{max}' = x_{min} + \frac{w}{h}( y_{max} - y_{min} )
+\end{equation}
+
+If the adjusting is choosen for $y_{max}$, then its adjusted value is: 
+
+\begin{equation} 
+   y_{max}' = y_{min} + \frac{h}{w}( x_{max} - x_{min} )
+\end{equation}
+
+By applying the adjusting for the previous case for $x_{max}$, its
+adjusted value becomes: 
+
+\begin{equation} 
+   x_{max}' = (-50) + \frac{500}{600}( 200 - (-200) ) \approx 283.333
+\end{equation}
+
+The ratios $u_x$, $u_y$ become: 
+
+
+\begin{eqnarray*} 
+   u_x' &=& \frac{ w }{ x_{max}' - x_{min} } = \frac{ 500 }{ 283.333 - (-50) } \approx 1.50  \\
+   u_y' &=& \frac{ h }{ y_{max} - y_{min} }  = \frac{ 600 }{ 200 - (-200) }  = 1.50    \\
+\end{eqnarray*}
+
+As the ratios became equal, a square of side 10 will not appear
+distorted as its width and lenght in pixels, became equal. 
+
+ *Screenshots* 
+
+
+[[file:images/opengl-chart-2.png][file:images/opengl-chart-2.png]]
+
+[[file:images/opengl-chart-1.png][file:images/opengl-chart-1.png]]
+
+
+  *Files and shaders code*
+
+Vertex Shader: 
+
+#+BEGIN_SRC cpp 
+  #version 330 core 
+
+  layout ( location = 0) in vec2 position;
+  layout ( location = 1) in vec3 color;   
+
+  // Forwarded to fragment shader 
+  out vec3 out_color;
+
+  uniform mat4 u_model;  // Model matrix 
+  uniform mat4 u_proj;   // Projection matrix 
+
+  void main()
+  {
+      // vec4(position, 0.0, 1.0) means => vec4(x, y, z = 0.0, w =1.0)
+      gl_Position = u_proj * u_model * vec4(position, 0.0, 1.0);
+      // Forward to fragment shader 
+      out_color = color; 
+  }
+#+END_SRC
+
+Fragment Shader: 
+
+#+BEGIN_SRC cpp 
+  #version 330 
+
+  in vec3 out_color;
+
+  void main()
+  {
+      // Set vertex colors
+      gl_FragColor =  vec4(out_color, 1.0);
+  }
+#+END_SRC
+
+File: _CMakeLists.txt_
+
+#+BEGIN_SRC cmake 
+   cmake_minimum_required(VERSION 3.5)
+   project(Draw2D-Chart-GLFW)
+
+   set(CMAKE_CXX_STANDARD 17)
+   set(CMAKE_CXX_STANDARD_REQUIRED ON)
+   set(CMAKE_VERBOSE_MAKEFILE ON)
+
+   #================ GLFW Settings  ===============#
+
+   find_package(OpenGL REQUIRED)
+
+   include(FetchContent)
+
+   # Set GLFW Options before FectchContent_MakeAvailable 
+   set( GLFW_BUILD_EXAMPLES OFF CACHE BOOL  "GLFW lib only" )
+   set( GLFW_BUILD_TESTS    OFF CACHE BOOL  "GLFW lib only" )
+   set( GLFW_BUILD_DOCS     OFF CACHE BOOL  "GLFW lib only" )
+   set( GLFW_BUILD_INSTALL  OFF CACHE BOOL  "GLFW lib only" )
+
+   # Donwload GLFW library
+   FetchContent_Declare(
+     glfwlib
+     URL   https://github.com/glfw/glfw/releases/download/3.3.2/glfw-3.3.2.zip
+   )
+   FetchContent_MakeAvailable(glfwlib)
+
+   # Download GLM (OpenGL math library for matrix and vectors transformation)
+   FetchContent_Declare(
+     glm  
+     URL  https://github.com/g-truc/glm/archive/0.9.8.zip
+   )
+   FetchContent_MakeAvailable(glm)
+
+   message( [DEBUG] " glm_SOURCE_DIR = ${glm_SOURCE_DIR} ")
+   include_directories(${glm_SOURCE_DIR})
+
+     # ======= TARGETS ===========================#
+
+          add_executable( draw2d-chart  draw2d-chart.cpp   )
+   target_link_libraries( draw2d-chart  glfw OpenGL::GL GLU )
+#+END_SRC
+
+File: _draw2d-chart.cpp_
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <vector> 
+  #include <array>
+  #include <cmath>
+  #include <cassert>
+  #include <algorithm>
+  #include <thread>
+
+  // -------- OpenGL headers ---------//
+  //
+  #define GL_GLEXT_PROTOTYPES 
+  #define GL3_PROTOTYPES      
+
+  #include <GL/gl.h>
+  #include <GLFW/glfw3.h>
+
+  // #include <GL/glew.h>
+  #include <GL/glu.h>
+  // #include <GL/glut.h>
+
+  // --------- OpenGL Math Library ------------//
+  #include <glm/glm.hpp>
+  #include <glm/gtc/matrix_transform.hpp>
+  #include <glm/gtc/type_ptr.hpp>
+  #include <glm/gtx/string_cast.hpp>
+  #include <glm/gtc/matrix_access.hpp>
+
+  struct Point2D { GLfloat x, y;  };
+  struct ColorRGB{ GLfloat r, g, b; };
+
+  struct Vertex2D
+  {
+      Point2D  position; 
+      ColorRGB color;
+  };
+
+  constexpr ColorRGB color_red    = { 1.0, 0.0, 0.0 };
+  constexpr ColorRGB color_green  = { 0.0, 1.0, 0.0 };        
+  constexpr ColorRGB color_blue   = { 0.0, 0.0, 1.0 };
+  constexpr ColorRGB color_white  = { 1.0, 1.0, 1.0 };
+  constexpr ColorRGB color_yellow = { 1.0, 1.0, 0.0 };
+
+  // ------------------------------------//
+  // Shader code at the end of file. 
+  extern const char*  code_vertex_shader;
+  extern const char*  code_frag_shader;
+
+  void        compile_shader(GLuint m_program, const char* code, GLenum type);
+  GLFWwindow* make_glfwWindow(int  width, int height, const char* title);
+
+  // Upload vertices position and colors to GPU in a single call. 
+  void send_vertices( GLuint* pVao, GLuint* pVbo
+                    , GLint attr_position
+                    , GLint attr_color 
+                    , std::vector<Vertex2D> const& vertices );
+
+  // using resize_callback_t = void (*) (GLFWwindow* window, int width, int height);
+  using FuncResizeCallback = std::function<void (GLFWwindow* window, int width, int height)>;
+  FuncResizeCallback resize_callback;
+
+
+  /*  Ajust orthogonal projection matrix for keeping the aspect ratio.
+   ,*  If the flag is false, the range (Xmin, Xmax), (Ymax, Ymin) is not adjusted.
+   ,*******************************************************************/
+  void adjust_window_range( GLFWwindow* window
+                          , GLint uniform_projection_id
+                          , bool flag 
+                          , float xmin, float xmax, float ymin, float ymax);
+
+
+  template<typename Function>
+  auto make_curve(  ColorRGB color, float xmin, float xmax
+                  , size_t npoints, Function&& fun) -> std::vector<Vertex2D> 
+  {
+      std::vector<Vertex2D> curve;
+      // Reserve pre-allocated space in order to avoid multiple allocations 
+      // via vector.push_back(Item)
+      curve.reserve(npoints);
+      float x = xmin;
+      float y = 0.0;
+      float dx = (xmax - xmin) / npoints;
+
+      for(size_t n = 0; n < npoints; n++)
+      {
+          y = fun(x);
+          curve.push_back( Vertex2D{ Point2D{x, y}, color } );
+          // std::fprintf(stderr, " [TRACE] x = %f ; y = %f \n", x, y);
+          x = x + dx;
+      }
+      return curve;
+  }
+
+  int main()
+  {
+      // Initialize GLFW 
+      if (!glfwInit()){ return -1; }
+      const char* title = "2D Scientific Chart with Orthogonal projection.";
+      GLFWwindow* window = make_glfwWindow(600, 400, title);
+
+      // ========== Shader settings ==================// 
+      // 
+      GLuint prog = glCreateProgram();
+      // Compile shader code 
+      compile_shader(prog, code_vertex_shader, GL_VERTEX_SHADER  ) ;    
+      compile_shader(prog, code_frag_shader,   GL_FRAGMENT_SHADER );
+      glUseProgram(prog);    
+      // ------- Shader attribute locations -------//
+      //
+      const GLint attr_position = glGetAttribLocation(prog, "position");
+      const GLint attr_color    = glGetAttribLocation(prog, "color");
+      assert( attr_color >= 0 );
+      // --------- Shader Uniform Variables -------//
+      //
+      const GLint u_proj  = glGetUniformLocation(prog, "u_proj");
+      const GLint u_model = glGetUniformLocation(prog, "u_model");
+      // Note: The error checking for other uniforms are missing 
+      // for breviety purposes.
+      assert( u_model >= 0 ); 
+
+      // ------ Default values for uniform variables ----------//
+      //
+      const auto matrix_identity = glm::mat4(1.0);
+      glUniformMatrix4fv(u_model, 1, GL_FALSE, glm::value_ptr(matrix_identity));
+      glUniformMatrix4fv(u_proj,  1, GL_FALSE, glm::value_ptr(matrix_identity));
+
+      // Forward callback to global variable.
+      glfwSetFramebufferSizeCallback(window, [](GLFWwindow* window, int width, int height){
+           resize_callback(window, width, height);
+      });
+
+       glm::mat4 model_rectangle = glm::mat4(1.0);
+      model_rectangle = glm::translate(model_rectangle, glm::vec3(5.0, 4.0, 0.0));
+
+      // ==== O R T H O G O N A L - P R O J E C T I O N =====//
+      //
+      float xmin = -20.0f, xmax = +10.0f;
+      float ymin = -5.0f, ymax  = +100.0f;
+      float zNear = +1.0, zFar = -1.0;
+
+      bool aspect_ratio_flag = true;
+      adjust_window_range(window, u_proj, aspect_ratio_flag, xmin, xmax, ymin, ymax);
+
+      resize_callback = [&](GLFWwindow* window, int width, int height)
+      {
+          // std::fprintf(stderr, " [TRACE] Window resize to width = %d ; height = %d \n", width, height);
+          // Resize windo view port to the whole window 
+          glViewport(0, 0, width, height);
+      };
+
+      // --- Console loop thread callback =>> Allows user to adjust chart range 
+      // using console. 
+      auto console_thread = std::thread( [&]{
+          // glfwMakeContextCurrent(window);
+          for(;;){
+              std::cout << " Enter chart range (xmin, xmax, ymin, ymax): ";
+              std::cin >> xmin >> xmax >> ymin >> ymax;
+              // Send an empty envent to the render loop for redrawing the window.
+              // It makes the subroutine glfwWaitEvents() return to calling code.
+              glfwPostEmptyEvent();
+                
+          }
+      });
+
+      console_thread.detach();
+
+      // ======= U P L O A D - T O - G P U ===========//
+      // 
+
+  #if 1 
+      // X, Y axis lines at point (0, 0)
+      auto chart_axis = std::vector<Vertex2D> {
+              // X axis Line - color green 
+              { { -500.0, 0}, color_green }, { {500.0, 0}, color_green }
+              // Y axis Line  - color blue 
+            , { {0, -500.0}, color_blue },  { {0, 500.0}, color_blue }
+      };
+      GLuint vao_axis = 0, vbo_axis = 0;
+      send_vertices(&vao_axis, &vbo_axis, attr_position, attr_color, chart_axis);
+  #endif 
+
+      auto curve = std::vector<Vertex2D>{};
+
+      GLuint vao_quadratic_curve = 0;
+      GLuint vbo_quadratic_curve = 0;
+      curve = make_curve( color_red, -20.0, 20.0, 500
+                        , [](float x){ return 100.0 - x * x;  });
+      GLint quadratic_curve_points = curve.size();
+      send_vertices( &vao_quadratic_curve, &vbo_quadratic_curve
+                   , attr_position, attr_color, curve );  
+
+      // Sine curve f(x) = 25 * sin(x / (2·PI) ) + + 60.0;
+      GLuint vao_sine_curve = 0;      
+      GLuint vbo_sine_curve = 0;
+      constexpr float PI_2 = 2.0 * 3.141592653589;
+      curve = make_curve(  color_yellow, -50.0, 200.0, 500
+                       , [](float x){ return 25.0 * sin(x / PI_2) + 60.0;  } );
+      GLint sine_curve_points = curve.size();
+      send_vertices( &vao_sine_curve, &vbo_sine_curve
+                   , attr_position, attr_color, curve );  
+
+
+      //  ======= R E N D E R  - L O O P ============//
+      //                                             //
+      while ( !glfwWindowShouldClose(window) )
+      {
+          glClear(GL_COLOR_BUFFER_BIT  | GL_DEPTH_BUFFER_BIT);
+
+          // ====== BEGIN RENDERING ============//        
+
+              // Adjust orthogonal projection and range of coordinates shown in the window.
+              adjust_window_range(window, u_proj, aspect_ratio_flag, xmin, xmax, ymin, ymax);
+
+              // Draw lines for X and Y axis 
+              //-------------------------------//
+              glUniformMatrix4fv(u_model, 1, GL_FALSE, glm::value_ptr(matrix_identity));
+              glBindVertexArray(vao_axis);
+              glDrawArrays(GL_LINES, 0, 4);
+
+              // Draw curve quadratic curve f(x) = 100.0 - x^2 
+              //-------------------------------//
+              glUniformMatrix4fv(u_model, 1, GL_FALSE, glm::value_ptr(matrix_identity));
+              glBindVertexArray(vao_quadratic_curve);
+              glDrawArrays(GL_POINTS, 0, quadratic_curve_points);
+
+              // Draw sine curve f(x) = 50 * sin(x) + 10.0;
+              //-------------------------------//
+              glUniformMatrix4fv(u_model, 1, GL_FALSE, glm::value_ptr(matrix_identity));
+              glBindVertexArray(vao_sine_curve);
+              glDrawArrays(GL_LINE_STRIP, 0, sine_curve_points);
+            
+        
+           // ====== END RENDERING ==============//
+
+          // Swap front and back buffers
+          glfwSwapBuffers(window);
+          // Wait for events - blocks current thread until some event arrives.
+          glfwWaitEvents();
+
+          // ====== PROCESS EVENTS =============//
+
+            // std::fprintf(stderr, " [TRACE] Waiting events. \n");
+
+          if( glfwGetKey(window, 'A') == GLFW_PRESS ){  aspect_ratio_flag = true;  }
+          if( glfwGetKey(window, 'B') == GLFW_PRESS ){  aspect_ratio_flag = false; }
+
+      } // --- End of render loop --- //
+
+      return 0;
+  }
+
+  // --------- S H A D E R S --------------------------------//
+
+  // Minimal vertex shader =>> Runs on the GPU and processes each vertex.
+  const char* code_vertex_shader = R"(    
+      #version 330 core 
+
+      layout ( location = 0) in vec2 position;
+      layout ( location = 1) in vec3 color;   
+    
+      // Forwarded to fragment shader 
+      out vec3 out_color;
+    
+      uniform mat4 u_model;  // Model matrix 
+      uniform mat4 u_proj;   // Projection matrix 
+
+      void main()
+      {
+          // vec4(position, 0.0, 1.0) means => vec4(x, y, z = 0.0, w =1.0)
+          gl_Position = u_proj * u_model * vec4(position, 0.0, 1.0);
+          // Forward to fragment shader 
+          out_color = color; 
+      }
+
+  )";
+
+  // Fragment shader source code 
+  const char* code_frag_shader = R"(
+      #version 330 
+
+      in vec3 out_color;
+
+      void main()
+      {
+          // Set vertex colors
+          gl_FragColor =  vec4(out_color, 1.0);
+      }
+  )";
+
+
+  // --------- I M P L E M E N T A T I O N S -----------------//
+
+  GLFWwindow* 
+  make_glfwWindow(int  width, int height, const char* title)
+  {
+
+      glfwSetErrorCallback([](int error, const char* description)
+                           { std::fprintf( stderr, " [GLFW ERROR] Error = %d ; Description = %s \n"
+                                          , error, description);
+                           });
+
+      GLFWwindow* window = glfwCreateWindow(width, height, title, NULL, NULL);
+      assert( window != nullptr && "Failed  to create Window");
+
+      // OpenGL context 
+      glfwMakeContextCurrent(window);
+      // Pain whole screen as black - dark screen colors are better 
+      // for avoding eye strain due long hours staring on monitor.
+      glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+      // Set - OpenGL Core Profile - version 3.3
+      glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+      glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+      glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
+      // Make the window the topmost (Always on top)
+      glfwWindowHint(GLFW_FLOATING, GLFW_TRUE);
+
+      glEnable(GL_COLOR_MATERIAL);
+      glEnable(GL_DEPTH_TEST);
+      glEnable(GL_BLEND);
+
+      return window;
+  }
+
+
+  void compile_shader(GLuint m_program, const char* code, GLenum type)
+  {
+      GLint shader_id = glCreateShader( type );
+      glShaderSource(shader_id, 1, &code, nullptr);
+      glCompileShader(shader_id);
+    
+      GLint is_compiled = GL_FALSE;
+      // Check shader compilation result 
+      glGetShaderiv(shader_id, GL_COMPILE_STATUS, &is_compiled);
+
+      // If there is any shader compilation result, 
+      // print the error message.
+      if( is_compiled == GL_FALSE)
+      {
+          std::cerr << " [SHADER ERROR] =>> Abort execution. " << '\n';
+          // Abort the exection of current process. 
+          std::abort();
+      }          
+
+      glAttachShader(m_program, shader_id);   
+      glDeleteShader(shader_id);
+      glLinkProgram(m_program);
+      GLint link_status = GL_FALSE;
+      glGetProgramiv(m_program, GL_LINK_STATUS, &link_status);
+      assert( link_status != GL_FALSE );   
+      // glUseProgram(m_program);         
+  }
+
+
+  // Upload vertices from main memory to GPU memory.
+  // Vertices position and colors are uploaded in a single call.
+  void send_vertices( GLuint* pVao, GLuint* pVbo
+                    , GLint attr_position
+                    , GLint attr_color 
+                    , std::vector<Vertex2D> const& vertices )
+  {
+      assert(pVao != nullptr);
+      assert(pVbo != nullptr);
+      GLuint& vao = *pVao;
+      GLuint& vbo = *pVbo;
+      // Generate and bind current VAO (Vertex Array Object)
+      if(vao == 0){ glGenVertexArrays(1, &vao); }
+      glBindVertexArray(vao);
+      // Generate and bind current VBO (Vertex Buffer Object)
+      glGenBuffers(1, &vbo);
+      glBindBuffer(GL_ARRAY_BUFFER, vbo);
+      // Upload data to current VBO buffer in GPU 
+      glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex2D)
+                  , vertices.data(), GL_STATIC_DRAW);   
+
+      glEnableVertexAttribArray(attr_position);    
+      glEnableVertexAttribArray(attr_color);    
+
+      static_assert( sizeof(Vertex2D) == 5 * sizeof(float)
+                   ,"Vertex2D size assumption does not hold." );    
+
+      static_assert( sizeof(Point2D) == offsetof(Vertex2D, color)
+                   , "Invalid offsetof() assumption");
+    
+      // Set data layout - how data will be interpreted.
+      // => Each vertex has 2 coordinates. 
+      glVertexAttribPointer( attr_position     // Position vertex shader attribute
+                            , 2                // Each position has 2 coordinates (X, Y)
+                            , GL_FLOAT         // Type of each coordinate 
+                            , GL_FALSE
+                            , sizeof(Vertex2D) // Offset to next coordinates (5 floats in this case)        
+                            , nullptr
+                            );
+
+      glVertexAttribPointer( attr_color
+                             // Each color has 3 components R, G, B
+                            , 3          
+                             // Type of each color coordinate    
+                            , GL_FLOAT   
+                            , GL_FALSE   
+                             // Offset to next coordinates (next row)
+                            , sizeof(Vertex2D)     
+                             // Offset to color member variable in class Vertex2D
+                            , reinterpret_cast<void*>( offsetof(Vertex2D, color) )
+                            );
+
+      // ------ Disable Global state set by this function -----//
+      // Unbind VAO 
+      glBindVertexArray(0);
+      // Unbind VBO 
+      glBindBuffer(GL_ARRAY_BUFFER, vbo);
+      // Disable current shader attribute 
+      glDisableVertexAttribArray(attr_position);
+      glDisableVertexAttribArray(attr_color);
+  }
+
+  void adjust_window_range( GLFWwindow* window
+                          , GLint uniform_projection_id
+                          , bool flag 
+                          , float xmin, float xmax, float ymin, float ymax)
+  {
+      constexpr float zFar  = -1.0f;
+      constexpr float zNear = +1.0f;
+
+      if(flag == false)
+      {
+          glm::mat4 proj_1 = glm::ortho(xmin, xmax, ymin, ymax, zNear, zFar);
+          glUniformMatrix4fv(uniform_projection_id, 1, GL_FALSE, glm::value_ptr(proj_1));
+          return;
+      }
+
+      int width, height;
+      glfwGetWindowSize(window, &width, &height);
+      float k_aspect = static_cast<float>(width) / static_cast<float>(height);
+      float dx = xmax - xmin;
+      float dy = ymax - ymin;
+
+      if(dx > dy){        
+          ymax =  ymin + (1.0f / k_aspect ) * dx;
+          // std::fprintf(stderr, " [TRACE] Adjust range => ymax = %f \n", ymax);
+      } else {
+          xmax = xmin + k_aspect * dy;
+          // std::fprintf(stderr, " [TRACE] Adjust range => xmax = %f \n", ymax);
+      }
+    
+      dx = xmax - xmin;
+      dy = ymax - ymin;
+      float ux = width / dx;
+      float uy = height / dy;
+
+      // std::fprintf(stderr, " [TRACE] ux = %f ; uy = %f \n", ux, uy);
+
+      glm::mat4 proj_2 = glm::ortho(xmin, xmax, ymin, ymax, zNear, zFar);
+      glUniformMatrix4fv(uniform_projection_id, 1, GL_FALSE, glm::value_ptr(proj_2));
+  }
+
+#+END_SRC
 ** 3D Graphics - Rotating cube 
 
 This sample application contains: two cubes; two grid planes for
@@ -7683,7 +8443,7 @@ File: _draw3d-camera.cpp_
       // Disable current shader attribute 
       glDisableVertexAttribArray(shader_attr);
 
-  }q
+  }
 #+END_SRC
 
 
