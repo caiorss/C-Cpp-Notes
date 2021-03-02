@@ -706,136 +706,6 @@ affine transforms. Those concepts are not exclusive to OpenGL, they
 are essential and universal to all computer graphics APIS -
 Application Programming Interfaces, including OpenGL, DirectX, Metal,
 Vulkan, WebGL and html5 canvas. 
-
-*** Default Coordinate Systems 
-
-  *OpenGL Default Coordinate System* 
-
-OpenGL API uses a default coordinate system with the origin place at
-the screen center, X axis as the horizontal axis, Y axis as the
-vertical axis and Z axis going from the screen center towards the
-user. This default coordinate system NDC is normalized, each dimension
-X, Y and Z has the range from -1.0 to +1.0. Any vertex with any
-dimension out of this range is not displayed on the screen. 
-
-In this coordinate system, the coordinate of points: point A at the OpenGL
-window top right corner is (x = 1, y = 1); the coordinate of point B
-is (x = 1,y= -1); the coordinate of the point C is (x = -1, y = -1).
-
-#+CAPTION: OpenGL default coordinate system (NDC - Normalized Device Coordinate)
-[[file:images/default-coordinate-system1.png][file:images/default-coordinate-system1.png]] 
-
-
-  *OpenGL Coordinate System X Math-textbook Coordinate System*
-
-OpenGL default coordinate system should not be confused with the
-coordinate system commonly found in math and physics textbooks, where
-Z axis is the vertical axis, Y axis is the horizontal axis and the X
-axis is going from the screen twoards the screen observer (out of
-screen). The advantage of OpenGL coordinate system over the coordinate
-system used by textbooks is that 2D drawing requires just ignoring the
-Z axis, setting any Z coordinate to zero. If one does not like the
-OpenGL default coordinate system, it is possible to obtain the math
-textbook coordinate system just by applying affine rotation transform
-the OpenGL default coordinate system.
-
-#+CAPTION: OpenGL coordinate system versus math or physics coordinate system. 
-[[file:images/default-coordinate-system2.png][file:images/default-coordinate-system2.png]]
-
-
-   *Coordinate System positions from other computer graphics APIS*  
-
-The following diagram shows the possible default coordinate systems
-positions from many computer graphics APIS: 
-
-#+CAPTION: Default coordinate systems positions 
-[[file:images/default-coordinate-system3.png][file:images/default-coordinate-system3.png]]  
-
-  + (C) => Center of display screen
-    + Default position of OpenGL NDC coordinate system (clip-space). 
-
-  + (B) => Lower-left corner of display screen
-    + Default position of OpenGL screen coordinate system
- 
-  + (U) => Upper-left corner of display screen
-    + => The Y axis is inverted, it is positive in the downward
-      direction instead of upward direction.
-    + Default position of most 2D graphics APIs including: Html5
-      canvas; SVG; Java AWT 2D. 
-
-
-Transform matrix, $T_{B \rightarrow U}$, that maps coordinates from
-lower-left corner (B) coordinate system to upper-left-corner
-coordinate system. 
-
-\begin{equation} 
-   T_{B \rightarrow U} =  
-           \begin{bmatrix}
-               1 &  0 & 0  \\ 
-               0 & -1 & h  \\
-               0 &  0 & 1
-           \end{bmatrix}
-\end{equation}
-
-Transform matrix, $T_{C \rightarrow U}$, that maps coordinates from
-(C) window-center coordinate system to upper-left corner (U)
-coordinate system. This transform is useful for drawing with origin on
-screen center when using gaphics APIs which the default coordinate
-system is located at the upper-left corner.
-
-\begin{equation} 
-   T_{C \rightarrow U} =  
-           \begin{bmatrix}
-               1 &  0 & w/2  \\ 
-               0 & -1 & h/2  \\
-               0 &  0 & 1
-           \end{bmatrix}
-\end{equation}
-
-\begin{equation} 
-   V_U = T_{C \rightarrow U} \cdot V_C 
-\end{equation}
-
-\begin{equation} 
-   \begin{bmatrix} x_u \\ y_u \\ 1 \end{bmatrix}
-   =  
-   T_{C \rightarrow U} 
-   \begin{bmatrix} x_c \\ y_c \\ 1 \end{bmatrix}
-
-   = 
-   \begin{bmatrix} 
-        x_c + w/2  \\
-       -y_c + h/2  \\ 
-        1 
-   \end{bmatrix}
-\end{equation}
-
-Transform matrix, $T_{B \rightarrow C}$, that maps coordinates from
-lower-left corner (B) to screen-center origin, OpenGL normalized
-coordinate system (C). 
-
-\begin{equation} 
-   T_{B \rightarrow C} =  
-           \begin{bmatrix}
-               2/w &  0  & -1  \\ 
-               0   & 2/h & -1  \\
-               0   &  0  &  1
-           \end{bmatrix}
-\end{equation}
-
-The matrix transform, $T_{C \rightarrow B}$, that maps from coordinate
-system C to coordinate system B can be computed as the inverse of
-$T_{B \rightarrow C}$.
-
-\begin{equation}
-   T_{C \rightarrow B} = T_{B \rightarrow C}^{-1}
-   = 
-           \begin{bmatrix}
-               w/2 &  0  & w/2  \\ 
-               0   &  h/2 & h/2  \\
-               0   &  0  &  1
-           \end{bmatrix}
-\end{equation}
 *** Vector Algebra 
 
 Given 2 3D vectors $\vec{A} = [ x_A, y_A, z_A ]$ and $\vec{B} = [ x_B, y_B, z_B ]$ 
@@ -1877,6 +1747,9 @@ Testing formula in [[https://www.sympy.org/en/index.html][Sympy]] - Python CAS (
   ⎣-sin(t)  0  cos(t)⎦
 
 #+END_SRC
+*** 2D Window to Viewport transform 
+
+The 
 *** Camera View Transform 
 
 The camera view transform matrix transforms world-space coordinates to
@@ -4359,6 +4232,204 @@ Test rotation quaternions:
     3.032974966311837
    10.373266739736607
 
+#+END_SRC
+
+** Default Coordinate Systems 
+
+In order to proper use a graphics application programming interface,
+one must know the default coordinate system and conventions defined by
+the graphics API. This convention includes: the coordinate system
+origin, which may be on the upper left corner of drawing window or
+lower left corner of drawing window; the default direction of axis and
+whether the coordinate system is RHS (Right-Handed System) or LHS
+(Left-Handed System). 
+
+  *OpenGL Default Coordinate System* 
+
+OpenGL API uses a default coordinate system with the origin place at
+the screen center, X axis as the horizontal axis, Y axis as the
+vertical axis and Z axis going from the screen center towards the
+user. This default coordinate system NDC is normalized, each dimension
+X, Y and Z has the range from -1.0 to +1.0. Any vertex with any
+dimension out of this range is not displayed on the screen. 
+
+In this coordinate system, the coordinate of points: point A at the OpenGL
+window top right corner is (x = 1, y = 1); the coordinate of point B
+is (x = 1,y= -1); the coordinate of the point C is (x = -1, y = -1).
+
+#+CAPTION: OpenGL default coordinate system (NDC - Normalized Device Coordinate)
+[[file:images/default-coordinate-system1.png][file:images/default-coordinate-system1.png]] 
+
+
+  *OpenGL Coordinate System X Math-textbook Coordinate System*
+
+OpenGL default coordinate system should not be confused with the
+coordinate system commonly found in math and physics textbooks, where
+Z axis is the vertical axis, Y axis is the horizontal axis and the X
+axis is going from the screen twoards the screen observer (out of
+screen). The advantage of OpenGL coordinate system over the coordinate
+system used by textbooks is that 2D drawing requires just ignoring the
+Z axis, setting any Z coordinate to zero. If one does not like the
+OpenGL default coordinate system, it is possible to obtain the math
+textbook coordinate system just by applying affine rotation transform
+the OpenGL default coordinate system.
+
+#+CAPTION: OpenGL coordinate system versus math or physics coordinate system. 
+[[file:images/default-coordinate-system2.png][file:images/default-coordinate-system2.png]]
+
+
+   *Coordinate System positions from other computer graphics APIS*  
+
+The following diagram shows the possible default coordinate systems
+positions from many computer graphics APIS: 
+
+#+CAPTION: Default coordinate systems positions 
+[[file:images/default-coordinate-system3.png][file:images/default-coordinate-system3.png]]  
+
+  + (C) => Center of display screen
+    + Default position of OpenGL NDC coordinate system (clip-space). 
+
+  + (B) => Lower-left corner of display screen
+    + Default position of OpenGL screen coordinate system
+ 
+  + (U) => Upper-left corner of display screen
+    + => The Y axis is inverted, it is positive in the downward
+      direction instead of upward direction.
+    + Default position of most 2D graphics APIs including: Html5
+      canvas; SVG; Java AWT 2D. 
+
+
+Transform matrix, $T_{B \rightarrow U}$, that maps coordinates from
+lower-left corner (B) coordinate system to upper-left-corner
+coordinate system. 
+
+\begin{equation} 
+   T_{B \rightarrow U} =  
+           \begin{bmatrix}
+               1 &  0 & 0  \\ 
+               0 & -1 & h  \\
+               0 &  0 & 1
+           \end{bmatrix}
+\end{equation}
+
+Transform matrix, $T_{C \rightarrow U}$, that maps coordinates from
+(C) window-center coordinate system to upper-left corner (U)
+coordinate system. This transform is useful for drawing with origin on
+screen center when using gaphics APIs which the default coordinate
+system is located at the upper-left corner.
+
+\begin{equation} 
+   T_{C \rightarrow U} =  
+           \begin{bmatrix}
+               1 &  0 & w/2  \\ 
+               0 & -1 & h/2  \\
+               0 &  0 & 1
+           \end{bmatrix}
+\end{equation}
+
+\begin{equation} 
+   V_U = T_{C \rightarrow U} \cdot V_C 
+\end{equation}
+
+\begin{equation} 
+   \begin{bmatrix} x_u \\ y_u \\ 1 \end{bmatrix}
+   =  
+   T_{C \rightarrow U} 
+   \begin{bmatrix} x_c \\ y_c \\ 1 \end{bmatrix}
+
+   = 
+   \begin{bmatrix} 
+        x_c + w/2  \\
+       -y_c + h/2  \\ 
+        1 
+   \end{bmatrix}
+\end{equation}
+
+Transform matrix, $T_{B \rightarrow C}$, that maps coordinates from
+lower-left corner (B) to screen-center origin, OpenGL normalized
+coordinate system (C). 
+
+\begin{equation} 
+   T_{B \rightarrow C} =  
+           \begin{bmatrix}
+               2/w &  0  & -1  \\ 
+               0   & 2/h & -1  \\
+               0   &  0  &  1
+           \end{bmatrix}
+\end{equation}
+
+The matrix transform, $T_{C \rightarrow B}$, that maps from coordinate
+system C to coordinate system B can be computed as the inverse of
+$T_{B \rightarrow C}$.
+
+\begin{equation}
+   T_{C \rightarrow B} = T_{B \rightarrow C}^{-1}
+   = 
+           \begin{bmatrix}
+               w/2 &  0  & w/2  \\ 
+               0   &  h/2 & h/2  \\
+               0   &  0  &  1
+           \end{bmatrix}
+\end{equation}
+
+** Drawing Primitives 
+
+OpenGL can draw only points, lines, triangles and quads as
+primitives. Complex models, solids, surfaces and curves can be drawn
+combining those primitives. 
+
+Drawing is perfomed by using the _glDrawArrays()_ subroutine, that draws
+using the vertices from the current bound VBO - Vertex Buffer Object
+or VAO - Vertex Array Object. 
+
+Primitives: 
+
+  + _GL_POINTS_ => Draw a point for each vertex. 
+
+  + _GL_LINES_ => Unconnected lines - useful for drawing grids and
+    coordinate axis. Each two vertices are considered the beginning
+    and the end of the current line. For instance, if there are 6
+    vertices, V0, V1, V2, V3, V4, V5. The primitive GL_LINES, will
+    result in the following lines: Line(V0, V1) - line  from V0 to V1;
+    Line(V2, V3); Line(V4, V5).
+
+  + _GL_LINE_STRIP_  => Draw connected lines for each pair of
+    consecutive vertices. For each, if there is a set of 4 vertices,
+    named V0, V1, V2, V3. This primitive will draw the following
+    lines: Line(V0, V1) - line from V0 to V1; Line(V1, V2) and
+    Line(V2, V3). q
+
+  + _GL_LINE_LOOP_ => Similar, to GL_LINE_STRIP primitive, although this
+    primitive draws a line between the first and the last vertex. This
+    primitive is suitable for drawing poligons.
+
+  + _GL_TRIANGLES_ => Draws a triangle for each three vertices. This
+    primitive is useful for drawing surfaces and solids. Any complex
+    OpenGL surface can be approximated using triangles. This primitive
+    draws a triangle for each three vertices. If there is a set of
+    vertices V0, V1, V2, V3, V4 and V5, the primitive will draw the
+    following triangles Triangle(V0, V1, V2) and Triangle(V3, V4,
+    V5). 
+
+  + _GL_TRIANGLE_FAN_
+
+  + _GL_TRIANGLE_STRIP_ 
+
+
+#+BEGIN_SRC cpp 
+   glBindVertexArray(my_vao);
+
+   // Draw points lines - using the vertices coordinates from VAO 'my_vao'.
+   // (current bounded VAO)
+   glDrawArrays(GL_POINTS, 0, n_vertices);
+
+
+   // Draw unconnected lines - using the vertices coordinates from VAO 'my_vao'.
+   glDrawArrays(GL_LINES, 0, n_vertices);
+
+   // Draw connected lines - using the vertices coordinates from VAO 'my_vao'.
+   // (current bounded VAO)
+   glDrawArrays(GL_LINE_STRIP, 0, n_vertices);
 #+END_SRC
 
 ** Library GLM - OpenGL Mathematics 
