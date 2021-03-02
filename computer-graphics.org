@@ -4819,7 +4819,6 @@ affine transforms:
 #+END_SRC
 
 
-
 Construct a matrix from column vectors:
 
 \begin{equation}
@@ -7528,6 +7527,547 @@ File: _draw2d-chart.cpp_
       glUniformMatrix4fv(uniform_projection_id, 1, GL_FALSE, glm::value_ptr(proj_2));
   }
 
+#+END_SRC
+** 2D Graphics - IBO - Index Buffer Object 
+
+This code uses OpenGL IBO (Index Buffer Objects) for drawing triangles
+and lines OpenGL primitives. The IBO is useful for drawing complex
+objects without repeating vertices, which saves memory and bandwith
+and increases performance. 
+
+  *Screenshot* 
+
+#+CAPTION: Triangles IBO - Index Buffer Object 
+[[file:images/opengl-ibo-triangles.png][file:images/opengl-ibo-triangles.png]] 
+
+
+  *Code Highlights* 
+
+Vertices and colors data structures: 
+
+#+BEGIN_SRC cpp 
+   struct Point2D  { GLfloat x, y;    };
+   struct ColorRGB { GLfloat r, g, b; };
+   struct Vertex2D { Point2D  position; ColorRGB color; };
+
+   using VertexArray = std::vector<Vertex2D>;
+   using IndexArray  = std::vector<GLuint>;
+#+END_SRC
+
+The next blocks defines the triangles vertices and the connection
+between those vertices. Each three indices in the 'triangles_indices'
+variables represents a triangle. Without using IBO (Index Buffer
+Object), there would be duplicated vertices, then the content of array
+'vertices' would be [V0, V1, V2, V1, V3, V4, V3, V5, V6, V2, V7, V5], 
+
+
+#+BEGIN_SRC cpp 
+    // Triangle side 
+    float a = 1.0 / 5.0; 
+    // Triangle height 
+    float h = sqrt(3.0) * a;
+    
+    auto vertices = VertexArray {
+          Vertex2D{ { 0,       0  }, color_green   } // V0 - vertex 0 
+        , Vertex2D{ { 2 * a,   0  }, color_green   } // V1 
+        , Vertex2D{ { a,       h  }, color_green   } // V2 
+
+        , Vertex2D{ { 3 * a,   h  }, color_blue    } // V3
+        , Vertex2D{ { 4 * a,   0  }, color_blue    } // V4
+
+        , Vertex2D{ { 2 * a, 2 * h }, color_red    } // V5
+        , Vertex2D{ { 4 * a, 2 * h }, color_red    } // V6
+        , Vertex2D{ {     0, 2 * h }, color_yellow } // V7 - vertex 7 
+    };
+    
+    // Indices for GL_TRIANGLE drawing primitive. 
+    auto triangles_indices = IndexArray {
+          0, 1, 2  // Draw triangle with vertices V0, V1, V2 (Triangle A)
+        , 1, 3, 4  // Draw triangle with vertices V1, V3, V4 (Triangle B)
+        , 3, 5, 6  // Draw triangle with vertices V3, V5, V6 (Triangle C)
+        , 2, 7, 5  // Draw triangle with vertices V2, V7, V5 (Triangle D)
+    };
+#+END_SRC
+
+This index array defines the connections between vertices for
+GL_LINES primitives, each 2 indices represents a line. 
+
+#+BEGIN_SRC cpp 
+   // Indices for GL_LINES drawing primitive 
+    auto lines_indices = IndexArray {
+          0, 1 // Line connecting vertices V0 and V1 
+        , 0, 2 // Line connecting vertices V0 and V2 
+        , 1, 2 // Line connecting vertices V1 and V2 
+        
+        , 2, 7 
+        , 5, 7 
+        , 2, 5 
+
+        , 1, 3
+        , 1, 4
+        , 3, 4
+
+        , 3, 5
+        , 3, 6
+        , 5, 6
+    };
+#+END_SRC
+
+In the following code highlight, the vertices indices and data are
+sent to the GPU using the subroutines send_vertices() and
+send_indices(). These functions uses the following parameters: vao
+(Vertex Array Object); vbo (Vertex Buffer Object) and ibo (Index
+Buffer Objects), which are supposed to be allocated by calling
+code. 
+
+#+BEGIN_SRC cpp 
+    // ------- Upload data for drawing traingle primitives --------//
+    //
+    GLuint vao_triangles = 0, vbo_triangles = 0, ibo_triangles = 0;    
+
+    send_vertices( &vao_triangles, &vbo_triangles
+                 , attr_position, attr_color, vertices);
+
+    send_indices(&vao_triangles, &ibo_triangles, triangles_indices);
+
+
+    // -------- Upload data for drawing lines primitives ----------// 
+    //
+    GLuint vao_lines = 0, vbo_lines = 0, ibo_lines = 0;  
+    send_vertices( &vao_lines, &vbo_lines
+                 , attr_position, attr_color, vertices);     
+    send_indices(&vao_lines, &ibo_lines, lines_indices);
+#+END_SRC
+
+At the rendering loop. The OpenGL glDrawElements() subroutine is used
+,instead of glDrawArrays(), for drawing triangles and lines
+primitives. This subroutine uses the vertices indices instead of using
+the vertices ordering. For instance, if glDrawArrays() was used, each
+three vertices from the current bound VBO would be used for drawing a
+triangle.
+
+#+BEGIN_SRC cpp 
+   // ====== BEGIN RENDERING ============//
+
+       // ---- Draw triangles primitives using IBO -------// 
+       glUniformMatrix4fv(u_model, 1, GL_FALSE, glm::value_ptr(model_triangle_primtives));
+       glBindVertexArray(vao_triangles);
+       // Draw OpenGL primitives between vertices designated by their
+       // IBO - Index Buffer Object.         
+       glDrawElements(GL_TRIANGLES, triangles_indices.size() , GL_UNSIGNED_INT, nullptr);
+
+       // ----- Draw lines using IBO -----------------------//
+       glUniformMatrix4fv(u_model, 1, GL_FALSE, glm::value_ptr(model_lines_primitives));
+       glBindVertexArray(vao_lines);
+       glDrawElements(GL_LINES, lines_indices.size() , GL_UNSIGNED_INT, nullptr);            
+
+   // ====== END RENDERING ==============//
+
+#+END_SRC
+
+  *Files / Sources* 
+
+File: _CMakeLists.txt_
+
+#+BEGIN_SRC cmake
+   cmake_minimum_required(VERSION 3.5)
+   project(Draw2D-Chart-GLFW)
+
+   set(CMAKE_CXX_STANDARD 17)
+   set(CMAKE_CXX_STANDARD_REQUIRED ON)
+   set(CMAKE_VERBOSE_MAKEFILE ON)
+
+   #================ GLFW Settings  ===============#
+
+   find_package(OpenGL REQUIRED)
+
+   include(FetchContent)
+
+   # Set GLFW Options before FectchContent_MakeAvailable
+   set( GLFW_BUILD_EXAMPLES OFF CACHE BOOL  "GLFW lib only" )
+   set( GLFW_BUILD_TESTS    OFF CACHE BOOL  "GLFW lib only" )
+   set( GLFW_BUILD_DOCS     OFF CACHE BOOL  "GLFW lib only" )
+   set( GLFW_BUILD_INSTALL  OFF CACHE BOOL  "GLFW lib only" )
+
+   # Donwload GLFW library
+   FetchContent_Declare(
+     glfwlib
+     URL   https://github.com/glfw/glfw/releases/download/3.3.2/glfw-3.3.2.zip
+   )
+   FetchContent_MakeAvailable(glfwlib)
+
+   # Download GLM (OpenGL math library for matrix and vectors transformation)
+   FetchContent_Declare(
+     glm
+     URL  https://github.com/g-truc/glm/archive/0.9.8.zip
+   )
+   FetchContent_MakeAvailable(glm)
+
+   message( [DEBUG] " glm_SOURCE_DIR = ${glm_SOURCE_DIR} ")
+   include_directories(${glm_SOURCE_DIR})
+
+     # ======= TARGETS ===========================#
+
+          add_executable( draw2d-ibo-triangles  draw2d-ibo-triangles.cpp   )
+   target_link_libraries( draw2d-ibo-triangles  glfw OpenGL::GL GLU )
+#+END_SRC
+
+File: _draw2d-ibo-triangles.cpp_ 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <vector> 
+  #include <array>
+  #include <cmath>
+  #include <cassert>
+
+  // -------- OpenGL headers ---------//
+  //
+  #define GL_GLEXT_PROTOTYPES 1 // Necessary for OpenGL >= 3.0 functions
+  #define GL3_PROTOTYPES      1 // Necessary for OpenGL >= 3.0 functions
+
+  #include <GL/gl.h>
+  #include <GLFW/glfw3.h>
+
+  #include <GL/gl.h>
+  #include <GLFW/glfw3.h>
+
+  // #include <GL/glew.h>
+  #include <GL/glu.h>
+
+  // --------- OpenGL Math Library ------------//
+  #include <glm/glm.hpp>
+  #include <glm/gtc/matrix_transform.hpp>
+  #include <glm/gtc/type_ptr.hpp>
+  #include <glm/gtx/string_cast.hpp>
+  #include <glm/gtc/matrix_access.hpp>
+
+  struct Point2D  { GLfloat x, y;    };
+  struct ColorRGB { GLfloat r, g, b; };
+  struct Vertex2D { Point2D  position; ColorRGB color; };
+
+  extern const char*  code_vertex_shader;
+  extern const char*  code_frag_shader;
+
+  void        compile_shader(GLuint m_program, const char* code, GLenum type);
+  GLFWwindow* make_glfwWindow(int  width, int height, const char* title);
+
+  // Send vertices (position and color of each vertex to GPU memory)
+  void send_vertices( GLuint* pVao, GLuint* pVbo
+                    , GLint attr_position
+                    , GLint attr_color 
+                    , std::vector<Vertex2D> const& vertices );
+
+  // Send vertices indices to GPU memory. 
+  void send_indices(GLuint* pVao, GLuint* pVbi
+                  , std::vector<GLuint> const& indices);
+
+  constexpr ColorRGB color_red    = { 1.0, 0.0, 0.0 };
+  constexpr ColorRGB color_green  = { 0.0, 1.0, 0.0 };        
+  constexpr ColorRGB color_blue   = { 0.0, 0.0, 1.0 };
+  constexpr ColorRGB color_white  = { 1.0, 1.0, 1.0 };
+  constexpr ColorRGB color_yellow = { 1.0, 1.0, 0.0 };
+
+  int main(int argc, char** argv)
+  {
+      if (!glfwInit()){ return -1; }
+
+      /* Create a windowed mode window and its OpenGL context */
+      GLFWwindow* window = make_glfwWindow(640, 480, "Draw 2D - IBO - Index Buffer Object");
+
+      // ======= S H A D E R - C O M P I L A T I O N ==========// 
+      // 
+      GLuint prog = glCreateProgram();
+      // Compile shader code 
+      compile_shader(prog, code_vertex_shader, GL_VERTEX_SHADER  ) ;    
+      compile_shader(prog, code_frag_shader,   GL_FRAGMENT_SHADER );
+      glUseProgram(prog);    
+      // ------- Shader attribute locations -------//
+      const GLint attr_position = glGetAttribLocation(prog, "position");
+      const GLint attr_color    = glGetAttribLocation(prog, "color");
+      assert( attr_position >= 0 );
+      assert( attr_color >= 0 );
+      // --------- Shader Uniform Variables -------//
+      const GLint u_proj  = glGetUniformLocation(prog, "u_proj");
+      const GLint u_model = glGetUniformLocation(prog, "u_model");
+      assert(u_proj >= 0);
+      assert(u_model >= 0);
+
+      // ------ Default values for uniform variables ----------//
+      const auto matrix_identity = glm::mat4(1.0);
+      glUniformMatrix4fv(u_model, 1, GL_FALSE, glm::value_ptr(matrix_identity));
+      glUniformMatrix4fv(u_proj,  1, GL_FALSE, glm::value_ptr(matrix_identity));
+
+    
+      //  ======= U P L O A D - T O - G P U =====================//
+      //     
+
+      using VertexArray = std::vector<Vertex2D>;
+      using IndexArray = std::vector<GLuint>;
+
+      // Triangle side 
+      float a = 1.0 / 5.0; 
+      // Triangle height 
+      float h = sqrt(3.0) * a;
+    
+      auto vertices = VertexArray {
+            Vertex2D{ { 0,       0  }, color_green   } // V0 - vertex 0 
+          , Vertex2D{ { 2 * a,   0  }, color_green   } // V1 
+          , Vertex2D{ { a,       h  }, color_green   } // V2 
+
+          , Vertex2D{ { 3 * a,   h  }, color_blue    } // V3
+          , Vertex2D{ { 4 * a,   0  }, color_blue    } // V4
+
+          , Vertex2D{ { 2 * a, 2 * h }, color_red    } // V5
+          , Vertex2D{ { 4 * a, 2 * h }, color_red    } // V6
+          , Vertex2D{ {     0, 2 * h }, color_yellow } // V7 - vertex 7 
+      };
+    
+      // Indices for GL_TRIANGLE drawing primitive. 
+      auto triangles_indices = IndexArray {
+            0, 1, 2  // Draw triangle with vertices V0, V1, V2 (Triangle A)
+          , 1, 3, 4  // Draw triangle with vertices V1, V3, V4 (Triangle B)
+          , 3, 5, 6  // Draw triangle with vertices V3, V5, V6 (Triangle C)
+          , 2, 7, 5  // Draw triangle with vertices V2, V7, V5 (Triangle D)
+      };
+
+      // Indices for GL_LINES drawing primitive 
+      auto lines_indices = IndexArray {
+            0, 1 // Line connecting vertices V0 and V1 
+          , 0, 2 // Line connecting vertices V0 and V2 
+          , 1, 2 // Line connecting vertices V1 and V2 
+        
+          , 2, 7 
+          , 5, 7 
+          , 2, 5 
+
+          , 1, 3
+          , 1, 4
+          , 3, 4
+
+          , 3, 5
+          , 3, 6
+          , 5, 6
+      };
+
+      // ------- Upload data for drawing traingle primitives --------//
+      //
+      GLuint vao_triangles = 0, vbo_triangles = 0, ibo_triangles = 0;    
+
+      send_vertices( &vao_triangles, &vbo_triangles
+                   , attr_position, attr_color, vertices);
+
+      send_indices(&vao_triangles, &ibo_triangles, triangles_indices);
+
+
+      // -------- Upload data for drawing lines primitives ----------// 
+      //
+      GLuint vao_lines = 0, vbo_lines = 0, ibo_lines = 0;  
+      send_vertices( &vao_lines, &vbo_lines
+                   , attr_position, attr_color, vertices);     
+      send_indices(&vao_lines, &ibo_lines, lines_indices);
+
+      // ==== Model matrices for translating drawings =======//
+      //      
+      glm::mat4 model_triangle_primtives = matrix_identity;
+      glm::mat4 model_lines_primitives = matrix_identity;   
+      // Translate triangles to point (x = -0.7, y = -0.8, z = 0.0)
+      model_triangle_primtives = glm::translate(model_triangle_primtives, glm::vec3(-0.7, -0.8, 0.0));
+
+      //  ======= R E N D E R  - L O O P ===================//
+      //                                                    //
+      while ( !glfwWindowShouldClose(window) )
+      {
+          glClear(GL_COLOR_BUFFER_BIT  | GL_DEPTH_BUFFER_BIT);
+
+          // ====== BEGIN RENDERING ============//
+        
+              // ---- Draw triangles primitives using IBO -------// 
+              glUniformMatrix4fv(u_model, 1, GL_FALSE, glm::value_ptr(model_triangle_primtives));
+              glBindVertexArray(vao_triangles);
+              // Draw OpenGL primitives between vertices designated by their
+              // IBO - Index Buffer Object.         
+              glDrawElements(GL_TRIANGLES, triangles_indices.size() , GL_UNSIGNED_INT, nullptr);
+            
+              // ----- Draw lines using IBO -----------------------//
+              glUniformMatrix4fv(u_model, 1, GL_FALSE, glm::value_ptr(model_lines_primitives));
+              glBindVertexArray(vao_lines);
+              glDrawElements(GL_LINES, lines_indices.size() , GL_UNSIGNED_INT, nullptr);            
+
+          // ====== END RENDERING ==============//
+
+          glfwSwapBuffers(window);
+          glfwPollEvents();
+      }
+
+      glfwTerminate();
+      return 0;
+  }
+
+  // ---------- S H A D E R S - C O D E  ---------------------// 
+
+  // Minimal vertex shader =>> Runs on the GPU and processes each vertex.
+  const char* code_vertex_shader = R"(    
+      #version 330 core 
+
+      layout ( location = 0) in vec2 position;
+      layout ( location = 1) in vec3 color;   
+    
+      // Forwarded to fragment shader 
+      out vec3 out_color;
+    
+      uniform mat4 u_model;  // Model matrix 
+      uniform mat4 u_proj;   // Projection matrix 
+
+      void main()
+      {
+          // vec4(position, 0.0, 1.0) means => vec4(x, y, z = 0.0, w =1.0)
+          gl_Position = u_proj * u_model * vec4(position, 0.0, 1.0);
+        
+          // Forward to fragment shader 
+          out_color = color; 
+      }
+
+  )";
+
+  // Fragment shader source code 
+  const char* code_frag_shader = R"(
+      #version 330 
+
+      in vec3 out_color;
+
+      void main()
+      {
+          // Set vertex colors
+          gl_FragColor =  vec4(out_color, 1.0);
+      }
+  )";
+
+  // --------- I M P L E M E N T A T I O N S -----------------//
+
+  GLFWwindow* 
+  make_glfwWindow(int  width, int height, const char* title)
+  {
+
+      glfwSetErrorCallback([](int error, const char* description)
+                           { std::fprintf( stderr, " [GLFW ERROR] Error = %d ; Description = %s \n"
+                                          , error, description);
+                           });
+
+      GLFWwindow* window = glfwCreateWindow(width, height, title, NULL, NULL);
+      assert( window != nullptr && "Failed  to create Window");
+
+      // OpenGL context 
+      glfwMakeContextCurrent(window);
+      // Set window color 
+      glClearColor(0.0f, 0.5f, 3.0f, 1.0f);
+      // Set - OpenGL Core Profile - version 3.3
+      glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+      glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+      glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
+      // Make the window the topmost (Always on top)
+      glfwWindowHint(GLFW_FLOATING, GLFW_TRUE);
+
+      glEnable(GL_COLOR_MATERIAL);
+      glEnable(GL_DEPTH_TEST);
+      glEnable(GL_BLEND);
+
+      return window;
+  }
+
+
+  void compile_shader(GLuint m_program, const char* code, GLenum type)
+  {
+      GLint shader_id = glCreateShader( type );
+      glShaderSource(shader_id, 1, &code, nullptr);
+      glCompileShader(shader_id);
+    
+      GLint is_compiled = GL_FALSE;
+      // Check shader compilation result 
+      glGetShaderiv(shader_id, GL_COMPILE_STATUS, &is_compiled);
+
+      // If there is any shader compilation result, 
+      // print the error message.
+      if( is_compiled == GL_FALSE)
+      {
+          std::cerr << " [SHADER ERROR] =>> Abort execution. " << '\n';
+          // Abort the exection of current process. 
+          std::abort();
+      }          
+
+      glAttachShader(m_program, shader_id);   
+      glDeleteShader(shader_id);
+      glLinkProgram(m_program);
+      GLint link_status = GL_FALSE;
+      glGetProgramiv(m_program, GL_LINK_STATUS, &link_status);
+      assert( link_status != GL_FALSE );   
+      // glUseProgram(m_program);         
+  }
+
+  // Upload vertices from main memory to GPU memory.
+  // Vertices position and colors are uploaded in a single call.
+  void send_vertices( GLuint* pVao, GLuint* pVbo
+                    , GLint attr_position
+                    , GLint attr_color 
+                    , std::vector<Vertex2D> const& vertices )
+  {
+      assert(pVao != nullptr);
+      assert(pVbo != nullptr);
+      GLuint& vao = *pVao;
+      GLuint& vbo = *pVbo;
+      // Generate and bind current VAO (Vertex Array Object)
+      if(vao == 0){ glGenVertexArrays(1, &vao); }
+      glBindVertexArray(vao);
+      // Generate and bind current VBO (Vertex Buffer Object)
+      glGenBuffers(1, &vbo);
+      glBindBuffer(GL_ARRAY_BUFFER, vbo);
+      // Upload data to current VBO buffer in GPU 
+      glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex2D)
+                  , vertices.data(), GL_STATIC_DRAW);   
+
+      glEnableVertexAttribArray(attr_position);    
+      glEnableVertexAttribArray(attr_color);    
+   
+      // Set data layout - how data will be interpreted.
+      // => Each vertex has 2 coordinates. 
+      glVertexAttribPointer( attr_position, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex2D), nullptr);
+
+      glVertexAttribPointer( attr_color, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex2D)     
+                             // Offset to color member variable in class Vertex2D
+                            , reinterpret_cast<void*>( offsetof(Vertex2D, color) )
+                            );
+
+      // ------ Disable Global state set by this function -----//
+      // Unbind VAO 
+      glBindVertexArray(0);
+      // Unbind VBO 
+      glBindBuffer(GL_ARRAY_BUFFER, vbo);
+      // Disable current shader attribute 
+      glDisableVertexAttribArray(attr_position);
+      glDisableVertexAttribArray(attr_color);
+  }
+
+  void send_indices(GLuint* pVao, GLuint* pVbi, std::vector<GLuint> const& indices)
+  {
+      GLuint& vao = *pVao;
+      GLuint& vbi = *pVbi;
+      glBindVertexArray(vao);
+      // Generate index buffer object 
+      glGenBuffers(1, &vbi); 
+      // Bind this index buffer object - only one IBO can 
+      // be bound at a time. (It is a global state!!)
+      glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, vbi );
+      // Upload indices to GPU - This VBI object is a handle 
+      // (token, akin to file descriptor) that refers 
+      // to the data sent to the GPU on the next line. 
+      glBufferData( GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint)
+                      , indices.data(), GL_STATIC_DRAW);    
+      // ----------- Unset global state -------------//
+      // 
+      glBindVertexArray(0);
+      glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0 );
+  }
 #+END_SRC
 ** 3D Graphics - Rotating cube
 
