@@ -5598,43 +5598,179 @@ OpenGL subroutines used:
 
   *Source Code*
 
-File: _CMakeLists.txt_
+  + This CMakeLists.txt building script saves the user from manually
+    downloading, building, installing and configuring OpenGL Glew and
+    GLFW companion libraries. This file automatically downloads the
+    GLFW library, that provides window system abstraction and OpenGL
+    context; and a pre-compiled GLEW library (Windows only) that
+    provides platform-agnostic OpenGL function pointer loading.
 
-#+BEGIN_SRC cmake
-  cmake_minimum_required(VERSION 3.5)
-  project(GLFW_project)
+  + The CMakeLists.txt (version 2) contains a macro for defining
+    OpenGL applications without the boilerplate needed for linking
+    against OpenGL companion libraries and statically linking against
+    MINGW runtimme libraries. 
 
-  set(CMAKE_CXX_STANDARD 17)
-  set(CMAKE_CXX_STANDARD_REQUIRED ON)
-  set(CMAKE_VERBOSE_MAKEFILE ON)
+File: _CMakeLists.txt_ (Version 1)
 
-  #================ GLFW Settings  ===============#
+#+BEGIN_SRC cmake 
+   make_minimum_required(VERSION 3.5)
+   project(OpenGL_Draw2D_VBO)
 
-  find_package(OpenGL REQUIRED)
+   set(CMAKE_CXX_STANDARD 17)
+   set(CMAKE_CXX_STANDARD_REQUIRED ON)
+   set(CMAKE_VERBOSE_MAKEFILE ON)
 
-  include(FetchContent)
+   #================ GLFW Settings  ===============#
 
-  # Set GLFW Options before FectchContent_MakeAvailable
-  set( GLFW_BUILD_EXAMPLES OFF CACHE BOOL  "GLFW lib only" )
-  set( GLFW_BUILD_TESTS    OFF CACHE BOOL  "GLFW lib only" )
-  set( GLFW_BUILD_DOCS     OFF CACHE BOOL  "GLFW lib only" )
-  set( GLFW_BUILD_INSTALL  OFF CACHE BOOL  "GLFW lib only" )
+   find_package(OpenGL REQUIRED)
 
-  # Donwload GLFW library
-  FetchContent_Declare(
-    glfwlib
-    URL   https://github.com/glfw/glfw/releases/download/3.3.2/glfw-3.3.2.zip
-  )
-  FetchContent_MakeAvailable(glfwlib)
+   include(FetchContent)
 
-         add_executable( draw2d-raw  draw2d-raw.cpp )
-  target_link_libraries( draw2d-raw  glfw OpenGL::GL GLU)
+   # Set GLFW Options before FectchContent_MakeAvailable
+   set( GLFW_BUILD_EXAMPLES OFF CACHE BOOL  "GLFW lib only" )
+   set( GLFW_BUILD_TESTS    OFF CACHE BOOL  "GLFW lib only" )
+   set( GLFW_BUILD_DOCS     OFF CACHE BOOL  "GLFW lib only" )
+   set( GLFW_BUILD_INSTALL  OFF CACHE BOOL  "GLFW lib only" )
+
+   # Donwload GLFW library
+   FetchContent_Declare(
+     glfwlib
+     URL   https://github.com/glfw/glfw/releases/download/3.3.2/glfw-3.3.2.zip
+   )
+   FetchContent_MakeAvailable(glfwlib)
+
+   # Download pre-compiled GLEW when building under Windows NT OS (x64)
+   IF(WIN32)
+      FetchContent_Declare(
+         glew-release 
+         URL     https://megalink.dl.sourceforge.net/project/glew/glew/2.1.0/glew-2.1.0-win32.zip
+         # https://github.com/nigels-com/glew/archive/glew-2.2.0.zip
+      )
+      FetchContent_MakeAvailable(glew-release)
+      include_directories( ${glew-release_SOURCE_DIR}/include  ${glm_SOURCE_DIR} )        
+      link_directories(  ${glew-release_SOURCE_DIR}/lib/Release/x64 )
+
+      set( GLEW_LIB_PATH1 ${glew-release_SOURCE_DIR}/lib/Release/x64/glew32.lib )
+      set( GLEW_LIB_PATH2 ${glew-release_SOURCE_DIR}/lib/Release/x64/glew32s.lib )
+   ENDIF()
+
+      # ======= T A R G E T S ============================#
+      #                                                   #
+
+
+          add_executable( draw2d-raw  draw2d-raw.cpp )
+   target_link_libraries( draw2d-raw  glfw
+                                      OpenGL::GL
+                                      ${GLEW_LIB_PATH1} ${GLEW_LIB_PATH2}  )
+
+   # For MINGW (GCC Ported to Windows)				 
+   IF(MINGW)
+      # Statically link against MINGW dependencies
+      # for making easier to deploy on other machines. 
+      target_link_options( draw2d-raw PRIVATE                                 
+                               -static-libgcc
+                               -static-libstdc++
+
+                               -Wl,-Bstatic,--whole-archive -lwinpthread
+                                 -Wl,--no-whole-archive				     
+                               )
+   ENDIF()       
+
+
+   # Copy GLEW DLL shared library to same directory as the executable.				 
+   IF(WIN32)				 
+      add_custom_command(TARGET draw2d-raw POST_BUILD 
+                     COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                     "${glew-release_SOURCE_DIR}/bin/Release/x64/glew32.dll"              
+                     $<TARGET_FILE_DIR:draw2d-raw>)
+   ENDIF()	   
+
+#+END_SRC
+
+File: _CMakeLists.txt_ (Version 2)
+
+#+BEGIN_SRC cmake 
+   cmake_minimum_required(VERSION 3.5)
+   project(OpenGL_Draw2D_VBO)
+
+   set(CMAKE_CXX_STANDARD 17)
+   set(CMAKE_CXX_STANDARD_REQUIRED ON)
+   set(CMAKE_VERBOSE_MAKEFILE ON)
+
+   #================ GLFW Settings  ===============#
+
+   find_package(OpenGL REQUIRED)
+
+   include(FetchContent)
+
+   # Set GLFW Options before FectchContent_MakeAvailable
+   set( GLFW_BUILD_EXAMPLES OFF CACHE BOOL  "GLFW lib only" )
+   set( GLFW_BUILD_TESTS    OFF CACHE BOOL  "GLFW lib only" )
+   set( GLFW_BUILD_DOCS     OFF CACHE BOOL  "GLFW lib only" )
+   set( GLFW_BUILD_INSTALL  OFF CACHE BOOL  "GLFW lib only" )
+
+   # Donwload GLFW library
+   FetchContent_Declare(
+     glfwlib
+     URL   https://github.com/glfw/glfw/releases/download/3.3.2/glfw-3.3.2.zip
+   )
+   FetchContent_MakeAvailable(glfwlib)
+
+   # Download pre-compiled GLEW when building under Windows NT OS (x64)
+   IF(WIN32)
+      FetchContent_Declare(
+         glew-release 
+         URL     https://megalink.dl.sourceforge.net/project/glew/glew/2.1.0/glew-2.1.0-win32.zip
+         # https://github.com/nigels-com/glew/archive/glew-2.2.0.zip
+      )
+      FetchContent_MakeAvailable(glew-release)
+      include_directories( ${glew-release_SOURCE_DIR}/include  ${glm_SOURCE_DIR} )        
+      link_directories(  ${glew-release_SOURCE_DIR}/lib/Release/x64 )
+
+      set( GLEW_LIB_PATH1 ${glew-release_SOURCE_DIR}/lib/Release/x64/glew32.lib )
+      set( GLEW_LIB_PATH2 ${glew-release_SOURCE_DIR}/lib/Release/x64/glew32s.lib )
+   ENDIF()
+
+
+   MACRO(ADD_OPENGL_APP target sources)
+      add_executable( ${target} ${sources} )
+      message([TRACE] " Add OpenGL executable = ${target} ")
+
+      target_link_libraries( ${target} glfw
+                                       OpenGL::GL
+                                       ${GLEW_LIB_PATH1}
+                                       ${GLEW_LIB_PATH2} )
+
+       IF(MINGW)
+           # Statically link against MINGW dependencies
+           # for making easier to deploy on other machines. 
+           target_link_options( ${target} PRIVATE                                 
+                                    -static-libgcc
+                                    -static-libstdc++
+                                    -Wl,-Bstatic,--whole-archive -lwinpthread
+                                      -Wl,--no-whole-archive				     
+                                    )
+        ENDIF()       
+
+
+        # Copy GLEW DLL shared library to same directory as the executable.		 
+        IF(WIN32)				 
+           add_custom_command(TARGET ${target} POST_BUILD 
+                          COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                          "${glew-release_SOURCE_DIR}/bin/Release/x64/glew32.dll"              
+                          $<TARGET_FILE_DIR:${target}>)
+        ENDIF()	   				   
+   ENDMACRO()     
+
+        # ======= T A R G E T S ============================#
+        #                                                   #
+
+   ADD_OPENGL_APP( draw2-raw draw2d-raw.cpp 
 #+END_SRC
 
 File: _draw2d-raw.cpp_
 
-#+BEGIN_SRC cpp
-  // Draw curve mapping buffer to the GPU.
+#+BEGIN_SRC cpp 
   #include <iostream>
   #include <vector>
   #include <array>
@@ -5646,12 +5782,17 @@ File: _draw2d-raw.cpp_
   #define GL_GLEXT_PROTOTYPES 1 // Necessary for OpenGL >= 3.0 functions
   #define GL3_PROTOTYPES      1 // Necessary for OpenGL >= 3.0 functions
 
+
+  #if defined(_WIN32)
+     #include <windows.h>
+     #include <GL/glew.h>
+  #endif
+
   #include <GL/gl.h>
   #include <GLFW/glfw3.h>
 
-  // #include <GL/glew.h>
   #include <GL/glu.h>
-  #include <GL/glut.h>
+  // #include <GL/glut.h>
 
 
   struct Vertex2D
@@ -5664,12 +5805,10 @@ File: _draw2d-raw.cpp_
   {
       GLFWwindow* window;
 
-      /* Initialize the library */
-      if (!glfwInit())
-          return -1;
+      // Initialize GLFW 
+      if (!glfwInit()){ return -1; }
 
-      glutInit(&argc, argv);
-
+    
       /* Create a windowed mode window and its OpenGL context */
       window = glfwCreateWindow(640, 480, "2D Drawing raw VBO buffers", NULL, NULL);
       if (!window)
@@ -5683,6 +5822,15 @@ File: _draw2d-raw.cpp_
       // glClearColor(0.0f, 0.5f, 0.6f, 1.0f);
       glClearColor(0.0f, 0.0f, 0.0, 1.0f);
 
+      // --- GLEW should always be initialized after an OpenGL context.
+      #if _WIN32
+      glewExperimental = GL_TRUE;
+      if (glewInit() != GLEW_OK) {
+          std::cerr << "GLEW::Error : failed to initialize GLEW"<< std::endl;
+      }
+      std::fprintf(stderr, " [TRACE] Glew Initialized Ok. \n");
+      #endif
+    
 
       Vertex2D triangle_points[3] = {
           Vertex2D{-0.25,   -0.25}
@@ -5803,8 +5951,61 @@ File: _draw2d-raw.cpp_
       glfwTerminate();
       return 0;
   }
+
 #+END_SRC
 
+  *Building on Linux* 
+
+#+BEGIN_SRC sh 
+  $ cmake -H. -B_build_linux -DCMAKE_BUILD_TYPE=Debug
+  $ cmake --build _build_linux --target 
+ 
+  # Run 
+  $ _build_linux/draw2d-raw 
+#+END_SRC
+
+ *Building with dockercross tool (cross compilation for Windows)*
+
+ + See: Cross compiling toolchains in Docker images
+   + =>> https://github.com/dockcross/dockcross 
+
+#+BEGIN_SRC sh 
+  $ docker run -it --rm -v $PWD:/cwd -w /cwd --entrypoint=bash dockcross/windows-static-x64
+
+  $ cmake -H. -B_build_cross -DCMAKE_BUILD_TYPE=Debug
+  $ cmake --build _build_cross --target
+
+#+END_SRC
+
+List build directory:
+
+#+BEGIN_SRC sh 
+  $ ls _build_cross
+  CMakeCache.txt CMakeFiles  Makefile  _deps  cmake_install.cmake  draw2d-raw.exe  glew32.dll
+#+END_SRC
+
+Run executable with *wine* on Linux: 
+
+#+BEGIN_SRC sh 
+  $ wine _build_cross/draw2d-raw.exe 
+#+END_SRC
+
+ *Building on Windows with MINGW (GCC ported to Windows)* 
+
+#+BEGIN_SRC sh 
+  $ cmake -H. -B_build_mingw -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Debug
+  $ cmake --build _build_mingw --target
+#+END_SRC
+
+Run executable: 
+
+#+BEGIN_SRC sh 
+  # On Window
+  $ _build_mingw\draw2d-raw.exe 
+
+  # on Linux via wine 
+  $ wine _build_mingw\draw2d-raw.exe  
+#+END_SRC
 ** 2D Graphics - using VAO
 
 A VAO (Vertex Array Object) is an object that stores all the
