@@ -3628,7 +3628,216 @@ Output:
 
 #+END_SRC
 
-** Microsft Windows OS Specific Snippets
+** Microsft Windows Specific
+*** Statically link against MINGW runtime
+
+Linking error reporting missing shared libraries is a common issue
+that may happen when distributing C or C+++ applications built with
+MINGW to other Windows machines without MINGW runtime installed. The
+solution for this issue is to static link the executable against MINGW
+runtime dependencies as shown in the next sample project.
+
+  *Project Files* 
+
+File: _CMakeLists.txt_
+
+#+BEGIN_SRC cmake 
+   cmake_minimum_required(VERSION 3.5)
+   project(mingw-statically-linked)
+
+   set(CMAKE_CXX_STANDARD 17)
+   set(CMAKE_CXX_STANDARD_REQUIRED ON)
+   set(CMAKE_VERBOSE_MAKEFILE ON)
+
+
+   # ---------- T A R G E T S  ----------------------------#
+
+   # Executable linked dynamically against MinGW libraries
+   # It may fail to execute if the deployment machine
+   # does not have MINGW runtime libraries installed. 
+          add_executable( winapp-dynam windows-application.cpp)
+   target_link_libraries( winapp-dynam stdc++fs )
+
+   # Executable statically linked against MingW runtinme  dependencies
+   # - which allows deploying it on any Windows machine.
+   #
+   # find_package( Threads REQUIRED)
+   add_executable( winapp-static windows-application.cpp)
+   target_link_libraries( winapp-static stdc++fs )
+
+   IF(MINGW)
+      target_link_options( winapp-static PRIVATE                                 
+                            -static-libgcc
+                            -static-libstdc++
+                            -Wl,-Bstatic,--whole-archive -lwinpthread -Wl,--no-whole-archive
+                           )
+   ENDIF()       
+
+
+#+END_SRC
+
+File: _windows-application.cpp_ 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <filesystem>
+
+  #include <windows.h>
+
+  namespace fs = std::filesystem;
+
+  void list_directory(std::string const& path);
+
+
+  int main()
+  {
+
+      std::cerr << " [TRACE] Display root directory of current machine" << '\n';
+      /* List root directory or C:\\ */
+      list_directory("C:\\");
+
+      std::fprintf(stderr, " [TRACE] Hello world MS-Windows.");
+      OutputDebugStringA("Output of applications built for Window Subsystem");
+
+      /*  Show messagebox window */
+      DWORD const infoboxOptions  = MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND;
+      MessageBoxA( nullptr, "Messagebox text", "MessageBox title", infoboxOptions);
+
+      OutputDebugStringA("Exit application");
+
+      std::cout << " => Type RETURN to exit" << std::endl;    
+      std::cin.get();
+      return 0;
+  }
+
+  void list_directory(std::string const& path)
+  {
+    for(auto const& entry : fs::directory_iterator(path) )
+    {
+      auto p = entry.path();
+      std::cout << " => Path = " << p.filename() << std::endl;	      
+    }
+  }
+
+#+END_SRC
+
+  *Building* 
+
+Build using MinGW on Windows.
+
+#+BEGIN_SRC sh 
+  $ cmake -H. -B_build_mingw -DCMAKE_BUILD_TYPE=Debug -G "MinGW Makefiles"
+  $ cmake --build _build_mingw --target
+  
+  # View build directory: 
+  $ ls _build_mingw\
+  cmake_install.cmake  CMakeFiles/  winapp-dynam.exe*
+  CMakeCache.txt       Makefile     winapp-static.exe*
+#+END_SRC
+
+Build cross compiling with Dockercross (see: [[https://github.com/dockcross/dockcross][dockcross]] ), a docker
+image for cross compiling for several platforms. Note: This docker
+image only statically links MINGW runtime libraries regardless of
+CMake settings.
+
+#+BEGIN_SRC sh 
+  $ docker run -it --rm -v $PWD:/cwd -w /cwd --entrypoint=bash dockcross/windows-static-x64
+  $ cmake -H. -B_build_cross_compile -DCMAKE_BUILD_TYPE=Debug
+  $ cmake --build _build_cross_compile --target
+
+  # View build directory 
+  [root:/cwd/cmake-mingw-project] # ls _build_cross_compile/
+  CMakeCache.txt	Makefile	     winapp-dynam.exe
+  CMakeFiles	cmake_install.cmake  winapp-static.exe
+#+END_SRC
+
+
+ *Attempt to run the executable winapp-dynam.exe* 
+
+#+BEGIN_SRC sh 
+  # Execute on Windows 
+  $ _build_mingw\winapp-dynam.exe
+#+END_SRC
+
+An attempt to run the executable winapp-dynam.exe in a machine without
+MINGW installed or without any MINGW runtime dependencies results in
+the following error messages which are locale-specific (user language
+specific).
+
+
+  + Error message 1 (Machine with English Locale) : "The code
+    execution cannot proceed because libgcc_s_seh-1.dll was not
+    found. Reinstalling the program may fix this problem".
+
+  + Error message 2 (Machine with English Locale) : "The code
+    execution cannot proceed because libstdc++-6.dll was not
+    found. Reinstalling the program may fix this problem".
+
+  + Error message 1 (Machine with Portuguese Locale) : "A execução do
+    código não pode continuar porque libgcc_s_seh-1.dll não foi
+    encontrado. Reinstalando o programa para corrigir o problema."
+
+  + Error message 2 (Machine with Portuguese Locale) : "A execução do
+    código não pode continuar porque libstdc++-6 não foi
+    encontrado. Reinstalando o programa para corrigir o problema." 
+
+
+If an attempt to run this application using Linux's wine is made, the
+next error messages appears: 
+
+#+BEGIN_SRC sh 
+   $ >> wine _build_mingw/winapp-dynam.exe  
+  002b:err:module:import_dll Library libgcc_s_seh-1.dll (which is needed by L"Z:\\home\\user\\Documents\\cmake-mingw-project\\_build_mingw\\winapp-dynam.exe") not found
+  002b:err:module:import_dll Library libstdc++-6.dll (which is needed by L"Z:\\home\\user\\Documents\\cmake-mingw-project\\_build_mingw\\winapp-dynam.exe") not found
+  002b:err:module:LdrInitializeThunk Importing dlls for L"Z:\\home\\user\\Documents\\cmake-mingw-project\\_build_mingw\\winapp-dynam.exe" failed, status c0000135
+#+END_SRC
+
+ *Attempt to run the executable winapp-static.exe*  
+
+The second executable works without any issues in another Windows
+machine without MINGW runtime libraries. This attempt works because
+the executable was statically linked against all MINGW runtime
+libraries.
+
+ + Running under Windows 10 
+
+#+BEGIN_SRC sh 
+  $ _build_mingw\winapp-static.exe
+
+   [TRACE] Display root directory of current machine
+   => Path = "$Recycle.Bin"
+   => Path = "Config.Msi"
+   => Path = "Documents and Settings"
+   => Path = "hiberfil.sys"
+   => Path = "pagefile.sys"
+   => Path = "PerfLogs"
+   => Path = "Program Files"
+   => Path = "Program Files (x86)"
+   => Path = "ProgramData"
+   => Path = "Recovery"
+   => Path = "swapfile.sys"
+   => Path = "System Volume Information"
+   => Path = "Temp"
+   => Path = "Users"
+   => Path = "Windows"
+   [TRACE] Hello world MS-Windows. => Type RETURN to exit
+#+END_SRC
+
+ + Running under Wine on Linux 
+
+#+BEGIN_SRC sh 
+   $ >> wine _build_mingw/winapp-static.exe
+   [TRACE] Display root directory of current machine
+   => Path = "Program Files"
+   => Path = "Program Files (x86)"
+   => Path = "ProgramData"
+   => Path = "users"
+   => Path = "windows"
+   [TRACE] Hello world MS-Windows. => Type RETURN to exit
+
+#+END_SRC
+
+
 *** Executable Target with resource icon
 
 This section provides an example about how to add a resource icon to a
@@ -3900,7 +4109,7 @@ _anonymous namespace_, example:
 
   }
 
-#+END_SRC
+#+END_SRC 
 ** Snippets 
 *** Place build-tree object-code in source directory 
 
