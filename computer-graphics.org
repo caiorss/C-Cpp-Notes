@@ -9,8 +9,10 @@
 * Computer Graphics
 ** Computer Graphics Applications 
 
+  *Motivation* 
+
 Outline of common computer graphics applications and a motivation for
-the study of this field. 
+the study of this field.
 
    + 2D and 3D Games
 
@@ -31,6 +33,20 @@ the study of this field.
    + Implementation of CAD (Computer Aided Design) systems
 
    + Animation. See Pixar company that created many movies using computer graphics.
+ 
+ 
+  *Videos - Related to Computer Graphics* 
+
+   + [[https://www.youtube.com/watch?v=pQcC2CqReSA][Tutorial 9 - Coordinate Systems in OpenGL]] [BEST]
+
+   + [[https://www.youtube.com/watch?v=vQ60rFwh2ig][The True Power of the Matrix (Transformations in Graphics) - Computerphile]]
+
+   + [[https://www.youtube.com/watch?v=KdyvizaygyY][A universe of Triangles - Computerphile]]
+
+   + [[https://www.youtube.com/watch?v=U93RImC-by4][VOX - Why video games are made of tiny triangles]]
+
+   + [[https://www.youtube.com/watch?v=TPCpXXBHFSA][VOX - Why gamers use WASD to move]]
+
 ** GPU Accelerated Computer Graphics APIs
 
  *Native Graphics APIs* (exposed as C-subroutines)
@@ -9976,3 +9992,918 @@ File: _draw3d-camera.cpp_
 
   }
 #+END_SRC
+** 3D Graphics - 3D Surface wireframe chart  
+
+This code draws a wireframe surface of a function of two variables
+y = f(x, z) using GL_LINE primitives. 
+
+\begin{equation} 
+   y = f(x, z) = \frac{10 \cdot \sin x \cdot \sin z}{z}
+\end{equation}
+
+ *Screenshot* 
+
+#+CAPTION: 3D surface wireframe chart of f(x, z)
+[[file:images/opengl-draw3d-surface-wireframe-plot.png][file:images/opengl-draw3d-surface-wireframe-plot.png]]
+
+
+ *Code Highlights* 
+
+Data structures: 
+
+#+BEGIN_SRC cpp 
+
+  struct Position { GLfloat x, y, z;  };
+  struct Normal   { GLfloat x, y, z;  };
+  struct Color    { GLfloat r, g, b;  };
+
+  struct Vertex   {  
+      Position position; // Vertex position in space 
+      Normal   normal;   // Vertex normal vector for illumination (Future use)
+      Color    color;    // Vertex color (RGB)
+  };
+
+
+  // Mesh - set of vertices (position and attributes) that represents 
+  // some surface or solid. 
+  struct Mesh 
+  {
+      std::vector<Vertex> vertices{};
+      std::vector<GLuint> indices{}; 
+      GLfloat line_width = 1.0;
+      GLenum  draw_type; 
+      GLuint vao = 0, vbo = 0, ibo = 0;
+    
+      // Draw mesh using indices 
+      void draw_indices()
+      {
+          // Check wheter the mesh was sent to GPU.
+          assert( vao != 0 && ibo != 0 );
+          // Note: The subroutine glLineWidth is stateful!!
+          glLineWidth(line_width);
+          glBindVertexArray(vao);
+          glDrawElements(draw_type, indices.size(), GL_UNSIGNED_INT, nullptr);
+      }
+
+      // Draw mesh using vertices 
+      void draw_vertices()
+      {
+          assert( vao != 0 );
+          glLineWidth(line_width);       
+          glBindVertexArray(vao);
+          glDrawArrays(draw_type, 0, vertices.size());
+      }
+  };
+#+END_SRC
+
+Subroutine for generating surface mesh: 
+
+#+BEGIN_SRC cpp 
+  Mesh generate_surface_wireframe_mesh(  
+                               float xmin, float xmax
+                             , float zmin, float zmax
+                             , size_t Nx, size_t Nz
+                             , Color color 
+                             , SurfaceFunction const& function)
+  {
+      assert( xmax > xmin );
+      assert( zmax > zmin );
+      assert( Nx  != 0 && Nz  != 0 );
+
+      std::cout << " [TRACE] Nx = " << Nx << " ; Nz = " << Nz << '\n';
+
+      Mesh mesh;
+      mesh.draw_type = GL_LINES;
+
+      float dx = (xmax - xmin) / Nx;
+      float dz = (zmax - zmin) / Nz; 
+
+      // Intial allocation for avoiding many dynamic allocations
+      mesh.vertices.reserve( Nx * Nz );
+      mesh.indices.reserve( 2 * Nx * Nz  );
+      float x, y, z, y_h;
+
+      // Draw lines parallel to plane XY  
+      for(size_t j = 0; j < Nz; j++)
+      {   for(size_t i = 0; i < Nx; i++)
+          {
+              x = xmin + i * dx;
+              z = zmin + j * dz; 
+              y = function(x, z);
+              y_h = function(x + dx, z);
+
+              // Draw line segment of containing lines parallel to XY axis    
+              mesh.vertices.push_back( Vertex{ Position{x, y, z}, zero_normal, color } );
+              mesh.vertices.push_back( Vertex{ Position{x + dx, y_h, z}, zero_normal, color } );
+
+          }
+      }
+
+      for(size_t i = 0; i < Nx; i++)
+      {   for(size_t j = 0; j < Nz; j++)
+          {
+              x = xmin + i * dx;
+              z = zmin + j * dz; 
+              y = function(x, z);
+              y_h = function(x, z + dz);
+
+              // Line segments in planes paralle to plane YZ 
+              mesh.vertices.push_back( Vertex{ Position{x, y, z       }, zero_normal, color } );
+              mesh.vertices.push_back( Vertex{ Position{x, y_h, z + dz}, zero_normal, color } );
+
+           }
+      }
+      return mesh;
+  }
+
+#+END_SRC
+
+Vertex shader: 
+
+#+BEGIN_SRC cpp 
+  #version 330 core 
+
+  layout ( location = 0)  in vec3 position;
+  layout ( location = 1) in vec3 color;   
+
+  out vec3 out_color;
+  out vec3 out_coord; 
+  out vec3 out_eye;
+
+  uniform vec3 u_eye;  // Cameras's position in space
+  uniform mat4 u_model;       // Model matrix 
+  uniform mat4 u_view;        // Camera's view matrix    
+  uniform mat4 u_projection;  // Camera's projection matrix 
+
+
+  void main()
+  {
+      gl_Position = u_projection * u_view * u_model * vec4(position, 1.0);
+
+      // Forward to fragment shader 
+      out_coord  = position;
+      out_color = color; // vec3(0.56, 0.6, 0.0);
+      out_eye = u_eye;
+  }
+#+END_SRC
+
+
+Fragment shader: 
+
+#+BEGIN_SRC cpp 
+  #version 330 
+
+  in vec3 out_color;
+  in vec3 out_coord;
+  in vec3 out_eye; 
+
+  void main()
+  {
+      float k;
+
+      if(gl_FrontFacing)
+          k = 1.0; // 2.0;
+      else 
+          k = 0.1; // 0.01;
+
+      float factor = distance(out_eye, out_coord) ;
+
+      // Set vertex colors
+      vec3 color = (out_coord / 2.0 / factor ) + k * out_color * ( 20.0 / factor ) ;
+      // vec3 color =  k * out_color * ( 20.0 / factor ) ;
+
+      // vec3 color = 1.0 / fac + (out_color / 2.0 + 0.5) * k;
+
+      gl_FragColor =  vec4( color , 1.0);
+      // gl_FragColor = vec4(0.3, 0.6, 0.0, 1.0);
+  }
+#+END_SRC
+
+ *Source code* 
+
+File: _CMakeLists.txt_ 
+
+#+BEGIN_SRC cmake 
+   cmake_minimum_required(VERSION 3.5)
+   project(OpenGL_Draw2d_Wireframe_Surface_Chart)
+
+   set(CMAKE_CXX_STANDARD 17)
+   set(CMAKE_CXX_STANDARD_REQUIRED ON)
+   set(CMAKE_VERBOSE_MAKEFILE ON)
+
+   #================ GLFW Settings  ===============#
+
+   find_package(OpenGL REQUIRED)
+
+   include(FetchContent)
+
+   # Set GLFW Options before FectchContent_MakeAvailable
+   set( GLFW_BUILD_EXAMPLES OFF CACHE BOOL  "GLFW lib only" )
+   set( GLFW_BUILD_TESTS    OFF CACHE BOOL  "GLFW lib only" )
+   set( GLFW_BUILD_DOCS     OFF CACHE BOOL  "GLFW lib only" )
+   set( GLFW_BUILD_INSTALL  OFF CACHE BOOL  "GLFW lib only" )
+
+   # Donwload GLFW library
+   FetchContent_Declare(
+     glfwlib
+     URL   https://github.com/glfw/glfw/releases/download/3.3.2/glfw-3.3.2.zip
+   )
+   FetchContent_MakeAvailable(glfwlib)
+
+   # Download GLM (OpenGL math library for matrix and vectors transformation)
+   FetchContent_Declare(
+     glm
+     URL  https://github.com/g-truc/glm/archive/0.9.8.zip
+   )
+   FetchContent_MakeAvailable(glm)
+   include_directories(${glm_SOURCE_DIR})
+
+
+   # Download pre-compiled GLEW when building under Windows NT OS (x64)
+   IF(WIN32)
+      FetchContent_Declare(
+         glew-release 
+         URL     https://megalink.dl.sourceforge.net/project/glew/glew/2.1.0/glew-2.1.0-win32.zip
+         # https://github.com/nigels-com/glew/archive/glew-2.2.0.zip
+      )
+      FetchContent_MakeAvailable(glew-release)
+      include_directories( ${glew-release_SOURCE_DIR}/include  ${glm_SOURCE_DIR} )        
+      link_directories(  ${glew-release_SOURCE_DIR}/lib/Release/x64 )
+
+      set( GLEW_LIB_PATH1 ${glew-release_SOURCE_DIR}/lib/Release/x64/glew32.lib )
+      set( GLEW_LIB_PATH2 ${glew-release_SOURCE_DIR}/lib/Release/x64/glew32s.lib )
+   ENDIF()
+
+
+   MACRO(ADD_OPENGL_APP target sources)
+      add_executable( ${target} ${sources} )
+      message([TRACE] " Add OpenGL executable = ${target} ")
+
+      target_link_libraries( ${target} glfw
+                                       OpenGL::GL
+                                       ${GLEW_LIB_PATH1}
+                                       ${GLEW_LIB_PATH2} )
+
+       IF(MINGW)
+           # Statically link against MINGW dependencies
+           # for making easier to deploy on other machines. 
+           target_link_options( ${target} PRIVATE                                 
+                                    -static-libgcc
+                                    -static-libstdc++
+                                    -Wl,-Bstatic,--whole-archive -lwinpthread
+                                      -Wl,--no-whole-archive				     
+                                    )
+        ENDIF()       
+
+
+        # Copy GLEW DLL shared library to same directory as the executable.		 
+        IF(WIN32)				 
+           add_custom_command(TARGET ${target} POST_BUILD 
+                          COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                          "${glew-release_SOURCE_DIR}/bin/Release/x64/glew32.dll"              
+                          $<TARGET_FILE_DIR:${target}>)
+        ENDIF()	   				   
+   ENDMACRO()     
+
+        # ======= T A R G E T S ============================#
+        #                                                   #
+
+   ADD_OPENGL_APP( draw3d-plot-surface draw3d-plot-surface.cpp )
+#+END_SRC
+
+
+File: _draw3d-plot-surface.cpp_ 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string> 
+  #include <sstream>
+  #include <vector> 
+  #include <array>
+  #include <cmath>
+  #include <functional>
+  #include <thread>
+
+  // -------- OpenGL headers ---------//
+  //
+  #define GL_GLEXT_PROTOTYPES 1 // Necessary for OpenGL >= 3.0 functions
+  #define GL3_PROTOTYPES      1 // Necessary for OpenGL >= 3.0 functions
+
+  #include <GL/gl.h>
+  #include <GLFW/glfw3.h>
+
+  // #include <GL/glew.h>
+  #include <GL/glu.h>
+
+  // --------- OpenGL Math Librar ------------//
+  #include <glm/glm.hpp>
+  #include <glm/gtc/matrix_transform.hpp>
+  #include <glm/gtc/type_ptr.hpp>
+  #include <glm/gtx/string_cast.hpp>
+
+  // #define GLUT_ENABLED 
+
+  #if defined(GLUT_ENABLED)
+      #include <GL/glut.h>
+  #endif 
+
+  #define GL_CHECK(funcall)\
+      do { \
+          (funcall); \
+          GLint error = glGetError();  \
+          if(error == GL_NO_ERROR){ break; } \
+          std::fprintf(stderr, " [OPENGL ERROR] Error code = %d ; line = %d ; call = '%s'  \n" \
+                        , error, __LINE__, #funcall ); \
+          abort(); \
+      } while(0)
+
+  GLFWwindow* make_glfwWindow(int  width, int height, const char* title);
+
+  // Compile some  shader 
+  void compile_shader(GLuint m_program, const char* code, GLenum type);
+
+  // Send data from memory to GPU VBO memory 
+  void send_buffer(   GLuint* pVao        // Pointer to VAO (Vertex Array Object) - allocated by caller 
+                    , GLuint* pVbo        // Pointer to VBO (Vertex Buffer Object) - allocated by caller
+                    , GLsizei sizeBuffer  // Total buffer size in bytes
+                    , void*   pBufffer    // Pointer to buffer 
+                    , GLint   shader_attr // Shader attribute location id 
+                    , GLint   size        // Number of coordinates of a given vertex
+                    , GLenum  type        // Type of each element coordinate                   
+                    );
+
+  // ------------ Basic Data Structures -----------// 
+
+
+  struct Position { GLfloat x, y, z;  };
+  struct Normal   { GLfloat x, y, z;  };
+  struct Color    { GLfloat r, g, b;  };
+
+  struct Vertex   {  
+      Position position; // Vertex position in space 
+      Normal   normal;   // Vertex normal vector for illumination (Future use)
+      Color    color;    // Vertex color (RGB)
+  };
+
+  std::ostream& operator<<(std::ostream& os, Vertex const& v)
+  {
+      return os << " Vertex{ x = " << v.position.x << " ; " 
+                << " y = " << v.position.y << " ; z = " << v.position.z << " } ";
+  }
+
+  // Mesh - set of vertices (position and attributes) that represents 
+  // some surface or solid. 
+  struct Mesh 
+  {
+      std::vector<Vertex> vertices{};
+      std::vector<GLuint> indices{}; 
+      GLfloat line_width = 1.0;
+      GLenum  draw_type; 
+      GLuint vao = 0, vbo = 0, ibo = 0;
+    
+      // Draw mesh using indices 
+      void draw_indices()
+      {
+          // Check wheter the mesh was sent to GPU.
+          assert( vao != 0 && ibo != 0 );
+          // Note: The subroutine glLineWidth is stateful!!
+          glLineWidth(line_width);
+          glBindVertexArray(vao);
+          glDrawElements(draw_type, indices.size(), GL_UNSIGNED_INT, nullptr);
+      }
+
+      // Draw mesh using vertices 
+      void draw_vertices()
+      {
+          assert( vao != 0 );
+          glLineWidth(line_width);       
+          glBindVertexArray(vao);
+          glDrawArrays(draw_type, 0, vertices.size());
+      }
+  };
+
+
+  // Send/upload mesh data to GPU 
+  // attr_position =>> Shader attribute location for vertex position 
+  // attr_color    =>> Shader attribute location for vertex color 
+  void send_mesh( Mesh& mesh , GLint attr_position , GLint attr_color ); 
+
+  constexpr Position origin = { 0.0, 0.0, 0.0};
+  constexpr Position position_x(float x){ return {x, 0.0, 0.0};  }
+  constexpr Position position_y(float y){ return {0.0, y, 0.0};  }
+  constexpr Position position_z(float z){ return {0.0, 0.0, z};  }
+
+  constexpr Normal zero_normal = { 0.0, 0.0 , 0.0};
+  constexpr Color  color_red   = {1.0, 0.0, 0.0};
+  constexpr Color  color_green = {0.0, 1.0, 0.0};        
+  constexpr Color  color_blue  = {0.0, 0.0, 1.0};
+
+  const glm::mat4 matrix_identity = glm::mat4(1.0);
+
+
+  struct Camera
+  {
+      // Current location of camera in world coordinates
+      glm::vec3 eye  = { 2.0, 4.0, 5.0 };
+      // Direction to where camera is looking at.
+      glm::vec3 forward =  {-1.0, 0.0, -1.0 };
+      // Current  camera up vector (orientation) - Y axis (default)
+      glm::vec3 up = { 0.0, 1.0, 0.0 };
+
+      // Field of view
+      float fov_angle = glm::radians(60.0);
+      // Aspect ratio
+      float aspect   = 1.0;
+      float zFar     = 100.0;
+      float zNear    = 0.1;
+
+      // ID of shader's view uniform variable - for setting view matrix
+      GLint shader_uniform_view = -1;
+      // ID of shader's projection uniform variable for setting projection matrix.
+      GLint shader_uniform_proj = -1;
+
+      GLint shader_uniform_eye = -1;
+
+      Camera(GLuint uniform_view, GLuint uniform_proj, GLuint uniform_eye, float aspect):
+           shader_uniform_view(uniform_view)
+         , shader_uniform_proj(uniform_proj)
+         , shader_uniform_eye(uniform_eye)
+         , aspect(aspect)
+      {  update_view();  }
+
+      void update_view()
+      {
+
+          // Point to where camera is looking at.
+          auto cam_at = this->eye + this->forward;
+          // Create View matrix (maps from world-space to camera-space)
+          auto Tview = glm::lookAt(eye, cam_at, up);
+          // Create projection matrix maps - camera-space to NDC (Normalized Device Coordinates).
+          auto Tproj = glm::perspective( fov_angle, aspect, zNear, zFar );
+          // Set shader uniform variables.
+          glUniformMatrix4fv(shader_uniform_view, 1, GL_FALSE, glm::value_ptr(Tview) );
+          glUniformMatrix4fv(shader_uniform_proj, 1, GL_FALSE, glm::value_ptr(Tproj) );
+          glUniform3fv(shader_uniform_eye, 1, glm::value_ptr(eye));
+      }
+
+      // Rotate around camera's Up vecto.
+      void rotate_yaw(float angle)
+      {
+          // Build quaternion from axis angle
+          glm::quat q = glm::angleAxis(glm::radians(angle), this->up);
+          // Rotate current forward vector
+          forward = forward * q;
+          // std::cout << " [FORWARD VECTOR ] " << glm::to_string(forward) << '\n';
+          this->update_view();
+      }
+
+      // Rotate around camera's pitch axis (X axis) elevate camera view.
+      void rotate_pitch(float angle)
+      {
+          glm::vec3 axis = glm::cross(this->up, this->forward);
+          // Build quaternion from axis angle
+          glm::quat q = glm::angleAxis(glm::radians(angle), axis);
+          forward = q * forward;
+          this->update_view();
+      }
+
+        // Move at forward vector direction (to where camera is looking at).
+      void move_forward(float factor)
+      {
+          this->eye = this->eye + factor * this->forward;
+          this->update_view();
+      }
+      // Move camera to specific point in the space.
+      void set_position(float x, float y, float z)
+      {
+          this->eye = glm::vec3(x, y, z);
+          this->update_view();
+      }
+
+      // Set position to where camera is looking at.
+      void look_at(const glm::vec3& at)
+      {
+          this->forward = at - this->eye;
+          this->update_view();
+      }
+
+  };
+
+  using SurfaceFunction = std::function<float (float, float)>;
+
+  // Nx - Number of points in the Xmin, Xmax interval 
+  // Ny - Number of points in the Ymin, Ymax interval 
+  Mesh generate_surface_wireframe_mesh(  
+                               float xmin, float xmax
+                             , float zmin, float zmax
+                             , size_t Nx, size_t Nz
+                             , Color color 
+                             , SurfaceFunction const& function);
+
+  int main(int argc, char** argv)
+  {
+
+      /* Initialize the library */
+      if (!glfwInit()){ return -1; }
+
+      #if defined(GLUT_ENABLED)
+          glutInit(&argc, argv);
+      #endif
+
+      // ====== S H A D E R - C O M P I L A T I O N ====//
+      //                                                // 
+    
+      GLFWwindow* window = make_glfwWindow(640, 480, "Plot 3D surface");
+
+      // Note: The shader source code is at the end of file.
+      extern const char* code_vertex_shader;
+      extern const char* code_frag_shader;
+
+      GLuint prog = glCreateProgram();
+      // Compile shader code 
+      compile_shader(prog, code_vertex_shader, GL_VERTEX_SHADER  ) ;    
+      compile_shader(prog, code_frag_shader,   GL_FRAGMENT_SHADER );
+      glUseProgram(prog);
+
+      // Get shader uniform variable location for projection matrix
+      // See shader code: "uniform mat4 projection;"
+      const GLint u_proj  = glGetUniformLocation(prog, "u_projection");
+      assert( u_proj >= 0 && "Failed to find u_projection uniform variable" );
+
+      const GLint u_view = glGetUniformLocation(prog, "u_view");
+      assert( u_proj >= 0 && "Failed to find u_view uniform variable" );
+
+      // Get shader uniform variable  location for model matrix.
+      const GLint u_model  = glGetUniformLocation(prog, "u_model");
+      assert( u_model >= 0 && "Failed to find uniform variable" );  
+
+      const GLint u_camera_eye = glGetUniformLocation(prog, "u_eye");
+      printf(" [TRACE] u_camera_eye = %d \n", u_camera_eye);
+      assert( u_camera_eye >= 0 );  
+
+      // Get shader attribute location - the function glGetAttribLocation - returns (-1) on error.
+      const GLint attr_position = glGetAttribLocation(prog, "position");
+      assert( attr_position >= 0 && "Failed to get attribute location" );
+
+      // Get shader attribute of color 
+      const GLint attr_color = glGetAttribLocation(prog, "color");
+      if( attr_color < 0){ std::fprintf(stderr, " [WARNING] Shader color attribute location not found. \n"); };
+
+      glUniformMatrix4fv(u_model, 1, GL_FALSE, glm::value_ptr(matrix_identity) );
+      glUniformMatrix4fv(u_proj,  1, GL_FALSE, glm::value_ptr(matrix_identity) );
+
+      // ====== U P L O A D - TO - G P U =========================// 
+      //                                                          //
+
+      // ----- X, Y, Z axis for visual debugging ----------------
+      // X axis (GREEN) ; Y axis (RED); Z axis (BLUE)
+      GLuint vao_axis = 0; 
+      GLuint vbo_axis_vertices = 0;
+      GLuint vbo_axis_colors = 0;
+      float axis_len = 100.0;
+
+
+      Mesh mesh_axis{};
+      mesh_axis.vertices = {
+            // X axis line  
+            { origin,                  zero_normal,  color_green }
+          , { position_x(axis_len),    zero_normal,  color_green }
+            // Y axis line 
+          , { origin,                   zero_normal,  color_red  }
+          , { position_y(axis_len),     zero_normal,  color_red  }  
+            //  Z axis line
+          , { origin,                   zero_normal,  color_blue }
+          , { position_z(axis_len),     zero_normal,  color_blue } 
+      };
+      mesh_axis.line_width = 10.0;
+      mesh_axis.draw_type  = GL_LINES;
+      send_mesh(mesh_axis, attr_position, attr_color);
+    
+
+      Mesh mesh_surface = generate_surface_wireframe_mesh(
+                                -20, +20.0  // Xmax, Xmin 
+                              , -20, +20.0  // Zmax, Zmin 
+                              ,  200, 200   // Nx, Nz     => Number of points on X and Z axis
+                              , color_green // Surface wireframe color 
+                              // , [&](float x, float z){ return 25.0 - x * x - z * z ;}
+                              , [&](float x, float z){ return 10.0 * sin(x) * sin(z) / z  ; }
+                          ); 
+      mesh_surface.line_width = 0.25;
+      mesh_surface.draw_type  = GL_LINES;
+      send_mesh(mesh_surface, attr_position, attr_color);
+
+      // ============== Set Shader Uniform Variables =============// 
+      //                                                          // 
+
+      int width, height;
+      glfwGetWindowSize(window, &width, &height);
+      // Window aspect ratio
+      float aspect = static_cast<float>(width) / height;
+
+      // Set projection matrix uniform variable
+      // glUniformMatrix4fv(u_proj, 1, GL_FALSE, glm::value_ptr(identity) );
+    
+      Camera camera(u_view, u_proj, u_camera_eye, width / height);
+      camera.set_position(-23.0, 21.0, -22.0);
+      camera.look_at({0.0, 0.0, 0.0});
+
+      //  ======= R E N D E R  - L O O P ============//
+      //                                             //
+      while ( !glfwWindowShouldClose(window) )
+      {
+          glClear(GL_COLOR_BUFFER_BIT  | GL_DEPTH_BUFFER_BIT);
+
+          // ====== BEGIN RENDERING ============//    
+
+              // Draw axis lines
+              mesh_axis.draw_vertices();           
+
+              // Draw surface
+              mesh_surface.draw_vertices(); 
+              // mesh_surface.draw_indices();
+             
+
+          // ====== END RENDERING ==============//
+
+          /* Swap front and back buffers */
+          glfwSwapBuffers(window);
+          /* Poll for and process events */
+          glfwWaitEvents();
+
+          if( glfwGetKey(window, 'Q' ) == GLFW_PRESS )
+          {
+               std::cout << " [TRACE] User typed Q =>> Shutdown program. Ok. " << '\n';
+               break;
+          }
+
+          // Move camera to direction to where it is looking at.
+          if( glfwGetKey(window, GLFW_KEY_UP ) == GLFW_PRESS    ){ camera.move_forward(+0.5);  }
+          if( glfwGetKey(window, GLFW_KEY_DOWN ) == GLFW_PRESS  ){ camera.move_forward(-0.5);  }
+
+          // Rotate around its Y axis 
+          if( glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS  ){ camera.rotate_yaw(+5.0);   }
+          if( glfwGetKey(window, GLFW_KEY_LEFT ) == GLFW_PRESS  ){ camera.rotate_yaw(-5.0);   }
+
+          // Rotate camera around its local X axis
+          if( glfwGetKey(window, 'S') == GLFW_PRESS ){ camera.rotate_pitch(+5.0); }
+          if( glfwGetKey(window, 'D') == GLFW_PRESS ){ camera.rotate_pitch(-5.0); }
+
+          // Reset camera - look at origin
+          if( glfwGetKey(window, 'R' ) == GLFW_PRESS  )
+          {
+              camera.set_position(4.0, 3.0, 2.5);
+              camera.look_at( {0.0, 0.0, 0.0} );
+          }
+
+      }
+
+      glfwTerminate();
+      return 0;
+
+  } // --- End of main() -----//
+
+
+  // ---------- S H A D E R - P R O G R A M S  -------------------------//
+  //
+
+  // Minimal vertex shader =>> Runs on the GPU and processes each vertex.
+  const char* code_vertex_shader = R"(    
+      #version 330 core 
+
+      layout ( location = 0)  in vec3 position;
+      layout ( location = 1) in vec3 color;   
+
+      out vec3 out_color;
+      out vec3 out_coord; 
+      out vec3 out_eye;
+
+      uniform vec3 u_eye;  // Cameras's position in space
+      uniform mat4 u_model;       // Model matrix 
+      uniform mat4 u_view;        // Camera's view matrix    
+      uniform mat4 u_projection;  // Camera's projection matrix 
+    
+
+      void main()
+      {
+          gl_Position = u_projection * u_view * u_model * vec4(position, 1.0);
+       
+          // Forward to fragment shader 
+          out_coord  = position;
+          out_color = color; // vec3(0.56, 0.6, 0.0);
+          out_eye = u_eye;
+      }
+
+  )";
+
+  // Fragment shader source code 
+  const char* code_frag_shader = R"(
+      #version 330 
+
+      in vec3 out_color;
+      in vec3 out_coord;
+      in vec3 out_eye; 
+
+      void main()
+      {
+          float k;
+
+          if(gl_FrontFacing)
+              k = 1.0; // 2.0;
+          else 
+              k = 0.1; // 0.01;
+
+          float factor = distance(out_eye, out_coord) ;
+
+          // Set vertex colors
+          vec3 color = (out_coord / 2.0 / factor ) + k * out_color * ( 20.0 / factor ) ;
+          // vec3 color =  k * out_color * ( 20.0 / factor ) ;
+        
+          // vec3 color = 1.0 / fac + (out_color / 2.0 + 0.5) * k;
+
+          gl_FragColor =  vec4( color , 1.0);
+          // gl_FragColor = vec4(0.3, 0.6, 0.0, 1.0);
+      }
+  )";
+
+
+      // ====== I M P L E M E N T A T I O N S ==========// 
+
+  GLFWwindow* 
+  make_glfwWindow(int  width, int height, const char* title)
+  {
+
+      glfwSetErrorCallback([](int error, const char* description)
+                           { std::fprintf( stderr, " [GLFW ERROR] Error = %d ; Description = %s \n"
+                                          , error, description);
+                           });
+
+      GLFWwindow* window = glfwCreateWindow(width, height, title, NULL, NULL);
+      assert( window != nullptr && "Failed  to create Window");
+
+      // OpenGL context 
+      glfwMakeContextCurrent(window);
+      // Pain whole screen as black - dark screen colors are better 
+      // for avoding eye strain due long hours staring on monitor.
+      glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+
+      // Set - OpenGL Core Profile - version 3.3
+      GL_CHECK( glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3) ); 
+      GL_CHECK( glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3) );
+      GL_CHECK( glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE) );
+
+      GL_CHECK( glEnable(GL_COLOR_MATERIAL) );
+      GL_CHECK( glEnable(GL_DEPTH_TEST)     );
+      GL_CHECK( glEnable(GL_BLEND)          );
+
+      return window;
+  }
+
+  void compile_shader(GLuint m_program, const char* code, GLenum type)
+  {
+      GLint shader_id = glCreateShader( type );
+      glShaderSource(shader_id, 1, &code, nullptr);
+      glCompileShader(shader_id);
+      GLint is_compiled = GL_FALSE;
+      // Check shader compilation result 
+      glGetShaderiv(shader_id, GL_COMPILE_STATUS, &is_compiled);
+      // If there is any shader compilation result, 
+      // print the error message.
+      if( is_compiled == GL_FALSE)
+      {
+          GLint length;
+          glGetShaderiv(shader_id, GL_INFO_LOG_LENGTH, &length);
+          assert( length > 0 );
+
+          std::string out(length + 1, 0x00);
+          GLint chars_written;
+          glGetShaderInfoLog(shader_id, length, &chars_written, out.data());
+          std::cerr << " [SHADER ERROR] = " << out << '\n';
+          // Abort the exection of current process. 
+          std::abort();
+      }          
+
+      glAttachShader(m_program, shader_id);   
+      glDeleteShader(shader_id);
+      glLinkProgram(m_program);
+      GLint link_status = GL_FALSE;
+      glGetProgramiv(m_program, GL_LINK_STATUS, &link_status);
+      assert( link_status != GL_FALSE );   
+      // glUseProgram(m_program);         
+  }
+
+  //  Send  mesh data to GPU ----//
+  void send_mesh( Mesh& mesh , GLint attr_position , GLint attr_color   ) 
+  { 
+      GLuint& vao = mesh.vao;
+      GLuint& vbo = mesh.vbo;
+      GLuint& ibo = mesh.ibo;
+
+      // ------------- Upload vertices --------------//
+    
+      // Generate and bind current VAO (Vertex Array Object)
+      if(vao == 0){ glGenVertexArrays(1, &vao); }
+      glBindVertexArray(vao);
+      // Generate and bind current VBO (Vertex Buffer Object)
+      glGenBuffers(1, &vbo);
+      glBindBuffer(GL_ARRAY_BUFFER, vbo);
+      // Upload data to current VBO buffer in GPU 
+      glBufferData(GL_ARRAY_BUFFER, mesh.vertices.size() * sizeof(Vertex)
+                  , mesh.vertices.data(), GL_STATIC_DRAW);   
+
+      glEnableVertexAttribArray(attr_position);    
+      glEnableVertexAttribArray(attr_color);    
+   
+      // Set data layout - how data will be interpreted.
+      // => Each vertex has 2 coordinates. 
+      glVertexAttribPointer( attr_position, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), nullptr);
+
+      glVertexAttribPointer( attr_color, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex)     
+                             // Offset to color member variable in class Vertex2D
+                            , reinterpret_cast<void*>( offsetof(Vertex, color) )
+                            );
+
+      // -------- Upload indices ----------------------//
+      //
+      if (!mesh.indices.empty())
+      {
+          glBindVertexArray(vao);
+          glGenBuffers(1, &ibo);
+          glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
+          glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh.indices.size() * sizeof(GLuint)
+                       , mesh.indices.data(), GL_STATIC_DRAW );
+      }
+
+      // ------ Disable Global state set by this function -----//
+      // Unbind VAO 
+      glBindVertexArray(0);
+      // Unbind VBO 
+      glBindBuffer(GL_ARRAY_BUFFER, 0);
+      // Unbind IBO 
+      glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0);
+      // Disable current shader attribute 
+      glDisableVertexAttribArray(attr_position);
+      glDisableVertexAttribArray(attr_color);
+
+  }
+
+
+  Mesh generate_surface_wireframe_mesh(  
+                               float xmin, float xmax
+                             , float zmin, float zmax
+                             , size_t Nx, size_t Nz
+                             , Color color 
+                             , SurfaceFunction const& function)
+  {
+      assert( xmax > xmin );
+      assert( zmax > zmin );
+      assert( Nx  != 0 && Nz  != 0 );
+
+      std::cout << " [TRACE] Nx = " << Nx << " ; Nz = " << Nz << '\n';
+
+      Mesh mesh;
+      mesh.draw_type = GL_LINES;
+
+      float dx = (xmax - xmin) / Nx;
+      float dz = (zmax - zmin) / Nz; 
+
+      // Intial allocation for avoiding many dynamic allocations
+      mesh.vertices.reserve( Nx * Nz );
+      mesh.indices.reserve( 2 * Nx * Nz  );
+      float x, y, z, y_h;
+
+      // Draw lines parallel to plane XY  
+      for(size_t j = 0; j < Nz; j++)
+      {   for(size_t i = 0; i < Nx; i++)
+          {
+              x = xmin + i * dx;
+              z = zmin + j * dz; 
+              y = function(x, z);
+              y_h = function(x + dx, z);
+
+              // Draw line segment of containing lines parallel to XY axis    
+              mesh.vertices.push_back( Vertex{ Position{x, y, z}, zero_normal, color } );
+              mesh.vertices.push_back( Vertex{ Position{x + dx, y_h, z}, zero_normal, color } );
+
+          }
+      }
+
+      for(size_t i = 0; i < Nx; i++)
+      {   for(size_t j = 0; j < Nz; j++)
+          {
+              x = xmin + i * dx;
+              z = zmin + j * dz; 
+              y = function(x, z);
+              y_h = function(x, z + dz);
+
+              // Line segments in planes paralle to plane YZ 
+              mesh.vertices.push_back( Vertex{ Position{x, y, z       }, zero_normal, color } );
+              mesh.vertices.push_back( Vertex{ Position{x, y_h, z + dz}, zero_normal, color } );
+
+           }
+      }
+      return mesh;
+  }
+
+#+END_SRC
+
+
