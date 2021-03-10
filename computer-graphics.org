@@ -1240,6 +1240,13 @@ multiplications, in the same way as rotations.
        x \\ y \\ z \\ w = 1
      \end{bmatrix}
 
+\end{equation}
+
+
+\begin{equation}
+     \begin{bmatrix}
+       x' \\ y' \\ z' \\ 1
+      \end{bmatrix}
     =
 
     \begin{bmatrix}
@@ -4647,6 +4654,84 @@ the OpenGL default coordinate system.
 #+CAPTION: OpenGL coordinate system versus math or physics coordinate system.
 [[file:images/default-coordinate-system2.png][file:images/default-coordinate-system2.png]]
 
+
+The transform matrix that maps coordinates from the math and physics
+style coordinate system (M) to the OpenGL coordinate (C) can be obtained by: 
+
+
+\begin{equation}
+   T_{M -> C} = \text{Rot}_x(-90) \cdot \text{Rot}_z(-90)  
+\end{equation}
+
+\begin{equation}
+   T_{M -> C} = 
+           \begin{bmatrix}
+               1 &  0  & 0 & 0  \\
+               0 &  0  & 1 & 0  \\ 
+               0 & -1  & 0 & 0  \\
+               0 &  0  & 0 & 1 
+           \end{bmatrix}
+
+           \begin{bmatrix}
+               0 &  1  & 0 & 0  \\
+              -1 &  0  & 0 & 0  \\ 
+               0 &  0  & 1 & 0  \\
+               0 &  0  & 0 & 1 
+           \end{bmatrix}
+\end{equation}
+
+
+\begin{equation}
+   T_{M -> C} = \begin{bmatrix}
+                    0 & 1 & 0 & 0  \\
+                    0 & 0 & 1 & 0  \\ 
+                    1 & 0 & 0 & 0  \\
+                    0 & 0 & 0 & 1 
+                \end{bmatrix}
+\end{equation}
+
+Where: 
+
+  + $Rot_x$ - Is the X axis rotation matrix.
+  + $Rot_z$ - Is the Z axis rotation matrix.
+  + $T_{M -> C}$ - Is the affine matrix transform that maps
+    coordinates from math-and-physics coordinate system to OpenGL
+    coordinate system. 
+  + M - designates the coordinate system similar to the
+    math-and-physics textbooks as in the right side of the previous
+    picture.
+  + C - designates the openGL coordinate system.
+
+Coordinates from math textbook style coordinate systems can be mapped
+to OpenGL by using the previous affine transform matrix.
+
+\begin{equation} 
+   \begin{bmatrix} x_c \\ y_c \\ z_c \\ 1 \end{bmatrix}
+
+     =   T_{M -> C} 
+        \begin{bmatrix} x_m \\ y_m \\ z_m \\ 1 \end{bmatrix}
+\end{equation}
+
+With the previous equation it is possible to verify that the Y axis,
+vector (0, 1, 0) from the M coordinate system corresponds to the axis
+X (1, 0, 0) in the openGL (C) coordinate system. 
+
+\begin{equation} 
+     \begin{bmatrix} 1 \\ 0 \\ 0 \\ 1 \end{bmatrix}
+      = 
+         \begin{bmatrix}
+             0 & 1 & 0 & 0  \\
+             0 & 0 & 1 & 0  \\ 
+             1 & 0 & 0 & 0  \\
+             0 & 0 & 0 & 1 
+         \end{bmatrix}    
+        \begin{bmatrix} 0 \\ 1 \\ 0 \\ 1 \end{bmatrix}
+\end{equation}
+
+The same procedure can be applied to X axis in (M) coordinate system,
+which is mapped to Z axis in OpenGL coordinate system and to Z axis
+from (M)  coordinate system which is mapped to Y axis in OpenGL
+coordinate system. 
 
    *Coordinate System positions from other computer graphics APIS*
 
@@ -10092,8 +10177,11 @@ Subroutine for generating surface mesh:
               y = function(x, z);
               y_h = function(x + dx, z);
 
-              // Draw line segment of containing lines parallel to XY axis    
-              mesh.vertices.push_back( Vertex{ Position{x, y, z}, zero_normal, color } );
+              // Draw line segments in planes parallel to plane XY.
+              //---------------------------------------------------------------------//
+              // Initial vertex of line  segment
+              mesh.vertices.push_back( Vertex{ Position{x, y, z}, zero_normal, color } );        
+              // Final vertex of line segment 
               mesh.vertices.push_back( Vertex{ Position{x + dx, y_h, z}, zero_normal, color } );
 
           }
@@ -10107,7 +10195,7 @@ Subroutine for generating surface mesh:
               y = function(x, z);
               y_h = function(x, z + dz);
 
-              // Line segments in planes paralle to plane YZ 
+              // Draw line segments in planes parallel to plane YZ.
               mesh.vertices.push_back( Vertex{ Position{x, y, z       }, zero_normal, color } );
               mesh.vertices.push_back( Vertex{ Position{x, y_h, z + dz}, zero_normal, color } );
 
@@ -10880,7 +10968,7 @@ File: _draw3d-plot-surface.cpp_
               y = function(x, z);
               y_h = function(x + dx, z);
 
-              // Draw line segment of containing lines parallel to XY axis    
+              // Draw line segments in planes parallel to plane XY.
               mesh.vertices.push_back( Vertex{ Position{x, y, z}, zero_normal, color } );
               mesh.vertices.push_back( Vertex{ Position{x + dx, y_h, z}, zero_normal, color } );
 
@@ -10895,7 +10983,7 @@ File: _draw3d-plot-surface.cpp_
               y = function(x, z);
               y_h = function(x, z + dz);
 
-              // Line segments in planes paralle to plane YZ 
+              // Draw line segments in planes parallel to plane YZ.
               mesh.vertices.push_back( Vertex{ Position{x, y, z       }, zero_normal, color } );
               mesh.vertices.push_back( Vertex{ Position{x, y_h, z + dz}, zero_normal, color } );
 
