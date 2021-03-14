@@ -424,6 +424,12 @@ Libraries for window systems, event handling and OpenGL context abstraction: [ES
       and DirectX. SLD also has facilities for dealing with audio,
       joystick, CD-ROM, network and threads.
 
+  + [[https://www.sfml-dev.org/][SFML]] (Simple and Fast Multimedia Library) [MOST-USED]
+    + "SFML provides a simple interface to the various components of
+      your PC, to ease the development of games and multimedia
+      applications. It is composed of five modules: system, window,
+      graphics, audio and network." 
+
   + [[http://freeglut.sourceforge.net/][GLUT]] (FreeGlut) - OpenGL Utility Toolkit
     * Deals with window creation, OpenGL initialization, event
       handling and  so on.
@@ -2867,6 +2873,7 @@ Test in Julia programming language:
 
   + *CSE - 420 Computer Graphics* - California State University [BEST]
     * http://cse.csusb.edu/tongyu/courses/cs420/notes/viewing2.php
+
 *** Concatenating Affine Transforms
 
   *Concatenating / Combinating of affine transforms*
@@ -3216,6 +3223,209 @@ scaling; 3rd - translation:
    ⎢                              ⎥
    ⎣              1               ⎦
 #+END_SRC
+*** 3D Scene Transforms  
+
+In a 3D scene, the following typical transformations happens to the
+vertex coordinates of some object to be rendered. The model matrix
+transform, $T_m$, converts the object vertex coordinates from the
+local-space (a.k.a object-space) to world-space, then the view-matrix,
+$T_v$, converts vertex world-space coordinates to the camera-space,
+finally the projection matrix transform, $T_p$, turns the camera-space
+coordinates into clip-space coordinates (NDC - Normalized Device
+Coordinates) within the range -1.0 to 1.0 on each axis. Any NDC
+coordinate out of the range -1.0 to 1.0 will not be visible on the
+canvas, graphics window screen. 
+
+
+#+BEGIN_SRC tex                                                       Eye
+                +---------+              +---------+ Space      +---------------+  Clip-Space
+    Local       |         |  World       |         |  Camera    |               |  (NDC - Coordinates)
+   Space        |   Model |  Space       |  View   |  Space     |  Projection   | 
+      +------->>+  Matrix +------>>----->+ Matrix  +---------->>+   Matrix      +------->>>
+    V           |         |   Vw         |         |   Vc       |               |  Vndc
+                | Tm      |              |  Tv     |            |    Tp         |
+                +---------+              +---------+            +---------------+
+
+
+      Tm - (4x4) Model matrix transform 
+      Tv - (4x4) View matrix transform 
+      Tp - (4x4) Projection matrix transform. 
+
+      V    - Vertex coordinate in local space 
+      Vw   - Vertex coordinate in world-space
+      Vc   - Vertex coordinate in camera-space coordinate (a.k.a eye-space)
+      Vndc - Vertex coordinate in clip-space coordinate (NDC)
+#+END_SRC
+
+
+  + Transform from local-space coordinates to world-space coordinates
+    + Where:
+      + $T_m$ - is the _model-matrix_, often comprised of rotation,
+        scaling and translation concatened canonical transforms. 
+      + v - Vertex coordinate in local-space.
+        + $v = \begin{bmatrix} x & y & z & 1 \end{bmatrix}^T$ 
+      + $v_w$ - Vertex coordinate in world-space
+        + $v_w = \begin{bmatrix} x_w & y_w & z_w & 1 \end{bmatrix}^T$
+
+\begin{equation} 
+   v_w = T_m \cdot v
+\end{equation}
+
+
+  + Transform from world-space coordinates to camera-space coordinates
+    (a.k.a eye space).
+    + $T_v$ - is the _view matrix_, computed using the eye vector,
+      camera position; up vector - camera orientation; at
+      point-vector, point which the camera is looking at.
+
+\begin{equation}
+  v_c = T_v \cdot v_w 
+\end{equation}
+
+  + Transform from camera-space to clip-space coordinates.
+    + Where:
+      + $T_p$ - is the _projection matrix_ which can be either the
+        _perspective_ projection matrix or _ortographic_ projection
+        matrix.
+      + $v_{\text{ndc}}$ - is the vertex NDC coordinate. 
+
+\begin{equation}
+  v_{\text{ndc}} = T_p \cdot v_c 
+\end{equation}
+
+  + Overall scene transform from local-space to clip-space
+    coordinates. 
+
+\begin{equation}
+  v_{\text{ndc}} = \left( T_p \cdot T_v \cdot T_m \right) v
+\end{equation}
+
+
+ + MVP transform - The overall transform is often designated as
+   Model-View-Projection transform ( $T_{mvp}$ ).
+
+\begin{eqnarray*}
+   v_{\text{ndc}} &=&  T_{mvp} \cdot v \\
+   T_{mvp}        &=&  T_p \cdot T_v \cdot T_m 
+\end{eqnarray*}
+
+\begin{equation}
+     T_{\text{ModelViewProjection}} =T_{\text{Projection}} \cdot T_{\text{View}} \cdot T_{\text{Model}}
+\end{equation}
+  
+ + The _Model-View transform_ is the product between the model and view
+    transforms.
+
+\begin{eqnarray*}
+   T_{mv}                    &=& T_v \cdot T_m  \\
+   T_{\text{ModelView}} &=& T_{\text{View}} \cdot T_{\text{Model}}
+\end{eqnarray*}
+
+
+  + _Normal transform matrix_ ( $T_{normal}$ ) is computed as the
+    transpose of model-view matrix inverse. This matrix transform
+    vertex _normal_ vector in the local-space coordinates to
+    camera-space coordinates. This transform matrix is used for
+    illumination calculations, such as Phong illumination model.
+    + Where:
+      + n - is the normal vector in local-space coordinates.
+        + $n = \begin{bmatrix} x_n & y_n & z_n & 0 \end{bmatrix}^T$
+      + $n_c$ is the normal vector in camera-space (eye-space) coordinates. 
+
+\begin{equation}
+   T_{normal} = \left[ T_{\text{ModelView}}^{-1}  \right]^T = \left[ ( T_{\text{View}} \cdot T_{\text{Model}}  )^{-1}  \right]^T
+\end{equation} 
+
+\begin{equation}
+   n_c = T_{normal} \cdot n 
+\end{equation} 
+
+  *References* 
+
+    + Chapter 8 - OpenGL – A 3D Graphics API 8.1 - Pipeline architecture
+      + <https://people.cs.clemson.edu/~dhouse/courses/817/notes/OpenGL-pipeline.pdf>
+
+    + CS315 Lab 3: 3D Transformations
+      + <https://www.cs.uregina.ca/Links/class-info/315/WebGL2/Lab3/>
+
+    + Appendix F - Homogeneous Coordinates and Transformation Matrices
+      / OpenGL Programming Guide
+      + <https://www.glprogramming.com/red/appendixf.html>
+
+    + GLSL Programming/Vertex Transformations - Wikibooks
+      + <https://en.wikibooks.org/wiki/GLSL_Programming/Vertex_Transformations>
+
+    + OpenGL Normal Vector Transformation - Song ho Ahn
+      + <http://www.songho.ca/opengl/gl_normaltransform.html>
+
+    + The normal matrix - Light House 3D
+      + <https://www.lighthouse3d.com/tutorials/glsl-12-tutorial/the-normal-matrix/>
+
+    + Normal Vector Transform
+      + <https://www.cs.upc.edu/~robert/teaching/idi/normalsOpenGL.pdf>
+*** 2D Scene Transforms  
+
+A 2D scene can be generated as particular case of a 3D scene by
+setting the vertex  Z coordinate to always zero, replacing the view
+transform matrix with identity matrix and setting the projection matrix
+as the ortographic projection matrix. This approach only works if the
+graphics API default coordinate system is the same as the OpenGL one,
+where the Y and X axis are on the screen and the Z axis positive
+direction goes from the screen towards the viewer (computer user).
+
+\begin{equation}
+  v_{\text{ndc}} = \left( T_p \cdot T_v \cdot T_m \right) v
+\end{equation}
+
+By following the previous approach for a 2D scene, the vertex
+transformation becomes: 
+
+\begin{equation}
+  v_{\text{ndc}} = \left( T_{\text{ortographic}} \cdot T_{\text{model}} \right)  
+                     \begin{bmatrix} x \\ y \\ 0 \\ 1 \end{bmatrix}
+\end{equation}
+
+The model matrix is a combination of translation affine transforms
+with z set as zero, scaling affine transforms with Z set as zero and
+rotations around Z axis. 
+
+Some matrices that can be used for building the model matrix are: 
+
+  + 2D translation 
+
+\begin{equation}
+   T_{\text{translation-2D}} = 
+   \begin{bmatrix}
+     1   & 0   &  0 &  \Delta_x \\
+     0   & 1   &  0 &  \Delta_y \\
+     0   & 0   &  1 &   0       \\
+     0   & 0   &  0 &   1       \\
+   \end{bmatrix}
+\end{equation}
+
+  + 2D scaling 
+
+\begin{equation}
+  T_{\text{scaling-2D}} =
+   \begin{bmatrix}
+     s_x   & 0     &  0   &  0 \\
+     0     & s_y   &  0   &  0 \\
+     0     & 0     &  0   &  0 \\
+     0     & 0     &  0   &  1  \\
+   \end{bmatrix}
+\end{equation}
+
+  + 2D rotation (rotation around Z axis)
+
+\begin{equation}
+   T_{\text{rotation-2D}} =
+     \begin{bmatrix}
+        \cos{\theta}  & -\sin{\theta} &  0 & 0 \\
+        \sin{\theta}  &  \cos{\theta} &  0 & 0 \\
+       0              & 0             &  1 & 0 \\
+       0              & 0             &  0 & 1 \\
+     \end{bmatrix}
+\end{equation}
 
 *** Quaternions
 
@@ -10273,7 +10483,7 @@ File: _CMakeLists.txt_
 
 #+BEGIN_SRC cmake 
    cmake_minimum_required(VERSION 3.5)
-   project(OpenGL_Draw2d_Wireframe_Surface_Chart)
+   project(OpenGL_3D_Wireframe_Surface_Chart)
 
    set(CMAKE_CXX_STANDARD 17)
    set(CMAKE_CXX_STANDARD_REQUIRED ON)
