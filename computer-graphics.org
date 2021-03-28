@@ -230,8 +230,11 @@ GPU Listing:
 
   + API - Application Programming Interface
 
+  + [[https://en.wikipedia.org/wiki/Khronos_Group][Khronos Group]] - Industry consortium that takes care of OpenGL and
+    Vulkan standards and specifications. 
+
   + SGI - Silicon Graphics International - Company which developed
-    first version of OpenGL. It was known for this SGI workstations.
+    first version of OpenGL. It was known for its SGI workstations.
 
   + _OpenGL_ - Open Graphics Library
 
@@ -239,7 +242,7 @@ GPU Listing:
 
   + [[http://glew.sourceforge.net/index.html][GLEW]] - OpenGL Extension Wrangler
 
-  + ARB - Architecture Review Board
+  + ARB - OpenGL Architecture Review Board
 
   + OpenGL _Immediate Mode_ (Fixed-Function Pipeline, Legacy OpenGL)
     + Also known as: Legacy OpenGL, Fixed-Function Pipeline
@@ -265,7 +268,9 @@ GPU Listing:
     computers also have dedicated GPUs built in the same chip as the
     CPU cores. This type of GPU is enough for most common tasks such
     as lightweight games, 2D games and watching youtube videos, but
-    they are not suitable for heavy AAA (triple-A) games.
+    they are not suitable for heavy AAA (triple-A) games or for
+    running CAD applications. Note: Most server-grade processor IC
+    (Integrated Circuits), such as Intel Xeon lacks integrated GPU. 
 
   + _dGPU_ - Dedicated GPU - GPU available as a separated card and
     connected to the motherboard via PCI connection. They are suitable
@@ -696,7 +701,7 @@ Obj File Documentation:
 
   + [[https://www.khronos.org/opengl/wiki/Tutorial1:_Creating_a_Cross_Platform_OpenGL_3.2_Context_in_SDL_(C_/_SDL)][Tutorial1: Creating a Cross Platform OpenGL 3.2 Context in SDL (C / SDL) - OpenGL Wiki]]
 
-** Legacy/Obsolete OpenGL Subroutines
+** Legacy/Obsolete OpenGL APIs / Subroutines
 
 The following OpenGL subroutines are from the OpenGL _immediate mode_
 (fixed-function pipeline), which are obsolete and should be avoided as
@@ -785,13 +790,68 @@ Obsolete Subroutines:
 
 See:
 
+  + [[https://glm.g-truc.net/0.9.1/api/a00003.html][glm - Deprecated function replacements]]
+    + "The OpenGL 3.0 specification deprecated some features, and most
+      of these have been removed from the OpenGL 3.1 specfication and
+      beyond. GLM provides some replacement functions. Many of these
+      functions come from the GLM_GTC_matrix_transform: Matrix
+      transform functions. extension." 
+
+  + [[https://github.com/fendevel/Guide-to-Modern-OpenGL-Functions][A Guide to Modern OpenGL Functions]]
+
   + [[https://stackoverflow.com/questions/13647108/matrix-stacks-in-opengl-deprecated][Matrix stacks in OpenGL deprecated?]]
 
   + [[https://stackoverflow.com/questions/3755998/what-is-the-point-of-the-matrix-stack-in-opengl][What is the point of the matrix stack in OpenGL?]]
 
   + [[http://edeleastar.github.io/opengl-programming/topic05/pdf/3.MatrixStacks.pdf][OpenGL Matrix Stacks {PDF}]]
 
-** Linux-Specific
+** Operating System Specific 
+*** Microsoft Windows NT
+
+  *Command Line Shortcuts for Troubleshooting* 
+
+The following applications can be accessed either from command line
+(cmd.exe shell) or via the shortcut Windows Key + R. 
+
+    + $ _dxdigag_ => Tool for DirectX and OpenGL diagnostics.
+
+    + $ _devmgmt.msc_ => Device manager shortcut.
+
+    + $ [[https://support.microsoft.com/en-us/topic/description-of-microsoft-system-information-msinfo32-exe-tool-10d335d8-5834-90b4-8452-42c58e61f9fc][msinfo32]] => View details about hardware.
+
+    + $ _systeminfo_ => View summarized information about operating
+      system, hardware, RAM memory, disk space and patches. Note: It
+      only works from command line. 
+
+   *GPU details and OpenGL Implementation Information* 
+
+    + [[http://realtech-vr.com/home/glview][OpenGL Extensions Viewer 6 | realtech VR]]
+      + Graphical application that allows viewing details about Vulkan
+        and OpenGL implementation at the current machine. 
+      + Brief: "A reliable software which displays useful information
+        about the current OpenGL 3D accelerator and new Vulkan 3D
+        API. This program displays the vendor name, the version
+        implemented, the renderer name and the extensions of the current
+        OpenGL 3D accelerator."
+
+    + [[https://www.geeks3d.com/20210125/gpu-caps-viewer-1-50-0-released/][GPU Caps View - Geeks3D]]
+      + Brief: "A new version of GPU Caps Viewer is available. GPU
+        Caps Viewer is a graphics card / GPU information and
+        monitoring utility that quickly describes the essential
+        capabilities of your GPU including GPU type, amount of VRAM ,
+        OpenGL, Vulkan, OpenCL and CUDA API support level."
+
+    + [[https://www.geeks3d.com/gputest/][GPU Test]]
+      + Brief: "GpuTest is a cross-platform (Windows, Linux and Max OS
+        X) GPU stress test and OpenGL benchmark. GpuTest comes with
+        several GPU tests including some popular ones from
+        Windows'world (FurMark or TessMark)." 
+
+  *Setting Default GPU on Windows* 
+
+    + [[https://on1help.zendesk.com/hc/en-us/articles/115000138471][How to update Video Card Driver and Set Default GPU]] 
+
+*** Linux-Based Operating Systems 
 
   *Install OpenGL development dependencies*
 
@@ -848,7 +908,6 @@ Display:
   name of display: :1
   display: :1  screen: 0
 #+END_SRC
-
 ** Computer Graphics Math
 *** Overview
 
@@ -3756,7 +3815,7 @@ The quaternion unit vectors or basis elements satifies the following
 properties:
 
 \begin{equation}
-   i^1 = j^2 = k^2 = i \cdot j \cdot k = -1
+   i^2 = j^2 = k^2 = i \cdot j \cdot k = -1
 \end{equation}
 
 And also:
@@ -11344,6 +11403,13 @@ File: _CMakeLists.txt_
    FetchContent_MakeAvailable(glm)
    include_directories( ${glm_SOURCE_DIR} )
 
+   FetchContent_Declare(
+     tinyobjloader 
+     URL   https://github.com/tinyobjloader/tinyobjloader/archive/v2.0.0rc8.zip
+   )
+   FetchContent_MakeAvailable(tinyobjloader)
+
+
    # Download pre-compiled GLEW when building under Windows NT OS (x64)
    IF(WIN32)
       FetchContent_Declare(
@@ -11411,7 +11477,7 @@ File: _CMakeLists.txt_
       ADD_OPENGL_APP( model-loader model-loader.cpp )
 
       # Define resourse files to be embedded in the executable (model-loader)
-      cmrc_add_resource_library( model-loader-shader-resources 
+      cmrc_add_resource_library( model-loader-resources 
                                  NAMESPACE resource
                                  ./model_loader_vshader.glsl 
                                  ./model_loader_fshader.glsl
@@ -11421,7 +11487,10 @@ File: _CMakeLists.txt_
                                 )
 
      # Append resources to the executable                            
-     target_link_libraries( model-loader  model-loader-shader-resources )
+     target_link_libraries( model-loader
+                            model-loader-resources tinyobjloader )
+
+
 #+END_SRC
 
 File: _model_loader_vshader.glsl_ / Vertex Shader 
@@ -12251,4 +12320,19 @@ File: _model-loader.cpp_
       auto fd = fs.open(file_name);
       return std::string(fd.begin(), fd.end());
   }
+#+END_SRC
+
+  *Building on Linux* 
+
+#+BEGIN_SRC sh 
+   $ cmake -H. -B_build_linux -DCMAKE_BUILD_TYPE=Debug
+   $ cmake --build _build_linux --target
+#+END_SRC
+
+  *Cross-compiling to Windows from Linux via MINGW Docker* 
+
+#+BEGIN_SRC sh 
+  docker run -it --rm -v $PWD:/cwd -w /cwd --entrypoint=bash dockcross/windows-static-x64
+   $ cmake -H. -B_build_windows -DCMAKE_BUILD_TYPE=Debug
+   $ cmake --build _build_windows --target
 #+END_SRC
