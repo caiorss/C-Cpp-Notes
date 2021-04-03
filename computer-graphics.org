@@ -227,7 +227,6 @@ Image Resolution DPI, PPI and so on:
 
   + [[https://www.omnicalculator.com/other/pixels-per-inch][PPI - Calculator (Pixels Per Inch)]]
 
-
 ** OpenGL Documentation
 
  *OpenGL:*
@@ -6328,7 +6327,7 @@ for a future error handling.
 
 #+END_SRC
 
-** 2D Graphics - using VBO
+** 2D Graphics - Using GLFW Window and VBO
 
 The following code draws a square and a triangle using the OpenGL
 retained mode API. Before the rendering takes place, data must be
@@ -6812,6 +6811,464 @@ Run executable:
 
   # on Linux via wine 
   $ wine _build_mingw\draw2d-raw.exe  
+#+END_SRC
+** 2D Graphics - Using SDL Library 
+
+The next code uses the SLD (Simple Direct Media Layer) library instead
+of GLFW for window system abstraction. The advantage of SDL over GLFW
+is that, SDL supports more platforms and is able to deal with audio
+and image loading, which are essential features for rich multimedia
+applications. This CMake script automatically downloads SDL and
+defines a macro for making it easier to create OpenGL apps with
+SDL statically linked.  
+
+SDL Web Sites: 
+
+  + https://www.libsdl.org/
+
+  + https://github.com/libsdl-org/SDL (Repository)
+
+  + https://github.com/libSDL2pp/libSDL2pp (C++ Wrapper)
+
+
+ *Project Files* 
+
+File: _CMakeLists.txt_ 
+
+#+BEGIN_SRC cmake 
+   cmake_minimum_required(VERSION 3.5)
+   project(OPENGL_SDL_project)
+
+   set(CMAKE_CXX_STANDARD 17)
+   set(CMAKE_CXX_STANDARD_REQUIRED ON)
+   set(CMAKE_VERBOSE_MAKEFILE ON)
+
+   #================ GLFW Settings  ===============#
+
+   find_package(OpenGL REQUIRED)
+
+   include(FetchContent)
+   # Download GLM (OpenGL math library for matrix and vectors transformation)
+   FetchContent_Declare(
+     glm  
+     URL  https://github.com/g-truc/glm/archive/0.9.8.zip
+   )
+   FetchContent_MakeAvailable(glm)
+   include_directories(${glm_SOURCE_DIR} )
+
+   # Donwload library SLD - Simple Direct Media Layer 
+   FetchContent_Declare(
+     sdl  
+     URL    https://github.com/libsdl-org/SDL/archive/refs/tags/release-2.0.14.zip 
+   )
+   FetchContent_MakeAvailable(sdl)
+   # find_package( SDL REQUIRED )
+
+   file(MAKE_DIRECTORY  ${sdl_SOURCE_DIR}/headers/SDL2)
+   file(COPY  ${sdl_SOURCE_DIR}/include/ 
+              DESTINATION ${sdl_SOURCE_DIR}/headers/SDL2 
+              FILES_MATCHING PATTERN "*.h"
+              )
+
+                  add_library( sdl-include  INTERFACE )
+   target_include_directories( sdl-include  INTERFACE ${sdl_SOURCE_DIR}/headers )
+   # Option for making this target IDE-friendly
+   IF(false)
+   target_sources( sdl-include INTERFACE  
+                                 ${sdl_SOURCE_DIR}/headers/SDL2/SDL.h   
+                                 ${sdl_SOURCE_DIR}/headers/SDL2/SDL_opengl.h  
+                              )
+
+   ENDIF()
+
+   # Download pre-compiled GLEW when building under Windows NT OS (x64)
+   IF(WIN32)
+      FetchContent_Declare(
+         glew-release 
+         URL     https://megalink.dl.sourceforge.net/project/glew/glew/2.1.0/glew-2.1.0-win32.zip
+         # https://github.com/nigels-com/glew/archive/glew-2.2.0.zip
+      )
+      FetchContent_MakeAvailable(glew-release)
+      include_directories( ${glew-release_SOURCE_DIR}/include  ${glm_SOURCE_DIR} )        
+      link_directories(  ${glew-release_SOURCE_DIR}/lib/Release/x64 )
+
+      set( GLEW_LIB_PATH1 ${glew-release_SOURCE_DIR}/lib/Release/x64/glew32.lib )
+      set( GLEW_LIB_PATH2 ${glew-release_SOURCE_DIR}/lib/Release/x64/glew32s.lib )
+   ENDIF()
+
+   MACRO(ADD_OPENGL_APP target sources)
+      add_executable( ${target} ${sources} )
+      message([TRACE] " Add OpenGL executable = ${target} ")
+
+      target_link_libraries( ${target} OpenGL::GL SDL2-static sdl-include 
+                                       ${GLEW_LIB_PATH1}
+                                       ${GLEW_LIB_PATH2} )
+
+       IF(MINGW)
+           # Statically link against MINGW dependencies
+           # for making easier to deploy on other machines. 
+           target_link_options( ${target} PRIVATE                                 
+                                    -static-libgcc
+                                    -static-libstdc++
+                                    -Wl,-Bstatic,--whole-archive -lwinpthread
+                                      -Wl,--no-whole-archive                                    
+                                    )
+        ENDIF()       
+
+
+        # Copy GLEW DLL shared library to same directory as the executable.                 
+        IF(WIN32)                           
+           add_custom_command(TARGET ${target} POST_BUILD 
+                          COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                          "${glew-release_SOURCE_DIR}/bin/Release/x64/glew32.dll"              
+                          $<TARGET_FILE_DIR:${target}>)
+        ENDIF()                                       
+   ENDMACRO()     
+
+
+         #========== Targets Configurations ================#
+
+   ADD_OPENGL_APP( opengl-sdl opengl-sdl.cpp )
+
+#+END_SRC
+
+File: _opengl-sdl.cpp_ 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string> 
+  #include <cassert>
+
+  #if defined(_WIN32)
+     #include <windows.h>
+     #include <GL/glew.h>
+  #endif
+
+  #define GL_GLEXT_PROTOTYPES 1
+  #define GL3_PROTOTYPES      1
+  #include <GL/gl.h> 
+  #include <GL/glu.h> 
+
+  #define SDL_MAIN_HANDLED
+  #include <SDL2/SDL.h>
+  #include <SDL2/SDL_opengl.h>
+
+  // --------- OpenGL Math Library ------------//
+  #include <glm/glm.hpp>
+  #include <glm/gtc/matrix_transform.hpp>
+  #include <glm/gtc/type_ptr.hpp>
+  #include <glm/gtx/string_cast.hpp>
+
+  // Wrapper for 2D vertex coordinates
+  struct Vertex2D{  GLfloat x, y;  };
+  // Wrapper for RGB colors
+  struct ColorRGB { GLfloat r, g, b; };
+
+  constexpr ColorRGB COLOR_R = { 1.0, 0.0, 0.0  }; // Red
+  constexpr ColorRGB COLOR_G = { 0.0, 1.0, 0.0  }; // Green
+  constexpr ColorRGB COLOR_B = { 0.0, 0.0, 1.0  }; // Blue
+
+  void compile_shader(GLuint m_program, const char* code, GLenum type);
+
+  void send_buffer( GLuint* pVao, GLuint* pVbo, GLsizei sizeBuffer
+                  , void* pBufffer, GLint   shader_attr, GLint size
+                  , GLenum type);
+
+  extern const char* shader_vertex; 
+  extern const char* shader_fragment;
+
+  const glm::mat4 matrix_identity = glm::mat4(1.0);
+
+
+  int main() 
+  {
+      std::puts(" [TRACE] OpenGL SDL started Ok. ");
+
+      int window_x = 100, window_y = 100, window_w = 500, window_h = 400;
+      SDL_Window* window = SDL_CreateWindow(  
+                                  "OpenGL with SLD library"
+                                 , window_x, window_y  // Window position 
+                                 , window_w, window_h  // Window width and height 
+                                 , SDL_WINDOW_OPENGL   // Bitwise-OR flags  
+                                 );
+   
+      SDL_GLContext ctx = SDL_GL_CreateContext(window);
+
+      // --- Initialize GLEW library after OpenGL context --------- //
+      #if _WIN32
+      glewExperimental = GL_TRUE;
+      if (glewInit() != GLEW_OK) {
+          std::cerr << "GLEW::Error : failed to initialize GLEW" << std::endl;
+          std::abort();
+      }
+      std::fprintf(stderr, " [TRACE] Glew Initialized Ok. \n");
+      #endif
+    
+      // ====== C O M P I L E  - S H A D E R ================== // 
+
+      GLuint prog = glCreateProgram();
+      compile_shader(prog, shader_vertex,   GL_VERTEX_SHADER   ) ;
+      compile_shader(prog, shader_fragment, GL_FRAGMENT_SHADER );
+      glUseProgram(prog);
+
+      // Get shader uniform variable location for projection matrix
+      // See shader code: "uniform mat4 projection;"
+      const GLint u_proj  = glGetUniformLocation(prog, "u_projection");
+      assert( u_proj >= 0 && "Failed to find uniform variable" );
+
+      // Get shader uniform variable  location for model matrix.
+      const GLint u_model  = glGetUniformLocation(prog, "u_model");
+      assert( u_model >= 0 && "Failed to find uniform variable" );
+
+      // Get shader attribute location - the function glGetAttribLocation
+      // returns (-1) on error.
+      const GLint attr_position = glGetAttribLocation(prog, "position");
+      assert( attr_position >= 0 && "Failed to get attribute location" );
+      std::fprintf(stderr, " [TRACE] Attribute location attr_position = %d \n"
+                  , attr_position);
+
+      // Get shader index of color attribute variable.
+      const GLint attr_color = glGetAttribLocation(prog, "color");
+      assert( attr_color >= 0);
+
+      glUniformMatrix4fv(u_model, 1, GL_FALSE, glm::value_ptr(matrix_identity) );
+      glUniformMatrix4fv(u_proj,  1, GL_FALSE, glm::value_ptr(matrix_identity) );
+
+      // ======== U P L O A D - T O - G P U ==============================// 
+
+      constexpr size_t NUM_VERTICES = 3;
+
+      float a = 0.25;
+
+      Vertex2D vertices[NUM_VERTICES] = {
+        {  0.0  ,   a * sqrt(3.0f) } // Vertex 0  
+      , { -2 * a,  -2 * a          } // Vertex 1  
+      , {  2 * a,  -2 * a          } // Vertex 2  
+      };
+
+      ColorRGB colors[NUM_VERTICES] = {
+            {0.4, 0.2, 0.67} 
+          , {0.8, 0.6, 0.30}
+          , {0.2, 0.6, 0.10}  
+      };
+
+      // Always initialize with zero (0), otherwise, the values
+      // of those variables will be undefined. (Undefine Behavior)
+      GLuint vao_triangle = 0;
+      GLuint vbo_vertices = 0;
+      GLuint vbo_colors   = 0;
+
+      // Send vertices to GPU VBO (vbo_vertices)
+      send_buffer(  &vao_triangle    // Ponter to VAO [OUTPUT]
+                  , &vbo_vertices    // Pointer VBO   [OUTPUT]
+                  , sizeof(vertices) // Size of buffer sent to GPU (VBO memory)
+                  , vertices         // Pointer to buffer
+                  , attr_position    // Shader attribute location
+                  , 2                // Each vertex has 2 coordinates (X, Y)
+                  , GL_FLOAT         // Each vertex coordinate has type GLfloat (float)
+                  );
+
+      // Send colors to GPU VBO (vbo_colors)
+      send_buffer(  &vao_triangle   // Pointer Vertex Array object
+                  , &vbo_colors     // Pointer Vertex buffer object handle (aka token)
+                  , sizeof(colors)  // Buffer size
+                  , colors          // Pointer to buffer (addrress of first buffer element)
+                  , attr_color      // Shader attribute location
+                  , 3               // Each color has 3 coordinates (R, G, B)
+                  , GL_FLOAT        // Each color coordiante has type GLfloat
+                  );
+
+      glm::mat4 model; 
+
+      // ======== R E N D E R I N G - L O O P ============================//
+
+      bool is_running = true; 
+
+      while( is_running )
+      {
+          SDL_Event event;
+          // std::fprintf(stderr, " [TRACE] Waiting SDL event \n"); 
+
+          while( SDL_PollEvent(&event) )
+          {
+              // std::fprintf(stderr, " [TRACE] Polling event \n");
+
+              if( event.type == SDL_QUIT ){ is_running == false; }
+ 
+              if( event.type == SDL_WINDOWEVENT 
+                  && event.window.event == SDL_WINDOWEVENT_CLOSE )
+              {  is_running = false; 
+                 SDL_Quit(); 
+              }
+          }
+
+          glViewport(0, 0, window_w, window_h);
+          // OpenGL Background color (black for avoiding eye strain)
+          glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+          glClear(GL_COLOR_BUFFER_BIT);
+
+          // === BEGIN REDERING ========// 
+
+              // ------ Draw triangle 1 ------ //  
+              glBindVertexArray(vao_triangle);
+              model = matrix_identity;
+              model = glm::translate(model, glm::vec3(0.35, 0.22, 0.0));
+              glUniformMatrix4fv(u_model, 1, GL_FALSE, glm::value_ptr(model) );
+              glDrawArrays(GL_TRIANGLES, 0, 3);
+ 
+              // ------ Draw triangle 1 ------ //
+              glBindVertexArray(vao_triangle);
+              model = matrix_identity;
+              model = glm::translate(model, glm::vec3(-0.5, -0.4, 0.0));
+              model = glm::scale(model, glm::vec3(0.5, 0.5, 0.5 ) );
+              model = glm::rotate(model, glm::radians(25.0f), glm::vec3(0.0, 0.0, 1.0) );
+              glUniformMatrix4fv(u_model, 1, GL_FALSE, glm::value_ptr(model) );
+              glDrawArrays(GL_TRIANGLES, 0, 3);
+ 
+          // === END RENDERING ==========// 
+
+          SDL_GL_SwapWindow(window);
+      }
+
+      std::puts(" [TRACE] Shutdown gracefully. ");
+      return 0;
+  } 
+
+  // ----- I M P L E M E N T A T I O N S --------------// 
+
+      // ====== I M P L E M E N T A T I O N S ==========//
+
+  void compile_shader(GLuint m_program, const char* code, GLenum type)
+  {
+      GLint shader_id = glCreateShader( type );
+      glShaderSource(shader_id, 1, &code, nullptr);
+      glCompileShader(shader_id);
+
+      GLint is_compiled = GL_FALSE;
+      // Check shader compilation result
+      glGetShaderiv(shader_id, GL_COMPILE_STATUS, &is_compiled);
+
+      // If there is any shader compilation result,
+      // print the error message.
+      if( is_compiled == GL_FALSE)
+      {
+          GLint length;
+          glGetShaderiv(shader_id, GL_INFO_LOG_LENGTH, &length);
+          assert( length > 0 );
+
+          std::string out(length + 1, 0x00);
+          GLint chars_written;
+          glGetShaderInfoLog(shader_id, length, &chars_written, out.data());
+          std::cerr << " [SHADER ERROR] = " << out << '\n';
+          // Abort the exection of current process.
+          std::abort();
+      }
+
+      glAttachShader(m_program, shader_id);
+      glDeleteShader(shader_id);
+      glLinkProgram(m_program);
+      GLint link_status = GL_FALSE;
+      glGetProgramiv(m_program, GL_LINK_STATUS, &link_status);
+      assert( link_status != GL_FALSE );
+      // glUseProgram(m_program);
+  }
+
+  // Upload buffer from main memory to GPU VBO
+  // =>> Parameters VAO, VBO are allocated by the caller.
+  void send_buffer( GLuint* pVao, GLuint* pVbo, GLsizei sizeBuffer
+                  , void* pBufffer, GLint   shader_attr, GLint size
+                  , GLenum type)
+  {
+      assert(pVao != nullptr);
+      assert(pVbo != nullptr);
+      GLuint& vao = *pVao;
+      GLuint& vbo = *pVbo;
+
+      // Generate and bind current VAO (Vertex Array Object)
+      if(vao == 0){ glGenVertexArrays(1, &vao); }
+      glBindVertexArray(vao);
+
+      // Generate and bind current VBO (Vertex Buffer Object)
+      glGenBuffers(1, &vbo);
+      glBindBuffer(GL_ARRAY_BUFFER, vbo);
+
+      // Upload data to current VBO buffer in GPU
+      glBufferData(GL_ARRAY_BUFFER, sizeBuffer, pBufffer, GL_STATIC_DRAW);
+      glEnableVertexAttribArray(shader_attr);
+      glVertexAttribPointer(shader_attr, size, type, GL_FALSE, 0, nullptr);
+
+      // ------ Disable Global state set by this function -----//
+      //
+      // Unbind VAO
+      glBindVertexArray(0);
+      // Unbind VBO
+      glBindBuffer(GL_ARRAY_BUFFER, vbo);
+      // Disable current shader attribute
+      glDisableVertexAttribArray(shader_attr);
+
+  }
+
+  // ----- S H A D E R S ------------------------------// 
+
+  const char* shader_vertex = R"(
+      #version 330 core
+    
+      layout ( location = 2)  in vec2 position;
+      layout ( location = 1 ) in vec3 color;
+
+      out vec3 out_color;
+      uniform mat4 u_model;
+      uniform mat4 u_projection;
+
+      void main()
+      {
+         gl_Position = u_projection * u_model * vec4(position, 0, 1.0);
+         out_color = color;
+      }
+        
+   )";
+
+
+  const char* shader_fragment = R"( 
+      #version 330
+
+      // This color comes from Vertex shader
+      in vec3 out_color;
+
+      void main()
+      {
+          // Set vertex colors
+          gl_FragColor = vec4(out_color, 1.0);
+      }
+
+  )";
+#+END_SRC
+
+  *Building* 
+
+Building on Linux. 
+
+#+BEGIN_SRC sh 
+  $ cmkae -H. -B_build_linux -DCMAKE_BUILD_TYPE=Debug
+  $ cmkae --build _build_linux --target 
+#+END_SRC
+
+Building for Windows NT (cross-compilation) from Linux.
+
+#+BEGIN_SRC sh 
+    $ docker run -it --rm -v $PWD:/cwd -w /cwd --entrypoint=bash dockcross/windows-static-x64
+    $ cmake -H. -B_build_windows -DCMAKE_BUILD_TYPE=Debug
+    $ cmake --build _build_windows --target 
+
+    $ ls 
+    CMakeCache.txt	Makefile		 _deps		      glew32.dll
+    CMakeFiles	SDL2ConfigVersion.cmake  cmake_install.cmake  opengl-sdl.exe
+#+END_SRC
+
+Run with wine: 
+
+#+BEGIN_SRC sh 
+  $ wine _build_windows/opengl-sdl.exe 
 #+END_SRC
 ** 2D Graphics - using VAO
 
