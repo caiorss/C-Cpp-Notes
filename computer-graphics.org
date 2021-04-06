@@ -2166,6 +2166,7 @@ Translation transform applied to an homogeneous vector (x, y, z, w = 1):
 \end{equation}
 
 
+Scaling transform applied to a homogeneous coordinate vector:
 
 \begin{equation}
      \begin{bmatrix}
@@ -6355,7 +6356,7 @@ for a future error handling.
 
 #+END_SRC
 
-** 2D Graphics - Using GLFW Window and VBO
+** 2D Graphics - Minimal GLFW project with VBO 
 
 The following code draws a square and a triangle using the OpenGL
 retained mode API. Before the rendering takes place, data must be
@@ -6840,7 +6841,7 @@ Run executable:
   # on Linux via wine 
   $ wine _build_mingw\draw2d-raw.exe  
 #+END_SRC
-** 2D Graphics - Using SDL Library 
+** 2D Graphics - Minimal SDL project 
 
 The next code uses the SLD (Simple Direct Media Layer) library instead
 of GLFW for window system abstraction. The advantage of SDL over GLFW
@@ -7298,6 +7299,448 @@ Run with wine:
 #+BEGIN_SRC sh 
   $ wine _build_windows/opengl-sdl.exe 
 #+END_SRC
+
+** 2D Graphics - Minimal Qt5 OpenGL project 
+
+Qt Framework is a better fit for non-games cross-platform OpenGL
+graphical applications like 3D drawing akin to Blender, CAD
+(Computer-Aided Design), scientific visualization and charts than
+GLFW, SDL or SFML as those window abstraction libraries lack widgets,
+such as buttons, menus, text entry and so on which are necessary for
+rich and complex interaction. Other significant advantage of Qt over
+the aforementioned libraries is that the Qt framework already has
+everything that is needed for developing OpenGL applications,
+including, OpenGL loading, 4x4 matrix, quaternion, OpenGL
+widget and scene graph.
+
+Documentation: 
+
+  + [[https://doc.qt.io/qt-5/qopenglwindow.html][QOpenGLWindow class]]
+
+  + [[https://doc.qt.io/qt-5/qopenglwidget.html][QOPenGLWidget class]]
+
+  + [[https://doc.qt.io/qt-5/qopenglshaderprogram.html][QOpenGLShaderProgram]] 
+
+  + [[https://doc.qt.io/qt-5/qvector3d.html][QVector3D class]]
+
+  + [[https://doc.qt.io/qt-5/qvector4d.html][QVector4D class]]
+
+  + [[https://doc.qt.io/qt-5/qquaternion.html][QQuaternion class]]
+
+  + [[https://doc.qt.io/qt-5/qmatrix4x4.html][QMatrix4x4 class]]
+
+Examples: 
+
+  + https://doc.qt.io/qt-5/qtopengl-cube-example.html
+
+  + https://doc.qt.io/qt-5/qtopengl-2dpainting-example.html
+
+  + https://doc.qt.io/qt-5/qtgui-openglwindow-example.html
+
+  *Screenshot* 
+
+In this sample application, the vertex data is uploaded only once to
+the GPU via VBO (Vertex Buffer Object) and used for drawing two
+triangles, which the positions are set via affine trasnform
+objects. The program has tree buttons that controls the second
+triangle by performing the following set of operations: scale
+increasing; scale decreasing and rotation.
+
+#+CAPTION: Minimal Qt 3D OpenGL application. 
+[[file:images/opengl-qt3d-minimal.png][file:images/opengl-qt3d-minimal.png]]
+
+  *Project Files* 
+
+File: _CMakeLists.txt_ 
+
+#+BEGIN_SRC cmake 
+   cmake_minimum_required(VERSION 3.9)
+   project(Qt5_Widget_OpenGL)
+
+   #====== Global Configurations ==================#
+
+   set(CMAKE_CXX_STANDARD 17)
+   set(CMAKE_VERBOSE_MAKEFILE ON)
+   set(CMAKE_INCLUDE_CURRENT_DIR ON)
+   set(CMAKE_AUTOUIC ON)
+   set(CMAKE_AUTOMOC ON)
+   set(CMAKE_AUTORCC ON)
+   set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+   find_package(Qt5 COMPONENTS Core Widgets REQUIRED)
+
+   #=============== Target Configurations ============#
+   SET(QT5_LINK_LIBRARIES Qt5::Core Qt5::Gui Qt5::Widgets)
+
+          add_executable( qt-opengl qt-opengl.cpp )
+   target_link_libraries( qt-opengl  Qt5::Core Qt5::Gui Qt5::Widgets )
+
+#+END_SRC
+
+File: _qt-opengl.cpp_ 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <functional>
+  #include <cassert>
+  #include <cmath>
+
+  #include <QtWidgets>
+  #include <QApplication>
+  #include <QOpenGLWindow>
+  #include <QOpenGLContext>
+  #include <QOpenGLBuffer>
+  #include <QOpenGLShaderProgram>
+
+
+  extern const char* shader_vertex;
+  extern const char* shader_fragment;
+
+  // Wrapper for 2D vertex coordinates
+  struct Vertex2D{  GLfloat x, y;  };
+  // Wrapper for RGB colors
+  struct ColorRGB { GLfloat r, g, b; };
+
+  struct Mesh
+  {
+      QOpenGLBuffer*            vbo_vertex  = nullptr;
+      QOpenGLBuffer*            vbo_color   = nullptr;
+      QOpenGLVertexArrayObject* vao         = nullptr;
+  };
+
+  struct Transform
+  {
+      QVector3D   position = {0.0,  0.0,  0.0,   };
+      QVector3D   scale    = {1.0f, 1.0f, 1.0f   };
+      QQuaternion rotation = {1.0, 0.0, 0.0, 0.0 };
+
+      // Cached affine trasnform for speeding up computation
+      // by tranding off time for space.
+      QMatrix4x4 trasnform;
+
+      // When this flag is true, the transform is computed again.
+      bool is_changed = false;
+
+      Transform& setPosition(float x, float y, float z)
+      {
+          position = {x, y, z};
+          is_changed = true;
+          return *this;
+      }
+
+      Transform& displace(float dx, float dy, float dz)
+      {
+          position = { position.x() + dx, position.y() + dy, position.z() + dz };
+          is_changed = true;
+          return *this;
+      }
+
+      Transform&  setRotationZ(float angle)
+      {
+          rotation = QQuaternion::fromAxisAndAngle( QVector3D{0.0, 0.0, 1.0}, angle );
+          is_changed = true;
+          return *this;
+      }
+
+      Transform& rotateZ(float angle)
+      {
+          rotation = rotation * QQuaternion::fromAxisAndAngle( QVector3D{0.0, 0.0, 1.0}, angle );
+          is_changed = true;
+          return *this;
+      }
+
+      Transform& setScale(float f)
+      {
+          scale = {f, f, f};
+          is_changed = true;
+          return *this;
+      }
+
+      Transform& addScale(float f)
+      {
+          scale = { scale.x() + f, scale.y() + f, scale.z() + f };
+          is_changed = true;
+          return *this;
+      }
+
+      QMatrix4x4 value()
+      {
+
+          if( is_changed )
+          {
+              std::fprintf(stderr, " [TRACE] Affine transform recalculated. Ok. \n");
+              trasnform.setToIdentity();
+              trasnform.translate( position );
+              trasnform.scale(scale);
+              trasnform.rotate(rotation);
+              is_changed = false;
+          }
+          return trasnform;
+      }
+  };
+
+  class OpenGLCanvas: public QOpenGLWidget
+  {
+  public:
+       using DrawCallback = std::function<void (QOpenGLExtraFunctions* ctx)>;
+  private:
+      QOpenGLShaderProgram* m_prog 	= nullptr;
+
+
+      // Shader attribute location
+      int attr_position = 0;
+      int attr_color    = 0;
+      // Shader uniform locations
+      int u_model = 0;
+      int u_proj  = 0;
+
+      DrawCallback m_callback = [](QOpenGLExtraFunctions* ){ };
+      DrawCallback m_init     = [](QOpenGLExtraFunctions* ){ };
+  public:
+
+      OpenGLCanvas(DrawCallback init):  m_init(init){ }
+
+      void initializeGL() override
+      {
+          auto ctx = QOpenGLContext::currentContext()->extraFunctions();
+          std::fprintf(stderr, " [TRACE] Initialized Ok. \n");
+
+          m_prog = new QOpenGLShaderProgram;
+          m_prog->addShaderFromSourceCode(QOpenGLShader::Vertex, 	 shader_vertex);
+          m_prog->addShaderFromSourceCode(QOpenGLShader::Fragment, shader_fragment);
+          m_prog->link();
+          m_prog->bind();
+          // Attribute location
+          attr_position = m_prog->attributeLocation("position");
+          Q_ASSERT( attr_position != -1 );
+          attr_color = m_prog->attributeLocation("color");
+          Q_ASSERT( attr_color != -1    );
+
+          // Uniform variables
+          u_model = m_prog->uniformLocation("u_model");
+          Q_ASSERT( u_model != -1 );
+          u_proj  = m_prog->uniformLocation("u_proj");
+          Q_ASSERT( u_proj != -1 );
+
+          // Initialize shader uniform variables
+          QMatrix4x4 m;
+          m.setToIdentity();
+          m_prog->setUniformValue(u_model, m);
+          m_prog->setUniformValue(u_proj,  m);
+
+          m_init(ctx);
+     }
+
+      void setDrawCallback(DrawCallback callback)
+      {
+          m_callback = callback;
+      }
+
+      // Override QOpenGLWidget::paintGL()
+      void paintGL() override
+      {
+          std::fprintf(stderr, " [TRACE] Painting window Ok. \n");
+
+          QOpenGLExtraFunctions* ctx = QOpenGLContext::currentContext()->extraFunctions();
+          ctx->glClearColor(0.0, 0.0, 0.0, 1.0);
+          ctx->glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
+
+          m_callback(ctx);
+      }
+
+      // Override QOpenGLWidget::resizeGL()
+      void resizeGL(int w, int h) override
+      {
+          std::fprintf(stderr, " [TRACE] Window resized. \n");
+
+          // Forward call to superclass
+          this->QOpenGLWidget::resizeGL(w, h);
+      }
+
+      // Set model matrix of current object
+      void setModel(QMatrix4x4 const& m){ m_prog->setUniformValue(u_model, m); }
+
+      // Upload vertices to GPU
+      Mesh upload(size_t num_vertices, Vertex2D* vertices, ColorRGB* colors)
+      {
+          auto ctx = QOpenGLContext::currentContext()->extraFunctions();
+
+          auto vao = new QOpenGLVertexArrayObject;
+          if( vao->create() ){ vao->bind(); }
+
+          // Send vertices positions to GPU
+          auto vbo_vertex = new QOpenGLBuffer;
+          vbo_vertex->create();
+          vbo_vertex->bind();
+          vbo_vertex->allocate( vertices , num_vertices * sizeof(Vertex2D) );
+          ctx->glEnableVertexAttribArray(attr_position);
+          // Set data layout, how the data will be interpreted.
+          ctx->glVertexAttribPointer( attr_position, 2, GL_FLOAT, GL_FALSE, 0, nullptr );
+
+          // Send vertices colors to GPU
+          auto vbo_color = new QOpenGLBuffer;
+          vbo_color->create();
+          vbo_color->bind();
+          vbo_color->allocate( colors, num_vertices * sizeof(ColorRGB));
+          ctx->glEnableVertexAttribArray(attr_color);
+          // Set color data layout
+          ctx->glVertexAttribPointer( attr_color, 3, GL_FLOAT, GL_FALSE, 0, nullptr );
+
+          Mesh mesh;
+          mesh.vbo_vertex = vbo_vertex;
+          mesh.vbo_color  = vbo_color;
+          mesh.vao = vao;
+          return mesh;
+      }
+  };
+
+
+  int main(int argc, char** argv)
+  {
+      std::cout << " [INFO] Starting Application" << std::endl;
+
+      QApplication app(argc, argv);
+      app.setApplicationName("Qt OpenGL Cavans");
+
+      constexpr size_t NUM_VERTICES = 3;
+
+      const float a = 0.5f ;
+
+      Vertex2D vertices[NUM_VERTICES] = {
+            {  0.0,  a * sqrtf(3.0f) } // Vertex 0
+          , {   -a,  0.0             } // Vertex 1
+          , {    a,  0.0             } // Vertex 2
+      };
+
+      ColorRGB colors[NUM_VERTICES] = {
+            {0.4, 0.5, 0.67}
+          , {0.8, 0.6, 0.30}
+          , {0.2, 0.7, 0.10}
+      };
+
+
+      QWidget window;
+      window.resize(500, 400);
+      window.setWindowTitle("Qt OpenGL Window is awesome!");
+
+      auto hbox = new QVBoxLayout(&window);
+
+      auto form = new QHBoxLayout();
+      auto btn_add_scale = new QPushButton("Increase scale");
+      auto btn_dec_scale = new QPushButton("Decrease scale");
+      auto btn_rotate = new QPushButton("Rotate");
+      form->addWidget(btn_add_scale);
+      form->addWidget(btn_dec_scale);
+      form->addWidget(btn_rotate);
+      hbox->addLayout(form);
+
+      Mesh mesh_triangle;
+
+      Transform trf_triangle1;
+      trf_triangle1.setPosition(0.36f, 0.50f, 0.0f)
+                   .rotateZ(0)
+                   .setScale(0.50);
+
+
+      Transform trf_triangle2;
+      trf_triangle2.setPosition(-0.24, -0.25, 0.0)
+                   .setScale(0.80)
+                   .rotateZ(35.0);
+
+      qDebug() << " Trasnform 1 = " << trf_triangle1.value();
+      qDebug() << " Transform 2 = " << trf_triangle2.value();
+
+      OpenGLCanvas* canvas = new OpenGLCanvas([&](QOpenGLExtraFunctions* ctx)
+      {
+          mesh_triangle = canvas->upload(NUM_VERTICES, vertices, colors);
+      });
+      canvas->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+      hbox->addWidget(canvas);
+
+      canvas->setDrawCallback([&](QOpenGLExtraFunctions* ctx)
+      {
+          // Draw triangle 1
+          mesh_triangle.vao->bind();
+          // canvas->setModel(model_triangle1);
+          canvas->setModel( trf_triangle1.value() );
+          ctx->glDrawArrays(GL_TRIANGLES, 0, NUM_VERTICES);
+
+          // Draw triangle 2
+          mesh_triangle.vao->bind();
+          // canvas->setModel(model_triangle2);
+          canvas->setModel( trf_triangle2.value() );
+          ctx->glDrawArrays(GL_TRIANGLES, 0, NUM_VERTICES);
+      });
+
+      window.show();
+
+
+      // ----------- Set events ----------------------//
+
+      QObject::connect(btn_add_scale, &QPushButton::clicked,
+               [&]{
+                     std::fprintf(stderr, " [TRACE] Button to increase scale clicked. Ok. \n"); 
+                     trf_triangle2.addScale(+0.10);
+                     canvas->repaint();
+               });
+
+      QObject::connect(btn_dec_scale, &QPushButton::clicked,
+                       [&]{
+                          std::fprintf(stderr, " [TRACE] Button to decrease scale clicked. Ok. \n"); 
+                          trf_triangle2.addScale(-0.10);
+                          canvas->repaint();
+                       });
+
+      QObject::connect(btn_rotate, &QPushButton::clicked,
+                       [&]{
+                           std::fprintf(stderr, " [TRACE] Button to rotate triangle clicked. Ok. \n");
+                           trf_triangle2.rotateZ(10.5);
+                           canvas->repaint();
+                       });
+
+      return app.exec();
+  }
+
+
+  // ===== S H A D E R - P R O G R A M S ==========//
+
+
+  const char* shader_vertex = R"(
+      #version 330 core
+
+      layout ( location = 2)  in vec2 position;
+      layout ( location = 1 ) in vec3 color;
+
+      out vec3 out_color;
+      uniform mat4 u_model;
+      uniform mat4 u_proj;
+
+      void main()
+      {
+         gl_Position = u_proj * u_model * vec4(position, 0, 1.0);
+         out_color = color;
+      }
+
+   )";
+
+
+  const char* shader_fragment = R"(
+      #version 330
+
+      // This color comes from Vertex shader
+      in vec3 out_color;
+
+      void main()
+      {
+          // Set vertex colors
+          gl_FragColor = vec4(out_color, 1.0);
+      }
+
+  )";
+
+#+END_SRC
+
+
 ** 2D Graphics - using VAO
 
 A VAO (Vertex Array Object) is an object that stores all the
