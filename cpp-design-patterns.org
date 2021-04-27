@@ -485,6 +485,130 @@ File: _glfw_kbd_singleton.cpp_
   } // ------ End of main() ---------------------------------------------//
 
 #+END_SRC
+*** Example 3 - Generic Singleton 
+
+This code contains a reusable-generic singleton template class, which
+is applied to the previous case for calling lambdas from a C++
+function that accepts function pointer and does not contain an extra
+void pointer for allowing the calling code to pass state or
+non-capturing lambdas. 
+
+Generic singleton templated class: 
+
+#+BEGIN_SRC cpp 
+  template<typename Impl>
+  class CRTP_Singleton
+  {
+  protected:
+      CRTP_Singleton() = default;
+  public:
+    
+      CRTP_Singleton(const CRTP_Singleton&) = delete;
+      CRTP_Singleton& operator=(CRTP_Singleton const&) = delete;
+
+      static Impl& getInstance()
+      {  
+          static Impl impl;
+          return impl;  
+      }
+
+  };
+#+END_SRC
+
+Singleton class that inherits CRTP_Singleton: 
+
+#+BEGIN_SRC cpp 
+  // Singleton object for registering lambda event handlers for GLFW keyboard typing events.
+  class KeyboardManager: public CRTP_Singleton<KeyboardManager>
+  {
+      friend KeyboardManager::CRTP_Singleton<KeyboardManager>;
+  public:
+
+      using KeyCallback = std::function<void (GLFWwindow* window)>;
+      using KeyCallbackDB = std::map<int, KeyCallback>;
+  protected:
+
+      KeyCallbackDB m_keydb{};
+      GLFWwindow*   m_window = nullptr;
+    
+      // Private constructor for not allowing client code creating more 
+      // than one instance.
+      KeyboardManager(){ }
+  public:
+      ~KeyboardManager() = default;
+
+      KeyboardManager& 
+      set_window(GLFWwindow* window)
+      {
+          m_window = window;
+          assert( m_window != nullptr );
+      
+      ::glfwSetKeyCallback(m_window 
+              ,[](GLFWwindow* window, int key, int scancode, int action, int mods)
+              {
+                  std::cerr << " [TRACE] glfwSetKeyCallback() key = " 
+                            << key << " / char " << (char) key <<  '\n';
+                  // Get singleton instance 
+                  KeyboardManager& instance = KeyboardManager::getInstance();
+                  auto it = instance.m_keydb.find(key);
+                  if(it == instance.m_keydb.end()){ return; }
+                  std::fprintf(stderr, " [TRACE] Execute callback function. \n");
+                  // Call callback functions.
+                  it->second(window);
+              });         
+           return *this;
+      }
+
+      KeyboardManager& 
+      add_keyCallback(int key, KeyCallback callback)
+      {
+
+          std::fprintf(stderr, " [TRACE] Add callback key. \n");
+          this->m_keydb[key] = callback;
+          return *this;
+      }    
+
+  };
+
+#+END_SRC
+
+Class usage in main() function: 
+
+#+BEGIN_SRC cpp 
+      ... ... ... ... .... .... 
+      ... ... ... ... .... .... 
+
+      GLFWwindow* window = glfwCreateWindow(640, 480, "Simple triangle draw", NULL, NULL);
+
+      if (!window)
+      {
+           std::fprintf(stderr, " [ERROR] Unable to open GLFW Window. \n");    
+          glfwTerminate();
+          return -1;
+      }
+      ... ... ... ... .... .... 
+
+     // Get singleton instance and set window.
+     auto& kdb = KeyboardManager::getInstance().set_window(window);
+
+     GLenum draw_type = GL_LINE_LOOP;
+
+     // Register events 
+     kdb.add_keyCallback('A', [&draw_type](GLFWwindow* win){ draw_type = GL_TRIANGLES; });    
+
+     // Positive rotatation of 10 degrees around Z axis (counter - clockwise)
+     kdb.add_keyCallback(GLFW_KEY_RIGHT, [&](GLFWwindow* win)
+         {  
+             std::cerr << " [TRACE] Postive rotation around Z axis " << '\n';
+             angle = angle + 10.0;
+             glUniform1f(uniform_angle, angle);
+         });  
+
+
+      ... ... ... ... .... .... 
+      ... ... ... ... .... .... 
+      ... ... ... ... .... .... 
+#+END_SRC
 ** Named constructor - static factory method
 
 The named constructor or static factory design pattern uses static
@@ -1014,15 +1138,15 @@ Example:
       auto user1 =
               UserBuilder()
               .setID(1065)
-              .setName("Enrico")
-              .setLastName("Fermi")
+              .setName("Blaise")
+              .setLastName("Pascal")
               .setEmail("dummyEmail@service1.co.uk")
               .build();
       auto user2 =
               UserBuilder()
               .setID(2001)
-              .setName("Stanislaw")
-              .setLastName("Ulam")
+              .setName("Nikola")
+              .setLastName("Tesla")
               .setEmail("wsx752@couk.com.sk")
               .build();
       user0.show();
@@ -1045,15 +1169,15 @@ Running:
 
    User{
      id        = 1065
-     name      = Enrico
-     last name = Fermi
+     name      = Blaise
+     last name = Pascal
      email     = dummyEmail@service1.co.uk
    }
 
    User{
      id        = 2001
-     name      = Stanislaw
-     last name = Ulam
+     name      = Nikola
+     last name = Tesla
      email     = wsx752@couk.com.sk
    }
 #+END_SRC
