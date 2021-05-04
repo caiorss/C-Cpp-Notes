@@ -1109,106 +1109,603 @@ Output:
 #+CAPTION: Graphical output - messagebox 
 [[file:images/output-messageboxUTF8.png][file:images/output-messageboxUTF8.png]] 
 
-*** Example - Setting Console to UTF8 
+** Environment Variables 
+*** Overview 
 
- + Source Code: [[file:src/windows/console-utf8.cpp][file:src/windows/console-utf8.cpp]]
- + Gist: [[https://gist.github.com/caiorss/54f73d235b87bbb897b0e3f943876345][console-utf8.cpp]]
+Environment variables are a set of key-value pairs that can be set by
+a command line shell or by a parent process for passing configuration
+and runtime parameters to applications, subprocesses and shared
+libraries. They are also useful for obtaining user information and
+locating the path of system directories.
 
-The class ConsoleUTF8 uses RAII - Resource Acquisition is
-Initialization for setting the console to UTF8 and restoring it when
-a class object goes out scope. 
+Windows APIs for enviroment variables: 
 
-#+BEGIN_SRC cpp 
-  // Uses RAII for setting console to UTF8
-  // and restoring its previous settings.
-  class ConsoleUTF8{
-  public:
-     // Constructor saves context 
-     ConsoleUTF8(){
-         m_config = ::GetConsoleOutputCP();
-         ::SetConsoleOutputCP(CP_UTF8);
-         std::perror(" [TRACE] Console set to UTF8");
-     }
-     // Destructor restores context 
-     ~ConsoleUTF8(){
-        std::perror(" [TRACE] Console restored.");
-        ::SetConsoleOutputCP(m_config);
-     }
-  private:
-     unsigned int m_config;
-  };
+  + [[https://docs.microsoft.com/en-us/windows/win32/procthread/environment-variables][MSDN - Environment Variables]]
+  + [[https://docs.microsoft.com/en-us/windows/desktop/api/WinBase/nf-winbase-getenvironmentvariable][GetEnvironmentVariable function (winbase.h)]]
+  + [[https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-setenvironmentvariable][SetEnvironmentVariable function (winbase.h)]]
+
+Useful Windows commands (cmd.exe) for environment variables: 
+
+  + $ set                          => Show all environment variables
+  + $ echo %PATH%                  => Show PATH environment variables.
+  + $ set PATH=C:\\app\bin\%PATH%  => Set path environment variable.
+  + $ set CREDENTIAL=PASS          => Set environemnt variable CREDENTIAL with value PASS.
+
+  *Most important environemnt variables* 
+
+ + _SystemDriver_ => Equivalent to Unix / (slash) root directory.
+
+#+BEGIN_SRC sh 
+  $ echo %SystemDrive%
+  C:
 #+END_SRC
 
-Class ExitPrompt uses RAII for asking the user to type RETURN to exit
-in order to allow its output to be ovserved by blocking the program
-from exiting immediately when it is invoked by clicking the
-executable.
+ + _SystemRoot_ => Path to Windows directory.
 
-#+BEGIN_SRC cpp 
-  struct ExitPrompt{
-      ~ExitPrompt(){
-          std::puts(" >>> Enter RETURN to exit");
-          std::cin.get();
-      }
-  };
+#+BEGIN_SRC sh 
+  $ echo %SystemRoot%
+  C:\Windows
+#+END_SRC 
+
+ + _Windir_ => Same as SystemRoot. 
+
+#+BEGIN_SRC 
+  $ echo %WinDir%
+  C:\Windows
 #+END_SRC
 
-Main function: 
+  + System32 folder (64 bits applications)
 
-#+BEGIN_SRC cpp 
-    #ifdef UTF8
-    auto utf8Console = ConsoleUTF8();
-    #endif 
-    //auto codePage = ::SetConsoleOutputCP(CP_UTF8);
-
-    auto exitPrompt = ExitPrompt();
-    std::puts("Testing Console output with UTF8");
-    std::puts("--------------------------------");
-
-    std::puts("Text with UTF8 - SÃO JOÃO -  ");
-    std::puts("Japanese Kanji - 漢字 ; Japanese Hiragrama - 平仮名 ");
-    std::puts("Cyrllic Script - Sputnik = Спутник-1");
-    std::puts("Greek/Latin Script = Α α, Β β, Γ γ, Δ δ, Ε ε, Ζ ζ, Η η, Θ θ");
-
-    //::SetConsoleOutputCP(codePage);
-    return 0;
+#+BEGIN_SRC sh 
+  $ echo "%SystemRoot%\System32"
+  "C:\Windows\System32"
 #+END_SRC
 
-Compiling with MSVC: 
+ + SysWOW64 folder (32 bits applications)
+   + Some files: regedit.exe (Registry editor), wscript.exe,
+     write.exe, wusa.exe, where.exe, whoami.exe, WF.msc, tracert.exe,
+     tracerpt.exe, tpm.msc, tcmsetup.exe, taskmgr.exe (Task Manager),
+     runas.exe, rundll32.exe and o on.
+   + See: [[https://docs.microsoft.com/en-us/windows/win32/winprog64/file-system-redirector?redirectedfrom=MSDN][File System Redirector]]
+   + See: [[https://www.samlogic.net/articles/32-64-bit-windows-folder-x86-syswow64.htm][The SysWOW64 explained]]
 
-#+BEGIN_SRC cpp 
-  // Compile and run with UTF8 flag disabled 
-  $ cl.exe console-utf8.cpp /EHsc /Zi /nologo /Fe:out.exe && out.exe
-
-    // Compile and run with UTF8 flag disabled // Compile run with UTF8 flag enabled  
-  $ cl.exe console-utf8.cpp /EHsc /Zi /nologo /Fe:out.exe -DUTF8 && out.exe
+#+BEGIN_SRC sh 
+  $ echo "%SystemRoot%\SysWOW64"
+  "C:\Windows\SysWOW64"
 #+END_SRC
 
-Compiling with Mingw/GCC:
+ + _ProgramFiles_ => Directory where 64 bits applications (Windows NT 64
+   bits) are installed.
 
-#+BEGIN_SRC cpp 
-  // Compile and run with UTF8 flag disabled 
-   g++ console-utf8.cpp -o out-gcc.exe -std=c++14 -Wall && out-gcc.exe
-  // Compile and run with UTF8 flag disabled 
-   g++ console-utf8.cpp -o out-gcc.exe -std=c++14 -Wall -DUTF8 && out-gcc.exe
+#+BEGIN_SRC sh 
+  $ echo %ProgramFiles%
+  C:\Program Files
 #+END_SRC
 
-#+CAPTION: Output with UTF8 disabled => Terminal in ANSI mode. 
-[[file:images/windows-console-ansi-mode.png][file:images/windows-console-ansi-mode.png]]
+ + _ProgramFiles(x86)_ => Directory where are installed 32-bits x86
+   applications. Note: x86 applications can only access up to 4GB of
+   RAM and cannot fully harness all hardware resources. 
 
-#+CAPTION: Output with UTF8 enalbed => Terminal in unicode UTF8 mode 
-[[file:images/windows-console-unicode-utf8.png][file:images/windows-console-unicode-utf8.png]]
+#+BEGIN_SRC sh 
+  $ echo %ProgramFiles(x86)%
+  C:\Program Files (x86)o
+#+END_SRC
 
-Note: The Japanese characters (Kanji and Hiragrama) are not shown
-because the current terminal lacks Japanese font. But other terminals
-such as cmder.exe or Windows terminal shows those characters.
+ +  _CommonProgramFiles_ 
 
-See: 
+#+BEGIN_SRC sh 
+  $ echo "%CommonProgramFiles%"
+  "C:\Program Files\Common Files"
+#+END_SRC
 
- + WINAPI - [[https://docs.microsoft.com/en-us/windows/console/setconsoleoutputcp][SetConsoleOutputCP function - Windows Console | Microsoft Docs]]
- + WINAPI - [[https://docs.microsoft.com/en-us/windows/console/getconsoleoutputcp][GetConsoleOutputCP function - Windows Console | Microsoft Docs]]
- + [[https://stackoverflow.com/questions/26834947/how-to-output-unicode-in-c-without-setmode/27894773][How to output unicode in C++ without _setmode - Stack Overflow]]
- + [[https://unicodebook.readthedocs.io/operating_systems.html][10. Operating systems — Programming with Unicode]]
+ + _CommonProgramFiles(x86)_ 
+
+#+BEGIN_SRC sh 
+  $ echo "%CommonProgramFiles(x86)%"
+  "C:\Program Files (x86)\Common Files"
+#+END_SRC
+
+ + _ProgramData_ 
+
+#+BEGIN_SRC sh 
+    $ echo %ProgramData%
+    C:\ProgramData
+#+END_SRC
+
+ + _DriverData_ 
+
+#+BEGIN_SRC sh 
+  $ echo "%DriverData%"
+  "C:\Windows\System32\Drivers\DriverData"
+#+END_SRC
+
+ + _UserProfile_ => Path to current user's data directory, similar to
+   Unix $HOME enviroment variable.
+   + Note: The application 'ls' (ported from Unix) is not Windows
+     native. It was used because the command 'dir' does not fully
+     shows the user directory since it hides the files and directories
+     'ntuser.init', 'ntuser.dat', 'Applications Data/', 'Start Menu/',
+     'SendTo', and so on. 
+    
+#+BEGIN_SRC 
+  $ echo %UserProfile%
+  C:\Users\ha3mx
+#+END_SRC
+
+ + _Temp_ => Directory for temporary files. Equivalent to Unix /tmp 
+
+#+BEGIN_SRC 
+  $ echo %TEMP%
+  C:\Users\h03fx\AppData\Local\Temp
+#+END_SRC
+
+ + _APPDATA_ => 
+
+#+BEGIN_SRC sh 
+  $ echo %AppData%
+  C:\Users\h03fx\AppData\Roaming
+#+END_SRC
+
+ + _LOCALAPPDATA_ => 
+
+#+BEGIN_SRC sh 
+  $ echo %LOCALAPPDATA%
+  C:\Users\h03fx\AppData\Local
+#+END_SRC
+
+ + _USERNAME_ => Name of current user account. 
+
+#+BEGIN_SRC sh 
+  % echo %USERNAME%
+  hafcx 
+#+END_SRC
+
+  + _USERDOMAIN_  
+
+#+BEGIN_SRC sh 
+  $ echo %USERDOMAIN%
+  DESKTOP-GMXQCB6
+#+END_SRC
+
+  *Directory Exploration* 
+
+ + Directory: %SystemDriver% (using dir command)
+
+#+BEGIN_SRC sh 
+  $ dir %SystemDrive%\
+   Volume in drive C has no label.
+   Volume Serial Number is BC40-DCC4
+
+   Directory of C:\
+
+  03/18/2019  09:52 PM    <DIR>          PerfLogs
+  02/06/2021  02:38 AM    <DIR>          Program Files
+  01/08/2021  08:25 AM    <DIR>          Program Files (x86)
+  01/05/2021  02:47 AM    <DIR>          Temp
+  01/05/2021  02:15 AM    <DIR>          Users
+  01/08/2021  03:08 PM    <DIR>          Windows
+                 0 File(s)              0 bytes
+                 6 Dir(s)  87,119,368,192 bytes free
+#+END_SRC
+
+ + Directory: %SystemDriver% (using Unix 'ls' applications that comes with GIT)
+
+#+BEGIN_SRC sh 
+  $ ls -la %SystemDrive%\
+  total 2660600
+  drwxr-xr-x 1 hafcx 197121          0 Jan  5 18:01 '$Recycle.Bin'/
+  drwxr-xr-x 1 hafcx 197121          0 May  3 03:37 '$WINDOWS.~BT'/
+  drwxr-xr-x 1 hafcx 197121          0 May  3 03:18 '$WinREAgent'/
+  drwxr-xr-x 1 hafcx 197121          0 May  3  2021  ./
+  drwxr-xr-x 1 hafcx 197121          0 May  3  2021  ../
+  drwxr-xr-x 1 hafcx 197121          0 May  3  2021  Config.Msi/
+  lrwxrwxrwx 1 hafcx 197121          8 Jan  5 00:22 'Documents and Settings' -> /c/Users/
+  -rw-r--r-- 1 hafcx 197121 1717768192 May  3 03:11  hiberfil.sys
+  -rw-r--r-- 1 hafcx 197121  738197504 May  3 03:11  pagefile.sys
+  drwxr-xr-x 1 hafcx 197121          0 Mar 18  2019  PerfLogs/
+  drwxr-xr-x 1 hafcx 197121          0 Feb  6 01:38 'Program Files'/
+  drwxr-xr-x 1 hafcx 197121          0 Jan  8 07:25 'Program Files (x86)'/
+  drwxr-xr-x 1 hafcx 197121          0 Jan  8 07:33  ProgramData/
+  drwxr-xr-x 1 hafcx 197121          0 Jan  5 00:22  Recovery/
+  -rw-r--r-- 1 hafcx 197121  268435456 May  3 03:11  swapfile.sys
+  drwxr-xr-x 1 hafcx 197121          0 Jan  5 00:27 'System Volume Information'/
+  drwxr-xr-x 1 hafcx 197121          0 Jan  5 01:47  Temp/
+  drwxr-xr-x 1 hafcx 197121          0 Jan  5 01:15  Users/
+  drwxr-xr-x 1 hafcx 197121          0 Jan  8 14:08  Windows/
+#+END_SRC
+
+ + Directory: %ProgramData%
+
+#+BEGIN_SRC sh 
+   λ dir %ProgramData%
+    Volume in drive C has no label.
+    Volume Serial Number is CA82-ED51
+
+    Directory of C:\ProgramData
+
+   03/03/2021  04:35 PM    <DIR>          chocolatey
+   01/05/2021  01:49 AM    <DIR>          Microsoft OneDrive
+   01/06/2021  05:27 AM    <DIR>          Microsoft Visual Studio
+   01/06/2021  12:55 PM    <DIR>          Mozilla
+   01/06/2021  05:45 AM    <DIR>          Package Cache
+   02/04/2021  05:02 PM    <DIR>          Packages
+   01/05/2021  06:14 PM    <DIR>          qemu-ga
+   05/03/2021  03:53 AM    <DIR>          regid.1991-06.com.microsoft
+   01/08/2021  08:33 AM    <DIR>          shimgen
+   03/18/2019  09:52 PM    <DIR>          SoftwareDistribution
+   01/05/2021  02:55 AM    <DIR>          USOPrivate
+   01/05/2021  01:17 AM    <DIR>          USOShared
+   01/06/2021  05:46 AM    <DIR>          Windows App Certification Kit
+   03/18/2019  11:23 PM    <DIR>          WindowsHolographicDevices
+                  0 File(s)              0 bytes
+                 14 Dir(s)  92,218,159,104 bytes free
+#+END_SRC
+
+ + Directory: %ProgramFiles% 
+
+#+BEGIN_SRC sh 
+  $ dir "%ProgramFiles%"
+   Volume in drive C has no label.
+
+   Directory of C:\Program Files
+
+  02/06/2021  02:38 AM    <DIR>          .
+  03/18/2019  10:02 PM    <DIR>          Common Files
+  01/06/2021  05:58 AM    <DIR>          dotnet
+  03/18/2019  11:21 PM    <DIR>          Internet Explorer
+  03/03/2021  04:13 PM    <DIR>          Microsoft Update Health Tools
+  03/18/2019  09:52 PM    <DIR>          ModifiableWindowsApps
+    ... ... ... ... ... ... ... ... 
+   .... ... ... ... .. .... ... ... 
+  03/18/2019  10:02 PM    <DIR>          Windows NT
+  03/18/2019  11:23 PM    <DIR>          Windows Photo Viewer
+  03/18/2019  11:23 PM    <DIR>          Windows Portable Devices
+  03/18/2019  09:52 PM    <DIR>          Windows Security
+  03/18/2019  09:52 PM    <DIR>          WindowsPowerShell
+#+END_SRC
+
+ + Directory: %ProgramFiles(x86)% 
+
+#+BEGIN_SRC sh 
+  $ dir "%ProgramFiles(x86)%"
+   Volume in drive C has no label.
+
+   Directory of C:\Program Files (x86)
+
+  01/08/2021  08:25 AM    <DIR>          .
+  01/08/2021  08:25 AM    <DIR>          ..
+  01/06/2021  05:45 AM    <DIR>          Application Verifier
+  01/08/2021  08:26 AM    <DIR>          CodeBlocks
+  01/06/2021  05:52 AM    <DIR>          Common Files
+  01/06/2021  05:56 AM    <DIR>          dotnet
+  01/06/2021  05:50 AM    <DIR>          HTML Help Workshop
+  03/18/2019  11:21 PM    <DIR>          Internet Explorer
+  01/06/2021  05:59 AM    <DIR>          Microsoft SDKs
+  01/06/2021  05:32 AM    <DIR>          Microsoft Visual Studio
+  01/06/2021  05:55 AM    <DIR>          Microsoft.NET
+  01/08/2021  03:08 PM    <DIR>          Mozilla Maintenance Service
+  01/06/2021  05:32 AM    <DIR>          MSBuild
+  01/06/2021  05:46 AM    <DIR>          Reference Assemblies
+  01/05/2021  06:14 PM    <DIR>          SPICE Guest Tools
+  03/18/2019  11:20 PM    <DIR>          Windows Defender
+  01/06/2021  05:52 AM    <DIR>          Windows Kits
+   ... ...  ... ...  ... ...  ... ...  ... ...  ... ... 
+   ... ...  ... ...  ... ...  ... ...  ... ...  ... ... 
+#+END_SRC
+
+ + Directory: %UserProfile% => Windows HOME directory for current  user.
+   + Note: NTUSER.DAT is the Windows registry file of current logged user.
+   + Note: This file is not shown with the Windows command line '$ dir'.
+
+#+BEGIN_SRC sh 
+  $ ls "%UserProfile%"
+  '3D Objects'/
+   AppData/
+  'Application Data'@
+   Contacts/
+   Cookies@
+   Desktop/
+   Documents/
+   Downloads/
+   Favorites/
+   Links/
+  'Local Settings'@
+   MicrosoftEdgeBackups/
+   Music/
+  'My Documents'@
+   NetHood@
+   NTUSER.DAT
+   ntuser.dat.LOG1
+   ntuser.dat.LOG2
+   NTUSER.DAT{fd9a35da-3abd-11e9-aa2c-908c07783950}.TxR.0.regtrans-ms
+   NTUSER.DAT{fd9a35da-3abd-11e9-aa2c-908c07783950}.TxR.1.regtrans-ms
+   NTUSER.DAT{fd9a35da-3abd-11e9-aa2c-908c07783950}.TxR.2.regtrans-ms
+   NTUSER.DAT{fd9a35da-3abd-11e9-aa2c-908c07783950}.TxR.blf
+   NTUSER.DAT{fd9a35db-3abd-11e9-aa2c-908c07783950}.TM.blf
+   NTUSER.DAT{fd9a35db-3abd-11e9-aa2c-908c07783950}.TMContainer00000000000000000001.regtrans-ms
+   NTUSER.DAT{fd9a35db-3abd-11e9-aa2c-908c07783950}.TMContainer00000000000000000002.regtrans-ms
+   ntuser.ini
+   OneDrive/
+   Pictures/
+   PrintHood@
+   Recent@
+  'Saved Games'/
+   scoop/
+   Searches/
+   SendTo@
+  'Start Menu'@
+   Templates@
+   Videos/
+#+END_SRC
+
+ + Directory: _%UserProfile%\Start Menu\Programs_ 
+
+#+BEGIN_SRC sh 
+  $ ls  "%UserProfile%\Start Menu\Programs"
+   Accessibility/          'Anaconda3 (64-bit)'/   Maintenance/    Startup/
+   Accessories/             CodeBlocks/            OneDrive.lnk*  'System Tools'/
+  'Administrative Tools'/   desktop.ini           'Scoop Apps'/   'Windows PowerShell'/
+
+  $ ls  "%UserProfile%\Start Menu\Programs\System Tools"
+  'Administrative Tools.lnk'*   computer.lnk*         Desktop.ini           Run.lnk*
+  'Command Prompt.lnk'*        'Control Panel.lnk'*  'File Explorer.lnk'*
+
+  $ ls  "%UserProfile%\Start Menu\Programs\Startup"
+  desktop.ini
+#+END_SRC
+
+ + Directory: %UserProfile%/AppData 
+
+#+BEGIN_SRC sh 
+  $ ls "%UserProfile%/AppData/"
+  Local/  LocalLow/  Roaming/
+
+  $ ls "%UserProfile%/AppData/Local"
+  'Application Data'@          IconCache.db     pip/
+   clink/                      Microsoft/       PlaceholderTileLogoFolder/
+   CMakeTools/                 MicrosoftEdge/   Publishers/
+   Comms/                      Mozilla/         ServiceHub/
+   ConnectedDevicesPlatform/   NuGet/           Temp/
+   D3DSCache/                  Packages/       'Temporary Internet Files'@
+   History@                    PeerDistRepub/   VirtualStore/
+
+  $ ls "%UserProfile%/AppData/Roaming"
+   Adobe/              Microsoft/                  NuGet/
+  'Code - Insiders'/  'Microsoft Visual Studio'/  'Visual Studio Setup'/
+   CodeBlocks/         Mozilla/                    vstelemetry/
+#+END_SRC
+
+ + Directory: %UserProfile%/SendTo 
+
+#+BEGIN_SRC sh 
+  $ ls "%UserProfile%/SendTo/
+  'Bluetooth File Transfer.LNK'*                Documents.mydocs
+  'Compressed (zipped) Folder.ZFSendToTarget'  'Fax Recipient.lnk'*
+  'Desktop (create shortcut).DeskLink'         'Mail Recipient.MAPIMail'
+   Desktop.ini
+#+END_SRC
+
+*** Usage of Windows environemnt variables 
+
+Environment variables can be used for global configuration,
+enable/disable logging detail output, setting application credentials
+and locating system directories. This program displays several Windows
+environment variables by calling the subroutines std::getenv()
+(standardized) and GetEvironmentVariable(). The application also
+demonstrates how environment variables can be used for changing the
+program behavior at startup time.
+
+File: _windows-envvars.cpp_ 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+  #include <cassert>
+
+  #include <windows.h>
+
+  //Note: std::get_envvar() is cross-platofrm and standardized.
+  std::string
+  get_envvar(std::string const& name)
+  {
+       const char* p = std::getenv(name.c_str());
+       if( p == nullptr){ return ""; }
+       return p;
+  }
+
+  void 
+  show_envvar(std::string const& name)
+  {
+      auto s = get_envvar(name);
+      std::cout << " [ENV] " << name << " = " << s << '\n';
+  }
+
+  std::string
+  get_envvar2(std::string const& name)
+  {
+    //Buffer max size in bytes 
+    constexpr size_t maximum_size = 32767;
+    std::string buffer(maximum_size, '\0');
+    DWORD nread = ::GetEnvironmentVariableA(name.c_str(), buffer.data(), maximum_size);
+    if(nread == 0){ return ""; } 
+    buffer.resize(nread);
+    return buffer;
+  }
+
+
+  void 
+  show_envvar2(std::string const& name)
+  {
+      auto s = get_envvar2(name);
+      std::cout << " [ENV2] " << name << " = " << s << '\n';
+  }
+
+  bool is_logging_enabled()
+  {
+      // Initialized only once. 
+      static const bool enabled = []{
+          auto var = get_envvar2("LOGGING_ENABLED");
+          return var == "TRUE";
+      }();
+      return enabled;
+  }
+
+  void display_factorial(int n)
+  {
+    int p = 1;
+    for(int i = 1; i < n + 1; i++)
+    {
+        p = p * i;
+      
+        if( is_logging_enabled())
+        { std::cout << " [TRACE] p = " << p << '\n'; } 
+    }
+
+    std::cout << " [RESULT] factorial( " << n << " ) = " << p << '\n';
+  }
+
+  int main()
+  {
+     std::puts("\n ============= EXPERIMENT 1 ==============");
+     show_envvar("SystemDrive");
+     show_envvar("USERPROFILE");
+     show_envvar("USERNAME");
+     show_envvar("USERDOMAIN");      
+     show_envvar("WINDIR");
+     show_envvar("PROGRAMDATA");   
+     show_envvar("SystemRoot");
+     show_envvar("AppData");
+     show_envvar("LocalAppData");
+     show_envvar("Temp");
+     show_envvar("ProgramFiles");
+     show_envvar("ProgramFiles(x86)");
+     show_envvar("CommonProgramFiles");
+     show_envvar("CommonProgramFiles(x86)");
+
+     show_envvar("CUSTOM_USER_SUPPLIED");   
+
+     std::puts("\n  ============= EXPERIMENT 2 ==============");
+     show_envvar2("SystemDrive");
+     show_envvar2("USERPROFILE");
+     show_envvar2("USERNAME");
+     show_envvar2("USERDOMAIN");      
+     show_envvar2("WINDIR");
+     show_envvar2("PROGRAMDATA");   
+     show_envvar2("SystemRoot");
+     show_envvar2("AppData");
+     show_envvar2("LocalAppData");
+     show_envvar2("Temp");
+     show_envvar2("ProgramFiles");
+     show_envvar2("ProgramFiles(x86)");
+     show_envvar2("CommonProgramFiles");
+     show_envvar2("CommonProgramFiles(x86)");
+
+     show_envvar2("CUSTOM_USER_SUPPLIED");
+
+     std::puts("====== RUNTIME CONFIGURATION DEMO ========");
+     display_factorial(5);
+   
+     return 0;
+  }
+#+END_SRC
+
+ + Building with Mingw from command line: 
+
+#+BEGIN_SRC sh 
+   $ g++ windows-envvars.cpp -o out.exe -std=c++1z -Wall -Wextra -g 
+#+END_SRC
+
+ + First run without setting custom environment variables. 
+
+#+BEGIN_SRC sh 
+ $ .\out.exe
+
+  ============= EXPERIMENT 1 ==============
+  [ENV] SystemDrive = C:
+  [ENV] USERPROFILE = C:\Users\hcf5
+  [ENV] USERNAME = hcf5
+  [ENV] USERDOMAIN = DESKTOP-GXMQDB8
+  [ENV] WINDIR = C:\Windows
+  [ENV] PROGRAMDATA = C:\ProgramData
+  [ENV] SystemRoot = C:\Windows
+  [ENV] AppData = C:\Users\hcf5\AppData\Roaming
+  [ENV] LocalAppData = C:\Users\hcf5\AppData\Local
+  [ENV] Temp = C:\Users\hcf5\AppData\Local\Temp
+  [ENV] ProgramFiles = C:\Program Files
+  [ENV] ProgramFiles(x86) = C:\Program Files (x86)
+  [ENV] CommonProgramFiles = C:\Program Files\Common Files
+  [ENV] CommonProgramFiles(x86) = C:\Program Files (x86)\Common Files
+  [ENV] CUSTOM_USER_SUPPLIED =
+
+   ============= EXPERIMENT 2 ==============
+  [ENV2] SystemDrive = C:
+  [ENV2] USERPROFILE = C:\Users\hcf5
+  [ENV2] USERNAME = hcf5
+  [ENV2] USERDOMAIN = DESKTOP-GXMQDB8
+  [ENV2] WINDIR = C:\Windows
+  [ENV2] PROGRAMDATA = C:\ProgramData
+  [ENV2] SystemRoot = C:\Windows
+  [ENV2] AppData = C:\Users\hcf5\AppData\Roaming
+  [ENV2] LocalAppData = C:\Users\hcf5\AppData\Local
+  [ENV2] Temp = C:\Users\hcf5\AppData\Local\Temp
+  [ENV2] ProgramFiles = C:\Program Files
+  [ENV2] ProgramFiles(x86) = C:\Program Files (x86)
+  [ENV2] CommonProgramFiles = C:\Program Files\Common Files
+  [ENV2] CommonProgramFiles(x86) = C:\Program Files (x86)\Common Files
+  [ENV2] CUSTOM_USER_SUPPLIED =
+ ======== CONFIG TEST =================
+  [RESULT] factorial( 5 ) = 120
+#+END_SRC
+
+  + Second run after setting custom environment variables. 
+
+#+BEGIN_SRC sh 
+  $ set CUSTOM_USER_SUPPLIED="Hello world! (EN) ola mundo! (PT) hola mundo! (ES) - halo Welt! (DE)"
+  $ set LOGGING_ENABLED=TRUE
+
+  λ .\out.exe
+
+   ============= EXPERIMENT 1 ==============
+   [ENV] SystemDrive = C:
+   [ENV] USERPROFILE = C:\Users\hcf5
+   [ENV] USERNAME = hcf5
+   [ENV] USERDOMAIN = DESKTOP-GXMQDB8
+   [ENV] WINDIR = C:\Windows
+   [ENV] PROGRAMDATA = C:\ProgramData
+   [ENV] SystemRoot = C:\Windows
+   [ENV] AppData = C:\Users\hcf5\AppData\Roaming
+   [ENV] LocalAppData = C:\Users\hcf5\AppData\Local
+   [ENV] Temp = C:\Users\hcf5\AppData\Local\Temp
+   [ENV] ProgramFiles = C:\Program Files
+   [ENV] ProgramFiles(x86) = C:\Program Files (x86)
+   [ENV] CommonProgramFiles = C:\Program Files\Common Files
+   [ENV] CommonProgramFiles(x86) = C:\Program Files (x86)\Common Files
+   [ENV] CUSTOM_USER_SUPPLIED = "Hello world! (EN) ola mundo! (PT) hola mundo! (ES) - halo Welt! (DE)"
+
+    ============= EXPERIMENT 2 ==============
+   [ENV2] SystemDrive = C:
+   [ENV2] USERPROFILE = C:\Users\hcf5
+   [ENV2] USERNAME = hcf5
+   [ENV2] USERDOMAIN = DESKTOP-GXMQDB8
+   [ENV2] WINDIR = C:\Windows
+   [ENV2] PROGRAMDATA = C:\ProgramData
+   [ENV2] SystemRoot = C:\Windows
+   [ENV2] AppData = C:\Users\hcf5\AppData\Roaming
+   [ENV2] LocalAppData = C:\Users\hcf5\AppData\Local
+   [ENV2] Temp = C:\Users\hcf5\AppData\Local\Temp
+   [ENV2] ProgramFiles = C:\Program Files
+   [ENV2] ProgramFiles(x86) = C:\Program Files (x86)
+   [ENV2] CommonProgramFiles = C:\Program Files\Common Files
+   [ENV2] CommonProgramFiles(x86) = C:\Program Files (x86)\Common Files
+   [ENV2] CUSTOM_USER_SUPPLIED = "Hello world! (EN) ola mundo! (PT) hola mundo! (ES) - halo Welt! (DE)"
+  ======== CONFIG TEST =================
+   [TRACE] p = 1
+   [TRACE] p = 2
+   [TRACE] p = 6
+   [TRACE] p = 24
+   [TRACE] p = 120
+   [RESULT] factorial( 5 ) = 120
+#+END_SRC
 
 ** CODE - Display information about current process 
 
@@ -3155,6 +3652,217 @@ Source:
  + File: [[file:src/windows/gui-basic1.cpp][file:src/windows/gui-basic1.cpp]]
  + GIST: [[https://gist.github.com/caiorss/cab14ba11e207bbc7beed9a2f0b4ebc4][gui-basic1.cpp]]
 
+ *Full Code* 
+
+File: _gui-basic1.cpp_ 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string> 
+  #include <map>
+  #include <set>
+  #include <sstream>
+
+  #include <windows.h>
+
+  LRESULT CALLBACK windowProcedure( HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
+  auto WinMessageToString(UINT msg) -> std::string;
+
+  int WINAPI WinMain(
+          // Handle to current application isntance 
+          HINSTANCE hInstance,
+          HINSTANCE hPrevInstance,
+          // Command line 
+          LPSTR     lpCmdLine,
+          int       nCmdShow
+          ){
+
+          OutputDebugString("Starting WinMain Application");
+          std::puts("It will not print to Console - Starting WinMain Application");	
+
+          //Window class name must be unique 
+          const char wincClassName [] = "NameOfWindow";
+	
+          // Win32 Window class structure
+          WNDCLASSEX wc;
+          // Win32 message structure 
+          MSG Msg;        	
+	
+         // Name to identify the class with. 
+          wc.lpszClassName = wincClassName;
+          //Pointer to the window procedure for this window class. 
+          wc.lpfnWndProc = windowProcedure;	
+          // 1 - Register Windows Size
+          wc.cbSize = sizeof(WNDCLASSEX);
+	
+          wc.style  = 0;
+          //Amount of extra data allocated for this class in memory. Usually 0
+          wc.cbClsExtra = 0;
+          //Amount of extra data allocated in memory per window of this type. Usually 0. 
+          wc.cbWndExtra = 0;
+          //Handle to application instance (that we got in the first parameter of WinMain()). 
+          wc.hInstance = hInstance;
+          // Large (usually 32x32) icon shown when the user presses Alt+Tab. 
+          wc.hIcon = LoadIcon(NULL, IDI_APPLICATION);
+          // Cursor that will be displayed over our window. 
+          wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+          // Background Brush to set the color of our window. 
+          wc.hbrBackground = (HBRUSH)(COLOR_WINDOW+1); // (HBRUSH) CreateSolidBrush(RGB(10, 20, 30)); // 
+          // Background Brush to set the color of our window. 
+          wc.lpszMenuName = NULL;	
+          // Small (usually 16x16) icon to show in the taskbar and in the top left corner of the window. 
+          wc.hIconSm = LoadIcon(NULL, IDI_APPLICATION);  
+
+          OutputDebugString("Registered Window Class OK.");
+
+          if(!RegisterClassEx(&wc)) 
+          {
+                  MessageBox( NULL,
+                             "Window Registration Failed!",
+                             "Error!",
+                             MB_ICONEXCLAMATION | MB_OK);
+                  //Error status code 
+                  return -1;
+          }
+
+          std::cout << "Class Registered" << std::endl;
+
+          int width = 500, height = 400;
+          int pos_left = 400, pos_top = 100;
+
+          HWND hwnd = CreateWindowA(
+                  wc.lpszClassName,
+                  "Title of Window",
+                  WS_OVERLAPPEDWINDOW,
+                  pos_left,
+                  pos_top,
+                  width,
+                  height,
+                  nullptr,
+                  nullptr,
+                  hInstance,
+                  nullptr
+                  );	
+          OutputDebugString(" [INFO] Window created OK");
+	
+          if(hwnd == NULL){
+                  MessageBox(NULL,
+                                     "Error: Failure to create Window",
+                                     "Error Report",
+                                     MB_ICONEXCLAMATION | MB_OK);
+                  return -1;
+          }
+          ShowWindow(hwnd, nCmdShow);
+          std::cout << "nCmdShow = " << nCmdShow << std::endl;
+          UpdateWindow(hwnd);
+
+          //---- Message Loop ----------//
+          while(GetMessage(&Msg, NULL, 0, 0) > 0 ){
+                  TranslateMessage(&Msg);
+                  DispatchMessage(&Msg);
+          }
+	
+          OutputDebugString(" [INFO] Exiting application. OK.");	
+          // Success status code 
+          return 0;
+  }
+  // ------------ End of Main ------------------------- //
+
+
+  // Window Procedure - Process window messages or events 
+  LRESULT CALLBACK windowProcedure (
+           HWND   hwnd    // Window Handle (Window object)
+          ,UINT   msg     // Window Message  
+          ,WPARAM wParam  // Additional message information
+          ,LPARAM lParam  // Additional message information
+          ){
+
+          // Variable initialized one. 
+          static auto ignored_messages = std::set<UINT>{
+                  WM_MOUSEMOVE, WM_NCHITTEST, WM_SETCURSOR, WM_IME_NOTIFY
+          };
+	
+          // Ignore messages which can flood the logging 
+          // if(msg != WM_MOUSEMOVE && msg != WM_NCMOUSEMOVE
+          //    && msg != WM_QUIT && msg != WM_NCHITTEST )
+          if(ignored_messages.find(msg) == ignored_messages.end())
+                  OutputDebugString(WinMessageToString(msg).c_str());	
+	
+          // Process messages 
+          switch(msg)
+          {
+              case WM_CREATE:
+                      SetWindowTextA(hwnd, "Change Window Title");		
+                      OutputDebugString(" [INFO] Window created. OK.");
+                      break;
+              case WM_CLOSE:
+                          OutputDebugString(" [INFO] Window closed. OK.");
+                          DestroyWindow(hwnd);
+                          break;
+              case WM_DESTROY:
+                          OutputDebugString(" [INFO] Exiting application. OK.");
+                          PostQuitMessage(0);
+                          break;
+              case WM_MOVE:
+                      std::cerr << " [INFO] Move window." << std::endl;
+                      break; 
+              case WM_PAINT:
+              {
+                      // GDI - Graphics Devices Interface Here
+                      //--------------------------------------------
+                      PAINTSTRUCT ps;
+                      HDC hdc;
+                      // std::cerr << " [INFO] Windown painting" << std::endl;
+                      hdc = BeginPaint(hwnd, &ps);
+                      std::string text = "Hello world Window!";		
+                      TextOutA(hdc, 125, 200, text.c_str(), text.size());
+                      Ellipse(hdc, 100, 100, 160, 160);
+                      Rectangle(hdc, 100, 100, 160, 160);
+                      EndPaint(hwnd, &ps);		
+              }
+              break;
+            default:
+                      return DefWindowProc(hwnd, msg, wParam, lParam);
+        }
+
+          return 0;
+  }
+
+  /** Get a human-readable description of a Windows message as a string */
+  auto WinMessageToString(UINT msg) -> std::string 
+  {
+          /** Database of Windows messages - full list of messages here: 
+           ,*   https://wiki.winehq.org/List_Of_Windows_Messages
+           ,*/
+          static auto WindowMessages = std::map<UINT, std::string>{
+                  {1, "WM_CREATE"}, {2, "WM_DESTROY"}, {5, "WM_SIZE"},
+                  {6, "WM_ACTIVATE"}, {13, "WM_SIZE"}, {22, "WM_SETVISIBLE"},
+                  {23, "WM_ENABLE"},  {29, "WM_PAINT"}, {3, "WM_MOVE"}, {30, "WM_CLOSE"},
+                  {32, "WM_SETCURSOR"},  {72, "WM_FULLSCREEN"}, {85, "WM_COPYDATA"},
+                  {512, "WM_MOUSEMOVE"},{132, "WM_NCHITTEST"}, {641, "WM_IME_SETCONTEXT"},
+                  {8, "WM_KILLFOCUS"}, {134, "WM_NCACTIVATE"}, {28, "WM_ACTIVATEAPP"},
+                  {160, "WM_NCMOUSEMOVE"}, {161, "WM_NCLBUTTONDOWN"},
+                  {36, "WM_GETMINMAXINFO"}, {642, "WM_IME_NOTIFY"}, {433, "WM_CAPTURECHANGED"},
+                  {534, "WM_MOVING"}, {674, "WM_NCMOUSELEAVE"}, {675, "WM_MOUSELEAVE"},
+                  {532, "WM_SIZING"}, {533, "WM_CAPTURECHANGED"}, {127, "WM_GETICON"},
+                  {20, "WM_ERASEBKGND"}, {70, "WM_WINDOWPOSCHANGING"}, {71, "WM_WINDOWPOSCHANGED"},
+                  {273, "WM_COMMAND"}, {274, "WM_SYSCOMMAND"}, {275, "WM_TIMER"}, {513, "WM_LBUTTONDOWN"},
+                  {514, "WM_LBUTTONUP"}
+          };
+          // Code for debugging messages sent to Window
+          static std::stringstream ss;
+          ss.str("");
+          ss << " [TRACE] WNPROC Message =>  "
+             << " Code = " << msg;
+          if(WindowMessages.find(msg) != WindowMessages.end())
+                  ss << " ; Message = " << WindowMessages[msg];
+          else
+                  ss << " ; Message = Unknown "; 
+          return ss.str();
+  }
+#+END_SRC
+
  *Compiling:*
 
  + MSVC 
@@ -3607,29 +4315,29 @@ main.
   }
 #+END_SRC
 
- *Files*
+ *Files* 
 
-File: _CMakeLists.txt_
+File: _CMakeLists.txt_ 
 
-#+BEGIN_SRC cmake
+#+BEGIN_SRC cmake 
   cmake_minimum_required(VERSION 3.0)
   project(WindowsGUI_WINAPI)
 
-  set(CMAKE_CXX_STANDARD     17)
+  set(CMAKE_CXX_STANDARD     17)     
   set(CMAKE_VERBOSE_MAKEFILE ON)
 
   add_executable( mygui WIN32 gui-without-winmain.cpp )
 
-  IF(MSVC)
+  IF(MSVC)   
     target_link_options( mygui PUBLIC "/ENTRY:mainCRTStartup" )
-  ENDIF()
+  ENDIF()       
 #+END_SRC
+ 
+File: _gui-without-winmain.cpp_ 
 
-File: _gui-without-winmain.cpp_
-
-#+BEGIN_SRC cpp
+#+BEGIN_SRC cpp 
   #include <iostream>
-  #include <string>
+  #include <string> 
 
   #include <windows.h>
 
@@ -3640,23 +4348,23 @@ File: _gui-without-winmain.cpp_
 
       HINSTANCE hInstance = GetModuleHandle(NULL);
       STARTUPINFO si;
-      GetStartupInfo(&si);
+      GetStartupInfo(&si);  
       int nCmdShow = si.wShowWindow;
 
       // -------------------------//
       OutputDebugString("Starting WinMain Application");
       std::puts("Starting WinMain Application");
 
-      //Window class name must be unique
+      //Window class name must be unique 
       const char wincClassName [] = "NameOfWindow";
 
       // Win32 Window class structure
       WNDCLASSEX wc;
-      // Win32 message structure
-      MSG Msg;
+      // Win32 message structure 
+      MSG Msg;        	
 
       wc.lpszClassName = wincClassName;
-      wc.lpfnWndProc = windowProcedure;
+      wc.lpfnWndProc = windowProcedure;	
       wc.cbSize = sizeof(WNDCLASSEX);
       wc.style  = 0;
       wc.cbClsExtra = 0;
@@ -3664,16 +4372,16 @@ File: _gui-without-winmain.cpp_
       wc.hInstance = hInstance;
       wc.hIcon = LoadIcon(NULL, IDI_APPLICATION);
       wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-      wc.hbrBackground = (HBRUSH)(COLOR_WINDOW+1); // (HBRUSH) CreateSolidBrush(RGB(10, 20, 30)); //
-      wc.lpszMenuName = nullptr;
-      wc.hIconSm = LoadIcon(nullptr, IDI_APPLICATION);
+      wc.hbrBackground = (HBRUSH)(COLOR_WINDOW+1); // (HBRUSH) CreateSolidBrush(RGB(10, 20, 30)); // 
+      wc.lpszMenuName = nullptr;	
+      wc.hIconSm = LoadIcon(nullptr, IDI_APPLICATION);  
 
       if(!RegisterClassEx(&wc)) {
               MessageBox(nullptr,
                          "Window Registration Failed!",
                          "Error!",
                          MB_ICONEXCLAMATION | MB_OK);
-              //Error status code
+              //Error status code 
               return -1;
       }
 
@@ -3713,34 +4421,34 @@ File: _gui-without-winmain.cpp_
       {
           TranslateMessage(&Msg);
           DispatchMessage(&Msg);
-      }
-      // Success status code
+      }	
+      // Success status code 
       return 0;
   }
   // ------------ End of Main ------------------------- //
 
 
-  // Window Procedure - Process window messages or events
+  // Window Procedure - Process window messages or events 
   LRESULT windowProcedure (
             HWND   hwnd    // Window Handle (Window object)
-           ,UINT   msg     // Window Message
+           ,UINT   msg     // Window Message  
            ,WPARAM wParam  // Additional message information
            ,LPARAM lParam  // Additional message information
         ){
 
-        // Process messages
+        // Process messages 
         switch(msg)
         {
            case WM_CREATE:
                    break;
-           case WM_CLOSE:
+           case WM_CLOSE:		
                    DestroyWindow(hwnd);
                    break;
            case WM_DESTROY:
                    PostQuitMessage(0);
                    break;
            case WM_MOVE:
-                   break;
+                   break; 
            case WM_PAINT:
            {
                    // GDI - Graphics Devices Interface Here
@@ -3749,11 +4457,11 @@ File: _gui-without-winmain.cpp_
                    HDC hdc;
                    // std::cerr << " [INFO] Windown painting" << std::endl;
                    hdc = BeginPaint(hwnd, &ps);
-                   std::string text = "Hello world Window!";
+                   std::string text = "Hello world Window!";		
                    TextOutA(hdc, 125, 200, text.c_str(), text.size());
                    Ellipse(hdc, 100, 100, 160, 160);
                    Rectangle(hdc, 100, 100, 160, 160);
-                   EndPaint(hwnd, &ps);
+                   EndPaint(hwnd, &ps);		
            }
            break;
            default:
@@ -3765,25 +4473,25 @@ File: _gui-without-winmain.cpp_
 
 #+END_SRC
 
- *Building with CMake and MSVC Compiler*
+ *Building with CMake and MSVC Compiler* 
 
-#+BEGIN_SRC sh
+#+BEGIN_SRC sh 
   # ---- Build -------------#
   $ cmake -H. -B_build_msvc -G "Visual Studio 16 2019" -A x64 -DCMAKE_BUILD_TYPE=Debug
-  $ cmake --build _build_msvc --target
+  $ cmake --build _build_msvc --target 
 
   # ---- Run --------------#
   $ _build_msvc\Debug\mygui.exe
 #+END_SRC
 
- *Building with CMake and MINGW Compiler*
+ *Building with CMake and MINGW Compiler* 
 
-#+BEGIN_SRC sh
+#+BEGIN_SRC sh 
   # ----- Build --------------#
   $ cmake -B_build_mingw -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Debug
-  $ cmake --build _build_mingw --target
+  $ cmake --build _build_mingw --target 
 
-  #------ Run ---------------#
+  #------ Run ---------------# 
   $ _build_mingw\mygui.exe
 #+END_SRC
 
