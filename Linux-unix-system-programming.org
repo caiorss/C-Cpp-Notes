@@ -45,8 +45,8 @@ vendors, what lead to many proprietary Unix variants.
         (volatile memory).
       * Stable and well documented system-calls.
       * The kernel receives significant contribution from many large
-        companies, such as Intel, AMD, Nvidia, Red Hat, IBM, Google
-        and so on. 
+        companies, such as Intel, AMD, Nvidia, Red Hat, IBM, Google,
+        Linar, Samsung and so on. 
     * Drawbacks:
       + _GLIBC_ - The GLIBC, which that encapsulates kernel system calls
         and implements basic C functions, such as memcpy and strcpy,
@@ -56,10 +56,26 @@ vendors, what lead to many proprietary Unix variants.
         every release, as a result native code applications or native
         executables may not work when moved or copied to other Linux
         machines.
+      + _Lack of C API for many functionalities_ => Unlike other
+        Unix-like operating systems and BSD-variants, Linux kernel
+        lacks user-space C APIs (subroutines) for many of its
+        functionalities. Instead of exposing these facilities as C
+        APIs through the GlibC library, the kernel exposes them as
+        virtual-file systems. For instance, instead of providing an
+        user-space API (C subroutine) for listing all processes, the
+        kernel exposes all processes via /proc virtual file system,
+        which allows user-space applications to query process
+        information just by reading and parsing files. Besides process
+        information API, the Cgroups functionality also lcaks a
+        user-space C API, instead it only has a virtual file system
+        API. 
       + _Fragmentation_ among Linux distributions which makes
-        harder to develop software for Linux-based systems, as every
+        harder to develop software for Linux-based systems as every
         distribution has different versions of GLIBC, different
-        versions of shared libraries and different package managers.
+        versions of shared libraries and different package
+        managers. The fragmentation could be reduced if Linux
+        distributions could share binaries without recompilation and
+        applications were developed in a self-contained way. 
       + _Dependency hell_: On most Linux distributions, it is only
         possible to install a single version of some application from
         package managers. Applications are also installed in a
@@ -69,7 +85,7 @@ vendors, what lead to many proprietary Unix variants.
         from the ones installed on the system and the older libraries
         are overriden, applications relying on the older libraries may
         no longer work as the symbols which they need may no longer be
-        available on the newer libraries. 
+        available on the newer libraries.
 
 
   * _Mac OSX_ / Apple Inc. (Desktop-only) [BSD Variant]
@@ -13009,6 +13025,11 @@ key, which is unique for every connection.
        tools for creating and validating certificates; creating
        self-signed certificates and check connection certificate;
        creating digital signature and so on.
+     + Note: OpenSSL is cross-platform and can be used on all
+       platforms, including Windows.
+     + Note: In many cases, web applications use OpenSSL indirectly
+       through Nginx reverse proxy where Nginx is used for providing
+       TLS security.
  
    * [[https://www.gnutls.org/][GNU TLS]]
      * License: LGPL 
@@ -13027,7 +13048,9 @@ key, which is unique for every connection.
 
    * [[https://www.wolfssl.com/][wolfSSL]] (Embedded Systems)
      * License: Dual license, GPL3 and commercial for closed source applications.
-     * Highly secure implementation, designed embedded systems.
+     * Highly secure implementation, designed for embedded
+       systems. Unlike other libraries, WolfSSL has certification for
+       meeting regulatory requirements.
      * Repository: https://github.com/wolfSSL/wolfssl
 
    * [[https://botan.randombit.net/][Botan]]
@@ -13097,12 +13120,13 @@ key, which is unique for every connection.
       over an unsafe channel before the encrypted communication takes
       place.
     * Applications and use-cases: bulk data encryption for hiding and
-      obfuscating data from unauthorized access; file encryption; file
-      system encryption; disk encryption; encrypted backup and private
-      key encryption. Shared key cryptography can be used for
-      encrypted communication. However, before the encrypted
-      communication takes place, the key may be transmitted in an
-      unencrypted way which makes the key vulnerable to interception.
+      obfuscating data from unauthorized access; password file
+      encryption; file system encryption; disk encryption; encrypted
+      backup and private key encryption. Shared key cryptography can
+      be used for encrypted communication. However, before the
+      encrypted communication takes place, the key may be transmitted
+      in an unencrypted channel which makes the key vulnerable to
+      interception.
 
   * _Public-Key Cryptography_ (a.k.a Asymmetric key cryptography)
     * Unlike the shared key cryptography, where the same key is used
@@ -13190,6 +13214,24 @@ key, which is unique for every connection.
       value of user passwords are storead and the database is leaked,
       whoever accesses the hashes will not be able to reuse it on
       other websites.
+ 
+  * _Digital Signature_
+    + The digital signature of a file or data is produced by
+      generating the hash of this file or data through some hash
+      algorithm and them encryting the hash with the sender's _private_
+      _key_. Then, the data and digital signature is sent to the recipient which can
+      check the message data integrity and that the messsage was relly
+      sent by whom the recipient claims to be. The recipient can
+      verify the message by decrypting the digital signature with the
+      sender's public key for obtaining the message hash which is
+      compared with message hash computed by the recipient.
+    + The digital signature can be used for ensuring _data integrity_,
+      and _non-repudiation_ assurance which is only possible if the
+      recipient is really sure that public key really belongs to the
+      sender.
+    + The recipient can veryify the ownership and authenticity of the
+      sender's public key by checking its digital signature signed by
+      a trusted CA - certificate authority.
 
   * _SRP_ - Secure Remote Password
 
@@ -13294,6 +13336,19 @@ Cryptography Concepts:
  + [[https://blog.cloudflare.com/ecdsa-the-digital-signature-algorithm-of-a-better-internet/][ECDSA: The digital signature algorithm of a better internet]]
 
  + [[https://blog.cloudflare.com/a-relatively-easy-to-understand-primer-on-elliptic-curve-cryptography/][A (Relatively Easy To Understand) Primer on Elliptic Curve Cryptography]]
+
+
+Digital Signature: 
+
+  + [[https://inversegravity.net/2019/crypto-hash-digital-signature/][Crytography - Hash Functions & Digital Signatures]]
+
+  + [[https://opensource.com/article/19/6/cryptography-basics-openssl-part-2][Opensource.com - How to use OpenSLL: Hahses, digital signature and more.]]
+
+  + [[https://www.ibm.com/docs/en/ztpf/1.1.0.14?topic=concepts-digital-signatures#:~:text=The%2520digital%2520signature%2520is%2520basically,with%2520the%2520signer's%2520private%2520key.&text=The%2520recipient%2520then%2520uses%2520the,hash%2520of%2520the%2520same%2520data][IBM - Digital Signatures]].
+
+  + [[https://www.thesslstore.com/blog/digital-signatures-why-you-should-sign-everything/][Digital Signature - Why you should sign everything]]
+
+  + [[https://www.gnupg.org/gph/en/manual/x215.html][GNUPG - Digital Signature]]
 
 OpenSSL API
 
@@ -15936,10 +15991,10 @@ Some commands for changing keyboard layout:
  * APL Keyboard Layout (for APL Programming Language)
    + $ /setxkbmap apl/
 
- * [[https://en.wikipedia.org/wiki/British_and_American_keyboards][American]] keyboard layout:
+ * [[https://en.wikipedia.org/wiki/British_and_American_keyboards][American]] English keyboard layout:
    + /$ setxkbmap us/
 
- * American keyboard layout with dvorak keyboard:
+ * American English keyboard layout with dvorak keyboard:
    + /$ setxkbmap us -variant dvorak/
 
  * American and Greek keyboard layouts. (use-case: typing math formulas)
@@ -15955,17 +16010,17 @@ Some commands for changing keyboard layout:
      letter (b), the letter beta (β) is typed. Finally, release the
      Windows key for switching back to American keyboard layout.
 
- * American and APL keyboard Layout (use-case: type APL symbols)
+ * American English and APL keyboard Layout (use-case: type APL symbols)
    * /$ setxkbmap -layout us,apl -option grp:win_switch/
 
- * [[https://en.wikipedia.org/wiki/AZERTY][French]] keyboard layout:
+ * [[https://en.wikipedia.org/wiki/AZERTY][French]] language keyboard layout:
    + /$ setxkbmap fr/
 
- * [[https://en.wikipedia.org/wiki/German_keyboard_layout][German]] keyboard layout. 
+ * [[https://en.wikipedia.org/wiki/German_keyboard_layout][German]] language keyboard layout. 
    + /$ setxkbmap de/
    + Note: German umlaut letters (ö, ä, ü, ß) are hard to type without this layout.)
 
- * [[https://help.keyman.com/keyboard/grkpoly2/2.0.1/grkpoly2][Greek]] keyboard layout: (α, β, η, κ, λ, ς, ε, σ, Σ)
+ * [[https://help.keyman.com/keyboard/grkpoly2/2.0.1/grkpoly2][Greek]] language keyboard layout: (α, β, η, κ, λ, ς, ε, σ, Σ)
    * /$ setxkbmap gr/
 
  * [[https://en.wikipedia.org/wiki/APL_(programming_language)#/media/File:APL-keybd2.svg][APL]] keyboard Layout (For APL programming language)
@@ -15973,29 +16028,35 @@ Some commands for changing keyboard layout:
    * APL symbols, such as ⍺, ⌈, ⌊, ⊂, ⊃, ∩, ⊥, ⊤, ○,≠,∇ ,are hard to
      type without this layout. 
 
- * [[http://kbdlayout.info/KBDBU/][Bulgarian]] keyboard layout (Cyrillic Script):
-   * /$ setxkbmap bg/
+ * Polish languag keyboard layout
+   * $ setxkbmap pl 
 
- * [[https://commons.wikimedia.org/wiki/File:KB_Russian.svg][Russian]] keyboard layout (Cyrillic Script):
-   * /$ setxkmap ru/
+ * [[http://kbdlayout.info/KBDBU/][Bulgarian]] language keyboard layout (Cyrillic Script):
+   * $ setxkbmap bg
 
- * [[https://commons.wikimedia.org/wiki/Category:Ukrainian_keyboard_layouts][Ukranian]] keyboard layout (Cyrillic Script):
+ * [[https://commons.wikimedia.org/wiki/Category:Ukrainian_keyboard_layouts][Ukranian]] language keyboard layout (Cyrillic Script):
    * /$ setxkmap ua/
 
- * [[https://en.wikipedia.org/wiki/Hebrew_keyboard][Hebrew]] keyboard layout:
+ * [[https://commons.wikimedia.org/wiki/File:KB_Russian.svg][Russian]] language keyboard layout (Cyrillic Script):
+   * /$ setxkmap ru/
+
+ * [[https://en.wikipedia.org/wiki/Hebrew_keyboard][Hebrew]] language keyboard layout:
    * /$ setxkbmap il/
 
- * [[https://commons.wikimedia.org/wiki/File:KB_Spanish.svg][Spanish]] - Latin America keyboard layout:
+ * Turkish Language keyboard layout:
+   * $ /setxkbmap tr/
+
+ * [[https://commons.wikimedia.org/wiki/File:KB_Spanish.svg][Spanish]] language - Latin America keyboard layout:
    * /$ setxkbmap latam/
    * Makes easier to type Spanish grammar symbols (?, ¿, ¡)
 
- * Portuguese ABNT2: 
+ * Portuguese language ABNT2: 
    * /$ setxkbmap -model abnt2 -layout br -variant abnt2/
 
- * Portuguese ABNT2 and APL, switching layout is similar to American keyboard.
+ * Portuguese language ABNT2 and APL, switching layout is similar to American keyboard.
    * /$ setxkbmap -model abnt2 -layout br,apl -variant abnt2 -option grp:win_switch/
 
- * Portuguese ABNT2 and Greek (For typing math formulas)
+ * Portuguese language ABNT2 and Greek (For typing math formulas)
    * /$ setxkbmap -model abnt2 -layout br,gr -variant abnt2 -option grp:win_switch/
 
 See also: 
