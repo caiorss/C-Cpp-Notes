@@ -7,7 +7,7 @@
 
 
 * Computer Graphics
-** Computer Graphics Applications 
+** Computer Graphics Overview [DRAFT] 
 
   *Motivation* 
 
@@ -28,15 +28,58 @@ the study of this field.
 
    + Data visualization
 
-   + Medical Images 
+   + Medical Images
+     + See: https://www.computerhistory.org/makesoftware/exhibit/mri/
+     + See: [[http://www.gg.caltech.edu/brain/mri_research.html][Magnetic Resonance Imaging for Computer Graphics]]
 
-   + Physical simulation
+   + Physics and engineering simulations.
 
    + Implementation of CAD (Computer Aided Design) systems
 
    + Animation. See Pixar company that created many movies using computer graphics.
  
+
+  *Books* 
+
+   + [[https://www.amazon.com/OpenGL-Programming-Guide-Official-Learning-ebook/dp/B00C2SBOJE][OpenGL Programming Guide: The Official Guide to Learning OpenG, Version 4.3]]
+     + Note: Official Modern OpenGL documentation with lots of details and explanations.
+
+   + [[https://www.amazon.com/Advanced-Graphics-Programming-Kaufmann-Computer/dp/1558606599][Advanced Graphics Programming Using OpenGL]] - (The Morgan Kaufmann
+     Series in Computer Graphics) 1st Edition
+     + Brief: "This book brings the graphics programmer beyond the
+       basics and introduces them to advanced knowledge that is hard
+       to obtain outside of an intensive CG work environment. The book
+       is about graphics techniques―those that don’t require
+       esoteric hardware or custom graphics libraries―that are
+       written in a comprehensive style and do useful things. It
+       covers graphics that are not covered well in your old graphics
+       textbook. But it also goes further, teaching you how to apply
+       those techniques in real world applications, filling real world
+       needs."
+     + Note: Contains useful notes about data visualization and CAD
+       implementations.
+
+   + [[https://www.amazon.com/Interactive-Computer-Graphics-Top-Down-Shader-Based/dp/0132545233][Interactive Computer Graphics: A Top-Down Approach With Shader-Based Opengl]] -  6th Edition
+     + Brief: "This book is suitable for undergraduate students in
+       computer science and engineering, for students in other
+       disciplines who have good programming skills, and for
+       professionals. Computer animation and graphics–once rare,
+       complicated, and comparatively expensive–are now prevalent in
+       everyday life from the computer screen to the movie
+       screen. Interactive Computer Graphics: A Top-Down Approach with
+       Shader-Based OpenGL, 6e, is the only introduction to computer
+       graphics text for undergraduates that fully integrates OpenGL
+       3.1 and emphasizes application-based programming. Using C and
+       C++, the top-down, programming-oriented approach allows for
+       coverage of engaging 3D material early in the text so readers
+       immediately begin to create their own 3D graphics. Low-level
+       algorithms (for topics such as line drawing and filling
+       polygons) are presented after readers learn to create
+       graphics."
+
+   + [[http://opengl.czweb.org/ewtoc.html][OpenGL Super Bible]] [ONLINE] 
  
+
   *Videos - Related to Computer Graphics* 
 
    + [[https://www.youtube.com/watch?v=pQcC2CqReSA][Tutorial 9 - Coordinate Systems in OpenGL]] [BEST]
@@ -3220,17 +3263,17 @@ Those transforms can be combined in the following way:
 #+BEGIN_SRC js
     // Where:
     //  =>  scale(3, 3, 3) is the scaling affine transform matrix.
-    //  =>  Va is the vertex coordinate after applying the scale transform.
+    //  =>  Va is the vertex coordinate after applying rotZ(54)
     //
-    Va = scale(3, 3, 3) · V
+    Va = rotZ(54) · V
 
     // Where:
     // => translate(25, 10, 20) is the translation affine transfom matrix.
     // => Vb is the result, vertex coodinate after the transform was applied.
-    Vb = translate(25, 10, 20)  · Va
+    Vb = rotX(30) · Va
 
-    Vc = rotX(30) · Vb
-    Vd = rotZ(54) · Vc
+    Vc = translate(25, 10, 20) · Vb
+    Vd = scale(3, 3, 3) · Vc
 
     // V' (V - prime) - overall transformation result (end result)
     V' = Vd
@@ -3241,30 +3284,30 @@ becomes:
 
 #+BEGIN_SRC text
    STEP 1:
-    Vb = translate(25, 10, 20) · Va
-    Vb = translate(25, 10, 20) · ( scale(3, 3, 3) · V )
+    Vb = rotX(30) · Va
+    Vb = rotX(30) · ( rotZ(54) · Va )
 
    STEP 2:
-     Vc = rotX(30) · Vb
-     Vc = rotX(30) · ( translate(25, 10, 20) · ( scale(3, 3, 3) · V ) )
+     Vc = translate(25, 10, 20) · Vb
+     Vc = translate(25, 10, 20) ·  ( rotX(30) · ( rotZ(54) · Va ) )
 
    STEP 3:
-     Vd = rotZ(54) · vc
-     Vd = rotZ(54) · ( rotX(30) · ( translate(25, 10, 20) · ( scale(3, 3, 3) · V ) ) )
+     Vd = scale(3, 3, 3) · Vc
+     Vd = scale(3, 3, 3) · ( translate(25, 10, 20) ·  rotX(30) ·  rotZ(54) · Va )
 
    STEP 4:  - End result
      V' = Vd
-     V' = rotZ(54) · ( rotX(30) · ( translate(25, 10, 20) · ( scale(3, 3, 3) · V ) ) )
+     V' = scale(3, 3, 3) · translate(25, 10, 20) ·  rotX(30) ·  rotZ(54) · Va 
 #+END_SRC
 
 The final vertex position can be stated as:
 
 #+BEGIN_SRC text
-     V' = rotZ(54) · rotX(30) · translate(25, 10, 20) · scale(3, 3, 3) · V
+     V' = scale(3, 3, 3) · translate(25, 10, 20) ·  rotX(30) ·  rotZ(54) · Va 
 
   OR:
 
-     V' =  [ rotZ(54) · rotX(30) · translate(25, 10, 20) · scale(3, 3, 3) ] · V
+     V' =  [ scale(3, 3, 3) · translate(25, 10, 20) ·  rotX(30) ·  rotZ(54) ] · V
 #+END_SRC
 
 All the sequence of transformations can be combined as a single
@@ -3280,7 +3323,7 @@ were applied.
   V' = T · V
 
   Where:
-     T =  rotZ(54) · rotX(30) · translate(25, 10, 20) · scale(3, 3, 3)
+     T =  scale(3, 3, 3) · translate(25, 10, 20) ·  rotX(30) ·  rotZ(54)
 #+END_SRC
 
 Multiple transforms can be combined as:
@@ -6356,7 +6399,7 @@ for a future error handling.
 
 #+END_SRC
 
-** 2D Graphics - Minimal GLFW project with VBO 
+** Minimal GLFW project with VBO 
 
 The following code draws a square and a triangle using the OpenGL
 retained mode API. Before the rendering takes place, data must be
@@ -6841,7 +6884,7 @@ Run executable:
   # on Linux via wine 
   $ wine _build_mingw\draw2d-raw.exe  
 #+END_SRC
-** 2D Graphics - Minimal SDL project 
+** Minimal SDL project 
 
 The next code uses the SLD (Simple Direct Media Layer) library instead
 of GLFW for window system abstraction. The advantage of SDL over GLFW
@@ -7300,7 +7343,7 @@ Run with wine:
   $ wine _build_windows/opengl-sdl.exe 
 #+END_SRC
 
-** 2D Graphics - Minimal Qt5 OpenGL project 
+** Minimal Qt5 OpenGL project 
 
 Qt Framework is a better fit for non-games cross-platform OpenGL
 graphical applications like 3D drawing akin to Blender, CAD
@@ -7328,6 +7371,8 @@ Documentation:
   + [[https://doc.qt.io/qt-5/qquaternion.html][QQuaternion class]]
 
   + [[https://doc.qt.io/qt-5/qmatrix4x4.html][QMatrix4x4 class]]
+
+  + [[https://doc.qt.io/qt-5/qt3d-index.html][Qt3D Core Module]]
 
 Examples: 
 
@@ -7785,6 +7830,410 @@ File: _qt-opengl.cpp_
 
    # Run application 
    $ >> ./_build_meson/qt-opengl
+#+END_SRC
+
+** Loading OpenGL without Glew 
+
+The next code loads OpenGL function pointers without Glew (OpenGL
+extension wrangler) for streamlining the building process. Glew is a
+library for loading OpenGL function pointers and OpenGL extensions in
+a platform-agnostic way. Despite the usefulness of this library, its
+source code is hard to integrate to building systems as the Glew
+building systems as Glew library needs Perl and other dependencies for
+code generation.
+
+Relevant documentation: 
+
+  + [[https://www.khronos.org/opengl/wiki/Load_OpenGL_Functions][Khronos Group - Load OpenGL Functions]]
+    + Brief: "Loading OpenGL Functions is an important task for
+      initializing OpenGL after creating an OpenGL context. You are
+      strongly advised to use an OpenGL Loading Library instead of a
+      manual process. However, if you want to know how it works
+      manually, read on." 
+
+  + [[https://stackoverflow.com/questions/47445643/why-are-opengl-functions-loaded-at-runtime-instead-of-dynamically-linked][Why are OpenGL functions loaded at runtime ...?]]
+
+  + [[https://stackoverflow.com/questions/27873784/when-do-i-need-to-use-an-opengl-function-loader][When do I need to use an OpenGL function loader?]] 
+
+  + [[https://docs.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-wglgetprocaddress][MSDN - wglGetProcAddress]] (WGL - Windows NT)
+    + Brief: "The wglGetProcAddress function returns the address of an OpenGL
+      extension function for use with the current OpenGL rendering
+      context."
+
+  + [[https://docs.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-wglgetcurrentcontext][MSDN - wglGetCurrentContext]] (WGL - Windows NT)
+    + Brief: "The wglGetCurrentContext function obtains a handle to the
+      current OpenGL rendering context of the calling thread."
+
+  + [[https://stackoverflow.com/questions/21769427/wglgetprocaddress-returns-null][wglGetProcAddress returns NULL]] 
+
+
+  *Screenshot* 
+
+[[file:images/opengl-load-function-ptr.png][file:images/opengl-load-function-ptr.png]]
+
+  *Files* 
+
+File: _CMakeListst.txt_ 
+
+#+BEGIN_SRC cmake 
+   cmake_minimum_required(VERSION 3.5)
+   project(OpenGL_Load_FPTR)
+
+   set(CMAKE_CXX_STANDARD 17)
+   set(CMAKE_CXX_STANDARD_REQUIRED ON)
+   set(CMAKE_VERBOSE_MAKEFILE ON)
+
+   #================ GLFW Settings  ===============#
+
+   find_package(OpenGL REQUIRED)
+
+   include(FetchContent)
+
+   # Set GLFW Options before FectchContent_MakeAvailable
+   set( GLFW_BUILD_EXAMPLES OFF CACHE BOOL  "GLFW lib only" )
+   set( GLFW_BUILD_TESTS    OFF CACHE BOOL  "GLFW lib only" )
+   set( GLFW_BUILD_DOCS     OFF CACHE BOOL  "GLFW lib only" )
+   set( GLFW_BUILD_INSTALL  OFF CACHE BOOL  "GLFW lib only" )
+
+   # Donwload GLFW library
+   FetchContent_Declare(
+     glfwlib
+     URL   https://github.com/glfw/glfw/releases/download/3.3.2/glfw-3.3.2.zip
+   )
+   FetchContent_MakeAvailable(glfwlib)
+
+   MACRO(ADD_OPENGL_APP target sources)
+      add_executable( ${target} ${sources} )
+      message([TRACE] " Add OpenGL executable = ${target} ")
+
+      target_link_libraries( ${target} glfw OpenGL::GL)
+
+       IF(MINGW)
+           # Statically link against MINGW dependencies
+           # for making easier to deploy on other machines. 
+           target_link_options( ${target} PRIVATE                                 
+                                    -static-libgcc
+                                    -static-libstdc++
+                                    -Wl,-Bstatic,--whole-archive -lwinpthread
+                                      -Wl,--no-whole-archive                                    
+                                    )
+        ENDIF()       
+
+   ENDMACRO()     
+
+        # ======= T A R G E T S ============================#
+        #                                                   #
+
+   ADD_OPENGL_APP( load-opengl-fptr  load-opengl-fptr.cpp )
+#+END_SRC
+
+File: _load-openg-fptr.cpp_ 
+
+#+BEGIN_SRC cpp 
+  // ----- Manual Loading of OpenGL function pointers -------//
+  #include <iostream>
+  #include <vector>
+  #include <array>
+  #include <cmath>
+  #include <cassert>
+
+  // -------- OpenGL headers ---------//
+  //
+  #define GL_GLEXT_PROTOTYPES 1 // Necessary for OpenGL >= 3.0 functions
+  #define GL3_PROTOTYPES      1 // Necessary for OpenGL >= 3.0 functions
+
+
+  #if defined(_WIN32)
+     #include <windows.h>
+  #endif
+
+  #include <GL/gl.h>
+
+  #if defined(__linux__) || defined(__bsd__)
+      #include <GL/glx.h>  // For glXGetProcAddress() and glXGetProcAddressARB()
+      #include <GL/glxext.h>
+  #endif
+
+  #include <GL/glu.h>
+  #include <GLFW/glfw3.h>
+
+
+  //======== B O I L E R P L A T E - F O R - L O A D I N G - O P E N G L ==========//
+  //
+
+  #define GL_ARRAY_BUFFER  0x8892
+  #define GL_STATIC_DRAW   0x88E4
+
+  // Generic void function pointer which can be casted to any other function pointer.
+  using FptrVoid = void*;
+
+  /** @brief Load OpenGL function pointer at runtime
+    ,* See:
+    ,*    -
+    ,*    - https://stackoverflow.com/questions/21769427/wglgetprocaddress-returns-null
+    ,*/
+  FptrVoid load_gl_function(const char* name)
+  {
+      FptrVoid fp = nullptr;
+      std::fprintf(stderr, " [TRACE] Loading pointer to OpenGL subroutine = %s \n", name);
+
+      #if defined(_WIN32)
+          assert( wglGetCurrentContext() != nullptr && "Current thread lacks a OpenGL rendering context." );
+
+          fp = (void*) wglGetProcAddress(name);
+          // assert( fp != nullptr );
+          if( fp == 0
+              || (fp == (void*)0x1) || (fp == (void*)0x2) || (fp == (void*)0x3)
+              || (fp == (void*)-1) )
+            {
+              HMODULE module = LoadLibraryA("opengl32.dll");
+              fp = (void *) GetProcAddress(module, name);
+            }
+
+          if( fp == nullptr)
+          {
+              std::fprintf(stderr, " [ERROR] OpenGL function = '%s' not found on Windows ", name );
+              std::abort();
+          }
+      #elif defined(__linux__) || defined(__bsd__)
+          fp = (FptrVoid) glXGetProcAddressARB( (const unsigned char*) name);
+
+          if( fp == nullptr )
+          {
+              std::fprintf(stderr, " [ERROR] OpenGL function not found on Linux or BSD " );
+              std::abort();
+          }
+      #endif
+      return fp;
+  }
+
+  typedef unsigned int	GLenum;
+  typedef unsigned char	GLboolean;
+  typedef unsigned int	GLbitfield;
+  typedef void		GLvoid;
+  typedef signed char	GLbyte;		/* 1-byte signed */
+  typedef short		GLshort;	/* 2-byte signed */
+  typedef int		GLint;		/* 4-byte signed */
+  typedef unsigned char	GLubyte;	/* 1-byte unsigned */
+  typedef unsigned short	GLushort;	/* 2-byte unsigned */
+  typedef unsigned int	GLuint;		/* 4-byte unsigned */
+  typedef int		GLsizei;	/* 4-byte signed */
+  typedef float		GLfloat;	/* single precision float */
+  typedef float		GLclampf;	/* single precision float in [0,1] */
+  typedef double	GLdouble;	/* double precision float */
+  typedef double	GLclampd;	/* double precision float in [0,1] */
+
+  #ifdef _WIN64
+      typedef signed   long long int khronos_intptr_t;
+      typedef unsigned long long int khronos_uintptr_t;
+      typedef signed   long long int khronos_ssize_t;
+      typedef unsigned long long int khronos_usize_t;
+  #else
+      typedef signed   long  int     khronos_intptr_t;
+      typedef unsigned long  int     khronos_uintptr_t;
+      typedef signed   long  int     khronos_ssize_t;
+      typedef unsigned long  int     khronos_usize_t;
+  #endif
+
+
+  typedef khronos_ssize_t GLsizeiptr;
+  typedef khronos_intptr_t GLintptr;
+
+  using glClear_t = void (*) ( unsigned int mask );
+  using glClearColor_t = void (*) ( float red, float green, float blue, float alpha );
+  using glBindBuffer_t = void (*) (GLenum target, GLuint buffer);
+  using glGenBuffers_t = void (*) (GLsizei n, GLuint * buffers);
+  using glBufferData_t = void (*) (GLenum target, GLsizeiptr size, const void *data, GLenum usage);
+  using glEnableVertexAttribArray_t = void (*) (GLuint index);
+  using glDisableVertexAttribArray_t = void (*) (GLuint index);
+  using glVertexAttribPointer_t = void (*) (GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const void *pointer);
+  using glDrawArrays_t = void (*) ( GLenum mode, GLint first, GLsizei count );
+
+  struct OpenGL {
+
+      OpenGL() {
+          this->glClear = reinterpret_cast<glClear_t>( load_gl_function("glClear") );
+          // It should be used reinterpret_cast<>, but C-style cast is used for breviety.
+          this->glClearColor = (glClearColor_t) load_gl_function("glClearColor");
+          this->glBindBuffer = (glBindBuffer_t) load_gl_function("glBindBuffer");
+          this->glGenBuffers = (glGenBuffers_t) load_gl_function("glGenBuffers");
+          this->glBufferData = (glBufferData_t) load_gl_function("glBufferData");
+          this->glEnableVertexAttribArray   = (glEnableVertexAttribArray_t) load_gl_function("glEnableVertexAttribArray");
+          this->glDisableVertexAttribArray  = (glDisableVertexAttribArray_t) load_gl_function("glDisableVertexAttribArray");
+          this->glVertexAttribPointer       = (glVertexAttribPointer_t) load_gl_function("glVertexAttribPointer");
+          this->glDrawArrays                = (glDrawArrays_t) load_gl_function("glDrawArrays");
+
+      }
+
+      glClear_t 	    	    glClear;
+      glClearColor_t                glClearColor;
+      glBindBuffer_t  		    glBindBuffer;
+      glGenBuffers_t  		    glGenBuffers;
+      glBufferData_t  	            glBufferData;
+      glEnableVertexAttribArray_t   glEnableVertexAttribArray;
+      glDisableVertexAttribArray_t  glDisableVertexAttribArray;
+      glVertexAttribPointer_t  	    glVertexAttribPointer;
+      glDrawArrays_t                glDrawArrays;
+  };
+
+  // ====== S T A R T - O F - A P P L I C A T I O N - C O D E ============//
+  //
+
+  struct Vertex2D
+  {
+      GLfloat x;
+      GLfloat y;
+  };
+
+  int main(int argc, char** argv)
+  {
+
+
+      GLFWwindow* window;
+
+      // Initialize GLFW 
+      if (!glfwInit()){ return -1; }
+
+      std::fprintf(stderr, " [TRACE] GLFW initialized Ok. \n");
+
+
+      /* Create a windowed mode window and its OpenGL context */
+      window = glfwCreateWindow(640, 480, "Load OpenGL functiion pointers", NULL, NULL);
+      if (!window)
+      {
+          glfwTerminate();
+          return -1;
+      } 
+
+      // ----- Before defining current OpenGL context ----//
+          glfwMakeContextCurrent(window);
+      // ----- After defining current OpenGL context -----//
+
+      // GL object Must only be instantiated after an OpenGL context (Window) is obtained
+      OpenGL gl;
+
+      gl.glClearColor(0.0f, 0.5f, 0.6f, 1.0f);
+
+      Vertex2D triangle_points[3] = {
+          Vertex2D{-0.25,   -0.25}
+        , Vertex2D{ 0.00,   0.25}
+        , Vertex2D{ 0.25,  -0.25}
+      };
+
+      Vertex2D square_points[4] = {
+          { -0.3,  -0.3 }
+        , { -0.3,   0.3 }
+        , {  0.3,   0.3 }
+        , {  0.3,  -0.3 }
+      };
+
+      // ================== Triangle Buffer ====================//
+      //
+
+      GLuint vbo_triangle_ = 0;
+
+      // Create an OpenGL VBO buffer
+      gl.glGenBuffers(1, &vbo_triangle_ );
+      assert( vbo_triangle_ != 0 );
+      gl.glBindBuffer(GL_ARRAY_BUFFER, vbo_triangle_);
+      gl.glBufferData(GL_ARRAY_BUFFER, sizeof(triangle_points), triangle_points, GL_STATIC_DRAW);
+      gl.glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+      // ================ Square / Vertex Buffer Object 2 ==================//
+      //
+
+      GLuint vbo_square_ = 0;
+      gl.glGenBuffers(1, &vbo_square_);
+      // Check for error
+      assert( vbo_square_ != 0);
+      gl.glBindBuffer(GL_ARRAY_BUFFER, vbo_square_);
+      gl.glBufferData(GL_ARRAY_BUFFER, sizeof(square_points), square_points, GL_STATIC_DRAW);
+      gl.glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+      GLint shader_attr = 0;
+
+      //  ======= R E N D E R  - L O O P ============//
+      //
+      while ( !glfwWindowShouldClose(window) )
+      {
+              gl.glClear(GL_COLOR_BUFFER_BIT);
+
+          // ====== BEGIN RENDERING ============//
+
+              // ------------ Draw triangle --------------//
+              //
+              gl.glBindBuffer(GL_ARRAY_BUFFER, vbo_triangle_);
+              gl.glEnableVertexAttribArray(shader_attr);
+
+              gl.glVertexAttribPointer(shader_attr, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
+              glDrawArrays(GL_TRIANGLES, 0, 3);
+
+              // Disable global state
+              gl.glBindBuffer(GL_ARRAY_BUFFER, 0);
+              gl.glDisableVertexAttribArray(0);
+
+              //------------ Draw Square -------------------------//
+              //
+
+              #if 1
+              gl.glBindBuffer(GL_ARRAY_BUFFER, vbo_square_);
+              gl.glEnableVertexAttribArray(shader_attr);
+              gl.glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
+              // Plot 4 vertices
+              gl.glDrawArrays(GL_LINE_LOOP, 0, 4);
+
+              // Disable global state
+              gl.glBindBuffer(GL_ARRAY_BUFFER, 0);
+              gl.glDisableVertexAttribArray(shader_attr);
+              #endif
+
+          // ====== END RENDERING ==============//
+
+          /* Swap front and back buffers */
+          glfwSwapBuffers(window);
+          /* Poll for and process events */
+          glfwPollEvents();
+
+          if( glfwGetKey(window, 'Q' ) == GLFW_PRESS )
+          {
+               std::cout << " [TRACE] User typed Q =>> Shutdown program. Ok. " << '\n';
+               break;
+          }
+      }
+
+      glfwTerminate();
+      return 0;
+  }
+
+#+END_SRC 
+
+ *Building* 
+
+Building on Linux: 
+
+#+BEGIN_SRC sh 
+  $ cmake -H. -B_build_linux -DCMAKE_BUILD_TYPE=Debug 
+  $ cmake --build _build_linux --target
+#+END_SRC
+
+Building for Windows with Dockercross tool: 
+
+#+BEGIN_SRC sh 
+  $ docker run -it --rm -v $PWD:/cwd -w /cwd --entrypoint=bash dockcross/windows-static-x64
+  $ cmake -H. -B_build_cross -DCMAKE_BUILD_TYPE=Debug 
+  $ cmake --build _build_cross --target
+
+  $ wine _build_cross/load-opengl-fptr.exe 
+   [TRACE] GLFW initialized Ok. 
+   [TRACE] Loading pointer to OpenGL subroutine = glClear 
+   [TRACE] Loading pointer to OpenGL subroutine = glClearColor 
+   [TRACE] Loading pointer to OpenGL subroutine = glBindBuffer 
+   [TRACE] Loading pointer to OpenGL subroutine = glGenBuffers 
+   [TRACE] Loading pointer to OpenGL subroutine = glBufferData 
+   [TRACE] Loading pointer to OpenGL subroutine = glEnableVertexAttribArray 
+   [TRACE] Loading pointer to OpenGL subroutine = glDisableVertexAttribArray 
+   [TRACE] Loading pointer to OpenGL subroutine = glVertexAttribPointer 
+   [TRACE] Loading pointer to OpenGL subroutine = glDrawArrays 
 #+END_SRC
 ** 2D Graphics - using VAO
 
@@ -13481,10 +13930,10 @@ File: _model-loader.cpp_
    $ cmake --build _build_linux --target
 #+END_SRC
 
-  *Cross-compiling to Windows from Linux via MINGW Docker* 
+  *Cross-compiling for Windows from Linux via MINGW Docker* 
 
 #+BEGIN_SRC sh 
-  docker run -it --rm -v $PWD:/cwd -w /cwd --entrypoint=bash dockcross/windows-static-x64
+   $ docker run -it --rm -v $PWD:/cwd -w /cwd --entrypoint=bash dockcross/windows-static-x64
    $ cmake -H. -B_build_windows -DCMAKE_BUILD_TYPE=Debug
    $ cmake --build _build_windows --target
 #+END_SRC
