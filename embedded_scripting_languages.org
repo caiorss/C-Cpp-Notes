@@ -203,11 +203,6 @@ Selection of embedded scripting languages and engines available as  libraries:
     * Implementation: C++ 
     * Syntax type: C++-like
 
-  * [[http://chaiscript.com/][ChaiScript]] 
-    * License: BSD 
-    * Implementation: C++
-    * Syntax type: C++-like
-
 
  *Smiliar to Javascript or subset of Javascript (ECMAScript)*
 
@@ -241,6 +236,10 @@ Selection of embedded scripting languages and engines available as  libraries:
     * Implementation: C
     * Syntax type: Javascript (ECMAScript)
 
+  * [[http://chaiscript.com/][ChaiScript]] 
+    * License: BSD 
+    * Implementation: C++
+    * Syntax type: Javascript-like 
 
  *Similar to Lisp or Scheme*
 
@@ -2994,6 +2993,184 @@ Running _main_ application, which embeds QuickJS JS engine:
 
 #+END_SRC
 
+** Chaiscript 
+
+Scripting engine available as a header-only library that has
+Javascript-like syntax and easy integration to C++ codebases.
+
+Drawbacks: 
+   + Header-only => Slow compile-time and large executable size due to
+     the intesive use of templates. [[https://arne-mertz.de/2019/02/extern-template-reduce-compile-times/][Extern templates]] C++ language
+     feature could reduce the compile time. 
+
+Repository: 
+  + https://github.com/ChaiScript/ChaiScript
+
+Web site: 
+  + https://chaiscript.com/examples.html  
+
+
+  *Files* 
+
+File: _CMakeLists.txt_ 
+
+#+BEGIN_SRC cmake 
+  cmake_minimum_required(VERSION 3.0)
+  project(chaiscript-eval)
+
+  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+
+  include( FetchContent )
+
+  set( BUILD_SAMPLES  OFF CACHE BOOL  "") 
+  set( BUILD_SAMPLES  OFF CACHE BOOL  "") 
+  set( RUN_FUZZY_TESTS OFF CACHE BOOL "")
+  set( RUN_PERFORMANCE_TESTS  OFF CACHE BOOL "")
+
+  FetchContent_Declare(
+       chaiscript 
+       GIT_REPOSITORY  https://github.com/ChaiScript/ChaiScript/
+       GIT_TAG         v6.1.0     
+  )
+  FetchContent_MakeAvailable(chaiscript)
+  include_directories( chaiscript-runtime PUBLIC ${chaiscript_SOURCE_DIR}/include )    
+
+  add_executable( runner chaiscript-eval.cpp)
+
+  if(UNIX)
+      target_link_libraries( runner PUBLIC pthread dl )
+  endif()
+#+END_SRC  
+
+File: _chaiscript-eval.cpp_ 
+
+#+BEGIN_SRC cpp 
+  #include <iostream> 
+  #include <string> 
+
+  #include <chaiscript/chaiscript.hpp>
+
+  void scriptable_function(const std::string& label, int w) 
+  {
+      std::cout << "\n [CALLED] label = " << label << " ; w = " << w << '\n';
+  }
+
+  class Robot
+  {
+      std::string name;
+      float x = 0, y = 0;
+  public:
+
+      Robot(){ }
+
+      Robot(float x, float y){}
+
+      void setPosition(float x, float y)
+      {
+          this->x = x;
+          this->y = y;
+          std::fprintf(stderr, " [INFO] Robot moved to x = %f ; y = %f \n", x, y);
+      }   
+
+      void showPosition()
+      {
+        std::fprintf(stderr, " [INFO] Robot position (x = %f, y = %f ) \n", x, y);
+      }
+  };
+
+
+  int main() {
+  
+    // Create script engine object 
+    chaiscript::ChaiScript chai;
+
+    // Register user function   
+    chai.add( chaiscript::fun(&scriptable_function)
+            , "scriptable_function");
+
+    chai.add( chaiscript::constructor<Robot()>(), "Robot" );
+    chai.add( chaiscript::fun(&Robot::showPosition), "showPosition");
+    chai.add( chaiscript::fun(&Robot::setPosition),  "setPosition" );
+
+    const char* code = R"(
+          // It supports C++-like syntax 
+          for(var i = 0; i < 5; ++i)
+          { 
+              print(i);
+          }
+
+          puts(" ========= Line ================= \n");
+          scriptable_function("Moon", 200);
+          scriptable_function("Mars", 500);
+
+          var robot = Robot();
+          robot.setPosition(200, 400);
+          robot.showPosition();
+
+          // User configuration function will be called 
+          // by the script engine. 
+
+          def on_init_hook()
+          {
+              puts("\n [TRACE] User function called. Ok.");
+          }
+
+      )";
+
+    // Attempt to evaluate code 
+    try { 
+        chai.eval(code);
+    } catch(chaiscript::exception::eval_error const& ex)
+    {
+        std::cout << " [TRACE] Exception = " << ex.what() << std::endl;
+    }
+
+    std::puts(" ==== Get robot object from script =========");
+
+    auto robot = chai.eval<std::shared_ptr<Robot>>("robot");
+  
+    robot->showPosition();
+    robot->setPosition(400, 1000);
+
+  } // ---- End of main() ----------// 
+#+END_SRC
+
+ *Check Executable* 
+
+#+BEGIN_SRC sh 
+  $ du -h build/runner
+  23M     build/runner
+
+  # Remove debugging symbols 
+  $ strip build/runner
+  $ du -h build/runner
+  7.6M    build/runner
+
+  $ file build/runner
+  build/runner: ELF 64-bit LSB shared object, x86-64, version 1 (GNU/Linux), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2
+#+END_SRC  
+
+ *Running* 
+
+#+BEGIN_SRC sh 
+  $ ./runner 
+  0
+  1
+  2
+  3
+  4
+   ========= Line ================= 
+
+   [CALLED] label = Moon ; w = 200
+
+   [CALLED] label = Mars ; w = 500
+   [INFO] Robot moved to x = 200.000000 ; y = 400.000000 
+   [INFO] Robot position (x = 200.000000, y = 400.000000 ) 
+   ==== Get robot object from script =========
+   [INFO] Robot position (x = 200.000000, y = 400.000000 ) 
+   [INFO] Robot moved to x = 400.000000 ; y = 1000.000000 
+#+END_SRC
 ** Python Engine via Pybind11 
 
 Documentation: 
