@@ -340,7 +340,30 @@ Julia language:
 
   + [[https://juliabyexample.helpmanual.io/][Julia By Example]]
 
-D Language: 
+C# (Csharp) for Dotnet Core:
+
+  + https://docs.microsoft.com/en-us/dotnet/core/tools/dotnet
+
+  + [[https://docs.microsoft.com/en-us/dotnet/core/install/linux-scripted-manual][Microsoft - Install the .NET SDK or the .NET Runtime manually]]
+
+  + [[https://docs.microsoft.com/en-us/dotnet/csharp/][C# Official Documentation]]
+
+  + [[https://docs.microsoft.com/en-us/dotnet/framework/interop/consuming-unmanaged-dll-functions][Consuming Unmanaged DLL Functions]]
+
+  + [[https://docs.microsoft.com/en-us/dotnet/api/system.intptr.zero?view=net-5.0][IntPtr.Zero Field]] 
+
+  + [[https://docs.microsoft.com/en-us/dotnet/framework/interop/exposing-dotnet-components-to-com][Exposing .NET components to COM]]
+
+  + [[https://docs.microsoft.com/en-us/windows/win32/dlls/dynamic-link-library-search-order][Microsft - Dynamic-Link Library Search Order]]
+
+  + Scott Hanselman - [[https://radu-matei.com/blog/self-contained-dotnet-cli/][Building self-contained, single executable .NET Core 3 CLI tools]]
+
+  + [[https://docs.microsoft.com/en-us/dotnet/core/deploying/single-file][Microsft - Single file deployment and executable]]
+
+  + [[https://www.hanselman.com/blog/exploring-the-new-net-dotnet-command-line-interface-cli][Exploring the new .NET "dotnet" Command Line Interface (CLI)]]
+
+
+D Language (DLang: 
 
   + [[https://en.wikipedia.org/wiki/D_(programming_language)][D (programming language) - Wikipedia]]
 
@@ -364,7 +387,7 @@ Lisp - SBCL (Steel Bank Common Lisp):
 
   + [[https://gist.github.com/lamberta/212533/c4ac72b6606666ace8d35ada018614cbb1d273d6][use C shared lib with cffi · GitHub]]
 
-  + [[https://gist.github.com/lagagain/df1b97eb08e57c2759c950efc3a2c7dd][[practice] [Common Lisp] hello CFFI (Common Lisp + C) · GitHub]]
+  + [[https://gist.github.com/lagagain/df1b97eb08e57c2759c950efc3a2c7dd][practice - Common Lisp hello CFFI (Common Lisp + C) · GitHub]]
 
   + [[https://www.xach.com/lisp/buildapp/][Buildapp - Create executables with SBCL or CCL]]
 
@@ -1490,6 +1513,245 @@ User Interface Screenshot:
 
 #+CAPTION: User interface for Dlang (D Language)
 [[file:images/cwrapper-qt5-3.png][file:images/cwrapper-qt5-3.png]]
+
+*** C# - Dotnet Core Client Code 
+
+This section contains the source code of a C# (dotnet) core client
+code that loads the C-wrapper shared library (libqwrap.so) for Qt5
+widgets framework through dotnet Pinvoke dotnet feature.
+
+
+File: _myapp.csproj_ 
+
+#+BEGIN_SRC xml 
+  <Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+      <OutputType>Exe</OutputType>
+      <TargetFramework>net5.0</TargetFramework>
+    </PropertyGroup>
+
+  </Project>
+#+END_SRC 
+
+File: _Program.cs_  - C# Csharp / core source code (dotnet core)
+
+#+BEGIN_SRC cpp 
+  using System;
+  using System.Runtime.InteropServices;
+
+  namespace myapp
+  {
+
+      class Wrapper 
+      {
+          public const int WIDGET_WINDOW = 0;
+          public const int WIDGET_WINDOW_MAIN = 2;
+          public const int WIDGET_QPUSH_BUTTON = 3;
+          public const int WIDGET_QLABEL = 4;
+          public const int WIDGET_QLINE_EDIT = 5;
+          public const int WIDGET_QDOUBLE_SPINBOX = 6;
+          public const int LAYOUT_QFORM_LAYOUT = 3;
+
+
+          [DllImport("qtwrapper")]
+          public static extern IntPtr qt_app_new2();
+
+          [DllImport("qtwrapper")]
+          public static extern IntPtr qt_app_exec(IntPtr self);
+
+
+          [DllImport("qtwrapper")]
+          public static extern IntPtr qt_qobject_del(IntPtr self);
+
+          [DllImport("qtwrapper")]
+          public static extern IntPtr qt_widget_new(IntPtr parent, int type);
+
+          [DllImport("qtwrapper")]
+          public static extern IntPtr qt_window_main();
+
+          [DllImport("qtwrapper")]
+          public static extern void qt_widget_setText(IntPtr self, string text);
+
+          [DllImport("qtwrapper")]
+          public static extern void qt_msgbox_info(IntPtr parent, string title, string text);
+
+          [DllImport("qtwrapper")]
+          public static extern IntPtr qt_layout_new(IntPtr parent, int type); 
+
+          [DllImport("qtwrapper")]
+          public static extern IntPtr qt_QFormLayout_addWidgetAndLabel(IntPtr parent, int type, string label); 
+
+          // A C# delegate is similar to a C++ function pointer type. 
+          public delegate void button_callback(IntPtr ctx);
+
+          [DllImport("qtwrapper")]
+          public static extern void qt_button_onClicked(IntPtr self, IntPtr ctx, button_callback callback); 
+
+ 
+      }
+
+      class Program
+      {
+
+          static void Main(string[] args)
+          {
+                  Console.WriteLine(" [TRACE] Program started Ok. ");
+
+              // Create a QApplication* C++ object 
+              // This object must be instantiated before any other Qt Widgets object. 
+              IntPtr qapp = Wrapper.qt_app_new2();
+              Console.WriteLine(" [TRACE] qapp (IntPtr) value = {0} ", qapp);
+
+
+              // Create a Qt Window object QWidget* 
+              IntPtr qwindow = Wrapper.qt_window_main();
+              Wrapper.qt_widget_setText(qwindow, "My QtWidget window in C# dotnet core on Linux!");
+
+
+              IntPtr form = Wrapper.qt_layout_new(qwindow,  Wrapper.LAYOUT_QFORM_LAYOUT);
+              IntPtr btn1 = Wrapper.qt_QFormLayout_addWidgetAndLabel(form , Wrapper.WIDGET_QPUSH_BUTTON , "");
+              Wrapper.qt_widget_setText(btn1, "Increment");
+
+              IntPtr btn2 = Wrapper.qt_QFormLayout_addWidgetAndLabel(form, Wrapper.WIDGET_QPUSH_BUTTON, "");
+              Wrapper.qt_widget_setText(btn2, "Messagebox");
+            
+              IntPtr text_entry = Wrapper.qt_QFormLayout_addWidgetAndLabel( form, Wrapper.WIDGET_QLINE_EDIT, "Result"); 
+
+              // ------------ Set event handlers --------------// 
+              //-----------------------------------------------// 
+
+              int counter = 0;
+
+              // Set button 1 event handler 
+              Wrapper.qt_button_onClicked(btn1, IntPtr.Zero, (IntPtr ctx) => 
+              {
+                  String s = String.Format("Button clicked {0} times.", counter++);
+                  Console.WriteLine(" [TRACE] QtPushButton cliked Ok. => " + s);
+                  Wrapper.qt_widget_setText(text_entry, s);
+              });
+
+              Wrapper.qt_button_onClicked(btn2, IntPtr.Zero, (IntPtr ctx) => 
+              {
+                  Wrapper.qt_msgbox_info(IntPtr.Zero , "System Notification" , "Batch workload finished Ok." );
+              });
+
+              // Run application and block current thread. 
+              Wrapper.qt_app_exec(qapp);
+
+              // ---- Dispose C++ objects -------------------//
+              // --------------------------------------------//
+              Wrapper.qt_qobject_del(qwindow);
+              Wrapper.qt_qobject_del(qapp);
+              Console.WriteLine(" [TRACE] Program terminated successfully Ok. ");
+          }
+      }
+  }
+
+
+#+END_SRC
+
+ *Building* 
+
+The following command sets the LD_LIBRARY_PATH environment variable
+for allowing the linker (aka loader) to find the shared library
+(libqtwrapper.so on Linux or BSD or qtwrapper.dll on Windows). On
+Windows, the operating system will linker will look for the shared
+library on the same directory where is the executable, then on
+predefined directories such as _C:\\Windows\\System32\_, and finally on
+directories listed in the %PATH% enviroment variable.  
+
+#+BEGIN_SRC sh 
+  export LD_LIBRARY_PATH=$HOME/_build/
+#+END_SRC
+
+Adding the shared library directory path to the %PATH% enviroment
+variable has the same effect of setting LD_LIBRARY_PATH on Linux. This
+setting can be performed on cmd.exe shell via the as in the following
+code block. The shared library can be located without setting the PATH
+variable by moving it to the System32 directory or placing it on the
+same directory where is the executable.
+
+#+BEGIN_SRC sh 
+  set PATH="%cd%\_build\path\to\shared\library\directory";%PATH%
+#+END_SRC
+
+Build from command line: 
+
+#+BEGIN_SRC sh 
+
+  $ ~/dotnet/dotnet build myapp.csproj
+  Microsoft (R) Build Engine version 16.9.0+57a23d249 for .NET
+  Copyright (C) Microsoft Corporation. All rights reserved.
+
+    Determining projects to restore...
+    All projects are up-to-date for restore.
+    myapp -> /home/unixuser/Documents/temp-projects/qt5-cwrapper/bin/Debug/net5.0/myapp.dll
+
+  Build succeeded.
+      0 Warning(s)
+      0 Error(s)
+
+  Time Elapsed 00:00:01.06
+
+
+#+END_SRC
+
+Check the executable: 
+
+#+BEGIN_SRC sh 
+   $ tree ./bin
+  ./bin
+  └── Debug
+      └── net5.0
+          ├── myapp
+          ├── myapp.deps.json
+          ├── myapp.dll
+          ├── myapp.pdb
+          ├── myapp.runtimeconfig.dev.json
+          ├── myapp.runtimeconfig.json
+          └── ref
+              └── myapp.dll
+
+  3 directories, 7 files
+
+   $ ldd bin/Debug/net5.0/myapp
+          linux-vdso.so.1 (0x00007fff251d4000)
+          libpthread.so.0 => /lib/x86_64-linux-gnu/libpthread.so.0 (0x00007fa56e3e0000)
+          libdl.so.2 => /lib/x86_64-linux-gnu/libdl.so.2 (0x00007fa56e3da000)
+          libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007fa56e1f9000)
+          libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007fa56e0aa000)
+          libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007fa56e08f000)
+          libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007fa56dea5000)
+          /lib64/ld-linux-x86-64.so.2 (0x00007fa56e64b000)
+#+END_SRC
+
+Running the application: 
+
+#+BEGIN_SRC sh 
+   $ file bin/Debug/net5.0/myapp
+  bin/Debug/net5.0/myapp: ELF 64-bit LSB shared object, x86-64, version 1 (GNU/Linux), dynamically linked, 
+  interpreter /lib64/ld-linux-x86-64.so.2, for GNU/Linux 2.6.32, BuildID[sha1]=1894b9678ab18e8406448464668a8949e4f9d2b5, stripped
+
+   $ ~/Documents/temp-projects/qt5-cwrapper master
+   $ bin/Debug/net5.0/myapp
+   [TRACE] Program started Ok. 
+   [TRACE] Create QAppliction Object Ok
+   [TRACE] qapp (IntPtr) value = 94225009981200 
+   [TRACE] QtPushButton cliked Ok. => Button clicked 0 times.
+   ... ... ... .. 
+   ... ... ... ... ... ... ... ..
+#+END_SRC
+
+Running the application via dotnet core tool: 
+
+#+BEGIN_SRC sh 
+   $ ~/dotnet/dotnet run --project=myapp.csproj
+#+END_SRC
+
+ *Screenshot* 
+
+[[file:images/cwrapper-qt5-5.png][file:images/cwrapper-qt5-5.png]]
 
 *** Common Lisp client code 
 
