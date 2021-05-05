@@ -45,7 +45,7 @@ Cross-Platform:
     formats - JSON  and XML; Zip compression; SSL and crypto utils.
     + See: [[https://en.wikipedia.org/wiki/POCO_C%2B%2B_Libraries][POCO C++ Libraries - Wikipedia]]
 
-** Idiosyncrasies
+** [DRAFT] Windows API Idiosyncrasies
  
   + Hungarian Notation
 
@@ -59,7 +59,7 @@ Cross-Platform:
     so on. Thus, a Windows path such as ~"C:\Users\sombody\file.exe"~ must be
     written as "C:\\Users\\sombody\\file.exe".
 
-  + Different Calling Conventions in the same OS: 
+  + Different Calling Conventions in the same OS: (Note: Only for 32 bits x86)
     + ~__stdcall~
     + ~__cdecl~
     + ~__fastcall~
@@ -1714,6 +1714,72 @@ directory.
 
 File: [[file:src/windows/currentProcess.cpp][file:src/windows/currentProcess.cpp]] 
 
+  *Files* 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+  #include <cassert>
+
+  #include <windows.h>
+
+  // Return true if program was launched by clicking on it, 
+  // return false if this program was launched from command line.
+  auto isInOwnConsole() -> bool {
+        DWORD procIDs[2];
+        DWORD maxCount = 2;
+        DWORD result = GetConsoleProcessList((LPDWORD)procIDs, maxCount);
+        return result != 1;
+  }
+
+  auto ExecutablePath = [](int pid){
+        HANDLE hProc = OpenProcess( PROCESS_QUERY_INFORMATION
+                                                                | PROCESS_VM_READ, FALSE, pid );
+        // Get process file path 
+        std::string process_path(MAX_PATH, 0);
+        DWORD size = MAX_PATH; 
+        QueryFullProcessImageNameA(hProc, 0, &process_path[0], &size);
+        process_path.resize(size);	
+        CloseHandle(hProc);
+        return process_path;
+  };
+	
+  auto CurrentDirectory = []{
+        DWORD size = ::GetCurrentDirectory(0, nullptr);
+        assert(size != 0);
+        std::string path(size + 1, 0x00);
+        size = ::GetCurrentDirectory(path.size(), &path[0]);
+        path.resize(size);
+        return path;
+  };	
+
+  int main()
+  {
+        // Get current process ID 
+        DWORD    pid   = GetCurrentProcessId();
+        // Return module handle of current process 
+        HMODULE  hProc = GetModuleHandleA(nullptr);
+        // Get process module
+        std::cout << "=========== Current Process Info ========"  << std::endl;
+        std::cout << "PID              = "   << pid                 << std::endl;
+        std::cout << "hProc            = 0x" << hProc               << std::endl;
+        std::cout << "Executable path  = "   << ExecutablePath(pid) << std::endl;
+        std::cout << "Current path     = "   << CurrentDirectory()  << std::endl;
+
+        // Copy itself to Desktop
+        CopyFile(ExecutablePath(pid).c_str(), "C:\\Users\\archbox\\Desktop\\appinfo.exe", false) ;
+
+        // Stop program from exiting if it was launched by clicking on it.
+        if(!isInOwnConsole()){
+                std::cout << "\n ==> Type RETURN to exit." << std::endl;
+                std::cin.get();
+        }	
+        return EXIT_SUCCESS;
+  }
+#+END_SRC
+
+  *Building* 
+
 Compile: MSVC
 
 #+BEGIN_SRC sh 
@@ -1825,6 +1891,69 @@ processes in current machine:
 Source: 
  + [[file:src/windows/showProcesses.cpp][file:src/windows/showProcesses.cpp]]
 
+  *Files* 
+
+FIle: _showProcesses.cpp_ 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+  #include <sstream>
+  #include <fstream>
+
+  // Windows Headers 
+  #include <windows.h>
+  #include <tlhelp32.h>
+
+  auto showProcessInfo(std::ostream& os) -> int;
+
+  int main()
+  {
+     // Log file 
+     auto plog = std::ofstream("process-log.txt");
+     // Print all processes to stdout. 
+     showProcessInfo(std::cout);
+     // Write all processes to file 
+     showProcessInfo(plog);
+     // Flush buffer - force data to be written to file.
+     plog.flush();
+
+     std::cout << "\n ==> Type return to exit." << std::endl;
+     std::cin.get();
+    return 0;
+  }
+
+  //=======================///
+
+  // Show all processes in current machine 
+  auto showProcessInfo(std::ostream& os) -> int 
+  {
+       // Get snapshot with process listing.
+       HANDLE hProcessSnapShot =
+         CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);  
+       // Instnatiate process' entry structure.
+       PROCESSENTRY32 ProcessEntry = { 0 };
+       ProcessEntry.dwSize = sizeof( ProcessEntry );
+       BOOL Return = FALSE;
+       Return = Process32First( hProcessSnapShot, &ProcessEntry );
+       // Returns -1 if process failed 
+       if(!Return ) {  return -1;}
+       do { // print process' data
+           os << "EXE File     = " << ProcessEntry.szExeFile      << "\n"
+              << "PID          = " << ProcessEntry.th32ProcessID  << "\n"
+              << "References   = " << ProcessEntry.cntUsage       << "\n"
+              << "Thread Count = " << ProcessEntry.cntThreads     << "\n"  
+              << "-----------------------------------------------\n";
+         }
+       while( Process32Next( hProcessSnapShot, &ProcessEntry ));
+       // Close handle releasing resource.
+       CloseHandle( hProcessSnapShot );
+       return 1;
+  }
+#+END_SRC
+
+  *Analysis* 
+
 Parts:
 
  + Function which prints all processes to any output stream: 
@@ -1926,6 +2055,170 @@ Libraries) loaded by some process given its PID.
 
  + Source:  [[file:src/windows/showModulesDLL.cpp][file:src/windows/showModulesDLL.cpp]]
  + Gist:    [[https://gist.github.com/caiorss/300a734093430bb8a66cd204526edbf6][showModulesDLL.cpp]]
+
+  *Files* 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string> 
+  #include <iomanip>
+  #include <functional>
+
+  //- Windows Headers ---
+  #include <windows.h>
+  #include <psapi.h>
+
+  // RAAI for managing Handler 
+  template<class HANDLER>
+  class ResourceHandler
+  {
+  public:
+          using Disposer = std::function<void (HANDLER)>;
+          ResourceHandler(HANDLER hnd, Disposer disposer)
+                  : m_hnd(hnd), m_fndisp(disposer)
+          {  }
+          auto get() -> HANDLER {
+                  return m_hnd;
+          }
+          ~ResourceHandler(){
+                  m_fndisp(m_hnd);
+          }
+          // Disable copy-constructor and copy-assignment operator 
+          ResourceHandler(const ResourceHandler&) = delete;
+          auto operator= (const ResourceHandler&) -> ResourceHandler& = delete;
+          // Move member functios
+          ResourceHandler(ResourceHandler&& rhs)
+                  : m_hnd(rhs.m_hnd),
+                    m_fndisp(rhs.m_fndisp){ }
+          auto operator= (ResourceHandler&& rhs){
+                  std::swap(this->m_hnd, rhs.m_hnd);
+                  this->m_fndisp = rhs->m_fndisp;		
+          }
+  private:
+          HANDLER m_hnd;
+          Disposer m_fndisp;
+  };
+
+  auto utf8_encode(const std::wstring& wstr) -> std::string;
+  auto utf8_decode(const std::string&  str) -> std::wstring;
+
+  namespace WProcess{
+          using ModuleConsumer = std::function<auto (HMODULE, const std::string&) -> void>;	
+          auto GetName(HANDLE hProc) -> std::string;
+          auto GetExecutablePath(HANDLE hProc) -> std::string;
+          auto ForEachModule(HANDLE hProc, ModuleConsumer FunIterator) -> void;
+  }
+
+
+  int main(int argc, char **argv){  
+    if(argc < 2){
+      std::cerr << "Error: missing Process ID <PID>.";
+      return EXIT_FAILURE;
+    }
+  
+    DWORD pid;
+    DWORD  flags = PROCESS_QUERY_INFORMATION | PROCESS_VM_READ;
+  
+    try{
+            pid  = std::stoi(argv[1]);
+    } catch(const std::invalid_argument& ex){
+            std::cerr << "Error invalid PID" << std::endl;
+            return EXIT_FAILURE;
+    }  
+    
+    auto hProc = ResourceHandler<HANDLE>{
+            ::OpenProcess(flags, FALSE, pid),
+            ::CloseHandle
+    };
+
+    if(hProc.get() == nullptr){
+            std::cerr << "Error: process of pid = <" << pid << "> not found." << std::endl;
+            return EXIT_FAILURE;
+    }
+
+    std::cout << "Process base name = "
+                          << WProcess::GetName(hProc.get())
+                          << std::endl; 
+    std::cout << "Process path      = "
+                          << WProcess::GetExecutablePath(hProc.get())
+                          << std::endl;
+
+    std::cout << std::endl;
+
+    // Print all DLLs used by some process 
+    WProcess::ForEachModule(
+            hProc.get(),
+            [](HMODULE hmod, const std::string& path) -> void
+            {
+                    std::cout << std::setw(10) << hmod
+                                          << std::setw(5)  << " "
+                                          << std::left 	 << std::setw(45) << path
+                                          << "\n";					
+            }
+            );
+	  
+    return EXIT_SUCCESS;
+  }
+  // ================= End of Main =================//
+
+  auto utf8_encode(const std::wstring &wstr) -> std::string
+  {
+      int size_needed = WideCharToMultiByte(
+              CP_UTF8, 0, &wstr[0],
+              (int)wstr.size(), NULL, 0, NULL, NULL);
+      std::string strTo(size_needed, 0);
+      WideCharToMultiByte(
+              CP_UTF8, 0, &wstr[0],
+              (int)wstr.size(), &strTo[0], size_needed, NULL, NULL);
+      return strTo;
+  }
+
+  auto utf8_decode(const std::string &str) -> std::wstring
+  {
+       int size_needed = MultiByteToWideChar(
+               CP_UTF8, 0,
+               &str[0], (int)str.size(), NULL, 0);
+       std::wstring wstrTo(size_needed, 0);
+       MultiByteToWideChar(
+               CP_UTF8, 0, &str[0],
+               (int) str.size(), &wstrTo[0], size_needed);
+       return wstrTo;
+  }
+	
+
+  namespace WProcess{
+          using ModuleConsumer = std::function<auto (HMODULE, const std::string&) -> void>;
+	
+          auto GetName(HANDLE hProc) -> std::string {
+                  std::wstring basename(MAX_PATH, 0);
+                  int n1 = ::GetModuleBaseNameW(hProc, NULL, &basename[0], MAX_PATH);
+                  basename.resize(n1);
+                  return utf8_encode(basename);
+          }
+          auto GetExecutablePath(HANDLE hProc) -> std::string {
+                  std::wstring path(MAX_PATH, 0);
+                  int n2 = ::GetModuleFileNameExW(hProc, NULL, &path[0], MAX_PATH);
+                  path.resize(n2);
+                  return utf8_encode(path);
+          }
+          auto ForEachModule(HANDLE hProc, ModuleConsumer FunIterator) -> void {
+                  HMODULE hMods[1024];
+                  DWORD   cbNeeded;
+                  if (::EnumProcessModules(hProc, hMods, sizeof(hMods), &cbNeeded)){
+                          int n = cbNeeded / sizeof(HMODULE);
+                          std::wstring path(MAX_PATH, 0);
+                          for(int i = 0; i < n; i++){
+                                  DWORD nread = ::GetModuleFileNameExW(hProc, hMods[i], &path[0], MAX_PATH);
+                                  path.resize(nread);		
+                                  if(nread) FunIterator(hMods[i], utf8_encode(path));
+                          }
+                  }	
+          }
+	
+  } // --- End of namespace WProcess ---- //
+#+END_SRC
+
+  *Building* 
 
 Compile with MSVC (cl.exe)
 
@@ -2130,7 +2423,7 @@ Print all DLLs used by the process:
 Gist: 
  + https://gist.github.com/bad57134dd6e95e394a04b8b727a825f
 
-File: attrib.cpp 
+File: _attrib.cpp_
 
 #+BEGIN_SRC cpp 
   #include <iostream>
@@ -2394,7 +2687,179 @@ Source:
  + File: [[file:src/windows/listFiles.cpp][file:src/windows/listFiles.cpp]]
  + Gist: [[https://gist.github.com/caiorss/17e9f2d79566b58b1ba65820c26bc1aa][listFiles.cpp]] 
 
-Compiling: 
+ *Files* 
+
+File: _listFiles.cpp_ 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string> 
+  #include <sstream>
+  #include <iomanip>
+  #include <functional>
+
+  //- Windows Headers ---
+  #include <windows.h>
+
+  //----------------------------------------------//
+
+  // Uses RAII for setting console to UTF8
+  // and restoring its previous settings.
+  class ConsoleUTF8{
+  public:
+     // Constructor saves context 
+     ConsoleUTF8(){
+         m_config = ::GetConsoleOutputCP();
+         ::SetConsoleOutputCP(CP_UTF8);
+         std::cerr << " [TRACE] Console set to UTF8" << std::endl;
+     }
+     // Destructor restores context 
+     ~ConsoleUTF8(){
+             std::cerr << " [TRACE] Console restored." << std::endl;
+        ::SetConsoleOutputCP(m_config);
+     }
+  private:
+     unsigned int m_config;
+  };
+
+  struct CloseHandleRAAI{
+          using Disposer = std::function<void ()>;
+          Disposer m_dispose;
+          CloseHandleRAAI(Disposer dispose): m_dispose(dispose){ }
+          ~CloseHandleRAAI(){ m_dispose(); }
+  };
+
+  void CloseHandleLog(HANDLE h, const std::string& name){
+          ::CloseHandle(h);
+          std::cerr << " [LOG] Handler <" << name << "> closed OK." << std::endl;	
+  }
+
+  auto utf8_encode(const std::wstring &wstr) -> std::string;
+  auto utf8_decode(const std::string &str) -> std::wstring;
+
+  using FileEnumerator = std::function<bool (const std::string&)>;
+
+  auto getLastErrorAsString() -> std::string;
+  auto EnumerateFiles(const std::string& path, FileEnumerator Enumerator) -> int;
+
+
+  int main(int argc, char** argv){
+          if(argc < 2){
+                  std::cerr << "Usage: " << argv[0] << " " << "[PATH]" << std::endl;
+                  return EXIT_FAILURE;
+          }
+	
+          auto utf8Console = ConsoleUTF8();
+          auto directoryPath = std::string{argv[1]};
+
+          std::cout << "directoryPath = " << directoryPath << "\n";
+	
+          int count = 0;	
+          // Show 50 first files. 
+          int status = EnumerateFiles(
+                  directoryPath,
+                  [&count](const auto& file){
+                          std::cout << " => " << file << "\n";
+                          if(count++ < 50)
+                                  return true;
+                          else
+                                  return false;
+                  });
+
+          if(status != ERROR_SUCCESS){
+                  std::cout << " => Error code    = " << ::GetLastError() << std::endl;
+                  std::cout << " => Error message = " << getLastErrorAsString() << std::endl;
+                  return EXIT_FAILURE;
+          }
+		
+          std::puts(" [LOG] End sucessfully");
+	
+          // FindClose(hFile);
+          //CloseHandle(hFind);
+          return EXIT_SUCCESS;
+  }
+  //---------------------------------------------------------//
+
+  /** Enumerate files of some directory util enumerator function (callback) returns false. 
+    ,* - path       - Directory path to be listed 
+    ,* - Enumerator - Functions which consumes a string (file listed) and returns bool.
+    ,*                this function returns false when it is no longer interested in 
+    ,*                being called. When it returns false the iteration stops. 
+    ,*
+    ,* - Return    - Returns error code from GetLastError(). If it is successful, 
+    ,*               the function returns ERROR_SUCCESS.
+    ,*/
+  auto EnumerateFiles(const std::string& path, FileEnumerator Enumerator) -> int {
+          WIN32_FIND_DATAW fdata;
+          HANDLE hFind = INVALID_HANDLE_VALUE;
+          // Ensure that resource hFind is always disposed. 
+          auto close_hFind = CloseHandleRAAI(std::bind(CloseHandleLog, hFind, "hFile"));
+          hFind = FindFirstFileW(utf8_decode(path).c_str(), &fdata);
+          if(hFind == INVALID_HANDLE_VALUE)
+                  return GetLastError();
+          do { //Consumer function 
+                  if(!Enumerator(utf8_encode(fdata.cFileName))) break;
+          } while(FindNextFileW(hFind, &fdata) != 0);
+          return ERROR_SUCCESS;
+  }
+
+  // Print human-readable description of GetLastError() - Error Code 
+  // Source: https://stackoverflow.com/questions/1387064
+  // Requires: <string>, <sstream>, <windows.h>, 
+  auto getLastErrorAsString() -> std::string {
+      //Get the error message, if any.
+      DWORD errorMessageID = ::GetLastError();
+      if(errorMessageID == 0)
+          return std::string();
+      LPSTR messageBuffer = nullptr;
+      static const DWORD flags  =
+        FORMAT_MESSAGE_ALLOCATE_BUFFER
+        | FORMAT_MESSAGE_FROM_SYSTEM
+        | FORMAT_MESSAGE_IGNORE_INSERTS;
+      size_t size = FormatMessageA(
+                  flags,
+                  NULL,
+                  errorMessageID,
+                  MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                  (LPSTR)&messageBuffer, 0, NULL);
+      auto message = std::string(messageBuffer, size);
+          auto ss = std::stringstream(message);
+          auto line = std::string{};
+          std::getline(ss, line, '\r');
+      //Free the buffer.
+      LocalFree(messageBuffer);
+      return line;  
+  }
+
+
+  auto utf8_encode(const std::wstring &wstr) -> std::string
+  {
+      int size_needed = WideCharToMultiByte(
+              CP_UTF8, 0, &wstr[0],
+              (int)wstr.size(), NULL, 0, NULL, NULL);
+      std::string strTo(size_needed, 0);
+      WideCharToMultiByte(
+              CP_UTF8, 0, &wstr[0],
+              (int)wstr.size(), &strTo[0], size_needed, NULL, NULL);
+      return strTo;
+  }
+
+  // Credits: https://gist.github.com/pezy/8571764
+  auto utf8_decode(const std::string &str) -> std::wstring
+  {
+       int size_needed = MultiByteToWideChar(
+               CP_UTF8, 0,
+               &str[0], (int)str.size(), NULL, 0);
+       std::wstring wstrTo(size_needed, 0);
+       MultiByteToWideChar(
+               CP_UTF8, 0, &str[0],
+               (int) str.size(), &wstrTo[0], size_needed);
+       return wstrTo;
+  }
+
+#+END_SRC
+
+  *Building* 
  
  + MSVC 
 
@@ -2564,6 +3029,82 @@ Source:
  + File: [[file:src/windows/GetLogicalDrivers.cpp][file:src/windows/GetLogicalDrivers.cpp]]
  + Gist: [[https://gist.github.com/caiorss/dc13ea333ce57a3fc9bc08579645d9f2][GetLogicalDrivers.cpp]] 
 
+
+ *Files:* 
+
+File: _GetLogicalDrivers.cpp_ 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+  #include <sstream>
+  #include <deque>
+  #include <vector>
+  #include <functional>
+  #include <Windows.h>
+
+  using DriverEnumerator = std::function<auto (std::string) -> void>;
+  auto EnumerateLogicalDriver(DriverEnumerator Consumer) -> void;
+
+  template<template<class, class> class Container = std::vector>
+  auto LogicalDriverList()
+          -> Container<std::string, std::allocator<std::string>>;
+
+  int main()
+   {
+          std::puts("Logical Drivers or Disks found in the current installation");
+          std::puts("------------------------------------------------");
+	
+          EnumerateLogicalDriver(
+                  [](const std::string& name){
+                          std::cout << "Driver = " << name << std::endl;
+                  });
+
+          auto driverList1 = LogicalDriverList<std::deque>();
+          std::cout << " *=> Driver list in STL container std::deque  = ";
+          for(const auto& d: driverList1){ std::cout << d << ", "; }
+          std::cout << std::endl;;
+	
+          auto driverList2 = LogicalDriverList<std::vector>();
+          std::cout << " *=> Driver list in STL container std::vector = ";
+          for(const auto& d: driverList2){ std::cout << d << ", "; }
+          std::cout << std::endl;;
+
+          return 0;
+  }
+
+  //---------------------------------------------------// 
+
+  using DriverEnumerator = std::function<auto (std::string) -> void>;
+
+  auto EnumerateLogicalDriver(DriverEnumerator Consumer) -> void 
+  {
+          size_t size = ::GetLogicalDriveStringsA(0, nullptr);
+          std::string buffer(size, 0x00);
+          ::GetLogicalDriveStringsA(buffer.size(), &buffer[0]);
+          std::stringstream ss{buffer};
+          while(std::getline(ss, buffer, '\0') && !buffer.empty())
+                  Consumer(buffer);
+  }
+
+  // Remember: Template always in header files 
+  // The user can choose the type of container used to return
+  // the computer drivers. 
+  template<template<class, class> class Container = std::vector>
+  auto LogicalDriverList()
+          -> Container<std::string, std::allocator<std::string>>
+  {	
+          Container<std::string, std::allocator<std::string>> list{};
+          EnumerateLogicalDriver(
+                  [&](const std::string& name){
+                          list.push_back(name);
+                  });
+          return list;	
+  }
+#+END_SRC
+ 
+  *Analysis* 
+
 Main Function: 
 
 #+BEGIN_SRC cpp 
@@ -2653,6 +3194,350 @@ process execution, get PID and also terminate the subprocess.
 Source:
   + File: [[file:src/windows/winprocess.cpp][file:src/windows/winprocess.cpp]]
   + GIST: [[https://gist.github.com/caiorss/7af874c24f9340e3148329896efc7dfd][winprocess.cpp]] 
+
+
+ *Files* 
+
+File: _winprocess.cpp_ 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+  #include <vector>
+  #include <cstdio>
+  #include <sstream>
+  #include <functional>
+  #include <fstream>
+
+  #include <windows.h>
+
+  //========= File: ProcessBuilder.hpp - Header ===================//
+
+  /** Requires: <iostream> <string>, <functional> <vector> <windows.h> */
+  class ProcessBuilder
+  {
+  private:
+          // Program to be run 
+          std::string              m_program;
+          // Arguments passed to the program 
+          std::vector<std::string> m_args = {};
+          // If this flag is true, the program is launched on console 
+          bool                     m_console = true;
+          std::string              m_cwd; 
+          STARTUPINFO              m_si = { sizeof(STARTUPINFO)};
+          PROCESS_INFORMATION      m_pi;
+  public:	
+          using SELF = ProcessBuilder&;
+          using LineConsumer = std::function<bool (std::string)>;
+	
+          ProcessBuilder() = default;
+          ProcessBuilder(const std::string& program, const std::vector<std::string>& args = {});
+          ProcessBuilder(const ProcessBuilder&) = delete;
+          auto operator=(const ProcessBuilder&)  = delete;	
+          ~ProcessBuilder();
+          ProcessBuilder(ProcessBuilder&& rhs);
+          auto operator=(ProcessBuilder&& rhs) -> SELF;
+          auto SetProgram(const std::string& program) -> SELF;	
+          auto SetConsole(bool flag) -> SELF;
+          /** Set process directory.
+           ,* @param path - Process directory path.
+           ,*/
+          auto SetCWD(const std::string& path) -> SELF;	
+          /** Start process without waiting for its termination.  */
+          auto Run() -> bool;
+          auto Wait() -> void;
+          // Start process and wait for its termination. 
+          auto RunWait() -> bool;
+          auto GetPID() -> DWORD;
+          auto Terminate() -> bool;
+          auto isRunning() -> bool;	
+          auto StreamLines(LineConsumer consumer) -> bool; 
+          auto GetOutput() -> std::string;	
+  private:
+          auto ReadLineFromHandle(HANDLE hFile) -> std::pair<bool, std::string>;	
+  }; //========= End of Class ProcessBuilder ===== // 
+
+
+  //========= File:  main.cpp ===================//
+
+
+  int main(int argc, char** argv)
+  {
+
+        if(argc < 2)
+        {
+             std::cerr << "Usage: " << argv[0] << " [test0 | test1 | test2 | test3 | test4 ]" << std::endl;
+             return EXIT_FAILURE;
+        }
+
+        auto tryExit = [&argc, &argv](std::function<int ()> Action) -> void {
+                try {
+                     // End current process with exit code returned
+                     // from function
+                     int status = Action();			
+                     std::cerr << "[SUCCESS] End gracefully";
+                     std::exit(status);
+                }catch(const std::runtime_error& ex)
+                {
+                    std::cerr << "[ERROR  ] " << ex.what() << std::endl;
+                    std::exit(1);
+                }		
+        };
+
+
+        /** Stream process output to stdout line by line. Print line read form subprocess 
+         ,* output as soon as it arrives. */
+        if(std::string(argv[1]) == "test0")
+                tryExit([]{
+                              auto p = ProcessBuilder();
+                              p.SetProgram("ping 8.8.8.8");				
+                              std::puts("Stream output of process ping to stdout.");
+                              p.StreamLines([](std::string line){
+                                              std::cout << " line = " << line << std::endl;
+                                              return true;
+                                      });
+                              return EXIT_SUCCESS;
+                        });
+
+        /** Read whole process output and then print it to console and to a file. 
+      ,* run $ dir . at path C:\\windows\\system32, read the whole process output 
+      ,* as string printing it and saving it to a log file. (output.log)
+      ,*/
+        if(std::string(argv[1]) == "test1")
+                tryExit([]{
+                                std::puts("Get output of tasklist.");
+                                auto p = ProcessBuilder("dir .");		
+                                p.SetCWD("C:\\windows\\system32");
+                                std::cout << "Process output = " << std::endl;
+                                auto out = p.GetOutput();
+                                std::cout << out << std::endl;
+
+                                std::ofstream fs("output.log");
+                                fs << " ==>>> Process output = " << "\n";
+                                fs << " +=================+ " << "\n";
+                                fs << out;	
+                                return EXIT_SUCCESS;
+                        });
+
+        /** Launch a process (for window subsystem) and wait for its termination. */
+        if(std::string(argv[1]) == "test2")
+                tryExit([]{
+                             std::puts("Launch process and wait for its termination");
+                             auto p = ProcessBuilder("notepad");
+                             p.Run();
+                             std::cout << "Waiting for process termination" << std::endl;
+                             p.Wait();
+                             std::cout << "Process terminated. OK." << std::endl;
+                             return EXIT_SUCCESS;
+                        });				
+
+        /** Launch a process and terminate it when user hit RETURN. */
+        if(std::string(argv[1]) == "test3")
+                tryExit([]{
+                            std::puts("Launch process and wait for its termination");
+                            auto p = ProcessBuilder("notepad");
+                            p.Run();
+                            std::cout << "Enter RETURN to terminate process => PID = " << p.GetPID() << std::endl;
+                            std::cin.get();
+                            p.Terminate();
+                            std::cout << " Process terminated OK.";
+                            return EXIT_SUCCESS;
+                        });
+
+        /** Simulate failure. */
+        if(std::string(argv[1]) == "test4")
+                tryExit([]{
+                            std::puts("Launch process and wait for its termination");
+                            auto p = ProcessBuilder("notepad-error-failure");
+                            p.Run();
+                            std::cout << "Enter RETURN to terminate process => PID = " << p.GetPID() << std::endl;
+                            std::cin.get();
+                            p.Terminate();
+                            std::cout << " Process terminated OK.";
+                            return EXIT_SUCCESS;
+                        });
+
+        std::cerr << "Error: invalid option " << std::endl;	
+        return EXIT_FAILURE;;
+  }
+
+
+  //========= File: ProcessBuilder.cpp - Implementation ===================//
+
+  ProcessBuilder::ProcessBuilder(const std::string& program,
+                                                             const std::vector<std::string>& args)
+          : m_program(std::move(program))
+          , m_args(std::move(args))
+          , m_si()
+	  
+  { }
+
+  ProcessBuilder::~ProcessBuilder(){
+          ::CloseHandle( m_pi.hProcess );
+          ::CloseHandle( m_pi.hThread );
+  }
+
+  ProcessBuilder::ProcessBuilder(ProcessBuilder&& rhs)
+  {
+          m_program = std::move(rhs.m_program);
+          m_args    = std::move(rhs.m_args);
+          m_console = std::move(rhs.m_console);
+          m_cwd     = std::move(m_cwd);
+          m_si      = std::move(m_si);
+          m_pi      = std::move(m_pi);
+  }
+  auto ProcessBuilder::operator=(ProcessBuilder&& rhs) -> SELF
+  {
+          std::swap(m_program, rhs.m_program);
+          std::swap(m_args,    rhs.m_args);
+          std::swap(m_console, rhs.m_console);
+          std::swap(m_cwd,     rhs.m_cwd);
+          std::swap(m_si,      rhs.m_si);
+          std::swap(m_pi,      rhs.m_pi);
+          return *this;
+  }
+
+  auto ProcessBuilder::SetProgram(const std::string& program) -> ProcessBuilder& {
+          m_program = program;
+          return *this;
+  }
+	
+  auto ProcessBuilder::SetConsole(bool flag) -> ProcessBuilder&
+  {
+          m_console = flag;
+          return *this;
+  }
+  /** Set process directory.
+   ,* @param path - Process directory path.
+   ,*/
+  auto ProcessBuilder::SetCWD(const std::string& path) -> ProcessBuilder&
+  {
+          m_cwd = path;
+          return *this;
+  }
+
+  /** Start process without waiting for its termination.  */
+  auto ProcessBuilder::Run() -> bool {
+          std::string cmdline = m_program;
+          for(const auto& s: m_args)
+                  cmdline = cmdline + " " + s;
+	
+          bool status = ::CreateProcessA(
+                  // lpApplicationName
+                  nullptr
+                  // lpCommandLine
+                  ,&cmdline[0]
+                  // lpProcessAttributes
+                  ,nullptr
+                  // lpThreadAttributes
+                  ,nullptr
+                  // bInheritHandles
+                  ,m_console ? true : false
+                  // dwCreationFlags
+                  ,m_console ? 0  : CREATE_NO_WINDOW
+                  // lpEnvironment - Pointer to environment variables
+                  ,nullptr
+                  // lpCurrentDirectory - Pointer to current directory
+                  ,m_cwd.empty() ? nullptr : &m_cwd[0]
+                  // lpStartupInfo
+                  ,&m_si
+                  // lpProcessInformation
+                  ,&m_pi
+                  );
+          DWORD code;
+          // Wait 10 milliseconds 
+          ::WaitForSingleObject(m_pi.hProcess, 10);
+                    ::GetExitCodeProcess(m_pi.hProcess, &code);  
+          if(code != STILL_ACTIVE)
+                  throw std::runtime_error(std::string("Failed to create process = ") + m_program);
+          return status;
+  }
+
+  auto ProcessBuilder::Wait() -> void {
+          ::WaitForSingleObject( m_pi.hProcess, INFINITE );
+  }
+
+  // Start process and wait for its termination. 
+  auto ProcessBuilder::RunWait() -> bool {
+          bool status = this->Run();
+          this->Wait();
+          return status;
+  }
+
+  auto ProcessBuilder::GetPID() -> DWORD {
+          return m_pi.dwProcessId;
+  }
+
+  auto ProcessBuilder::Terminate() -> bool {
+          return ::TerminateProcess(m_pi.hProcess, 0);
+  }
+
+  auto ProcessBuilder::isRunning() -> bool {
+          DWORD code;
+          ::GetExitCodeProcess(m_pi.hProcess, &code);
+          return code == STILL_ACTIVE;
+  }
+
+  auto ProcessBuilder::StreamLines(ProcessBuilder::LineConsumer consumer) -> bool {
+          HANDLE hProcStdoutRead = INVALID_HANDLE_VALUE;
+          HANDLE hProcStdoutWrite = INVALID_HANDLE_VALUE;
+          SECURITY_ATTRIBUTES sattr;
+          sattr.nLength              = sizeof(SECURITY_ATTRIBUTES);
+          sattr.bInheritHandle       = true;
+          sattr.lpSecurityDescriptor = nullptr;
+          if(!::CreatePipe(&hProcStdoutRead, &hProcStdoutWrite, &sattr, 0))
+                  throw std::runtime_error("Error: failed to create pipe");
+		
+          if(!::SetHandleInformation(hProcStdoutRead, HANDLE_FLAG_INHERIT, 0))
+                  throw std::runtime_error("Error: failed to set handle information");		
+
+          m_si.hStdOutput = hProcStdoutWrite;
+          m_si.dwFlags   |= STARTF_USESTDHANDLES;
+          bool status = this->Run();	   
+          // The writing handler must be closed befored reading the 
+          ::CloseHandle(hProcStdoutWrite);
+          auto lin = std::pair<bool, std::string>{};
+          while(lin = ReadLineFromHandle(hProcStdoutRead), lin.first)
+                  if(!consumer(std::move(lin.second))) break;
+          return status;
+  } //--- EOf ReadOutput --- //
+
+  auto ProcessBuilder::GetOutput() -> std::string {
+          std::stringstream ss;
+          StreamLines([&ss](std::string line){
+                          ss << line << '\n';
+                          return true;
+                  });
+          return ss.str();
+  }
+
+  auto ProcessBuilder::ReadLineFromHandle(HANDLE hFile) -> std::pair<bool, std::string> 
+  {
+          std::stringstream ss; 
+          DWORD bytesRead;
+          char c;
+          bool result;
+          while(true){
+                  result = ::ReadFile(hFile, &c, 1, &bytesRead, nullptr); //, result
+                  if(GetLastError() == ERROR_HANDLE_EOF || GetLastError() == ERROR_BROKEN_PIPE){
+                          // std::cerr << " [TRACE] Reach END OF FILE." << std::endl;
+                          return std::make_pair(false, "");
+                  }				
+                  if(c == '\n') break;	
+                  ss << c;
+          }
+          // Return (NOTEOF?, string) => Flag returns false while end of file is not reached.
+          std::string line = ss.str();
+          char last = line[line.size()-1];
+          if(last == '\r' || last == '\n')
+                  line = line.substr(0, line.size() - 2);
+          return std::make_pair(!(bytesRead == 0 && result), ss.str());
+  };	
+#+END_SRC
+
+
+  *Building* 
+
  
 Compiling MSVC:
 
@@ -3111,7 +3996,7 @@ References:
 
 *** CODE - Show IPv4 address of a hostname
 
- File: showIP.cpp 
+ File: _showIP.cpp_
 
  #+BEGIN_SRC cpp 
    /* Show IPV4 Address of a given hostname
@@ -3184,6 +4069,99 @@ References:
 Source: 
  + File: [[file:src/windows/client-socket-shell1.cpp][file:src/windows/client-socket-shell1.cpp]]
  + GIST: [[https://gist.github.com/caiorss/6f86bd879b339982550064f31b2ea75a][client-socket-shell1.cpp]]
+
+ *Source Files* 
+
+FIle: _client-socket-shell1.cpp_ 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+  #include <windows.h>
+  #pragma comment (lib, "Ws2_32.lib")
+  // #pragma comment (lib, "Mswsock.lib")
+  // #pragma comment (lib, "AdvApi32.lib")
+
+  int main(int argc, char** argv){
+          if(argc < 3){
+                  std::cerr << "Usage: " << argv[0] << " [HOSTNAME or ADDRESS] [PORT]" << std::endl;
+                  return EXIT_FAILURE;
+          }
+
+          // Client configuration 
+          const char*  host = argv[1];
+          unsigned int port = std::stoi(argv[2]);
+
+          //Start up Winsock…
+          WSADATA wsadata;
+          int error = WSAStartup(0x0202, &wsadata);
+          if(error){
+                  std::cerr << "Error: failed to initialize WinSock." << std::endl;
+                  return EXIT_FAILURE;
+          }
+
+          // Create client socket 
+          SOCKET client = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+          if(client == INVALID_SOCKET){
+               std::cerr << "Error, I cannot create socket" << std::endl;
+               return EXIT_FAILURE;
+          }
+          SOCKADDR_IN  addr;
+          memset(&addr, 0, sizeof(addr));
+          addr.sin_family      = AF_INET;
+          addr.sin_addr.s_addr = inet_addr(host);
+          addr.sin_port        = htons(port);
+
+          // Attemp to connect to server and exit on failure. 
+          int connval = connect(client, reinterpret_cast<sockaddr*>(&addr), sizeof(addr));
+          if(connval == SOCKET_ERROR){
+               std::cerr << "Error: cannot connect to server." << std::endl;
+               //Returns status code other than zero
+               return EXIT_FAILURE;
+          }
+
+          std::string msgClientConnect = " [CLIENT] Connected to server OK.\n";	
+          ::send(client, msgClientConnect.c_str(), msgClientConnect.size(), 0);
+
+          std::string msg = " [CLIENT SHELL]>> ";
+          std::string echo;
+	
+          bool flag = true;
+          while(flag){    
+              ::send(client, msg.c_str(), msg.size(), 0);
+              // Create a buffer with 2024 bytes or 2kb
+              std::string buffer(2024, 0);
+              //Returns the number of received bytes 
+              int n = ::recv(client, &buffer[0], buffer.size()-1, 0);
+              echo = " => [ECHO] " + buffer + "\n";
+              ::send(client, echo.c_str(), echo.size(), 0);
+              if(WSAGetLastError() == SOCKET_ERROR){
+                      std::cerr << "Disconnected OK." << std::endl;
+                      flag  = false;
+                      break;
+              } else {
+                      buffer.resize(n);
+                      if(buffer == "exit\n" ){
+                              std::string exitMessage = " [CLIENT] Disconnect gracefully - OK.\n";
+                              ::send(client, exitMessage.c_str(), exitMessage.size(), 0);				
+                              std::cerr << "[LOG] I got an exit message. Shutdowing socket now!" << "\n";
+                              std::cerr << "[LOG] Gracifully disconnecting application" << "\n";
+                              std::cerr.flush();
+                              break;
+                      }        
+                      std::cout << " [SERVER SENT] >> " << buffer ; //<< std::endl;
+                      // Force writing buffer to the stdout
+                      std::cout.flush();
+              }
+          }
+          std::cerr << "Finished." << std::endl;   
+          ::closesocket(client);
+          ::WSACleanup();    
+          // Returns status code 0
+          return EXIT_SUCCESS;
+  }
+#+END_SRC
+
 
  *Build* 
 
@@ -4547,7 +5525,7 @@ the windows subsystem.
   $ g++ gui-without-winmain.cpp -o gui-without-winmain.exe -std=c++1z -g -lgdi32 -luser32 -Wl,-subsystem,windows
 #+END_SRC
 ** Loading DLLs - shared libraries at runtime 
-*** Example 1 - Basic Dynamic Loading 
+*** Example 1 - Basic Dynamic Loading DLL 
 
 This example demonstrates how to dynamic load functions from a shared
 library at runtime with WinAPIs Loadlibrary, GetProcAddress and
@@ -4556,6 +5534,107 @@ FreeLibrary.
 Source:
  + File: [[file:src/windows/dynamic-loading1.cpp][file:src/windows/dynamic-loading1.cpp]] 
  + GIST: [[https://gist.github.com/caiorss/5ec138f86b6208214fb8866344f15e77][dynamic-loading1.cpp]]
+
+
+FIle: _dynamic-loading.cpp_ 
+
+#+BEGIN_SRC cpp 
+  //---------------------------------------------------------------------------
+  #include <iostream>
+  #include <string>
+
+  #include <windows.h>
+
+  int main(){
+
+          /** Reference: https://msdn.microsoft.com/en-us/ie/ms775123(v=vs.94)
+          Function Signature:          
+                  HRESULT URLDownloadToFile(
+                                           LPUNKNOWN            pCaller,
+                                           LPCTSTR              szURL,
+                                           LPCTSTR              szFileName,
+                    _Reserved_ DWORD                dwReserved,
+                                           LPBINDSTATUSCALLBACK lpfnCB
+                  );
+        ---------------------------------------------- */
+
+          // Wide-unicode strings 
+          std::wstring fileURL = L"http://httpbin.org/image/jpeg";
+          std::wstring file1   = L"download-file1.jpeg";
+          std::wstring file2   = L"download-file2.jpeg";	
+	
+          // Wide unicode version for LoadLibrary API
+          HMODULE hLib = ::LoadLibraryW(L"urlmon.dll");
+          if(hLib == nullptr){
+                  std::cerr << " [ERROR] Error: failed to load shared library" << std::endl;
+                  // Early return on Error. 
+                  return EXIT_FAILURE;		
+          }
+          std::cerr << " [INFO] DLL Loaded OK" << std::endl;
+
+          std::cout << "============ EXPERIMENT 1 ===================" << std::endl;
+
+          // The function pointer must have the same
+          // signature of the function to be dynamically loaded
+          //
+          // Note: Windows function pointer should include calling convention 
+          // If omitted, the default calling convention is __cdcel
+          // Possible Calling Conventions: __cdcel, __stdcall, __fastcall and so on.
+          //---------------------------
+
+          // C+11 type alias for function pointer 
+          using FunptrType =
+                  HRESULT (__cdecl *)(LPUNKNOWN, LPCWSTR, LPCWSTR, DWORD, LPBINDSTATUSCALLBACK);
+
+
+          // Alternative 2 for type alias (C++98/03)
+          typedef HRESULT (__cdecl * FunptrTypeTypedef)(LPUNKNOWN, LPCWSTR, LPCWSTR, DWORD, LPBINDSTATUSCALLBACK);
+
+	
+          FARPROC hFunc = ::GetProcAddress(hLib, "URLDownloadToFileW");
+          if(hFunc == nullptr){
+                  std::cerr << " [Error] Failed to load function from DLL" << std::endl;
+                  return EXIT_FAILURE;
+          }
+          std::cerr << " [INFO] Function loaded OK" << std::endl;
+
+          // Functin Pointer 
+          FunptrType URLDownloadToFileFunPTR = reinterpret_cast<FunptrType>(hFunc);	
+	
+          HRESULT result1 = URLDownloadToFileFunPTR(nullptr, fileURL.c_str(), file1.c_str(), 0, nullptr);
+
+          if(SUCCEEDED(result1)) 
+              std::cerr << " [INFO] Download successful OK. " << std::endl;
+          else
+              std::cerr << " [ERROR] Download failure. " << std::endl;
+
+	
+          std::cout << "============ EXPERIMENT 2 ===================" << std::endl;
+          // Same cast as reinterpret_cast 
+          void* hFunc2 = (void*) ::GetProcAddress(hLib, "URLDownloadToFileW");
+          // Omit error checking if(hFunct2 == nullptr){ ... }
+
+          // Note: Calling convention __cdecl can be omitted
+          using URLDownloadToFileW_t =
+                  auto __cdecl (LPUNKNOWN, LPCWSTR, LPCWSTR, DWORD, LPBINDSTATUSCALLBACK) -> HRESULT;
+          //  auto (LPUNKNOWN, LPCWSTR, LPCWSTR, DWORD, LPBINDSTATUSCALLBACK) -> HRESULT;
+	
+          auto DownloadFile = reinterpret_cast<URLDownloadToFileW_t*>(hFunc2);
+
+          HRESULT hresult2 = DownloadFile(nullptr, fileURL.c_str(), file2.c_str(), 0, nullptr);
+          if(SUCCEEDED(result1))
+                  std::cerr << " [INFO] Download successful OK. " << std::endl;
+          else
+                  std::cerr << " [ERROR] Download failure. " << std::endl;
+		
+          // WARNING: Code NOT Safe - prone to resource leaking
+          // in case of exception or forget to call this function. 
+          ::FreeLibrary(hLib);
+          std::cerr << " [INFO] Application ended gracefully. OK." << std::endl;
+	
+          return 0;
+  }
+#+END_SRC
 
 Types of loading:
 
@@ -4859,9 +5938,8 @@ Command output:
 
  + [[https://docs.microsoft.com/en-us/windows/desktop/dlls/dynamic-link-library-security][Dynamic-Link Library Security]]
 
- + [[https://docs.python.org/2/library/ctypes.html][15.17. ctypes — A
-   foreign function library for Python — Python 2.7.15 documentation]]
-*** Example 2 - Dynamic loading using a class
+ + [[https://docs.python.org/2/library/ctypes.html][15.17. ctypes — A foreign function library for Python — Python 2.7.15 documentation]]
+*** Example 2 - Dynamic loading with a class Wrapper 
 
 This code uses a class DLLoader to load a shared library hiding the
 complexity and implementation detail. It also uses RAII for ensuring
@@ -4870,6 +5948,147 @@ that the resource is released.
 Source: 
  + File: [[file:src/windows/dynamic-loading2.cpp][file:src/windows/dynamic-loading2.cpp]]
  + GIST: [[https://gist.github.com/caiorss/c5dd06a401f4816920bb682367455f5e][dynamic-loading2.cpp]]
+
+ 
+ *Files* 
+
+FIle: _dymaic-loading2.cpp_ 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+
+  #include <windows.h>
+
+  //========== File: DLLLoader.hpp =======//
+  class DLLLoader
+  {
+  private:
+       HMODULE      m_hLib;
+       std::string  m_file;
+  public:
+       DLLLoader(const std::string& file);
+       DLLLoader(const DLLLoader&) = delete;	
+       DLLLoader(DLLLoader&& rhs);
+       ~DLLLoader();
+       auto operator=(const DLLLoader&) = delete;
+       auto operator=(DLLLoader&& rhs);
+
+       auto GetFile() const ->  std::string;
+       auto IsLoaded() const -> bool;
+       operator bool() const;
+
+       template<class FunctionSignature>
+       auto GetFunction(const std::string& functionName ) const -> FunctionSignature*
+       {
+            if(m_hLib == nullptr){ return nullptr; }                       
+            FARPROC hFunc = ::GetProcAddress(m_hLib, functionName.c_str());
+            if(hFunc == nullptr){ return nullptr; }          
+            return reinterpret_cast<FunctionSignature*>(hFunc);
+       }	
+  };
+
+  //========== File: Main.cpp =======//
+
+  int main()
+  {
+          // Wide-unicode strings 
+          std::wstring fileURL = L"http://httpbin.org/image/jpeg";
+          std::wstring file1   = L"download-file1.jpeg";
+          std::wstring file2   = L"download-file2.jpeg";	
+
+          auto dll = DLLLoader("urlmon.dll");
+          if(!dll){
+                  std::cerr << "[Error] failed to load DLL." << std::endl;
+                  return EXIT_FAILURE;
+          }
+          std::cerr << "[INFO] DLL loaded OK." << std::endl;
+
+          // -----------------------------------------------------------------//
+          std::cout << "===== Experiment 1 =========== " << std::endl;
+	
+          auto URLDownloadToFileW =
+                  dll.GetFunction<HRESULT (LPUNKNOWN,
+                                           LPCWSTR,
+                                           LPCWSTR,
+                                           DWORD,
+                                           LPBINDSTATUSCALLBACK)>("URLDownloadToFileW");
+
+          if(URLDownloadToFileW == nullptr){
+                  std::cerr << "[Error] failed to load function. " << std::endl;
+                  return EXIT_FAILURE;
+          }
+          std::cerr << "[INFO] Function URLDownloadToFileW loaded OK. " << std::endl;
+
+
+          HRESULT result1 = URLDownloadToFileW(nullptr, fileURL.c_str(), file1.c_str(), 0, nullptr);
+          if(SUCCEEDED(result1))
+                  std::cerr << " [INFO] Download successful OK. " << std::endl;
+          else
+                  std::cerr << " [ERROR] Download failure. " << std::endl;	   
+
+          // -----------------------------------------------------------------//
+          std::cout << "===== Experiment 2 =========== " << std::endl;
+          // Note: Calling convention __cdecl can be omitted
+          using URLDownloadToFileW_t =
+                  HRESULT (*) (LPUNKNOWN, LPCWSTR, LPCWSTR, DWORD, LPBINDSTATUSCALLBACK);	
+	
+          auto URLDownloadToFileW2 =
+                  dll.GetFunction<URLDownloadToFileW_t>("URLDownloadToFileW");
+
+          HRESULT result2 =
+                  URLDownloadToFileW(nullptr, fileURL.c_str(), file2.c_str(), 0, nullptr);
+	
+          if(SUCCEEDED(result2))
+                  std::cerr << " [INFO] Download successful OK. " << std::endl;
+          else
+                  std::cerr << " [ERROR] Download failure. " << std::endl;	   	
+          return 0;
+  }
+
+  ///==== Implementations - file: DLLoader.hpp =======//
+
+  DLLLoader::DLLLoader(const std::string& file):
+     m_file(file),
+     m_hLib(::LoadLibraryA(file.c_str()))
+  {
+  }
+
+  // Move CTOR
+  DLLLoader::DLLLoader(DLLLoader&& rhs):
+      m_hLib(std::move(rhs.m_hLib)),
+      m_file(std::move(rhs.m_file))
+  {   	
+  }
+  // Move assignment operator
+  auto DLLLoader::operator=(DLLLoader&& rhs)		
+  {
+       std::swap(this->m_hLib, rhs.m_hLib);
+       std::swap(this->m_file, rhs.m_file);
+  }
+	
+  DLLLoader::~DLLLoader()
+  {
+      std::cerr << " [INFO] DLL handler released OK." << std::endl;
+      if(m_hLib != nullptr)
+              ::FreeLibrary(m_hLib);
+  }
+
+  auto DLLLoader::GetFile() const ->  std::string
+  {
+      return m_file;
+  }
+	
+  auto DLLLoader::IsLoaded() const -> bool
+  {
+      return m_hLib == nullptr;
+  }
+
+  DLLLoader::operator bool() const
+  {
+     return m_hLib != nullptr;
+  }
+#+END_SRC
 
  *Build and run with MSVC* 
 
@@ -5804,7 +7023,6 @@ Inspect: notepad.exe
        => Virtual Address = 0x31000
        =>     Raw Address = 0x2C000
 #+END_SRC
-
 
 
 ** Install Development Tools and Compilers 
