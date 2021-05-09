@@ -1707,6 +1707,351 @@ File: _windows-envvars.cpp_
    [RESULT] factorial( 5 ) = 120
 #+END_SRC
 
+** General System Information 
+
+ *Documentation* 
+
+   + [[https://docs.microsoft.com/en-us/windows/win32/api/shlobj_core/nf-shlobj_core-shgetfolderlocation][SHGetFolderLocation function]]
+     + Determine path of special folders. 
+
+   + [[https://docs.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-globalmemorystatusex][GlobalMemoryStatusEx function (sysinfoapi.h)]]
+     + Get amount of RAM memory (physical memory, aka working memory)
+       available; amount of page file used and amount of virtual
+       memory informations. 
+
+   + [[https://docs.microsoft.com/en-us/windows/win32/sysinfo/system-information-functions][System Information Functions]]
+     + Documentation functions for retrieving system information. 
+
+   + [[https://docs.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-getsysteminfo][GetSystemInfo()]] 
+
+   + [[https://docs.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-getsystemdirectorya][GetSystemDirectory()]]
+
+   + [[https://docs.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-getsystemwindowsdirectorya][GetSystemWindowsDirectory()]]
+
+   + [[https://docs.microsoft.com/en-us/windows/win32/api/wow64apiset/nf-wow64apiset-getsystemwow64directorya][GetSystemWow64Directory()]]
+
+   + [[https://docs.microsoft.com/en-us/windows/desktop/api/Winbase/nf-winbase-getusernamea][GetUserName()]]
+
+   + [[https://docs.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-getversion][GetVersion()]]
+
+   + [[https://docs.microsoft.com/en-us/windows/win32/sysinfo/operating-system-version][Operating System Version]]
+     + Brief: "The Version API Helper functions are used to determine
+       the version of the operating system that is currently
+       running. For more information, see Getting the System Version."
+
+   + [[https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getsystemmetrics][GetSystemMetrics function (winuser.h)]]
+
+   + [[https://docs.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-getlogicalprocessorinformation][GetLogicalProcessorInformation function (sysinfoapi.h)]]
+     + Determines the number of logical processors available. Intel and
+       AMD-based CPU cores can execute more than one stream of
+       instructions simultaneously when hyper-thread is enabled. For
+       instance, if a processor IC (Integrated Circuit) chip on the
+       motherboard, has 4 cores and each core has 2 hyper-threads, the
+       processor has 4 x 2 = 8 logical cores. Therefore, the processor
+       can run up to 8 threads simultaneously and has 8 hardware
+       threads. 
+
+
+  *Files* 
+
+File: _sysinfo.cpp_
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+  #include <cassert>
+
+  #include <windows.h>
+  #include <shfolder.h>  // For CSIDL_ constants
+  #include <shlobj.h>    // For CSIDL_ constants
+  // #include <shlobj_core.h>
+  #include <VersionHelpers.h>
+  #include <sysinfoapi.h>
+
+  std::string getSystemDirectory();
+  std::string getWindowsDirectory();
+
+
+  // Wrap functions with signature:
+  //   =>> using Func = UINT (*) (TCHAR* buffer, UINT n)
+  //
+  // The function returns a string by writing n bytes to the buffer
+  // and returns the string lenght in bytes. If the buffer is not
+  // enough larger to hold the string, the calling code should resize
+  // it with the number of characters returned by the function call.
+  //
+  template<typename Func, typename T = UINT>
+  auto wrap_fun(Func&& func) -> std::string;
+
+  template<typename Func>
+  auto wrap_fun2(Func&& func, DWORD size) -> std::string;
+
+  std::string get_shfolder_path(int csidl);
+  void        show_system_memory_info();
+  void        show_windows_version();
+  void        show_processor_info();
+
+  int main()
+  {
+
+    std::puts("\n ======= Windows Version ==================");
+    std::cout << std::boolalpha;
+    show_windows_version();
+  
+    std::cout << " [*] Is it Windows Sever? = " << ::IsWindowsServer()      << '\n';
+    std::cout << " [*] Is >= Windows 10?    = " << ::IsWindows10OrGreater() << '\n';
+    std::cout << " [*] Is >= Windows XP?    = " << ::IsWindowsXPOrGreater() << '\n';
+    std::cout << " [*] Is >= Windows 8?     = " << ::IsWindows8OrGreater() << '\n';
+
+  
+    std::puts("\n ======== System Memory Info  ==============");
+    show_system_memory_info();
+
+    std::puts("\n ======== Hardware Info  ===================");
+    show_processor_info();
+  
+    std::puts("\n ======== System Information ==============");
+
+    std::cout << " [*] Path to Windows Directory = "
+              << wrap_fun(&GetWindowsDirectoryA) << std::endl;
+
+    std::cout << " [*] Path to Windows System Directory = "
+              << wrap_fun(&GetSystemDirectoryA) << std::endl;
+
+    std::cout << " [*] Path to WOW64 Directory = "
+              << wrap_fun(&GetSystemWow64DirectoryA) << std::endl;
+
+    std::cout << " [*] Computer name = "
+              << wrap_fun2(&GetComputerNameA, 32767) << '\n';
+
+    // Note: This function fails if the username uses
+    // non ASCII characters such as Japanese Hiragrama
+    //, Katakana or Kanji.
+    std::cout << " [*] Username (account login name) = "
+              << wrap_fun2(&GetUserNameA, 32767) << '\n';
+
+    // Documentation at:
+    // https://docs.microsoft.com/en-us/windows/win32/api/shlobj_core/nf-shlobj_core-shgetfolderpatha
+    std::puts("\n ========= Special Directories =================");
+
+    std::cout << " =>> AdminTools = "
+              << get_shfolder_path(CSIDL_ADMINTOOLS) << '\n';
+
+    std::cout << " =>> AppData = "
+              << get_shfolder_path(CSIDL_APPDATA) << '\n';
+
+    std::cout << " =>> LocalAppData = "
+              << get_shfolder_path(CSIDL_LOCAL_APPDATA) << '\n';
+
+    std::cout << " =>> CommonAppData = "
+              << get_shfolder_path(CSIDL_COMMON_APPDATA) << '\n';
+
+    std::cout << " =>> Common Admin Tools = "
+              << get_shfolder_path(CSIDL_COMMON_ADMINTOOLS) << '\n';
+
+     std::cout << " =>> Common Documents = "
+              << get_shfolder_path(CSIDL_COMMON_DOCUMENTS) << '\n';
+
+     std::cout << " =>> My Pictures = "
+              << get_shfolder_path(CSIDL_MYPICTURES) << '\n';
+
+     std::cout << " =>> Personal Documents = "
+              << get_shfolder_path(CSIDL_PERSONAL) << '\n';
+
+     std::cout << " =>> Recent Folder = "
+              << get_shfolder_path(CSIDL_RECENT) << '\n';
+
+     std::cout << " =>> Internet Cache = "
+              << get_shfolder_path(CSIDL_INTERNET_CACHE) << '\n';
+
+     std::cout << " =>> System Folder = "
+              << get_shfolder_path(CSIDL_SYSTEM) << '\n';
+
+     std::cout << " =>> Windows Folder "
+              << get_shfolder_path(CSIDL_WINDOWS) << '\n';
+
+     std::cout << " =>> Program Files Folder = "
+              << get_shfolder_path(CSIDL_PROGRAM_FILES) << '\n';
+
+     std::cout << " =>> Program Files Common Folder = "
+              << get_shfolder_path(CSIDL_PROGRAM_FILES_COMMON) << '\n';
+
+     std::cout << " =>> Startup Folder = "
+              << get_shfolder_path(CSIDL_STARTUP) << '\n';
+
+     std::cout << " =>> Startup Menu Folder = "
+              << get_shfolder_path(CSIDL_STARTMENU) << '\n';
+
+     std::cout << " =>> Sendto Folder = "
+              << get_shfolder_path(CSIDL_SENDTO) << '\n';
+
+     // std::cout << " =>> Recycler Bin Folder = "
+     // 	    << get_shfolder_path(CSIDL_BITBUCKET) << '\n';
+
+    return 0;
+  }
+
+  //=================================//
+
+  template<typename Func, typename T = UINT>
+  auto wrap_fun(Func&& func) -> std::string
+  {
+    T n = 0;
+    // Determine the size of the buffer for storing the result.
+    n = func(nullptr, 0);
+    assert( n != 0 && "Failure => Handle this error." );
+    // Create a buffer with N null characters 0x00
+    auto buffer = std::string(n, '\0');
+    n = func(buffer.data(), n);
+    assert( n != 0);
+    return buffer;
+  }
+
+
+  template<typename Func>
+  auto wrap_fun2(Func&& func, DWORD size) -> std::string
+  {
+    auto buffer = std::string(size, '\0');
+    assert( func(buffer.data(), &size) != 0);
+    buffer.resize(size);
+    return buffer;
+  }
+
+  std::string
+  get_shfolder_path(int csidl)
+  {
+     std::string path(MAX_PATH, 0);
+
+     HRESULT h = ::SHGetFolderPathA( nullptr
+                                  ,csidl
+                                  ,nullptr
+                                  ,0
+                                  ,path.data());
+
+     assert( SUCCEEDED(h) );
+
+     // Find position of first null char in the buffer.
+     void* ps = memchr( &path[0], '\0', MAX_PATH);
+     ptrdiff_t pA = reinterpret_cast<ptrdiff_t>(ps);
+     ptrdiff_t pB = reinterpret_cast<ptrdiff_t>( path.data() );
+     path.resize(pA - pB);
+     return path;
+  }
+
+  void show_system_memory_info()
+  {
+      MEMORYSTATUSEX st;
+      st.dwLength = sizeof(st);
+      ::GlobalMemoryStatusEx(&st);
+
+      // Factor => Bytes to megabytes
+      constexpr double factor = 1.0 / (1024 * 1024 );
+
+      std::printf(" [*] Percent of total physical memory used        = %ld  \n", st.dwMemoryLoad);
+      std::printf(" [*] Total physical memory in Megabytes           = %.3f \n", st.ullTotalPhys * factor );
+      std::printf(" [*] Free memory in MB form total physical memory = %.3f \n", st.ullAvailPhys * factor );
+      std::printf(" [*] Total size of page file in MB                = %.3f \n", st.ullTotalPageFile * factor );
+      std::printf(" [*] Free memory of page file   MB                = %.3f \n", st.ullAvailPageFile * factor );
+      std::printf(" [*] Total virtual memory in  MB                  = %.3f \n", st.ullTotalVirtual * factor );
+      std::printf(" [*] Free virtual memory MB                       = %.3f \n", st.ullAvailVirtual * factor );
+      std::printf(" [*] Amount of extended memory available in MB    = %.3f \n", st.ullAvailExtendedVirtual * factor );
+  }
+
+  void show_windows_version()
+  {
+    DWORD version, majorVersion, minorVersion, build;
+    version = majorVersion = minorVersion = build = 0;
+
+    version = GetVersion();
+    majorVersion = static_cast<DWORD>( LOBYTE( LOWORD(version) ) );
+    minorVersion = static_cast<DWORD>( LOBYTE( HIWORD(version) ) );
+    if (version < 0x80000000){ build = static_cast<DWORD>(HIWORD(version));  }           
+    std::printf(" [*] Windows Version = %ld.%ld (%ld) \n", majorVersion, minorVersion, build);
+  }
+
+  void show_processor_info()
+  {
+      SYSTEM_INFO info;
+      ::GetNativeSystemInfo(&info);
+
+      printf(" [*] Processor architecture = %ld \n", info.wProcessorArchitecture);    
+
+      printf(" [*] Processor arch is x86 = %s \n"
+             , PROCESSOR_ARCHITECTURE_INTEL ==  info.wProcessorArchitecture ? "TRUE" : "FALSE");
+    
+      printf(" [*] Processor arch is AMD64 x64 (AMD or Intel = %s \n"
+             , PROCESSOR_ARCHITECTURE_AMD64 ==  info.wProcessorArchitecture ? "TRUE" : "FALSE");
+
+      printf(" [*] Processor arch is ARM = %s \n"
+             , PROCESSOR_ARCHITECTURE_ARM ==  info.wProcessorArchitecture ? "TRUE" : "FALSE");
+    
+      printf(" [*] Processor arch is ARM64 = %s \n"
+             , PROCESSOR_ARCHITECTURE_ARM64 ==  info.wProcessorArchitecture ? "TRUE" : "FALSE");
+    
+      printf(" [*] Page size (virtual memory) in bytes = %ld \n", info.dwPageSize);
+      printf(" [*] Number of processors                = %ld \n", info.dwNumberOfProcessors);
+    
+  }
+
+#+END_SRC
+
+ *Building and running*  (MINGW compiler)
+
+#+BEGIN_SRC sh 
+   $ g++ sysinfo.cpp -o sysinfo.exe -std=c++1z -Wall -Wextra -g -static && .\sysinfo.exe
+
+   ======= Windows Version ==================
+   [*] Windows Version = 10.98 (19042) 
+   [*] Is it Windows Sever? = false
+   [*] Is >= Windows 10?    = true
+   [*] Is >= Windows XP?    = true
+   [*] Is >= Windows 8?     = true
+
+   ======== System Memory Info  ==============
+   [*] Percent of total physical memory used        = 45  
+   [*] Total physical memory in Megabytes           = 4095.484 
+   [*] Free memory in MB form total physical memory = 2219.480 
+   [*] Total size of page file in MB                = 5503.484 
+   [*] Free memory of page file   MB                = 3580.918 
+   [*] Total virtual memory in  MB                  = 134217727.875 
+   [*] Free virtual memory MB                       = 134213543.578 
+   [*] Amount of extended memory available in MB    = 0.000 
+
+   ======== Hardware Info  ===================
+   [*] Processor architecture = 9 
+   [*] Processor arch is x86 = FALSE 
+   [*] Processor arch is AMD64 x64 (AMD or Intel = TRUE 
+   [*] Processor arch is ARM = FALSE 
+   [*] Processor arch is ARM64 = FALSE 
+   [*] Page size (virtual memory) in bytes = 4096 
+   [*] Number of processors                = 2 
+
+   ======== System Information ==============
+   [*] Path to Windows Directory = C:\WINDOWS\0
+   [*] Path to Windows System Directory = C:\WINDOWS\system32\0
+   [*] Path to WOW64 Directory = C:\WINDOWS\SysWOW64\0
+   [*] Computer name = DESKTOP-GLJQDB6
+   [*] Username (account login name) = user_001\0
+
+   ========= Special Directories =================
+   =>> AdminTools = C:\Users\user_001\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Administrative Tools
+   =>> AppData = C:\Users\user_001\AppData\Roaming
+   =>> LocalAppData = C:\Users\user_001\AppData\Local
+   =>> CommonAppData = C:\ProgramData
+   =>> Common Admin Tools = C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Administrative Tools
+   =>> Common Documents = C:\Users\Public\Documents
+   =>> My Pictures = C:\Users\user_001\Pictures
+   =>> Personal Documents = C:\Users\user_001\Documents
+   =>> Recent Folder = C:\Users\user_001\AppData\Roaming\Microsoft\Windows\Recent
+   =>> Internet Cache = C:\Users\user_001\AppData\Local\Microsoft\Windows\INetCache
+   =>> System Folder = C:\WINDOWS\system32
+   =>> Windows Folder C:\WINDOWS
+   =>> Program Files Folder = C:\Program Files
+   =>> Program Files Common Folder = C:\Program Files\Common Files
+   =>> Startup Folder = C:\Users\user_001\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup
+   =>> Startup Menu Folder = C:\Users\user_001\AppData\Roaming\Microsoft\Windows\Start Menu
+   =>> Sendto Folder = C:\Users\user_001\AppData\Roaming\Microsoft\Windows\SendTo
+#+END_SRC
 ** CODE - Display information about current process 
 
 Print information about current process and copy itself to desktop
