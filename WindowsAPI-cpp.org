@@ -1707,6 +1707,337 @@ File: _windows-envvars.cpp_
    [RESULT] factorial( 5 ) = 120
 #+END_SRC
 
+** Primitive IO - Input/Ouput
+*** Overview
+
+Unlike Unix-based operating systems, Windows NT does not use open(),
+read(), creat(), close() primitive IO subroutines, instead this
+operating system uses CreateFIle(), ReadFile(), WriteFile(),
+CloseHandle(). Windows NT also has asynchronous primitive IO
+subroutines which does not block the current thread.
+
+  + [[https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-openfile][CreateFileA()]] / ANSI Version
+    + Brief MSDN: "Creates or opens a file or I/O device. The most
+      commonly used I/O devices are as follows: file, file stream,
+      directory, physical disk, volume, console buffer, tape drive,
+      communications resource, mailslot, and pipe. The function
+      returns a handle that can be used to access the file or device
+      for various types of I/O depending on the file or device and the
+      flags and attributes specified."
+
+#+BEGIN_SRC cpp
+  // ---- ANSI version -------------//
+  HANDLE CreateFileA(
+    LPCSTR                lpFileName,
+    DWORD                 dwDesiredAccess,
+    DWORD                 dwShareMode,
+    LPSECURITY_ATTRIBUTES lpSecurityAttributes,
+    DWORD                 dwCreationDisposition,
+    DWORD                 dwFlagsAndAttributes,
+    HANDLE                hTemplateFile
+  );
+
+ // -- Unicode UTF-16 -----version ----//
+ HANDLE CreateFileW(
+   LPCWSTR               lpFileName,
+   DWORD                 dwDesiredAccess,
+   DWORD                 dwShareMode,
+   LPSECURITY_ATTRIBUTES lpSecurityAttributes,
+   DWORD                 dwCreationDisposition,
+   DWORD                 dwFlagsAndAttributes,
+   HANDLE                hTemplateFile
+ );
+#+END_SRC
+
+
+  + [[https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-readfile][ReadFile()]] - Read data from handle to buffer.
+    + Brief: "Reads data from the specified file or input/output (I/O)
+      device. Reads occur at the position specified by the file
+      pointer if supported by the device. This function is designed
+      for both synchronous and asynchronous operations. For a similar
+      function designed solely for asynchronous operation, see
+      ReadFileEx."
+    + Note: The argument lpBuffer (void*) is a pointer to any
+      contiguous memory location or any data without any internal
+      pointer.
+
+#+BEGIN_SRC cpp
+   BOOL ReadFile(
+     HANDLE       hFile,
+     LPVOID       lpBuffer,
+     DWORD        nNumberOfBytesToRead,
+     LPDWORD      lpNumberOfBytesRead,
+     LPOVERLAPPED lpOverlapped
+   );
+#+END_SRC
+
+  + [[https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-writefile][WriteFile()]] - Write a buffer to handle.
+    + Brief: "Writes data to the specified file or input/output (I/O)
+      device. This function is designed for both synchronous and
+      asynchronous operation. For a similar function designed solely
+      for asynchronous operation, see WriteFileEx."
+
+#+BEGIN_SRC cpp
+  BOOL WriteFile(
+    HANDLE       hFile,
+    LPCVOID      lpBuffer,
+    DWORD        nNumberOfBytesToWrite,
+    LPDWORD      lpNumberOfBytesWritten,
+    LPOVERLAPPED lpOverlapped
+  );
+#+END_SRC
+
+  + [[https://docs.microsoft.com/en-us/windows/win32/api/handleapi/nf-handleapi-closehandle][CloseHandle()]]
+    + Brief: "Closes an open object handle."
+    + This function can close all types of handles, including: file,
+      I/O completion port, mutex, pipe, console input, console screen
+      buffer, access token and so on.
+
+#+BEGIN_SRC cpp
+  BOOL CloseHandle(HANDLE hObject);
+#+END_SRC
+
+Other Windows APIs:
+
+  + [[https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-deletefilea][DeleteFile()]]
+    + Brief: "Deletes an existing file."
+
+#+BEGIN_SRC cpp
+   BOOL DeleteFileA(LPCSTR lpFileName);
+
+   BOOL DeleteFileW(LPCWSTR lpFileName);
+#+END_SRC
+
+  + [[https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createdirectorya][CreateDirectoryA()]]
+    + Brief: "Creates a new directory. If the underlying file system
+      supports security on files and directories, the function applies
+      a specified security descriptor to the new directory."
+
+#+BEGIN_SRC cpp
+  BOOL CreateDirectoryA(
+    LPCSTR                lpPathName,
+    LPSECURITY_ATTRIBUTES lpSecurityAttributes
+  );
+#+END_SRC
+
+*** Sample code
+
+  *Files*
+
+File: _primtive-io.cpp_
+
+#+BEGIN_SRC cpp
+  #include <iostream>
+  #include <string>
+  #include <cassert>
+
+  #include <windows.h>
+
+  //Note: std::get_envvar() is cross-platofrm and standardized.
+  std::string
+  get_envvar(std::string const& name)
+  {
+     const char* p = std::getenv(name.c_str());
+     if( p == nullptr){
+       throw std::runtime_error("Environment variable not found");
+     }
+     return std::string{p};
+  }
+
+  struct InventoryItem
+  {
+     int    id;
+     float  price;
+     char   product[200];
+  };
+
+  void run_experiment1();
+  void run_experiment2();
+  void run_experiment3();
+
+  int main()
+  {
+    std::puts("\n [EXPERIMENT 1] ===>> Create a text file with primitive IO ======");
+    run_experiment1();
+
+    std::puts("\n [EXPERIMENT 2] ===>> Create a binary file with structured data ======");
+    run_experiment2();
+
+    std::puts("\n [EXPERIMENT 3] ===>> Read a binary file containing structured data ===");
+    run_experiment3();
+
+    return 0;
+  }
+
+  void run_experiment1()
+  {
+    const auto desktop_dir = get_envvar("USERPROFILE") + "\\Desktop";
+    std::fprintf(stderr, " [TRACE] Desktop dir = %s \n", desktop_dir.c_str());
+
+    const auto fpath = desktop_dir + "\\testfile.txt";
+    std::fprintf(stderr, " [TRACE] File path = %s \n", fpath.c_str());
+
+    HANDLE hFile = CreateFileA( fpath.c_str()          // File path
+                               ,GENERIC_WRITE          // Open file for writing
+                               ,0                      // File is not shared with any other process.
+                               ,NULL                   // Use default security - It should be nullptr
+                               ,CREATE_ALWAYS
+                               ,FILE_ATTRIBUTE_NORMAL  // Normal file
+                               ,NULL  );               // DO not use attribute
+
+    assert( hFile != INVALID_HANDLE_VALUE && "Returned invalid handle.");
+
+    constexpr size_t BUFFER_SIZE = 500;
+    size_t len = 0;
+    BOOL error_flag = FALSE;
+
+    char buffer[BUFFER_SIZE];
+
+    // Initialize buffer with null character
+    memset(buffer, '\0', BUFFER_SIZE);
+
+    // Copy string literal to buffer.
+    strcpy(buffer, " =>> Buffer line 1 - test - Gotta love Windows NT \n");
+    // Number of bytes until '\0' null character is found.
+    len = strlen(buffer);
+    error_flag = WriteFile(  hFile   // File handle to be writtern
+                           , buffer  // Buffer to be written to file handle
+                           , len     // Number of bytes to be written
+                           , NULL    // [OUTPUT] Number of bytes written
+                           , NULL    // No overlapped structure
+                           );
+
+    assert( error_flag == TRUE && "Unable to write");
+
+    strcpy(buffer, " =>> C# CSharp, Dot net, Ponto NET - JAVA \n");
+    len = strlen(buffer);
+    WriteFile( hFile, buffer, len, NULL, NULL);
+    assert( error_flag == TRUE && "Unable to write");
+    // Close handle
+    CloseHandle(hFile);
+  }
+
+  // Write binary data
+  void run_experiment2()
+  {
+      InventoryItem item1;
+      item1.id = 200;
+      item1.price = 250.61;
+      strcpy(item1.product, "Some unknown product");
+
+      InventoryItem item2;
+      item2.id = 976;
+      item2.price = 1250.61;
+      strcpy(item2.product, "Old fashioned feature phone XYZW");
+
+      const auto desktop_dir = get_envvar("USERPROFILE") + "\\Desktop";
+      const auto fpath = desktop_dir + "\\inventory.dat";
+
+      HANDLE hFile = CreateFileA( fpath.c_str()
+                               ,GENERIC_WRITE
+                               ,0
+                               ,NULL
+                               ,CREATE_ALWAYS
+                               ,FILE_ATTRIBUTE_NORMAL
+                               ,NULL  );
+
+      BOOL error_flag = FALSE;
+
+      error_flag = WriteFile(hFile, &item1, sizeof(struct InventoryItem), NULL, NULL );
+      assert( error_flag == TRUE && "Unable to write");
+
+      error_flag = WriteFile(hFile, &item2, sizeof(struct InventoryItem), NULL, NULL );
+      assert( error_flag == TRUE && "Unable to write");
+
+      CloseHandle(hFile);
+  }
+
+  // Read binary data.
+  void run_experiment3()
+  {
+      const auto desktop_dir = get_envvar("USERPROFILE") + "\\Desktop";
+      const auto fpath = desktop_dir + "\\inventory.dat";
+
+      // Open file for reading
+      HANDLE hFile = CreateFileA( fpath.c_str()
+                               ,GENERIC_READ
+                               ,0
+                               ,NULL
+                               ,OPEN_EXISTING
+                               ,FILE_ATTRIBUTE_NORMAL
+                               ,NULL  );
+
+      assert( hFile != INVALID_HANDLE_VALUE && "Returned invalid handle.");
+
+      BOOL error_flag = FALSE;
+      DWORD nbytes_read = 0;
+
+      InventoryItem buffer;
+
+      error_flag = ReadFile(hFile, &buffer, sizeof(struct InventoryItem)
+                            , &nbytes_read, NULL);
+      assert( error_flag == TRUE && "Unable to read.");
+      assert( nbytes_read == sizeof(struct InventoryItem));
+
+      std::fprintf( stderr, " [ITEM 1] Id = %d ; price = %f; product = %s \n"
+                    , buffer.id, buffer.price, buffer.product);
+
+      error_flag = ReadFile(hFile, &buffer, sizeof(struct InventoryItem)
+                            , &nbytes_read, NULL);
+      assert( error_flag == TRUE && "Unable to read.");
+      assert( nbytes_read == sizeof(struct InventoryItem));
+
+      std::fprintf( stderr, " [ITEM 2] Id = %d ; price = %f; product = %s \n"
+                    , buffer.id, buffer.price, buffer.product);
+
+      CloseHandle(hFile);
+
+      std::cout << " [STATUS] Type return to terminate this application \n";
+      std::string line;
+      std::getline(std::cin, line);
+
+      // Delete file 'inventory.dat'
+      assert( DeleteFileA(fpath.c_str()) == TRUE );
+  }
+#+END_SRC
+
+ *Building*
+
+#+BEGIN_SRC sh
+  $ g++ primitive-io.cpp -o out.cmp -std=c++1z -Wall -Wextra -g -static
+
+  $ g++ primitive-io.cpp -o out.exe -std=c++1z -Wall -Wextra -g -static
+#+END_SRC
+
+ *Running*
+
+#+BEGIN_SRC sh
+  C:\Users\user_001\Desktop> out.cmp
+
+   [EXPERIMENT 1] ===>> Create a text file with primitive IO ======
+   [TRACE] Desktop dir = C:\Users\user_001\Desktop
+   [TRACE] File path = C:\Users\user_001\Desktop\testfile.txt
+
+   [EXPERIMENT 2] ===>> Create a binary file with structured data ======
+
+   [EXPERIMENT 3] ===>> Read a binary file containing structured data ===
+   [ITEM 1] Id = 200 ; price = 250.610001; product = Some unknown product
+   [ITEM 2] Id = 976 ; price = 1250.609985; product = Old fashioned feature phone XYZW
+   [STATUS] Type return to terminate this application
+#+END_SRC
+
+ *Check generated files from other terminal*
+
+#+BEGIN_SRC sh
+  $ type testfile.txt
+   =>> Buffer line 1 - test - Gotta love Windows NT
+   =>> C# CSharp, Dot net, Ponto NET - JAVA
+
+  # Not possible to show file content because it contains
+  # structured binary data (non readable bytes)
+  $ type inventory.dat
+  ╚)£zCSome unknown productHç√╞ ⌂☺☺☺hpKá‼↑►H^r♥╞ ⌂☺... ....
+#+END_SRC
 ** General System Information 
 
  *Documentation* 
