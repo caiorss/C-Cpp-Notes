@@ -306,7 +306,7 @@ Program output:
    [TRACE] Object deleted OK
 #+END_SRC
 
-** Calling Qt5 Widgets library from C, Julia, D-lang and Lisp
+** Calling Qt5 Widgets library from many languages 
 *** Overview
 
 This sample code provides a C wrapper to the QT5 Widgets GUI
@@ -327,6 +327,32 @@ QT5 Documentation for widgets classes used in the sample code:
   + [[https://doc.qt.io/qt-5/qpushbutton.html][QPushButton Class | Qt Widgets 5.15.0]]
 
   + [[https://doc.qt.io/qt-5/qdoublespinbox.html][QDoubleSpinBox Class | Qt Widgets 5.15.0]]
+
+
+Python 3 Ctypes FFI Documentation: 
+
+  + [[https://docs.python.org/3/library/ctypes.html][Python 3 Ctypes]] (Official Documentation)
+
+  + [[https://www.programiz.com/python-programming/closure][Python Closures]] - Programiz 
+
+  + [[https://pgi-jcns.fz-juelich.de/portal/pages/using-c-from-python.html][Using C from Python: How to create a ctypes wrapper]] - Julich Scientific IT Software.
+
+  + [[https://www.cl.cam.ac.uk/~jdy22/papers/ctypes-foreign-calls-in-your-native-language.pdf][ctypes: foreign calls in your native language]] - Jeremy Yallop - University of Cambridge
+
+  + [[http://www.dalkescientific.com/writings/NBN/ctypes.html][Python 2.5 Ctypes]] - Dalke Scientific
+
+  + [[https://scipy.github.io/old-wiki/pages/Cookbook/Ctypes.html][Scipy Cookbook - Ctypes]] 
+
+  + [[https://stackoverflow.com/questions/874245/python-ctypes-and-function-pointers][Python ctypes and function pointers]] (StackOverflow)
+
+  + [[https://stackoverflow.com/questions/25014191/python-ctypes-function-pointer][Python ctypes function pointer]] (StackOverflow)
+
+  + [[https://dbader.org/blog/python-ctypes-tutorial-part-2][Interfacing Python and C: Advanced "ctypes" Features]]
+
+  + [[https://doc.sagemath.org/html/en/thematic_tutorials/numerical_sage/ctypes.html][Sagemath - Python Ctypes]]
+
+  + [[https://www.cs.unc.edu/~gb/blog/2007/02/11/ctypes-tricks/][Python Ctypes for wrapping OpenCV]]
+
 
 Julia language: 
 
@@ -1041,6 +1067,210 @@ User Interface Screenshot:
 
 #+CAPTION: User interface for C client code. 
 [[file:images/cwrapper-qt5-1.png][file:images/cwrapper-qt5-1.png]] 
+*** Python3 Client Code 
+
+The following python script, loads the C shared library wrapper for
+Qt5 widgets using Python3 ctypes FFI (Foreign Function
+Interface). Although, Python3 already has [[https://wiki.python.org/moin/PyQt][PyQt]] and [[https://wiki.qt.io/Qt_for_Python][Pyside2]] library
+bindings what make this code seems pointless, the objective of this
+code is to be a proof-of-concept about how to load C++ libraries via
+FFI (Foreign Function Interface).
+
+ *Files:*
+
+File: _pywrapper.py_ 
+
+#+BEGIN_SRC python 
+   #!/usr/bin/env python3
+   import ctypes 
+   from ctypes import (c_int, c_int, c_char, c_void_p)
+
+   # ===== Aliases for making life easier ===========#
+   #-------------------------------------------------#
+
+   c_void  = None                         # void 
+   c_pconst_char = ctypes.POINTER(c_char) # const char* 
+   c_pnull = c_void_p(0)                  # Null pointer 
+   QObject = c_void_p                     # void* - void pointer 
+   Qapp    = c_void_p 
+   QWidget = c_void_p
+   QLayout = c_void_p 
+
+   #  =========== Load shared library ================#
+   #--------------------------------------------------#
+
+   #  Arguments of: ctypes.cdll.LoadLibrary(<LIBRARY>)
+   #
+   #  On Linux, the operating system linker looks for
+   # the library at directories listed in $LD_LIBRARY_PATH
+   # environment variable or in default set of directories 
+   # such as /lib, /usr/lib and so on. 
+   #
+   #  On Windows, the operating system looks for the library 
+   # in C:\\Windows\System32 directory or in directories
+   # listed in %PATH% environment variable.
+   # 
+   # The argument of LoadLibrary() can also be the absolute
+   # path to the shared library. 
+   #
+
+   lib = ctypes.cdll.LoadLibrary("libqtwrapper.so")
+
+   #======= Set types of C subroutines ===================#
+   #------------------------------------------------------#
+
+   # -- Note: There is no keyword const in Python
+   # it is assumed that the user or calling code
+   # will never modify the following definitions. 
+   WIDGET_WINDOW          = 0
+   WIDGET_WINDOW_MAIN     = 2
+   WIDGET_QPUSH_BUTTON    = 3
+   WIDGET_QLABEL          = 4
+   WIDGET_QLINE_EDIT      = 5
+   WIDGET_QDOUBLE_SPINBOX = 6
+   LAYOUT_QFORM_LAYOUT    = 3
+
+   lib.qt_app_new2.argtypes = []
+   lib.qt_app_new2.restype  = Qapp 
+
+   lib.qt_app_exec.argtypes = [ Qapp ]
+   lib.qt_app_exec.restype  = c_void
+
+   lib.qt_qobject_del.argtypes = [ QObject ]
+   lib.qt_qobject_del.restype  = c_void
+
+   lib.qt_window_main.argtypes = []
+   lib.qt_window_main.restype  = QWidget
+
+   lib.qt_widget_setText.argtypes = [ QWidget, c_pconst_char  ]
+   lib.qt_widget_setText.restype  = c_void 
+
+   lib.qt_layout_new.argytpes = [ QWidget, c_int ]
+   lib.qt_layout_new.restype  = QLayout
+
+   lib.qt_msgbox_info.argtypes = [ QWidget, c_pconst_char, c_pconst_char ]
+   lib.qt_msgbox_info.restype = c_void
+
+   lib.qt_QFormLayout_addWidgetAndLabel.argtypes = [QWidget, c_int, c_pconst_char ]
+   lib.qt_QFormLayout_addWidgetAndLabel.restype  = QWidget
+
+   # Callback type: 
+   FnButtonCallback = ctypes.CFUNCTYPE(  c_void    # Return tupe 
+                                       , c_void_p  # Type of first parameter (void*)
+                                       )
+
+   lib.qt_button_onClicked.argtypes = [ QWidget, c_void_p, FnButtonCallback ]
+   lib.qt_button_onClicked.restype  = c_void 
+
+   #===== Create the Qt5 Widgets - GUI - Graphics User ==========#
+   #-------------------------------------------------------------#
+
+   qapp = lib.qt_app_new2()
+
+   window = lib.qt_window_main()
+   lib.qt_widget_setText(window, "Qt5 Widgets Window from Python3 FFI".encode("UTF-8"))
+
+   form = lib.qt_layout_new(window, LAYOUT_QFORM_LAYOUT)
+
+   label_output = lib.qt_QFormLayout_addWidgetAndLabel(
+                   form, WIDGET_QLABEL, b"Result" )
+
+   btnA = lib.qt_QFormLayout_addWidgetAndLabel(
+                   form, WIDGET_QPUSH_BUTTON, b"Label A" )
+
+   lib.qt_widget_setText(btnA, "Button A".encode("UTF-8") )
+
+   btnB = lib.qt_QFormLayout_addWidgetAndLabel(
+                    form, WIDGET_QPUSH_BUTTON, b"Label B")
+
+   lib.qt_widget_setText(btnB, b"Button B" )
+
+   entry = lib.qt_QFormLayout_addWidgetAndLabel(
+                           form, WIDGET_QLINE_EDIT, b"Information:")
+
+   spinbox = lib.qt_QFormLayout_addWidgetAndLabel(
+                      form, WIDGET_QDOUBLE_SPINBOX, b"Price:")
+
+
+   print(" [PYTHON] Qt5 GUI Created Ok. ")
+
+   #===== Install callbacks (event handlers) ===================#
+   #------------------------------------------------------------#
+
+   counter = 0
+
+   # Note: Python lacks multi-line lambdas
+   def btnA_callback(ctx: c_void_p) -> c_void:
+       global counter 
+       counter = counter + 1
+       text = f" [PYTHON] Button A Clicked => Counter = {counter} "
+       text = text.encode("UTF-8")
+       print(text)
+       lib.qt_widget_setText(label_output, text)
+       lib.qt_widget_setText(entry, text)    
+
+   obj_btnA_callback = FnButtonCallback(btnA_callback)
+   lib.qt_button_onClicked(btnA, c_pnull, obj_btnA_callback)
+
+   def btnB_callback(ctx: c_void_p) -> c_void:
+       global counter
+       counter = counter - 1
+       text = f" [PYTHON] Button B Clicked => Counter = {counter} "
+       text = text.encode("UTF-8")    
+       print(text)
+       lib.qt_widget_setText(label_output, text)
+       lib.qt_widget_setText(entry, text)        
+       lib.qt_msgbox_info( window, b"Information:", text)
+
+   obj_btnB_callback = FnButtonCallback(btnB_callback)
+   lib.qt_button_onClicked(btnB, c_pnull, obj_btnB_callback)
+
+
+   #====== Run QT event loop blocking current thread ============#
+   #-------------------------------------------------------------#
+   print(" [PYTHON] Running QT event loop => Main thread blocked!. ")
+   lib.qt_app_exec(qapp)
+
+   #===== Dispose C++ objects loaded via FFI =====================#
+   #--------------------------------------------------------------#
+
+   # Note: Only the root object (wihout any parent element) needs
+   # to be disposed (aka released from memory).
+   lib.qt_qobject_del(window)
+
+   lib.qt_qobject_del(qapp)
+
+
+   print(" [PYTHON] Application terminated gracefully. Ok. ")
+
+#+END_SRC
+
+ *Running* 
+
+#+BEGIN_SRC sh 
+   $ python3 pywrapper.py
+   [TRACE] Create QAppliction Object Ok
+   [PYTHON] Qt5 GUI Created Ok. 
+   [PYTHON] Running QT event loop => Main thread blocked!. 
+  b' [PYTHON] Button A Clicked => Counter = 1 '
+  b' [PYTHON] Button A Clicked => Counter = 2 '
+  b' [PYTHON] Button A Clicked => Counter = 3 '
+  b' [PYTHON] Button A Clicked => Counter = 4 '
+  b' [PYTHON] Button A Clicked => Counter = 5 '
+  .... ... ...   .... ... ...   .... ... ...   .... ... ... 
+  .... ... ...   .... ... ...   .... ... ...   .... ... ... 
+  b' [PYTHON] Button B Clicked => Counter = 9 '
+  b' [PYTHON] Button B Clicked => Counter = 8 '
+  b' [PYTHON] Button A Clicked => Counter = 9 '
+  b' [PYTHON] Button A Clicked => Counter = 10 '
+  b' [PYTHON] Button A Clicked => Counter = 11 '
+   [PYTHON] Application terminated gracefully. Ok. 
+#+END_SRC
+
+ *Screenshot* 
+
+#+CAPTION: Python3 Ctypes FFI wrapper for lib qtwrapper shared library.
+[[file:images/cwrapper-qt5-6.png][file:images/cwrapper-qt5-6.png]]
 *** Julia Client Code (loader.jl)
 
 File: _loader.jl_ (Julia language client code)
@@ -1345,174 +1575,6 @@ User Interface Screenshot:
 
 #+CAPTION: User interface for Julia language client code. 
 [[file:images/cwrapper-qt5-2.png][file:images/cwrapper-qt5-2.png]]
-*** D language - D-lang Client Code
-
-File: _d_client.d_ (Dlang / D-language client code)
-
-#+BEGIN_SRC cpp
-  import core.stdc.stdio;
-  import std.range: empty;
-  import str = std.string;
-
-  // Import dlopen
-  import DLL = core.sys.posix.dlfcn;
-
-  alias QLayout         = void;
-  alias QObject         = void;
-  alias QWidget         = void;
-  alias QLabel          = void;
-  alias QApplication    = void;
-  alias QPushButton     = void;
-  alias QFormLayout     = void;
-  alias QAbstractButton = void;
-
-
-  const int WIDGET_WINDOW           = 1;
-  const int WIDGET_WINDOW_MAIN      = 2;
-  const int WIDGET_QPUSH_BUTTON     = 3;
-  const int WIDGET_QLABEL           = 4;
-  const int WIDGET_QLINE_EDIT       = 5;
-  const int WIDGET_QDOUBLE_SPINBOX  = 6;
-  const int LAYOUT_QFORM_LAYOUT = 3;
-
-  alias qapp_new_t          = extern(C) QApplication* function ();
-  alias qapp_exec_t         = extern(C) int      function(QApplication* self);
-  alias qobject_del_t       = extern(C) void     function (QObject*);
-  alias qt_widget_new_t     = extern(C) QWidget* function(QWidget* parent, int type);
-  alias qt_window_main_t    = extern(C) QWidget* function();
-  alias qt_widget_setText_t = extern(C) void     function(QWidget* self, const char* text);
-  alias qt_layout_new_t     = extern(C) QLayout* function (QWidget* parent, int type);
-  alias qt_msgbox_info_t    = extern(C) void     function(QWidget* parent, const char* title, const char* text);
-
-  // QObject* qt_QFormLayout_addWidgetAndLabel(QFormLayout* self, int type, const char* label)
-  alias qt_QFormLayout_addWidgetAndLabel_t =
-          extern(C) QPushButton* function (QFormLayout* self, int type, const char* label);
-
-  alias qt_button_onClicked_t = extern(C) void function ( QAbstractButton* self
-                                                        , void* ctx
-                                                        , void function(void* self) );
-
-
-  struct callback_state
-  {
-      int                 counter           = 0;
-      QLabel*             label             = null;
-      qt_widget_setText_t qt_widget_setText = null;
-      qt_msgbox_info_t    qt_msgbox_info    = null;
-  };
-
-  extern(C) void button_callback1(void* ctx)
-  {
-      import std.conv: to;
-
-      auto pstate = cast(callback_state*) ctx;
-      pstate.counter = pstate.counter + 1;
-      printf(" [TRACE] Button click event happened => state = %d. \n", pstate.counter);
-      string text = "Button clicked / counter = ";
-      text = text ~ to!string(pstate.counter);
-
-      pstate.qt_widget_setText(pstate.label, str.toStringz(text));
-
-      if(pstate.counter > 20){
-          pstate.qt_msgbox_info(null, "QT Event => Button Clicked", str.toStringz(text));
-      }
-  }
-
-  int main()
-  {
-      // ------------- Load Symbols from Shared Library -------------------//
-
-      void* dll = DLL.dlopen("./build/libqtwrapper.so", DLL.RTLD_GLOBAL | DLL.RTLD_LAZY);
-      if (!dll)
-      {
-          fprintf(stderr, " [ERROR] dlopen error: %s\n", DLL.dlerror());
-          return 1;
-      }
-
-      auto  qapp_new   = cast(qapp_new_t) DLL.dlsym(dll, "qt_app_new2");
-      auto  qapp_exec   = cast(qapp_exec_t) DLL.dlsym(dll, "qt_app_exec");
-
-      auto qt_qobject_del      = cast(qobject_del_t)         DLL.dlsym(dll, "qt_qobject_del");
-      auto qt_widget_new       = cast(qt_widget_new_t)       DLL.dlsym(dll, "qt_widget_new");
-      auto qt_layout_new       = cast(qt_widget_new_t)       DLL.dlsym(dll, "qt_layout_new");
-      auto qt_window_main      = cast(qt_window_main_t)      DLL.dlsym(dll, "qt_window_main");
-      auto qt_widget_setText   = cast(qt_widget_setText_t)   DLL.dlsym(dll, "qt_widget_setText");
-      auto qt_button_onClicked = cast(qt_button_onClicked_t) DLL.dlsym(dll, "qt_button_onClicked");
-      auto qt_msgbox_info      = cast(qt_msgbox_info_t)      DLL.dlsym(dll, "qt_msgbox_info");
-
-      auto form_add_item = cast(qt_QFormLayout_addWidgetAndLabel_t) DLL.dlsym(dll, "qt_QFormLayout_addWidgetAndLabel");
-      assert(form_add_item);
-
-      // ---------- Create QT GUI -----------------------------//
-      //
-
-      // Create an instance of class QApplication
-      auto qapp   = qapp_new();
-
-      auto window = qt_widget_new(null, WIDGET_WINDOW_MAIN) ;
-      assert( window );
-      qt_widget_setText(window, "QT Widgets GUI in D Language");
-
-      auto form  = qt_layout_new(window, LAYOUT_QFORM_LAYOUT);
-      auto btn   = form_add_item(form, WIDGET_QPUSH_BUTTON, "");
-      auto label = form_add_item(form, WIDGET_QLABEL,       "Display");
-
-      qt_widget_setText(btn, "Click ME NOW!!");
-
-
-      callback_state state;
-      state.counter = 10;
-      state.label   = label;
-      state.qt_msgbox_info = qt_msgbox_info;
-      state.qt_widget_setText = qt_widget_setText;
-
-      // Install button event handler
-      qt_button_onClicked(btn, &state, &button_callback1);
-
-      // ------ Run QT Event Loop blocking main thread ------//
-      qapp_exec(qapp);
-
-      // ------ Dipose QT Objects ---------------------------//
-      //
-      qt_qobject_del(window);
-      qt_qobject_del(qapp);
-
-      return 0;
-  }
-#+END_SRC
-
-
-Run file d_client.d as a script: 
-
-#+BEGIN_SRC 
-  $ rdmd d_client.d 
-   [TRACE] Create QAppliction Object Ok
-   [TRACE] Button click event happened => state = 11. 
-   [TRACE] Button click event happened => state = 12. 
-   [TRACE] Button click event happened => state = 13. 
-   [TRACE] Button click event happened => state = 14. 
-   [TRACE] Button click event happened => state = 15. 
-    ... ... ... ... ... ... ... ...   
-#+END_SRC
-
-Build and run executable: 
-
-#+BEGIN_SRC sh 
-  $ dmd d_client.d -g 
- 
-  $ ./d_client 
-   [TRACE] Create QAppliction Object Ok
-   [TRACE] Button click event happened => state = 11. 
-   [TRACE] Button click event happened => state = 12. 
-   [TRACE] Button click event happened => state = 13.
-   ... ... ...  ... ... ...  ... ... ...  ... ... ... 
-   ... ... ...  ... ... ...  ... ... ...  ... ... ... 
-#+END_SRC
-
-User Interface Screenshot: 
-
-#+CAPTION: User interface for Dlang (D Language)
-[[file:images/cwrapper-qt5-3.png][file:images/cwrapper-qt5-3.png]]
 
 *** C# - Dotnet Core Client Code 
 
@@ -1752,6 +1814,182 @@ Running the application via dotnet core tool:
  *Screenshot* 
 
 [[file:images/cwrapper-qt5-5.png][file:images/cwrapper-qt5-5.png]]
+*** D language - D-lang Client Code
+
+Note: This client code load function pointers from the C-wrapper
+shared library at runtime via Dlopen() API. The benefit of this
+approach over linking directly, at-compile time, is that application
+can build on machines without Qt installation or on dockers images
+without X11 installed. 
+
+ *Files:* 
+
+File: _d_client.d_ (Dlang / D-language client code)
+
+#+BEGIN_SRC cpp
+  import core.stdc.stdio;
+  import std.range: empty;
+  import str = std.string;
+
+  // Import dlopen
+  import DLL = core.sys.posix.dlfcn;
+
+  alias QLayout         = void;
+  alias QObject         = void;
+  alias QWidget         = void;
+  alias QLabel          = void;
+  alias QApplication    = void;
+  alias QPushButton     = void;
+  alias QFormLayout     = void;
+  alias QAbstractButton = void;
+
+
+  const int WIDGET_WINDOW           = 1;
+  const int WIDGET_WINDOW_MAIN      = 2;
+  const int WIDGET_QPUSH_BUTTON     = 3;
+  const int WIDGET_QLABEL           = 4;
+  const int WIDGET_QLINE_EDIT       = 5;
+  const int WIDGET_QDOUBLE_SPINBOX  = 6;
+  const int LAYOUT_QFORM_LAYOUT = 3;
+
+  alias qapp_new_t          = extern(C) QApplication* function ();
+  alias qapp_exec_t         = extern(C) int      function(QApplication* self);
+  alias qobject_del_t       = extern(C) void     function (QObject*);
+  alias qt_widget_new_t     = extern(C) QWidget* function(QWidget* parent, int type);
+  alias qt_window_main_t    = extern(C) QWidget* function();
+  alias qt_widget_setText_t = extern(C) void     function(QWidget* self, const char* text);
+  alias qt_layout_new_t     = extern(C) QLayout* function (QWidget* parent, int type);
+  alias qt_msgbox_info_t    = extern(C) void     function(QWidget* parent, const char* title, const char* text);
+
+  // QObject* qt_QFormLayout_addWidgetAndLabel(QFormLayout* self, int type, const char* label)
+  alias qt_QFormLayout_addWidgetAndLabel_t =
+          extern(C) QPushButton* function (QFormLayout* self, int type, const char* label);
+
+  alias qt_button_onClicked_t = extern(C) void function ( QAbstractButton* self
+                                                        , void* ctx
+                                                        , void function(void* self) );
+
+
+  struct callback_state
+  {
+      int                 counter           = 0;
+      QLabel*             label             = null;
+      qt_widget_setText_t qt_widget_setText = null;
+      qt_msgbox_info_t    qt_msgbox_info    = null;
+  };
+
+  extern(C) void button_callback1(void* ctx)
+  {
+      import std.conv: to;
+
+      auto pstate = cast(callback_state*) ctx;
+      pstate.counter = pstate.counter + 1;
+      printf(" [TRACE] Button click event happened => state = %d. \n", pstate.counter);
+      string text = "Button clicked / counter = ";
+      text = text ~ to!string(pstate.counter);
+
+      pstate.qt_widget_setText(pstate.label, str.toStringz(text));
+
+      if(pstate.counter > 20){
+          pstate.qt_msgbox_info(null, "QT Event => Button Clicked", str.toStringz(text));
+      }
+  }
+
+  int main()
+  {
+      // ------------- Load Symbols from Shared Library -------------------//
+
+      void* dll = DLL.dlopen("./build/libqtwrapper.so", DLL.RTLD_GLOBAL | DLL.RTLD_LAZY);
+      if (!dll)
+      {
+          fprintf(stderr, " [ERROR] dlopen error: %s\n", DLL.dlerror());
+          return 1;
+      }
+
+      auto  qapp_new   = cast(qapp_new_t) DLL.dlsym(dll, "qt_app_new2");
+      auto  qapp_exec   = cast(qapp_exec_t) DLL.dlsym(dll, "qt_app_exec");
+
+      auto qt_qobject_del      = cast(qobject_del_t)         DLL.dlsym(dll, "qt_qobject_del");
+      auto qt_widget_new       = cast(qt_widget_new_t)       DLL.dlsym(dll, "qt_widget_new");
+      auto qt_layout_new       = cast(qt_widget_new_t)       DLL.dlsym(dll, "qt_layout_new");
+      auto qt_window_main      = cast(qt_window_main_t)      DLL.dlsym(dll, "qt_window_main");
+      auto qt_widget_setText   = cast(qt_widget_setText_t)   DLL.dlsym(dll, "qt_widget_setText");
+      auto qt_button_onClicked = cast(qt_button_onClicked_t) DLL.dlsym(dll, "qt_button_onClicked");
+      auto qt_msgbox_info      = cast(qt_msgbox_info_t)      DLL.dlsym(dll, "qt_msgbox_info");
+
+      auto form_add_item = cast(qt_QFormLayout_addWidgetAndLabel_t) DLL.dlsym(dll, "qt_QFormLayout_addWidgetAndLabel");
+      assert(form_add_item);
+
+      // ---------- Create QT GUI -----------------------------//
+      //
+
+      // Create an instance of class QApplication
+      auto qapp   = qapp_new();
+
+      auto window = qt_widget_new(null, WIDGET_WINDOW_MAIN) ;
+      assert( window );
+      qt_widget_setText(window, "QT Widgets GUI in D Language");
+
+      auto form  = qt_layout_new(window, LAYOUT_QFORM_LAYOUT);
+      auto btn   = form_add_item(form, WIDGET_QPUSH_BUTTON, "");
+      auto label = form_add_item(form, WIDGET_QLABEL,       "Display");
+
+      qt_widget_setText(btn, "Click ME NOW!!");
+
+
+      callback_state state;
+      state.counter = 10;
+      state.label   = label;
+      state.qt_msgbox_info = qt_msgbox_info;
+      state.qt_widget_setText = qt_widget_setText;
+
+      // Install button event handler
+      qt_button_onClicked(btn, &state, &button_callback1);
+
+      // ------ Run QT Event Loop blocking main thread ------//
+      qapp_exec(qapp);
+
+      // ------ Dipose QT Objects ---------------------------//
+      //
+      qt_qobject_del(window);
+      qt_qobject_del(qapp);
+
+      return 0;
+  }
+#+END_SRC
+
+
+Run file d_client.d as a script: 
+
+#+BEGIN_SRC 
+  $ rdmd d_client.d 
+   [TRACE] Create QAppliction Object Ok
+   [TRACE] Button click event happened => state = 11. 
+   [TRACE] Button click event happened => state = 12. 
+   [TRACE] Button click event happened => state = 13. 
+   [TRACE] Button click event happened => state = 14. 
+   [TRACE] Button click event happened => state = 15. 
+    ... ... ... ... ... ... ... ...   
+#+END_SRC
+
+Build and run executable: 
+
+#+BEGIN_SRC sh 
+  $ dmd d_client.d -g 
+ 
+  $ ./d_client 
+   [TRACE] Create QAppliction Object Ok
+   [TRACE] Button click event happened => state = 11. 
+   [TRACE] Button click event happened => state = 12. 
+   [TRACE] Button click event happened => state = 13.
+   ... ... ...  ... ... ...  ... ... ...  ... ... ... 
+   ... ... ...  ... ... ...  ... ... ...  ... ... ... 
+#+END_SRC
+
+User Interface Screenshot: 
+
+#+CAPTION: User interface for Dlang (D Language)
+[[file:images/cwrapper-qt5-3.png][file:images/cwrapper-qt5-3.png]]
 
 *** Common Lisp client code 
 
