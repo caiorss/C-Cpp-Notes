@@ -2383,6 +2383,346 @@ File: _sysinfo.cpp_
    =>> Startup Menu Folder = C:\Users\user_001\AppData\Roaming\Microsoft\Windows\Start Menu
    =>> Sendto Folder = C:\Users\user_001\AppData\Roaming\Microsoft\Windows\SendTo
 #+END_SRC
+** Creating Windows Shortcut - LNK
+
+The following code snippet creates several Windows shortcuts, also
+known as Windows Shell Link (*.lnk files), which are similar to Unix's
+symbolic links and Free-Desktop .desktop (FreeDesktop standard)
+launchers used on X11. Shell link files allows creating launchers to
+executable and directories. Unlike the X11 Free-Desktop standard
+*.desktop files, which are text files, the Windows shell link files
+are structured binary files, as a result, they only can be viewed
+by using Windows facilities or by using a hexadecimal editor.
+
+ *Documentation*
+
+   + [[https://docs.microsoft.com/en-us/windows/win32/api/unknwn/nn-unknwn-iunknown][IUnknown COM Interface]] (header: unknown.h)
+     + Brief: "Enables clients to get pointers to other interfaces on
+       a given object through the QueryInterface method, and manage
+       the existence of the object through the AddRef and Release
+       methods. All other COM interfaces are inherited, directly or
+       indirectly, from IUnknown. Therefore, the three methods in
+       IUnknown are the first entries in the vtable for every
+       interface."
+
+   + [[https://docs.microsoft.com/en-us/windows/win32/api/shobjidl_core/nn-shobjidl_core-ishelllinka][IShellLinkA COM Interface]] (header: shobjidl_core.h)
+     + Brief: "Exposes methods that create, modify, and resolve Shell
+       links."
+
+   + [[https://docs.microsoft.com/en-us/windows/win32/api/objidl/nn-objidl-ipersist][IPersist COM Interface]] (header: objidl.h)
+     + Brief: "Provides the CLSID of an object that can be stored
+       persistently in the system. Allows the object to specify which
+       object handler to use in the client process, as it is used in
+       the default implementation of marshaling."
+
+   + [[https://docs.microsoft.com/en-us/windows/win32/api/combaseapi/nf-combaseapi-cocreateinstance][CoCreateInstance()]]
+     + Brief: "Creates and default-initializes a single object of the
+       class associated with a specified CLSID."
+
+   + [[https://docs.microsoft.com/en-us/windows/win32/learnwin32/creating-an-object-in-com][Creating an Object in COM]]
+
+
+Windows Shortcut Binary Format Specification:
+
+   + [[https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-shllink/16cb4ca1-9339-4d0c-a68d-bf1d6cc0f943][{MS-SHLLINK}: Shell Link (.LNK) Binary File Format]]
+     + Official specification of the Windows LNK file format.
+
+   + [[https://formats.kaitai.io/windows_lnk_file/index.html][Windows shell link file: format specification]]
+     + Kaitai Format Gallery.
+
+   + [[https://web.archive.org/web/20191001124542/https://ithreats.files.wordpress.com/2009/05/lnk_the_windows_shortcut_file_format.pdf][The Windows Shortcut Format]] [PDF] (Jesse Hager)
+
+   + [[https://github.com/reactos/reactos/blob/3fa57b8ff7fcee47b8e2ed869aecaf4515603f3f/sdk/tools/mkshelllink/mkshelllink.c][File: mkshelllink.c]] - ReactorOS implementation.
+
+
+X11 Free Desktop Shortcut Specification (for comparison)
+
+  + https://www.freedesktop.org/wiki/
+
+  + https://en.wikipedia.org/wiki/Freedesktop.org
+
+  + [[https://specifications.freedesktop.org/desktop-entry-spec/desktop-entry-spec-latest.html][Desktop Entry Specification]]
+    + Specification of *.desktop shortcut files used on Linux and BSD
+      X11 or Wayland desktop environments.
+
+  + [[https://wiki.archlinux.org/title/desktop_entries][ArchLinux - Desktop Entries ]]
+
+  + [[https://developer.gnome.org/integration-guide/stable/desktop-files.html.en][Desktop files: putting your application in the desktop menus]]
+
+ *Files*
+
+File: _winshortcut.cpp_
+
+#+BEGIN_SRC cpp
+  #include <iostream>
+  #include <string>
+  #include <cassert>
+
+  #define INITGUID      // Necessary for MINGW
+  #include <windows.h>
+
+  #include <shlobj.h>
+  #include <shobjidl.h>
+  #include <shlguid.h>
+  #include <comdef.h>
+  #include <comdefsp.h>
+
+
+  // Get environment variable
+  std::string get_envvar(std::string const& name);
+
+  // Create Windows Shortcut (aka shell Link - LNK File)
+  BOOL createWindowsShortcut(  std::string const& fileName
+                             , std::string const& arguments
+                             , std::string const& path
+                             , std::string const& title);
+
+  int main()
+  {
+    const auto homedir= get_envvar("USERPROFILE");
+    const auto desktop_dir = homedir + "\\Desktop";
+    std::fprintf(stderr, " [TRACE] Desktop dir = %s \n", desktop_dir.c_str());
+
+    // Create shortcut to Notepad.exe at user's Desktop directory.
+    createWindowsShortcut( // Executable or command that the shortcut will launch.
+                            "notepad.exe"
+                           // Arguments used by Notepad.exe
+                           , ""
+                           // Absolute path to where the shortcut will be created.
+                           , desktop_dir + "\\Notepad.lnk"
+                           , "Shortcut for notepad.exe"
+                           );
+
+    // Create shortcut for the DxDiag.exe utility
+    createWindowsShortcut( // Executable or command that the shortcut will launch.
+                            "dxdiag"
+                           , ""
+                           // Absolute path to where the shortcut will be created.
+                           , desktop_dir + "\\DxDiagTool.lnk"
+                           , "Shortcut for DirectX and OpenGL diagnosing tool."
+                           );
+
+    // Create shortcut to user's home directory
+    createWindowsShortcut(   homedir
+                           , ""
+                           , desktop_dir + "\\HomeDirectory.lnk"
+                           , "Shortcut for my documents"
+                           );
+
+    // Create shortcut to Device Manager for viewing user hardware settings.
+    createWindowsShortcut(  "RunDll32.exe"
+                           , "devmgr.dll DeviceManager_Execute"
+                           , desktop_dir + "\\Device_Manager.lnk"
+                           , "Shortcut for device manager."
+                           );
+
+    // Create shortcut for starting Notepad.exe automatically after reboot.
+    createWindowsShortcut(  "notepad.exe"
+                          , ""
+                          , homedir + "\\Start Menu\\Programs\\Startup\\MyNotepad.lnk"
+                          , "Notepad.exe tools"
+                          );
+
+    std::fprintf(stderr, " [TRACE] Application terminated Ok. \n");
+    return 0;
+  }
+
+      // ==== I M P L E M E N T A T I O N S ============== //
+
+  std::string
+  get_envvar(std::string const& name)
+  {
+       const char* p = std::getenv(name.c_str());
+       if( p == nullptr){ return ""; }
+       return p;
+  }
+
+
+  BOOL createWindowsShortcut(
+                // Executable or command launched by the Windows shortcut
+                 std::string const& filePath_
+                // Arguments used by the executable
+                , std::string const& args_
+                // Absolute path to where the shortcut file will be created.
+                // Note: This path must include the extenion .lnk, for instance
+                // this argument could be: "C:\\Users\\MyUser\\Desktop\\Notepad.exe"
+                , std::string const& path_
+                // Title or description of the shortcut file.
+                , std::string const& title_
+              )
+  {
+
+    const char* fileName = filePath_.c_str();
+    const char* args     = args_.c_str();
+    const char* path     = path_.c_str();
+    const char* title    = title_.c_str();
+
+    std::fprintf(stderr, "\n [TRACE] Creating shortcut for command = '%s' \n", fileName);
+    std::fprintf(stderr, " [TRACE] Creating shortcut as file = '%s' \n", path);
+
+    // Intialize COM
+    CoInitializeEx( NULL, 0 );
+
+    // Pointer to COM interface
+    IShellLink* ptr_com = nullptr;
+
+    HRESULT hres = CoCreateInstance(
+                          // CLSID =>> Unique universal identifier for Shell Link class
+                          // The class is the concrete implememntation of a COM Interface
+                          // (COM - Component Object Model)
+                             CLSID_ShellLink
+                           , NULL
+                           // This constant 'CLSCTX_INPROC_SERVER' means that the
+                           // COM server is in-process,in other words, the COM server
+                           // is provide by a DLL (Dynamic Linked Library)
+                           , CLSCTX_INPROC_SERVER
+                           // IID (Interface Identifier) => Unique universal identifier (GUID)
+                           // for the COM interface that the COM class conforms to.
+                           , IID_IShellLink
+                           // void** => [OUTPUT] Parameter that returns pointer to COM
+                           // Interface
+                           , reinterpret_cast<LPVOID*>(&ptr_com)
+                         );
+
+    if( !SUCCEEDED(hres) ){ return FALSE; }
+    assert( ptr_com != nullptr );
+
+    IPersistFile* ptr_com2 = nullptr;
+
+    // Query comp object pointed by ptr_com and check whether
+    // it implements the interface IPersistFile. If the query is
+    // successful, the pointer ptr_com2 will be not NULL.
+    // LPVOID = void**
+    hres = ptr_com->QueryInterface(IID_IPersistFile, (void**) &ptr_com2);
+    if( !SUCCEEDED(hres) ){ return FALSE; }
+    assert( ptr_com2 != nullptr );
+
+    ptr_com->SetPath(fileName);
+    ptr_com->SetDescription(title);
+
+    if(args_ != ""){ ptr_com->SetArguments(args); }
+
+    WCHAR out_path[MAX_PATH];
+    // Change string to Unicode
+    MultiByteToWideChar(CP_ACP, 0, path, -1, out_path, MAX_PATH);
+
+    // Save Windows shortcut
+    ptr_com2->Save(out_path, TRUE);
+
+    // Release COM interface pointers
+    ptr_com2->Release();
+    ptr_com->Release();
+
+    CoUninitialize();
+
+    return TRUE;
+  }
+#+END_SRC
+
+ *Building with Mingw*
+
+#+BEGIN_SRC sh
+  $ g++ winshortcut.cpp -o winshortcut-mingw.exe -std=c++1z -lole32 -loleaut32 -Wall -Wextra -g
+#+END_SRC
+
+ *Building with MSVC CL.exe*
+
+#+BEGIN_SRC sh
+  $ cl.exe winshortcut.cpp
+  Microsoft (R) C/C++ Optimizing Compiler Version 19.28.29335 for x64
+  Copyright (C) Microsoft Corporation.  All rights reserved.
+
+  winshortcut.cpp
+  Microsoft (R) Incremental Linker Version 14.28.29335.0
+  Copyright (C) Microsoft Corporation.  All rights reserved.
+
+  /out:winshortcut.exe
+  winshortcut.obj
+#+END_SRC
+
+ *Analyse the files with 'file' Linux tool from GIT*
+
+#+BEGIN_SRC sh
+  $ file winshortcut.exe
+  winshortcut.exe: PE32+ executable (console) x86-64, for MS Windows
+
+  $ file winshortcut-mingw.exe
+  winshortcut-mingw.exe: PE32+ executable (console) x86-64, for MS Windows
+
+  $ file winshortcut.obj
+  winshortcut.obj: Intel amd64 COFF object file, not stripped, 881 sections, symbol offset=0x106a9, 2772 symbols
+#+END_SRC
+
+ *Run application for creating Windows shortcuts*
+
+  + After the application is run, the shortcuts can be executed either
+    from command line or by clicking at them at the Desktop directory.
+
+#+BEGIN_SRC sh
+   $ .\winshortcut.exe
+   [TRACE] Desktop dir = C:\Users\user_001\Desktop
+
+   [TRACE] Creating shortcut for command = 'notepad.exe'
+   [TRACE] Creating shortcut as file = 'C:\Users\user_001\Desktop\Notepad.lnk'
+
+   [TRACE] Creating shortcut for command = 'dxdiag'
+   [TRACE] Creating shortcut as file = 'C:\Users\user_001\Desktop\DxDiagTool.lnk'
+
+   [TRACE] Creating shortcut for command = 'C:\Users\user_001'
+   [TRACE] Creating shortcut as file = 'C:\Users\user_001\Desktop\HomeDirectory.lnk'
+
+   [TRACE] Creating shortcut for command = 'RunDll32.exe'
+   [TRACE] Creating shortcut as file = 'C:\Users\user_001\Desktop\Device_Manager.lnk'
+
+   [TRACE] Creating shortcut for command = 'notepad.exe'
+   [TRACE] Creating shortcut as file = 'C:\Users\user_001\Start Menu\Programs\Startup\MyNotepad.lnk'
+   [TRACE] Application terminated Ok.
+#+END_SRC
+
+  *Run shortcuts from command line*
+
+List all shortcut files at Desktop directory:
+
+#+BEGIN_SRC sh
+  $ ls %USERPROFILE%/Desktop/*.lnk
+  'C:\Users\user_001/Desktop/CodeBlocks.lnk'*
+  'C:\Users\user_001/Desktop/Device_Manager.lnk'*
+  'C:\Users\user_001/Desktop/DxDiagTool.lnk'*
+  'C:\Users\user_001/Desktop/HomeDirectory.lnk'*
+  'C:\Users\user_001/Desktop/Notepad.lnk'*
+#+END_SRC
+
+View shortcut files:
+
+#+BEGIN_SRC sh
+  $ file Notepad.lnk
+  Notepad.lnk: MS Windows shortcut, Item id list present
+  , Has Description string, Has Relative path
+  , ctime=Mon Jan  1 08:00:00 1601
+  , mtime=Mon Jan  1 08:00:00 1601, atime=Mon Jan
+  1 08:00:00 1601, length=0, window=hide
+
+
+  $ file DxDiagTool.lnk
+  DxDiagTool.lnk: MS Windows shortcut, Item id list present,
+  Has Description string, Has Relative path, ctime=Mon Jan
+  1 08:00:00 1601, mtime=Mon Jan  1 08:00:00 1601,
+  atime=Mon Jan  1 08:00:00 1601, length=0, window=hide
+#+END_SRC
+
+Run shortcut from command line:
+
+#+BEGIN_SRC sh
+  # Run shortcut lnk that launches Notepad.exe
+  $ .\\Notepad.lnk
+
+  # Run shortcut lnk that launches DxDiagTool.lnk
+  $ .\DxDiagTool.lnk
+
+  # Run shortcutr that opens the directory C:\\Users\user_001 (%USERPROFILE%) directory
+  $ HomeDirectory.lnk
+#+END_SRC
+
 ** CODE - Display information about current process 
 
 Print information about current process and copy itself to desktop
