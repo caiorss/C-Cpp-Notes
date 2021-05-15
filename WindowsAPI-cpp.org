@@ -2038,7 +2038,7 @@ File: _primtive-io.cpp_
   $ type inventory.dat
   ╚)£zCSome unknown productHç√╞ ⌂☺☺☺hpKá‼↑►H^r♥╞ ⌂☺... ....
 #+END_SRC
-**  System Information 
+** System Information 
 
  *Documentation* 
 
@@ -3236,6 +3236,181 @@ File: _registry.cpp_
    ...  ...  ...  ...  ...  ...  ...  ...  ...  ... 
    ...  ...  ...  ...  ...  ...  ...  ...  ...  ... 
 #+END_SRC
+** Listing Windows and Related Processes 
+
+The following code lists all visible windows titles, the related process ID
+(PID) and the path to the process' executable file.
+
+  *Windows API Docs* 
+ 
+   + [[https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getdesktopwindow][GetDesktopWindow()]] 
+
+   + [[https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindow][GetWindow()]] 
+
+   + [[https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getclassname][GetClassName()]] 
+
+   + [[https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindowtexta][GetWindowText()]] 
+
+   + [[https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-findwindowa][FindWindowA()]]
+
+   + [[https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindowthreadprocessid][GetWindowThreadProcessId()]]
+
+   + [[https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindowtexta][GetWindowTextA()]]
+
+   + [[https://docs.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-openprocess][OpenProcess()]] 
+
+   + [[https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-queryfullprocessimagenamea][QueryFullProcessImageNameA()]]
+
+  *Files* 
+
+File: _enum-windows.cpp_ 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string> 
+  #include <cassert>
+
+  #include <windows.h>
+
+  int main()
+  {
+
+    HWND hDesk  = GetDesktopWindow();
+    assert( hDesk != 0 );
+  
+    // Current Winmdow 
+    HWND cwd = GetWindow(hDesk, GW_CHILD);
+    assert ( cwd != 0 );
+
+    constexpr size_t SIZE = 2048; // 2kbytes buffer
+    char buffer_window_title[SIZE];
+    char buffer_window_class[SIZE];
+    char buffer_executable_path[MAX_PATH];
+    
+    int n = 0;
+    DWORD pid = 0;
+
+    // If true the application does not list windows
+    // with empty titles. 
+    bool hide_empty_title = true;
+
+    while( cwd )
+    {
+        // Initialize and clean buffer
+        memset(buffer_window_title, '\0', SIZE);
+        memset(buffer_window_class, '\0', SIZE);
+        memset(buffer_executable_path, '\0', MAX_PATH);
+    
+        // Get Window title 
+        GetWindowTextA(cwd, buffer_window_title, SIZE);
+        // Get Window class 
+        GetClassName( cwd, buffer_window_class, SIZE);
+        // Get Window PID (Process Identifier) - unique identifier.
+        GetWindowThreadProcessId(cwd, &pid);
+        // Window visibility
+        bool isVisible = IsWindowVisible(cwd);
+
+        // Process handle      
+        HANDLE hProc = OpenProcess( PROCESS_QUERY_INFORMATION  | PROCESS_VM_READ, FALSE, pid);
+          // assert( hProc != 0);
+        DWORD size = MAX_PATH;
+
+        // Obtain path to proces image (executable)
+        QueryFullProcessImageNameA(hProc, 0, buffer_executable_path, &size);
+        // Close proces handle disposing this reosurce.
+        CloseHandle(hProc);
+
+
+        // Display only visible windows with non empty title.
+        if( !(hide_empty_title && strlen(buffer_window_title) == 0) && isVisible )
+        {
+          // Display window title 
+          std::printf( " [*] => n = %d / Visible = %s  "
+                       "\n   =>       Title = '%s' "
+                       "\n   =>         PID = %ld  "
+                       "\n   =>  Executable = %s  "
+                       "\n   =>       Class = %s \n\n"
+                       , n++, isVisible ? "TRUE" : "FALSE"
+                       , buffer_window_title, pid, buffer_executable_path
+                       , buffer_window_class
+                       );      
+        }
+        // GO to next window
+        cwd = GetNextWindow(cwd, GW_HWNDNEXT);
+    }
+
+    return 0;
+  }
+
+#+END_SRC 
+
+ *Building:* 
+
+#+BEGIN_SRC sh 
+  g++ enum-windows.cpp -o enum-windows.exe -std=c++1z -Wall -Wextra -pedantic-errors
+#+END_SRC
+
+ *Running* 
+
+#+BEGIN_SRC sh 
+   $  enum-windows.exe 
+
+   [*] => n = 0 / Visible = TRUE  
+     =>       Title = 'Cmder' 
+     =>         PID = 2268  
+     =>  Executable = C:\Users\User_001\scoop\apps\cmder\1.3.17\vendor\conemu-maximus5\ConEmu64.exe  
+     =>       Class = VirtualConsoleClass 
+
+   [*] => n = 1 / Visible = TRUE  
+     =>       Title = 'emacs@DESKTOP-GLXQFC6' 
+     =>         PID = 7648  
+     =>  Executable = C:\Users\User_001\scoop\apps\emacs\27.1\bin\emacs.exe  
+     =>       Class = Emacs 
+
+   [*] => n = 2 / Visible = TRUE  
+     =>       Title = 'System Configuration' 
+     =>         PID = 7048  
+     =>  Executable =   
+     =>       Class = #32770 
+
+   [*] => n = 3 / Visible = TRUE  
+     =>       Title = 'Event Viewer' 
+     =>         PID = 5944  
+     =>  Executable =   
+     =>       Class = MMCMainFrame 
+
+   [*] => n = 4 / Visible = TRUE  
+     =>       Title = 'About Windows' 
+     =>         PID = 1368  
+     =>  Executable = C:\Windows\System32\winver.exe  
+     =>       Class = #32770 
+
+   [*] => n = 5 / Visible = TRUE  
+     =>       Title = 'Settings' 
+     =>         PID = 3704  
+     =>  Executable = C:\Windows\ImmersiveControlPanel\SystemSettings.exe  
+     =>       Class = Windows.UI.Core.CoreWindow 
+
+   [*] => n = 6 / Visible = TRUE  
+     =>       Title = 'Settings' 
+     =>         PID = 6988  
+     =>  Executable = C:\Windows\System32\ApplicationFrameHost.exe  
+     =>       Class = ApplicationFrameWindow 
+
+   [*] => n = 7 / Visible = TRUE  
+     =>       Title = 'Microsoft Text Input Application' 
+     =>         PID = 5896  
+     =>  Executable = C:\Windows\SystemApps\MicrosoftWindows.Client.CBS_cw5n1h2txyewy\InputApp\TextInputHost.exe  
+     =>       Class = Windows.UI.Core.CoreWindow 
+
+   [*] => n = 8 / Visible = TRUE  
+     =>       Title = 'Program Manager' 
+     =>         PID = 4316  
+     =>  Executable = C:\Windows\explorer.exe  
+     =>       Class = Progman 
+
+#+END_SRC
+ 
 ** CODE - Display information about current process 
 
 Print information about current process and copy itself to desktop
