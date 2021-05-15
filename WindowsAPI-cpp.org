@@ -2038,7 +2038,7 @@ File: _primtive-io.cpp_
   $ type inventory.dat
   ╚)£zCSome unknown productHç√╞ ⌂☺☺☺hpKá‼↑►H^r♥╞ ⌂☺... ....
 #+END_SRC
-** General System Information 
+**  System Information 
 
  *Documentation* 
 
@@ -2383,7 +2383,7 @@ File: _sysinfo.cpp_
    =>> Startup Menu Folder = C:\Users\user_001\AppData\Roaming\Microsoft\Windows\Start Menu
    =>> Sendto Folder = C:\Users\user_001\AppData\Roaming\Microsoft\Windows\SendTo
 #+END_SRC
-** Creating Windows Shortcut - LNK
+** Windows Shortcut - LNK
 
 The following code snippet creates several Windows shortcuts, also
 known as Windows Shell Link (*.lnk files), which are similar to Unix's
@@ -2723,6 +2723,519 @@ Run shortcut from command line:
   $ HomeDirectory.lnk
 #+END_SRC
 
+** Windows Registry 
+*** Overview 
+
+The Windows registry is a tree-like database used by the operating
+system and by other applications for storing system configurations and
+user-specific settings. The data is stored as a tree data structure,
+where each child node is a key and each key may have zero or more
+value, which a entry comprised of a label and value.
+
+ *Documentation of Windows Registry APIs* 
+
+  + [[https://docs.microsoft.com/en-us/windows/win32/sysinfo/about-the-registry][About the registry]]
+
+  + [[https://docs.microsoft.com/en-us/windows/win32/sysinfo/structure-of-the-registry][Structure of the Registry]]
+
+  + [[https://docs.microsoft.com/en-us/windows/win32/sysinfo/predefined-keys][Predefined Keys]]
+
+  + Function: [[https://docs.microsoft.com/en-us/windows/win32/api/winreg/nf-winreg-regopenkeyexa][RegOpenKeyExA()]]
+    + Brief: "Opens the specified registry key. Note that key names
+      are not case sensitive."
+
+  + Function: [[https://docs.microsoft.com/en-us/windows/win32/api/winreg/nf-winreg-regopenkeyexw][RegOpenKeyExW()]]
+    + Brief: "Opens the specified registry key. Note that key names
+      are not case sensitive." 
+
+  + Function:  [[https://docs.microsoft.com/en-us/windows/win32/api/winreg/nf-winreg-regenumkeya][RegEnumKeyA()]]
+    + Brief: "Enumerates the subkeys of the specified open registry
+      key. The function retrieves the name of one subkey each time it
+      is called."
+
+  + Function: [[https://docs.microsoft.com/en-us/windows/win32/api/winreg/nf-winreg-regenumkeyexa][RegEnumKeyExA()]]
+    + Brief: "Enumerates the subkeys of the specified open registry
+      key. The function retrieves information about one subkey each
+      time it is called."
+
+  + Function: [[https://docs.microsoft.com/en-us/windows/win32/api/winreg/nf-winreg-regenumkeyexw][RegEnumKeyExW()]]
+    + Brief: "Enumerates the subkeys of the specified open registry
+      key. The function retrieves information about one subkey each
+      time it is called."
+
+  + Function: [[https://docs.microsoft.com/en-us/windows/win32/api/winreg/nf-winreg-reggetvaluea][RegGetValueA()]]
+    + Brief: "Retrieves the type and data for the specified registry
+      value."
+
+  + Function: [[https://docs.microsoft.com/en-us/windows/win32/api/winreg/nf-winreg-reggetvaluew][RegGetValueW()]]
+    + Brief: "Retrieves the type and data for the specified registry value."
+
+  + Function: [[https://docs.microsoft.com/en-us/windows/win32/api/winreg/nf-winreg-regqueryvaluea][RegQueryValueA()]]
+    + Brief: "Retrieves the data associated with the default or
+      unnamed value of a specified registry key. The data must be a
+      null-terminated string."
+
+
+  *Notable Registry Locations* 
+
+   + Root Keys
+     + ~HKLM~ or ~HKEY_LOCAL_MACHINE~
+     + ~HKCR~ or ~HKEY_CLASSES_ROOT~
+     + ~HKCU~ or ~HKEY_CURRENT_USER~
+     + ~HKCC~ or ~HKEY_CURRENT_CONFIG~
+   
+
+   + ~HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\hivelist~
+     + Lists all paths to files where Windows registry data are
+       stored.
+
+   + ~HKEY_CLASSES_ROOT\CLSID~
+     + Contains all registered COM (Component Object Model) class ID
+       as subkeys, where each subkey is a GUID (Universal Unique
+       Identifier), a 128-bit unique random number encoded as
+       hexadecimal.
+
+     + Example: The COM In-process server (~C:\Windows\System32\oleaut32.dll~) has the CLSID -
+       0000002F-0000-0000-C000-000000000046 and the registry key:
+       ~HKEY_CLASSES_ROOT\CLSID\{0000002F-0000-0000-C000-000000000046}~. 
+     
+   + ~HKEY_CLASSES_ROOT\Interface~
+     + Contains all COM interfaces registered in the systems. Each
+       subkey is the interface IID (GUID - global unique identifier).
+
+   + ~HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\\Advancede~
+     + Windows Explorer settings.
+
+   + ~HKEY_LOCAL_MACHINE\SYSTEM\\CurrentControlSet\Services~
+     + Subkeys are services that launched at system startup time after reboot.
+
+   + ~HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion~
+     + The entries (values) in this key, contains information about
+       the current Windows Version:
+       + Value: _EditionID_ => (example: Professional)
+       + Value: _ProductName_ => (example: Windows 10 Pro)
+       + Value: _RegisteredOwner_  
+       + Value: _CurrentBuild_
+       + Value: _BuildLab_ (example: 1941.vb_release.191206-1406)
+
+    
+
+  *Windows Registry Files* 
+
+The Windows registry data can be stored in several files in the
+system. Some of those files are:  
+
+  + Directory: ~%SystemRoot%\System32\config~
+
+  + File: ~%UserProfile%\Ntuser.dat~
+
+  + FIle: ~%UserProfile%\Local Settings\Application Data\Microsoft\Windows\UsrClass.dat~
+
+List all files where Windows registry data are stored using PowerShell. 
+
+#+BEGIN_SRC sh 
+  $ ItemProperty Registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\hivelist
+
+  \REGISTRY\MACHINE\HARDWARE                                           :
+  \REGISTRY\MACHINE\SYSTEM                                             : \Device\HarddiskVolume2\Windows\System32\config\SYSTEM
+  \REGISTRY\MACHINE\BCD00000000                                        : \Device\HarddiskVolume1\Boot\BCD
+  \REGISTRY\MACHINE\SOFTWARE                                           : \Device\HarddiskVolume2\Windows\System32\config\SOFTWARE
+  \REGISTRY\USER\.DEFAULT                                              : \Device\HarddiskVolume2\Windows\System32\config\DEFAULT
+  \REGISTRY\MACHINE\SECURITY                                           : \Device\HarddiskVolume2\Windows\System32\config\SECURITY
+  \REGISTRY\MACHINE\SAM                                                : \Device\HarddiskVolume2\Windows\System32\config\SAM
+  \REGISTRY\USER\S-1-5-20                                              : \Device\HarddiskVolume2\Windows\ServiceProfiles\NetworkService\NTUSER.DAT
+  \REGISTRY\USER\S-1-5-19                                              : \Device\HarddiskVolume2\Windows\ServiceProfiles\LocalService\NTUSER.DAT
+  \REGISTRY\USER\S-1-5-21-795742887-3693175558-2200833936-1001         : \Device\HarddiskVolume2\Users\User_001\NTUSER.DAT
+  \REGISTRY\USER\S-1-5-21-795742887-3693175558-2200833936-1001_Classes : \Device\HarddiskVolume2\Users\User_001\AppData\Local\Microsoft\Windows\usrClass.dat
+  PSPath                                                               : Microsoft.PowerShell.Core\Registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\hivelist
+  PSParentPath                                                         : Microsoft.PowerShell.Core\Registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control
+  PSChildName                                                          : hivelist
+  PSProvider                                                           : Microsoft.PowerShell.Core\Registry
+#+END_SRC
+
+
+ *See* 
+  
+  + [[https://en.wikipedia.org/wiki/Windows_Registry][Windows Registry - Wikipedia]]
+
+  + [[https://github.com/msuhanov/regf/blob/master/Windows%2520registry%2520file%2520format%2520specification.md][Windows Registry File Format Specification]] (Binary Format Description)
+
+  + [[https://superuser.com/questions/111311/where-are-registry-files-stored-in-windows][Where are Registry Files stored in Windows?]]
+
+  + [[https://docs.microsoft.com/en-us/windows/win32/sysinfo/registry-hives?redirectedfrom=MSDN][Registry Hives]]
+
+  + [[https://adamtheautomator.com/powershell-get-registry-value/][Powershell Get Registry Value]]
+
+  + [[https://devblogs.microsoft.com/scripting/use-powershell-to-enumerate-registry-property-values/][Use PowerShell to Enumerate Registry Property Values]]
+
+*** Sample Code 
+
+ *Files* 
+
+File: _registry.cpp_ 
+
+#+BEGIN_SRC cpp
+  #include <iostream>
+  #include <string>
+  #include <cstring>
+  #include <map>
+  #include <cassert>
+
+  #include <windows.h>
+
+  constexpr size_t MAX_KEY_LENGTH = 255;
+  constexpr size_t MAX_VALUE_NAME = 16383;
+
+  // Read a value from registry key.
+  std::string readRegistry_SZ(  HKEY hkey
+                              , const std::string& path
+                              , const std::string& key );
+
+  std::string readRegistry_SZ( const std::string& full_path
+                          , const std::string& key );
+
+  // Read Dword from registry
+  DWORD readRegistry_DW( HKEY hkey
+                        , const std::string& path
+                        , const std::string& key );
+
+
+  void enumKeyValues(HKEY root, std::string const& path) ;
+
+  void enumKeys(HKEY root,std::string const& path, DWORD nmax_keys);
+
+  int main()
+  {
+    const HKEY hkcu = HKEY_CURRENT_USER;
+
+    std::puts("\n ====== [ STEP 1] ===== Show Registry Keys ====================\n");
+    {
+       std::printf(" =>> Windows Explorer Settings ==== \n");
+       const char* path = "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced";
+       enumKeyValues(HKEY_CURRENT_USER, path);
+    }
+
+    std::puts("\n====== [ STEP 2 ] ====== Reading Windows Explorer Settings=====\n");
+    {
+       std::printf(" Location of COM Server with CLSID = {EC231970-6AFD-4215-A72E-97242BB08680} \n");
+       const char* com_path_key = "CLSID\\{EC231970-6AFD-4215-A72E-97242BB08680}\\InProcServer32";
+       const HKEY hcr = HKEY_CLASSES_ROOT;
+       std::cout << "  COM Server file path = " << readRegistry_SZ(hcr, com_path_key, "") << '\n';
+    }
+
+    std::puts("\n====== [ STEP 3 ] ====== Reading Windows Explorer Settings =======\n");
+    {
+       const char* path = "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced";
+
+       std::printf("  Key =>> Hidden[DWORD] =  %ld \n", readRegistry_DW( hkcu, path, "Hidden"));
+
+       std::printf("  Key =>> HideFileExt[DWORD] = %ld \n", readRegistry_DW( hkcu, path, "HideFileExt"));
+
+    }
+
+    std::puts("\n====== [ STEP 4 ] ===== Listing all services that can be started after reboot ====");
+    {
+    
+       std::printf("\n Listing of services (daemons) that can be launched after reboot, at startup time. ");
+       enumKeys( HKEY_LOCAL_MACHINE, "SYSTEM\\CurrentControlSet\\Services", -1);
+    }
+
+    return 0;
+  }
+
+  // ---- I M P L E M E N T A T I O N S -------------//
+  //
+
+
+  std::string
+  readRegistry_SZ(HKEY hkey, const std::string& path, const std::string& key )
+  {
+      HKEY  key_handle;
+      DWORD Type   = REG_SZ;
+      auto  result = std::string(1024, 0);
+      DWORD size   = result.size();
+      if( RegOpenKeyExA( hkey, path.c_str(), 0
+                         , KEY_QUERY_VALUE, &key_handle) != ERROR_SUCCESS )
+      {  return "<NOT-FOUND:KEY>"; }
+
+      if( RegQueryValueEx(key_handle, key.c_str()
+              , NULL, &Type, (LPBYTE) &result[0], &size) != ERROR_SUCCESS)
+      {
+          RegCloseKey (key_handle);
+          return "<NOT-FOUND:VALUE>";
+      }
+      RegCloseKey (key_handle);
+      result.resize(size-1);
+      return result;
+  }
+
+
+  std::string
+  readRegistry_SZ(const std::string& full_path, const std::string& key )
+  {
+
+      const char* hkcu = "HKEY_CURRENT_USER\\";
+
+      // Check whether string has prefix 'HKEY_CURRENT_USER\\'
+      if( std::strncmp(full_path.c_str(), hkcu, std::strlen(hkcu)) == 0 )
+      {
+        std::string path{ full_path.begin() + strlen(hkcu), full_path.end() };
+        std::cerr << "\n [TRACE] path = " << path << std::endl;
+        return readRegistry_SZ(HKEY_CURRENT_USER, path, key);
+      }
+
+      return "<NOT-FOUND>";
+  }
+
+  DWORD
+  readRegistry_DW(HKEY hkey, const std::string& path, const std::string& key )
+  {
+      HKEY  key_handle;
+      DWORD Type   = REG_DWORD;
+      DWORD result = 0;
+      DWORD ret    = 0;
+      DWORD size   = sizeof(DWORD);
+
+      ret = RegOpenKeyExA( hkey, path.c_str(), 0
+                           , KEY_QUERY_VALUE, &key_handle);
+
+      assert( ret == ERROR_SUCCESS );
+
+      ret = RegQueryValueExA( key_handle, key.c_str()
+                            , NULL, &Type, (LPBYTE) &result, &size );
+
+      if( ret != ERROR_SUCCESS )
+      {
+          RegCloseKey (key_handle);
+          std::perror("Error: unable to query key");
+          return -1;
+      }
+      RegCloseKey (key_handle);
+      return result;
+  }
+
+
+  // Query all values from a given registry key
+  // Adapted from: https://docs.microsoft.com/en-us/windows/win32/sysinfo/enumerating-registry-subkeys
+  void enumKeyValues(HKEY root, std::string const& path)
+  {
+
+      TCHAR    achClass[MAX_PATH] = TEXT("");  // buffer for class name
+      DWORD    cchClassName = MAX_PATH;  // size of class string
+      DWORD    cSubKeys=0;               // number of subkeys
+      DWORD    cbMaxSubKey;              // longest subkey size
+      DWORD    cchMaxClass;              // longest class string
+      DWORD    cValues;              // number of values for key
+      DWORD    cchMaxValue;          // longest value name
+      DWORD    cbMaxValueData;       // longest value data
+      DWORD    cbSecurityDescriptor; // size of security descriptor
+      FILETIME ftLastWriteTime;      // last write time
+
+      DWORD i, retCode;
+
+      TCHAR  achValue[MAX_VALUE_NAME];
+      DWORD cchValue = MAX_VALUE_NAME;
+
+      HKEY hKey{};
+      auto ret = RegOpenKeyEx(root, path.c_str(), 0, KEY_READ, &hKey );
+      if( ret != ERROR_SUCCESS ){ goto error;  }
+
+      // Get the class name and the value count.
+      retCode = RegQueryInfoKey(
+          hKey,                    // key handle
+          achClass,                // buffer for class name
+          &cchClassName,           // size of class string
+          NULL,                    // reserved
+          &cSubKeys,               // number of subkeys
+          &cbMaxSubKey,            // longest subkey size
+          &cchMaxClass,            // longest class string
+          &cValues,                // number of values for this key
+          &cchMaxValue,            // longest value name
+          &cbMaxValueData,         // longest value data
+          &cbSecurityDescriptor,   // security descriptor
+          &ftLastWriteTime);       // last write time
+
+
+      // Enumerate the key values.
+      if (!cValues){ goto cleanup; }
+      std::printf( "\n  ->> Number of values: %ld \n\n ", cValues);
+
+      static const auto key_types_db = std::map<DWORD, std::string>{
+            { REG_BINARY,              "REG_BINARY" }
+          , { REG_DWORD,               "REG_DWORD" }
+          , { REG_DWORD_LITTLE_ENDIAN, "REG_DWORD_LITTLE_ENDIAN" }
+          , { REG_DWORD_BIG_ENDIAN,    "REG_DWORD_BIG_ENDIAN" }
+          , { REG_LINK,                "REG_LINK" }
+          , { REG_SZ,                  "REG_SZ(string)"}
+      };
+
+      for (i=0, retCode=ERROR_SUCCESS; i<cValues; i++)
+      {
+           cchValue = MAX_VALUE_NAME;
+           achValue[0] = '\0';
+           retCode = RegEnumValue(hKey, i, achValue, &cchValue, NULL, NULL, NULL, NULL);
+           assert( retCode == ERROR_SUCCESS);
+
+           DWORD keyType = 0;
+           retCode = RegGetValueA(hKey, NULL, achValue, RRF_RT_ANY, &keyType, NULL, NULL);
+           assert( retCode == ERROR_SUCCESS);
+
+           auto it = key_types_db.find(keyType);
+           std::string keyDesc = ( it != key_types_db.end() ) ? it->second : "<UNKNOWN>";
+
+           std::printf( "   =>> (%ld) %s / type = '%s' \n"
+                       , i+1, achValue, keyDesc.c_str());	
+      }
+
+  cleanup:
+       RegCloseKey(hKey);
+       return;
+  error:
+       std::cerr << " [ERRO] Unable to open Key with path = " << path << std::endl;
+       RegCloseKey(hKey);
+  }
+
+
+  // Enumerate subkeys of a given Windows registry key.
+  // Adapted from: https://docs.microsoft.com/en-us/windows/win32/sysinfo/enumerating-registry-subkeys
+  // ---------------------------------------------------
+  // Set  max_keys to -1 in order to show all keys.
+  void enumKeys(HKEY root,std::string const& path, DWORD nmax_keys)
+  {
+      TCHAR    achKey[MAX_KEY_LENGTH];   // buffer for subkey name
+      DWORD    cbName;                   // size of name string
+      TCHAR    achClass[MAX_PATH] = TEXT("");  // buffer for class name
+      DWORD    cchClassName = MAX_PATH;  // size of class string
+      DWORD    cSubKeys=0;               // number of subkeys
+      DWORD    cbMaxSubKey;              // longest subkey size
+      DWORD    cchMaxClass;              // longest class string
+      DWORD    cValues;              // number of values for key
+      DWORD    cchMaxValue;          // longest value name
+      DWORD    cbMaxValueData;       // longest value data
+      DWORD    cbSecurityDescriptor; // size of security descriptor
+      FILETIME ftLastWriteTime;      // last write time
+
+      DWORD i, retCode;
+
+      HKEY hKey{};
+      auto ret = RegOpenKeyEx(root, path.c_str(), 0, KEY_READ, &hKey );
+      assert( ret == ERROR_SUCCESS );
+
+      // Get the class name and the value count.
+      retCode = RegQueryInfoKey( hKey, achClass, &cchClassName,  NULL
+                                 , &cSubKeys, &cbMaxSubKey, &cchMaxClass, &cValues
+                                 , &cchMaxValue, &cbMaxValueData, &cbSecurityDescriptor
+                                 ,&ftLastWriteTime);
+
+      // Enumerate the subkeys, until RegEnumKeyEx fails.
+
+      if( !cSubKeys ){ return; }
+      printf( "\nNumber of subkeys: %ld\n", cSubKeys);
+      // Show maximum of N Keys
+      DWORD nkeys = ( cSubKeys > nmax_keys) ? nmax_keys : cSubKeys;
+
+      for (i=0; i < nkeys; i++)
+      {
+          cbName = MAX_KEY_LENGTH;
+          retCode = RegEnumKeyEx(hKey, i, achKey, &cbName, NULL, NULL, NULL, &ftLastWriteTime);
+          if (retCode == ERROR_SUCCESS){ std::printf( " [*] (%ld) %s\n", i+1, achKey ); }
+      }
+  }
+#+END_SRC
+
+ *Building* 
+
+#+BEGIN_SRC sh 
+   $ g++ registry.cpp -o registry.exe -std=c++1z -Wall -Wextra   
+#+END_SRC
+
+ *Running* 
+
+#+BEGIN_SRC sh 
+  $ registry.exe
+
+   ====== [ STEP 1] ===== Show Registry Keys ====================
+
+   =>> Windows Explorer Settings ==== 
+
+    ->> Number of values: 28 
+
+      =>> (1) Start_SearchFiles / type = 'REG_DWORD' 
+     =>> (2) ServerAdminUI / type = 'REG_DWORD' 
+     =>> (3) Hidden / type = 'REG_DWORD' 
+     =>> (4) ShowCompColor / type = 'REG_DWORD' 
+     =>> (5) HideFileExt / type = 'REG_DWORD' 
+     =>> (6) DontPrettyPath / type = 'REG_DWORD' 
+     =>> (7) ShowInfoTip / type = 'REG_DWORD' 
+     =>> (8) HideIcons / type = 'REG_DWORD' 
+     =>> (9) MapNetDrvBtn / type = 'REG_DWORD' 
+     =>> (10) WebView / type = 'REG_DWORD' 
+     =>> (11) Filter / type = 'REG_DWORD' 
+     =>> (12) ShowSuperHidden / type = 'REG_DWORD' 
+     =>> (13) SeparateProcess / type = 'REG_DWORD' 
+     =>> (14) AutoCheckSelect / type = 'REG_DWORD' 
+     =>> (15) IconsOnly / type = 'REG_DWORD' 
+     =>> (16) ShowTypeOverlay / type = 'REG_DWORD' 
+     =>> (17) ShowStatusBar / type = 'REG_DWORD' 
+     =>> (18) StoreAppsOnTaskbar / type = 'REG_DWORD' 
+     =>> (19) ListviewAlphaSelect / type = 'REG_DWORD' 
+     =>> (20) ListviewShadow / type = 'REG_DWORD' 
+     =>> (21) TaskbarAnimations / type = 'REG_DWORD' 
+     =>> (22) StartMenuInit / type = 'REG_DWORD' 
+     =>> (23) TaskbarStateLastRun / type = 'REG_BINARY' 
+     =>> (24) ShowCortanaButton / type = 'REG_DWORD' 
+     =>> (25) ReindexedProfile / type = 'REG_DWORD' 
+     =>> (26) Start_TrackProgs / type = 'REG_DWORD' 
+     =>> (27) StartMigratedBrowserPin / type = 'REG_DWORD' 
+     =>> (28) TaskbarMigratedBrowserPin / type = 'REG_DWORD' 
+
+  ====== [ STEP 2 ] ====== Reading Windows Explorer Settings=====
+
+   Location of COM Server with CLSID = {EC231970-6AFD-4215-A72E-97242BB08680} 
+    COM Server file path = C:\Windows\System32\wbem\Microsoft.Uev.AgentWmi.dll
+
+  ====== [ STEP 3 ] ====== Reading Windows Explorer Settings =======
+
+    Key =>> Hidden[DWORD] =  2 
+    Key =>> HideFileExt[DWORD] = 1 
+
+  ====== [ STEP 4 ] ===== Listing all services that can be started after reboot ====
+
+   Listing of services (daemons) that can be launched after reboot, at startup time. 
+  Number of subkeys: 692
+   [*] (1) .NET CLR Data
+   [*] (2) .NET CLR Networking
+   [*] (3) .NET CLR Networking 4.0.0.0
+   [*] (4) .NET Data Provider for Oracle
+   [*] (5) .NET Data Provider for SqlServer
+   [*] (6) .NET Memory Cache 4.0
+   [*] (7) .NETFramework
+   [*] (8) 1394ohci
+   [*] (9) 3ware
+   [*] (10) AarSvc
+   [*] (11) AarSvc_2b782
+   [*] (12) ACPI
+   [*] (13) AcpiDev
+   [*] (14) acpiex
+   [*] (15) acpipagr
+
+    ... ...   ... ...   ... ...   ... ...   ... ...   ... ... 
+    ... ...   ... ...   ... ...   ... ...   ... ...   ... ... 
+
+   [*] (522) Telemetry
+   [*] (523) terminpt
+   [*] (524) TermService
+   [*] (525) Themes
+   [*] (526) TieringEngineService
+   [*] (527) TimeBrokerSvc
+   [*] (528) TokenBroker
+   [*] (529) TPM
+   [*] (530) TrkWks
+   [*] (531) TroubleshootingSvc
+   [*] (532) TrustedInstaller
+   ...  ...  ...  ...  ...  ...  ...  ...  ...  ... 
+   ...  ...  ...  ...  ...  ...  ...  ...  ...  ... 
+#+END_SRC
 ** CODE - Display information about current process 
 
 Print information about current process and copy itself to desktop
