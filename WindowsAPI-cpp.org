@@ -2180,6 +2180,11 @@ File: _primtive-io.cpp_
   ╚)£zCSome unknown productHç√╞ ⌂☺☺☺hpKá‼↑►H^r♥╞ ⌂☺... ....
 #+END_SRC
 ** System Information 
+*** Oveview 
+
+Sample codes using several Windows API subroutines for obtaining
+system information such as path to key directories, amount of working
+memory, username and etc. 
 
  *Documentation* 
 
@@ -2222,9 +2227,7 @@ File: _primtive-io.cpp_
        processor has 4 x 2 = 8 logical cores. Therefore, the processor
        can run up to 8 threads simultaneously and has 8 hardware
        threads. 
-
-
-  *Files* 
+*** C++ Sample Code Version  
 
 File: _sysinfo.cpp_
 
@@ -2524,6 +2527,217 @@ File: _sysinfo.cpp_
    =>> Startup Menu Folder = C:\Users\user_001\AppData\Roaming\Microsoft\Windows\Start Menu
    =>> Sendto Folder = C:\Users\user_001\AppData\Roaming\Microsoft\Windows\SendTo
 #+END_SRC
+*** Rust Sample Code Version 
+
+This rust version is an stil incomplete attempt of rewrite the C++ version.
+
+  + Note: The CSIDL_ constants are extracted from [[https://github.com/reactos/reactos/blob/3fa57b8ff7fcee47b8e2ed869aecaf4515603f3f/sdk/include/psdk/shlobj.h][shlobj.h (Reactor OS source)]].
+
+File: _sysinfo.rs_ 
+
+#+BEGIN_SRC c++ 
+  #[allow(warnings, unused_variables)]
+  #[allow(warnings, unused_imports)]
+  #[allow(dead_code)]
+  #[allow(warnings, unused_mut)]
+
+  use std::os::raw::{c_int, c_char, c_long, c_void, c_uint};
+  use std::ffi::CString;
+
+  // Useful Type aliases
+  type HANDLE  = *mut c_void;
+  type HWND    = *mut c_void;
+  type LPCSTR  = *const c_char;
+  type LPSTR   = *mut u8;
+  type DWORD   = c_int;
+  type UINT    = c_uint;
+  type HRESULT = c_long;
+  type BOOL    = c_int;
+
+  fn main()
+  {
+      // The type [u8, 400] => Is similar to C++ type: uint8_t var[400]
+      // or to the type std::array<uint8_t, 400>.
+      let mut buffer2: [u8; 400] = [0; 400];
+      let mut nread: UINT;
+      unsafe {
+          //GetSystemWindowsDirectoryA(buffer.as_mut_ptr(), buffer_size as UINT );
+          nread = GetSystemWindowsDirectoryA(buffer2.as_mut_ptr(), buffer2.len() as UINT); 
+      }
+
+      // println!(" [INFO] Windows path = {:?}", buffer);
+      // println!(" [INFO] Buffer2 = {:?}", buffer2);
+      let s = std::str::from_utf8(&buffer2[..(nread as usize)]).unwrap();
+      println!(" [INFO] Windows System Directory Path[2] = {:?}", s);
+
+      println!(" [INFO] Windows System Directory Path[1] = {}"
+               , wrap_function(GetSystemWindowsDirectoryA) );
+
+      println!(" [INFO] Windows Directory = {} "
+               , wrap_function(GetSystemDirectoryA) );
+
+      println!(" [INFO] Windows Wow64 Directory = {} "
+               , wrap_function(GetSystemWow64DirectoryA) );
+
+      const CSIDL_PROFILE:          c_int = 0x0028;
+      const CSIDL_DESKTOP:          c_int = 0x0000;
+      const CSIDL_PROGRAMS:         c_int = 0x0002;
+      const CSIDL_STARTMENU:        c_int = 0x000b;
+      const CSIDL_APPDATA:          c_int = 0x001a;
+      const CSIDL_PROGRAM_FILES:    c_int = 0x0026;
+      const CSIDL_ADMINTOOLS:       c_int = 0x0030;
+      const CSIDL_LOCAL_APPDATA:    c_int = 0x001c;
+      const CSIDL_FAVORITES:        c_int = 0x0006;
+      const CSIDL_STARTUP:          c_int = 0x0007;
+      const CSIDL_RECENT:           c_int = 0x0008;
+      const CSIDL_SENDTO:           c_int = 0x0009;
+      const CSIDL_WINDOWS:          c_int = 0x0024;
+      const CSIDL_SYSTEM:           c_int = 0x0025;
+      const CSIDL_FONTS:            c_int = 0x0014;
+      const CSIDL_PROGRAM_FILESX86: c_int = 0x002a;
+      const CSIDL_SYSTEMX86:        c_int = 0x0029;
+    
+    
+      println!("\n ==========================================");
+      println!(" [INFO] Profiles path      = {} ", get_sh_folder_path(CSIDL_PROFILE)       );
+      println!(" [INFO] AppData path       = {} ", get_sh_folder_path(CSIDL_APPDATA)       );
+      println!(" [INFO] LocalAppData path  = {} ", get_sh_folder_path(CSIDL_LOCAL_APPDATA) );
+      println!(" [INFO] Start menu path    = {} ", get_sh_folder_path(CSIDL_STARTMENU)     );
+      println!(" [INFO] Desktop path       = {} ", get_sh_folder_path(CSIDL_DESKTOP)       );
+      println!(" [INFO] Admin Tools Path   = {} ", get_sh_folder_path(CSIDL_ADMINTOOLS)    );
+      println!(" [INFO] Favorite path      = {} ", get_sh_folder_path(CSIDL_FAVORITES)     );
+      println!(" [INFO] Startup path       = {} ", get_sh_folder_path(CSIDL_STARTUP)       );
+      println!(" [INFO] Recent folder path = {} ", get_sh_folder_path(CSIDL_RECENT)        );
+      println!(" [INFO] Sendto path        = {} ", get_sh_folder_path(CSIDL_SENDTO)        );   
+      println!(" [INFO] Program path       = {} ", get_sh_folder_path(CSIDL_PROGRAM_FILES) );
+      println!(" [INFO] Windows path       = {} ", get_sh_folder_path(CSIDL_WINDOWS)       );
+      println!(" [INFO] System path        = {} ", get_sh_folder_path(CSIDL_SYSTEM)        );
+      println!(" [INFO] Fonts folder       = {} ", get_sh_folder_path(CSIDL_FONTS)         );
+      println!(" [INFO] System 86 path     = {} ", get_sh_folder_path(CSIDL_SYSTEMX86)     );
+      println!(" [INFO] Progrm Files x86   = {} ", get_sh_folder_path(CSIDL_PROGRAM_FILESX86));
+  }
+
+  //========================================================//
+
+  #[link(name = "shell32")] 
+  extern "C" {
+      fn SHGetFolderPathA( hwnd: HWND, csidl: c_int
+                          , hToken: HANDLE, flag: DWORD, path: LPSTR) -> HRESULT;
+  }
+
+  fn get_sh_folder_path(csidl: c_int) -> String
+  {
+      const max_path: usize = 260;
+      let mut buffer: [u8; max_path] = [0; max_path];
+      let status: HRESULT;
+      unsafe { 
+          status = SHGetFolderPathA(  std::ptr::null_mut()
+                           , csidl
+                           , std::ptr::null_mut()
+                           , 0
+                           , buffer.as_mut_ptr()
+                          );
+      }
+      assert!( status >= 0);
+      let st = std::str::from_utf8( &buffer[..(max_path)] ).unwrap();
+      let mut res: String = st.to_string();
+      // Remove \0 null characters.
+      res = res.trim_matches(char::from(0)).to_string();
+      return res;
+  }
+
+  extern "C" {
+     /* 
+      ,*   UINT GetSystemWindowsDirectoryA(
+      ,*				    LPSTR lpBuffer,
+      ,*				    UINT  uSize
+      ,*				    );
+      ,**********************************************/
+      fn GetSystemWindowsDirectoryA(buffer: LPSTR, size: UINT) -> UINT; 
+
+      fn GetSystemDirectoryA(buffer: LPSTR, size: UINT) -> UINT; 
+      fn GetSystemWow64DirectoryA(buffer: LPSTR, size: UINT) -> UINT; 
+  }
+
+  type Callback1 = unsafe extern "C" fn(buffer: LPSTR, size: UINT) -> UINT;
+
+  fn wrap_function(callback: Callback1) -> String
+  {
+      let mut buffer2: [u8; 400] = [0; 400];
+      let mut nread: UINT = 0;
+      unsafe {
+          nread = callback(buffer2.as_mut_ptr(), buffer2.len() as UINT); 
+      }
+      let s = std::str::from_utf8(&buffer2[..(nread as usize)]).unwrap();
+      return s.to_string();
+  }
+#+END_SRC
+
+ *Building* 
+
+#+BEGIN_SRC sh 
+ $ rustc sysinfo.rs 
+#+END_SRC
+
+ *Analyses the executable binary file* 
+
+#+BEGIN_SRC sh 
+   $ where ldd
+   C:\Users\User_001\scoop\apps\git\current\usr\bin\ldd.exe
+
+   $ where file
+   C:\Users\User_001\scoop\apps\git\current\usr\bin\file.exe
+
+   $ file sysinfo.exe
+   sysinfo.exe: PE32+ executable (console) x86-64, for MS Windows
+
+   $ du -h sysinfo.exe
+   172K    sysinfo.exe
+
+   $ ldd sysinfo.exe
+           ntdll.dll => /c/WINDOWS/SYSTEM32/ntdll.dll (0x7ffe52eb0000)
+           KERNEL32.DLL => /c/WINDOWS/System32/KERNEL32.DLL (0x7ffe510c0000)
+           KERNELBASE.dll => /c/WINDOWS/System32/KERNELBASE.dll (0x7ffe50b30000)
+           SHELL32.dll => /c/WINDOWS/System32/SHELL32.dll (0x7ffe51ac0000)
+           msvcp_win.dll => /c/WINDOWS/System32/msvcp_win.dll (0x7ffe50720000)
+           ucrtbase.dll => /c/WINDOWS/System32/ucrtbase.dll (0x7ffe505f0000)
+           USER32.dll => /c/WINDOWS/System32/USER32.dll (0x7ffe51920000)
+           win32u.dll => /c/WINDOWS/System32/win32u.dll (0x7ffe50870000)
+           GDI32.dll => /c/WINDOWS/System32/GDI32.dll (0x7ffe515c0000)
+           gdi32full.dll => /c/WINDOWS/System32/gdi32full.dll (0x7ffe50e00000)
+           VCRUNTIME140.dll => /c/WINDOWS/SYSTEM32/VCRUNTIME140.dll (0x7ffe49e30000)
+#+END_SRC
+
+ *Running* 
+
+#+BEGIN_SRC sh 
+   $ .\sysinfo.exe
+
+    [INFO] Windows System Directory Path[2] = "C:\\WINDOWS"
+    [INFO] Windows System Directory Path[1] = C:\WINDOWS
+    [INFO] Windows Directory = C:\WINDOWS\system32
+    [INFO] Windows Wow64 Directory = C:\WINDOWS\SysWOW64
+
+    ==========================================
+    [INFO] Profiles path      = C:\Users\User_001
+    [INFO] AppData path       = C:\Users\User_001\AppData\Roaming
+    [INFO] LocalAppData path  = C:\Users\User_001\AppData\Local
+    [INFO] Start menu path    = C:\Users\User_001\AppData\Roaming\Microsoft\Windows\Start Menu
+    [INFO] Desktop path       = C:\Users\User_001\Desktop
+    [INFO] Admin Tools Path   = C:\Users\User_001\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Administrative Tools
+    [INFO] Favorite path      = C:\Users\User_001\Favorites
+    [INFO] Startup path       = C:\Users\User_001\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup
+    [INFO] Recent folder path = C:\Users\User_001\AppData\Roaming\Microsoft\Windows\Recent
+    [INFO] Sendto path        = C:\Users\User_001\AppData\Roaming\Microsoft\Windows\SendTo
+    [INFO] Program path       = C:\Program Files
+    [INFO] Windows path       = C:\WINDOWS
+    [INFO] System path        = C:\WINDOWS\system32
+    [INFO] Fonts folder       = C:\WINDOWS\Fonts
+    [INFO] System 86 path     = C:\WINDOWS\SysWOW64
+    [INFO] Progrm Files x86   = C:\Program Files (x86)
+
+#+END_SRC
+
 ** Windows Shortcut - LNK
 
 The following code snippet creates several Windows shortcuts, also
