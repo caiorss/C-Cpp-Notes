@@ -8217,6 +8217,437 @@ the windows subsystem.
 #+BEGIN_SRC sh 
   $ g++ gui-without-winmain.cpp -o gui-without-winmain.exe -std=c++1z -g -lgdi32 -luser32 -Wl,-subsystem,windows
 #+END_SRC
+
+*** GUI Without WinMain in Rust 
+
+Note:  This Rust rewrite shows a blank GUI window and a message box
+when the window is closed.  This code is still incomplete and still
+needs porting the GDI structs for 2D drawing on the window. 
+
+ *Documentation of Windows APIs used:* 
+
+  + [[https://docs.microsoft.com/en-us/windows/win32/winprog/windows-data-types][Windows Data Types]]
+
+  + [[https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-createwindowexa][CreateWindowExA()]] function (winuser.h)
+
+  + [[https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms633573(v=vs.85)][WindowProc callback function]]
+
+  + [[https://docs.microsoft.com/en-us/windows/win32/api/processthreadsapi/ns-processthreadsapi-startupinfoa][STARTUPINFOA structure]]
+
+  + [[https://docs.microsoft.com/en-us/windows/win32/api/winuser/ns-winuser-wndclassexa][WNDCLASSEXA structure]]
+
+  + Note: In order to view messages sent by the OutputDebugString
+    subroutine, it is necessary the tool [[https://docs.microsoft.com/en-us/sysinternals/downloads/debugview][DebugView]] from sysinternal. 
+
+  + React OS header file: [[https://github.com/reactos/reactos/blob/master/sdk/include/psdk/winuser.h][winuser.h]] contains all constants WM_MOVE,
+    WM_CLOSE, ... and the source of many macros.
+    + Note: The operating system vendor does not provide the header
+      file _winuser.h_ on the internet. The only way to view this file
+      other than the accessing React OS source, is to install the
+      Windows SDK (Software Development Kit).
+
+ *Files:*
+ 
+File: _rust-wingui.rs_ 
+
+#+BEGIN_SRC cpp 
+  // Build for the "window" subsystem instead of console subsystem.
+  // Comment the next uncommented line to enable the console subsystem and view
+  // the stdout and stderr output.
+  #![windows_subsystem = "windows"] 
+
+  use std::os::raw::{c_int, c_char, c_long, c_void, c_uint, c_short};
+  use std::ffi::CString;
+  use std::mem;
+
+  const IDI_APPLICATION: c_int = 32512;
+  const IDI_HAND:        c_int = 32513;
+  const IDI_QUESTION:    c_int = 32514;
+  const IDI_EXCLAMATION: c_int = 32515;
+  const IDI_ASTERISK:    c_int = 32516;
+  const IDI_WINLOGO:     c_int = 32517;
+  const IDC_ARROW:       c_int = 32512;
+
+  const WS_OVERLAPPEDWINDOW: DWORD = 0xcf0000;
+
+  const WM_NULL:    UINT = 0;
+  const WM_CREATE:  UINT = 1;
+  const WM_DESTROY: UINT = 2;
+  const WM_ENABLE:  UINT = 10;
+  const WM_CLOSE:   UINT = 16;
+  const WM_QUIT:    UINT = 18;
+  const WM_PAINT:   UINT = 15;
+  const WM_MOVE:    UINT = 3;
+
+  extern "C" fn window_message_callback(  hwnd: HWND, msg: UINT
+                                        , wParam: WPARAM, lParam: LPARAM) -> LRESULT
+  {
+      let zero_ptr = std::ptr::null_mut();
+    
+      if msg == WM_CLOSE {
+          output_debug_string("Message WM_CLOSE sent. => Shutdown application");
+          unsafe { DestroyWindow(hwnd); }
+          return zero_ptr;
+      }
+
+      if msg == WM_DESTROY {
+          output_debug_string("Message WM_DESTROY sent.");	
+          unsafe{
+              PostQuitMessage(0);
+          }
+          return zero_ptr;
+      }
+
+      if msg == WM_MOVE {
+          output_debug_string("Message WM_MOVE sent.");
+          return zero_ptr;
+      }
+
+      if msg == WM_PAINT {
+          // TODO - Port the following code for the GDI
+          // (GDI - Graphics Device Interface)
+          /** 
+          ,*      PAINTSTRUCT ps;
+          ,*      HDC hdc;
+          ,*      // std::cerr << " [INFO] Windown painting" << std::endl;
+          ,*      hdc = BeginPaint(hwnd, &ps);
+          ,*      std::string text = "Hello world Window!";      
+          ,*      TextOutA(hdc, 125, 200, text.c_str(), text.size());
+          ,*      Ellipse(hdc, 100, 100, 160, 160);
+          ,*      Rectangle(hdc, 100, 100, 160, 160);
+          ,*      EndPaint(hwnd, &ps);       
+          -------------------------------------------------*/
+          // output_debug_string("TODO - Finish the GDI code");
+          return zero_ptr;
+      }
+    
+      return unsafe{ DefWindowProcA(hwnd, msg, wParam, lParam) };
+      //return std::ptr::null_mut();
+  }
+
+
+  fn main()
+  {
+      println!(" [TRACE] Hello world Rust! on Windows NT.");
+
+      output_debug_string("Hello world from a Rust process!!");
+      output_debug_string("You can see those messages using Sysinternals tool");
+
+      let c_null_ptr =  std::ptr::null_mut();
+      let c_null_ptr_u8 = std::ptr::null_mut() as *mut u8;
+
+
+      let hInstance: HINSTANCE = unsafe {  GetModuleHandleA(std::ptr::null_mut()) };
+      assert!( hInstance != c_null_ptr );
+    
+
+      // Initialize struct
+      let mut si: STARTUPINFO_A = STARTUPINFO_A {
+                cb: 0
+              , lpReserved:      std::ptr::null_mut()
+              , lpDesktop:       c_null_ptr_u8
+              , lpTitle:         c_null_ptr_u8
+              , dwX:             0
+              , dwY:             0
+              , dwXSize:         0
+              , dwYSize:         0
+              , dwXCountChars:   0
+              , dwYCountChars:   0
+              , dwFillAttribute: 0
+              , dwFlags:         0
+              , wShowWindow:     0
+              , cbReserved2:     0
+              , lpReserved2:     std::ptr::null_mut()
+              , hStdInput:       c_null_ptr
+              , hStdOutput:      c_null_ptr
+              , hStdError:       c_null_ptr
+      };
+
+      unsafe {  GetStartupInfoA( &mut si as *mut _ ) };
+
+      let nCmdShow: WORD = si.wShowWindow;
+    
+      let className: &str = "NameOfWIndow";
+      let className_: CString = CString::new(className).unwrap();
+
+      let COLOR_WINDOW: c_int = 5;
+    
+      let mut wc = WNDCLASSEXA {
+                cbSize:        mem::size_of::<WNDCLASSEXA>() as u32
+              , style:         0
+              , lpfnWndProc:   window_message_callback 
+              , cbClsExtra:    0
+              , cbWndExtra:    0
+              , hInstance:     hInstance
+              , hIcon:         unsafe{ LoadIconA( c_null_ptr , IDI_APPLICATION)  }
+              , hCursor:       unsafe{ LoadCursorA( c_null_ptr, IDC_ARROW)       }
+              , hbrBackground: (COLOR_WINDOW + 1) as *mut _
+              , lpszMenuName:  std::ptr::null_mut()
+              , lpszClassName: className_.as_ptr() 
+              , hIconSm:       std::ptr::null_mut()
+       };
+
+      let mut result: ATOM = 0; // False
+
+      result = unsafe {  RegisterClassExA(&wc as *const _) };
+      assert!( result != 0);
+
+      let pos_left: DWORD = 400;
+      let pos_top:  DWORD = 100;
+      let width:    DWORD = 500;
+      let height:   DWORD = 400;
+
+      let title = CString::new("Title of Window").unwrap() ;
+    
+      let hwnd: HWND = unsafe {
+          CreateWindowExA(
+                0                             // dwExStyle
+              , wc.lpszClassName              // lpClassName
+              , title.as_ptr()                // lpWindowName
+              , WS_OVERLAPPEDWINDOW           // dwStyle
+              , pos_left, pos_top             // X, Y 
+              , width, height                 // nWidth, nHeight
+              , c_null_ptr                    // hWndParent 
+              , c_null_ptr                    // hMenu 
+              , hInstance                     // hInstance 
+              , c_null_ptr                    // lpParam 
+          )
+      };
+
+      assert!( hwnd != c_null_ptr );
+
+      unsafe {
+          ShowWindow(hwnd, nCmdShow as i32);
+          UpdateWindow(hwnd);
+      }
+
+      // Dummy initialization => This struct is initialized
+      // by GetMessage(), however rust does not provide 
+      // any means to default initialize this struct.
+      let mut msg: MSG = MSG {
+                hwnd:     c_null_ptr
+              , message:  0
+              , wParam:   std::ptr::null_mut()
+              , lParam:   std::ptr::null_mut()
+              , time:     0
+              , pt:       POINT{ x: 0, y: 0 }
+              , lPrivate: 0
+      };
+    
+      // ---- Window event loop ---
+      loop {
+          let cond = unsafe { GetMessageA(&mut msg as *mut _, c_null_ptr, 0, 0) };
+          if cond <= 0 { break; }
+
+          unsafe {
+              TranslateMessage(&msg);
+              DispatchMessageA(&msg);
+          }
+      }
+
+      // sssssssssssssssssssssssmessage_box_info("Application terminated Ok", "Notification");    
+      println!(" [TRACE] Terminated. Ok!");
+    
+  } // --- End of main() --- //
+
+         // =====  I M P L E M E N T A T I O N S ============= //
+         //****************************************************//
+
+  // Useful Type aliases
+  //----------------------------------//
+  // Alias for C or C++ void* void pointer (opaque pointer)
+  type LPVOID   = *mut c_void;
+  // Windows handle's type aliases
+  type HINSTANCE = LPVOID;
+  type HANDLE    = LPVOID;
+  type HWND      = LPVOID;
+  type HMODULE   = LPVOID;
+  type HICON     = LPVOID;
+  type HCURSOR   = LPVOID;
+  type HBRUSH    = LPVOID;
+  type HMENU     = LPVOID;
+  // Aliases for string types
+  type LPCSTR  = *const c_char;
+  type LPSTR   = *mut u8;
+  // Operation status code
+  type HRESULT = c_long; // Return code of COM interfaces
+  type BOOL    = c_int;  // Boolean status code (0 - false), (1  or anything else is true)
+  type LPRESULT = *const HRESULT;
+
+  // Non Categorized aliases
+  type UINT    = c_uint;
+  type LPBYTE  = *mut u8;
+  type WORD    = c_short;
+  type DWORD   = c_int;
+  type WPARAM  = *mut UINT;
+  type LPARAM  = *mut c_long;
+  type LRESULT = *mut c_long;
+  type LONG    = c_long;
+  type ATOM    = WORD;
+
+  // Type alias for C function pointer (Function with C linkage)
+  // ,in other words, function with C-calling convention.
+  type  WindowProc = unsafe extern "C" fn(  hwnd:   HWND
+                                          , uMsg:   UINT
+                                          , wParam: WPARAM
+                                          , lParam: LPARAM) -> LRESULT;
+
+
+  #[repr(C)]
+  struct STARTUPINFO_A {
+      cb:              DWORD
+    , lpReserved:      LPSTR
+    , lpDesktop:       LPSTR
+    , lpTitle:         LPSTR
+    , dwX:             DWORD
+    , dwY:             DWORD
+    , dwXSize:         DWORD
+    , dwYSize:         DWORD
+    , dwXCountChars:   DWORD
+    , dwYCountChars:   DWORD
+    , dwFillAttribute: DWORD
+    , dwFlags:         DWORD
+    , wShowWindow:     WORD
+    , cbReserved2:     WORD
+    , lpReserved2:     LPBYTE
+    , hStdInput:       HANDLE
+    , hStdOutput:      HANDLE
+    , hStdError:       HANDLE
+  }
+
+  type LPSTARTUPINFO_A = *mut STARTUPINFO_A;
+
+  #[repr(C)]
+  struct WNDCLASSEXA {
+      cbSize:        UINT
+    , style:         UINT
+      // Callback function 'lpfnWndProc' (function pointer)
+    , lpfnWndProc:   WindowProc
+    , cbClsExtra:    c_int
+    , cbWndExtra:    c_int
+    , hInstance:     HINSTANCE
+    , hIcon:         HICON
+    , hCursor:       HCURSOR
+    , hbrBackground: HBRUSH
+    , lpszMenuName:  LPCSTR
+    , lpszClassName: LPCSTR
+    , hIconSm:       HICON
+  }
+
+  #[repr(C)]
+  struct POINT {
+      x: LONG
+    , y: LONG
+  }
+
+  #[repr(C)]
+  struct MSG {
+      hwnd:     HWND
+    , message:  UINT
+    , wParam:   WPARAM
+    , lParam:   LPARAM
+    , time:     DWORD
+    , pt:       POINT
+    , lPrivate: DWORD
+  }
+
+  type LPMSG = *mut MSG;
+
+
+  #[link(name = "user32")]
+  extern "C" {
+      fn GetModuleHandleA(lpModuleName: LPCSTR) -> HMODULE;
+      fn RegisterClassExA(unnamedParam1: *const WNDCLASSEXA) -> ATOM;
+
+      fn LoadIconA(hInstance: HINSTANCE, lpIconName: c_int) -> HICON;
+      // fn LoadIconA(hInstance: HINSTANCE, lpIconName: LPCSTR) -> HICON;
+
+      // HCURSOR LoadCursorA(HINSTANCE hInstance, LPCSTR lpCursorName);
+      // fn LoadCursorA(hInstance: HINSTANCE, lpCursorName: LPCSTR) -> HCURSOR;
+
+      fn LoadCursorA(hInstance: HINSTANCE, lpCursorName: c_int) ->  HCURSOR;
+    
+      fn ShowWindow(hWnd: HWND , nCmdShow: c_int ) -> BOOL;
+      fn UpdateWindow(hWnd: HWND) -> BOOL;
+
+      fn GetMessageA( lpMsg: LPMSG ,hWnd: HWND
+                    , wMsgFilterMin: UINT , wMsgFilterMax: UINT) -> BOOL;
+
+      fn GetStartupInfoA(lpStartupInfo: LPSTARTUPINFO_A ) -> c_void;
+
+      fn DefWindowProcA(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> LRESULT;
+
+      fn TranslateMessage(lpMsg: *const MSG) -> BOOL;
+
+      fn DispatchMessageA(lpMsg: *const MSG) -> LRESULT;
+
+      fn DestroyWindow(hWnd: HWND) -> BOOL;
+
+      fn PostQuitMessage(nExitCode: c_int) -> c_void;
+    
+      // Note: CreateWindowA is a macro.
+      fn CreateWindowExA(
+            dwExStyle:    DWORD
+          , lpClassName:  LPCSTR
+          , lpWindowName: LPCSTR
+          , dwStyle:      DWORD
+          , X:            c_int
+          , Y:            c_int
+          , nWidth:       c_int
+          , nHeight:      c_int
+          , hWndParent:   HWND
+          , hMenu:        HMENU
+          , hInstance:    HINSTANCE
+          , lpParam:      LPVOID
+      ) -> HWND;
+
+      fn OutputDebugStringA(message: LPCSTR) -> c_void;
+      fn MessageBoxA(hWnd: HWND, lpText: LPCSTR, lpCaption: LPCSTR, uType: UINT) -> c_int;
+    
+  }
+
+  fn output_debug_string(message: &str)
+  {
+      let cstr: CString = CString::new(message).unwrap();
+      unsafe {
+          OutputDebugStringA(cstr.as_ptr());
+      }
+  }
+
+  fn message_box(text: &str, caption: &str, u_type: c_uint)
+  {
+      let text_    = CString::new(text).unwrap();
+      let caption_ = CString::new(caption).unwrap();
+
+      // Unsafe functions can only be called from
+      // unsafe blocks.
+      unsafe {
+         MessageBoxA(  std::ptr::null_mut()
+                     , text_.as_ptr()
+                     , caption_.as_ptr()
+                     , u_type);
+      }
+  }
+
+  fn message_box_info(text: &str, caption: &str)
+  {
+      message_box(text, caption, 0x00020000 | 0x00000040);
+  }
+#+END_SRC
+
+Building: 
+
+#+BEGIN_SRC sh 
+  $ rustc rust-wingui.rs  
+  $ rustc rust-wingui.rs  -A warnings # Build supressing warnings 
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC sh 
+  $ .\rust-wingui.exe 
+#+END_SRC
+
 ** Loading DLLs - shared libraries at runtime 
 *** Example 1 - Basic Dynamic Loading DLL 
 
