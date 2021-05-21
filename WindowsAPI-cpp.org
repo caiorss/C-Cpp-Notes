@@ -134,6 +134,7 @@ Cross-Platform:
 |----------------------------------------------------+------------------------------------------------------+---|
 | *Command Line*                                       |                                                      |   |
 |----------------------------------------------------+------------------------------------------------------+---|
+| Windows version                                    | ver                                                  |   |
 | Summarized system information (CLI only)           | systeminfo                                           |   |
 | OS information and build number                    | wmic os list brief                                   |   |
 | Show all environment variables                     | set                                                  |   |
@@ -155,14 +156,15 @@ Cross-Platform:
 | List user accounts                                 | wmic useraccount                                     |   |
 | List user accounts brief                           | wmic useraccount list brief                          |   |
 |                                                    |                                                      |   |
+| List network shares (SMB / SAMBA)                  | wmic share list                                      |   |
 | List printers                                      | wmic printer list brief                              |   |
+| Installed patches and hotfixes                     | wmic qfe                                             |   |
 |                                                    |                                                      |   |
 | Reboot computer                                    | shutdown -r                                          |   |
 | Shutdown computer                                  | shutdown -s                                          |   |
 | Loggof from current session                        | shutdown -l                                          |   |
 | Abort previous shutdown command                    | shutdown -a                                          |   |
 |----------------------------------------------------+------------------------------------------------------+---|
-
 
 Note: 
  + Any executable in %PATH% variable can be called without .exe
@@ -171,6 +173,34 @@ Note:
  + A Windows service is similar to a Unix daemon, it is a program that continously
    runs in background and does not have any graphical interface
  + WMIC - Windows Management Instrumentation 
+
+
+  *Mounting remote SMB (Server Message Block) network shares* 
+
+#+BEGIN_SRC sh 
+  $ net use <DISK> <HOSTNAME>\<SHARED-FOLDER> /user:<USERNAME> <PASSWORD> 
+#+END_SRC
+
+Example: 
+
+#+BEGIN_SRC sh 
+  # Example 1 
+  $ net use z: \\10.0.0.2\data  /user:myuser  mypasswd 
+
+  # Example 2 - using computer Netbios name 
+  $ net use z:  mycomputername\data  /user:myuser  mypasswd 
+
+  # Example 3 - using computer Netbios name and with persistence 
+  $ net use z:  \\mycomputername\data /persistant:yes  /user:myuser  mypasswd 
+
+     # -------------------------------------# 
+
+  # Enter in the disk mapped to the network share 
+  $ z: 
+
+  # List files in the network share disk 
+  $ dir z:
+#+END_SRC
 
 *** Configuration 
 
@@ -2935,7 +2965,7 @@ File: _systeminfo.d_
 
 This rust version is an stil incomplete attempt of rewrite the C++ version.
 
-  + Note: The CSIDL_ constants are extracted from [[https://github.com/reactos/reactos/blob/3fa57b8ff7fcee47b8e2ed869aecaf4515603f3f/sdk/include/psdk/shlobj.h][shlobj.h (Reactor OS source)]].
+  + Note: The CSIDL_ constants are extracted from [[https://github.com/reactos/reactos/blob/3fa57b8ff7fcee47b8e2ed869aecaf4515603f3f/sdk/include/psdk/shlobj.h][shlobj.h (React-OS source)]].
 
 File: _sysinfo.rs_ 
 
@@ -7941,7 +7971,6 @@ Function *WinMessageToString*
        return ss.str();
   }
 #+END_SRC
-
 *** GUI Without WinMain 
 
 This code presents a minimal Win32 GUI graphical user interface
@@ -8217,12 +8246,12 @@ the windows subsystem.
 #+BEGIN_SRC sh 
   $ g++ gui-without-winmain.cpp -o gui-without-winmain.exe -std=c++1z -g -lgdi32 -luser32 -Wl,-subsystem,windows
 #+END_SRC
+*** GUI Without WinMain in DLang (D)
 
-*** GUI Without WinMain in Rust 
-
-Note:  This Rust rewrite shows a blank GUI window and a message box
-when the window is closed.  This code is still incomplete and still
-needs porting the GDI structs for 2D drawing on the window. 
+Note: In this rewrite, the D language version of the code became
+longer than the C++ version because it is not possible to use include
+statements as in C or C++, as a result, all declaration of structs and
+functions from Windows API must to be rewritten in D. 
 
  *Documentation of Windows APIs used:* 
 
@@ -8245,6 +8274,390 @@ needs porting the GDI structs for 2D drawing on the window.
       file _winuser.h_ on the internet. The only way to view this file
       other than the accessing React OS source, is to install the
       Windows SDK (Software Development Kit).
+
+  *Files:*
+
+ File: _wingui.d_
+
+#+BEGIN_SRC cpp 
+  import std.stdio;
+  import core.stdc.stdio;
+  import std.range: empty;
+  import std.string;
+  import core.stdc.string: strlen;
+  import std.conv : to;
+
+  void message_box_error(string message, string title)
+  {
+    MessageBoxA(  null
+                , std.string.toStringz(message)
+                , std.string.toStringz(title)
+                , MB_ICONEXCLAMATION | MB_OK
+               );
+  }
+
+
+  extern(C)
+  LRESULT window_message_callback(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam )
+  {
+        // Process messages 
+        switch(msg)
+        {
+           case WM_CREATE:
+                   break;
+           case WM_CLOSE:     
+                   DestroyWindow(hwnd);
+                   break;
+           case WM_DESTROY:
+                   PostQuitMessage(0);
+                   break;
+           case WM_MOVE:
+                   break; 
+           case WM_PAINT:
+           {
+             // GDI - Graphics Devices Interface Here
+             //--------------------------------------------
+	   
+             PAINTSTRUCT ps;
+             HDC hdc;
+             // std::cerr << " [INFO] Windown painting" << std::endl;
+             hdc = BeginPaint(hwnd, &ps);
+             const char* text = std.string.toStringz("Hello world Window!");
+             TextOutA(hdc, 125, 200, text, cast(int) strlen(text) );
+             Ellipse(hdc, 100, 100, 160, 160);
+             Rectangle(hdc, 100, 100, 160, 160);
+             EndPaint(hwnd, &ps);
+	   
+           }
+           break;
+           default:
+             return DefWindowProcA(hwnd, msg, wParam, lParam);
+       }
+
+        return null;
+  }
+
+  int main()
+  {
+    printf(" [TRACE] Started D application. Ok \n\n");
+
+    HINSTANCE hInstance = GetModuleHandleA(null);
+    assert( hInstance != null );
+  
+    STARTUPINFO_A si;
+    GetStartupInfoA(&si);  
+    int nCmdShow = si.wShowWindow;
+
+    // -------------------------//
+    OutputDebugStringA("Starting WinMain Application");  
+
+    const char* wincClassName = std.string.toStringz("NameOfWindow");
+
+    // Win32 Window class structure
+    WNDCLASSEXA wc;
+    // Win32 message structure 
+    MSG Msg;            
+
+    wc.lpszClassName = cast(char*) wincClassName;
+    wc.lpfnWndProc   = &window_message_callback;   
+    wc.cbSize        = WNDCLASSEXA.sizeof;
+    wc.style         = 0;
+    wc.cbClsExtra    = 0;
+    wc.cbWndExtra    = 0;
+    wc.hInstance     = hInstance;
+    wc.hIcon         = LoadIconA(null, cast(LPCSTR) IDI_APPLICATION);
+    wc.hCursor       = LoadCursorA(null, cast(LPCSTR) IDC_ARROW);
+    wc.hbrBackground = cast(HBRUSH)(COLOR_WINDOW+1);
+    wc.hIconSm = LoadIconA(null, cast(LPCSTR) IDI_APPLICATION);    
+
+    if( !RegisterClassExA(&wc) )
+    {
+      message_box_error("Window Registration Failed!", "Error!");
+      //Error status code 
+      return -1;
+    }
+
+    int width = 500, height = 400;
+    int pos_left = 400, pos_top = 100;
+
+    HWND hwnd = CreateWindowExA(
+                                  0
+                                , wc.lpszClassName
+                                , "Title of Window"
+                                , WS_OVERLAPPEDWINDOW
+                                , pos_left
+                                , pos_top
+                                , width
+                                , height
+                                , null
+                                , null
+                                , hInstance
+                                , null
+                                );  
+    assert( hwnd != null );
+
+    OutputDebugStringA(" [INFO] Window created OK");
+
+    if(hwnd == null)
+    {
+         message_box_error( "Error: Failure to create Window", "Error Report");
+         return -1;
+    }
+
+    ShowWindow(hwnd, nCmdShow);
+    UpdateWindow(hwnd);
+
+    //---- Message Loop ----------//
+    while( GetMessageA(&Msg, null, 0, 0) > 0 )
+    {
+      TranslateMessage(&Msg);
+      DispatchMessageA(&Msg);
+    }     
+
+    message_box_error("Program terminated Ok.", "Information:");
+  
+    return 0;
+
+  }
+
+        // ========== I M P L E M E N T A T I O N S  =================== //
+
+
+  // Useful Type aliases
+  //----------------------------------//
+  // Alias for C or C++ void* void pointer (opaque pointer)
+  alias LPVOID   = void*;
+  // Windows handle's alias aliases
+  alias HINSTANCE = LPVOID;
+  alias HANDLE    = LPVOID;
+  alias HWND      = LPVOID;
+  alias HDC       = LPVOID;
+  alias HMODULE   = LPVOID;
+  alias HICON     = LPVOID;
+  alias HCURSOR   = LPVOID;
+  alias HBRUSH    = LPVOID;
+  alias HMENU     = LPVOID;
+  // Aliases for string aliass
+  alias LPCSTR  = const char*;
+  alias LPSTR   = char*;
+  // Operation status code
+  alias HRESULT = long; // Return code of COM interfaces
+  alias BOOL    = int;  // Boolean status code (0 - false), (1  or anything else is true)
+  alias LPRESULT = const HRESULT*;
+
+  // Non Categorized aliases
+  alias UINT    = uint;
+  alias LONG    = long;
+  alias BYTE    = char;
+  alias LPBYTE  = char*;
+  alias WORD    = short;
+  alias DWORD   = int;
+  alias WPARAM  = UINT*;
+  alias LPARAM  = long*;
+  alias LRESULT = long*;
+  alias ATOM    = WORD;
+
+
+  // Type alias for C function pointer (Function with C linkage)
+  // ,in other words, function with C-calling convention.
+  alias  WNDPROC = extern(C)  LRESULT function(  HWND hwnd
+                                               , UINT uMsg
+                                               , WPARAM wParam
+                                               , LPARAM lParam );
+
+
+  struct RECT {
+    LONG left;
+    LONG top;
+    LONG right;
+    LONG bottom;
+  }
+
+  struct POINT
+  {
+    LONG x;
+    LONG y;
+  };
+
+  struct MSG
+  {
+    HWND   hwnd;
+    UINT   message;
+    WPARAM wParam;
+    LPARAM lParam;
+    DWORD  time;
+    POINT  pt;
+    DWORD  lPrivate;
+  };
+
+  struct STARTUPINFO_A
+  {
+    DWORD  cb;
+    LPSTR  lpReserved;
+    LPSTR  lpDesktop;
+    LPSTR  lpTitle;
+    DWORD  dwX;
+    DWORD  dwY;
+    DWORD  dwXSize;
+    DWORD  dwYSize;
+    DWORD  dwXCountChars;
+    DWORD  dwYCountChars;
+    DWORD  dwFillAttribute;
+    DWORD  dwFlags;
+    WORD   wShowWindow;
+    WORD   cbReserved2;
+    LPBYTE lpReserved2;
+    HANDLE hStdInput;
+    HANDLE hStdOutput;
+    HANDLE hStdError;
+  };
+
+  struct WNDCLASSEXA {
+    UINT      cbSize;
+    UINT      style;
+    WNDPROC   lpfnWndProc;
+    int       cbClsExtra;
+    int       cbWndExtra;
+    HINSTANCE hInstance;
+    HICON     hIcon;
+    HCURSOR   hCursor;
+    HBRUSH    hbrBackground;
+    LPSTR     lpszMenuName;
+    LPSTR     lpszClassName;
+    HICON     hIconSm;
+  };
+
+  struct PAINTSTRUCT {
+    HDC  hdc;
+    BOOL fErase;
+    RECT rcPaint;
+    BOOL fRestore;
+    BOOL fIncUpdate;
+    BYTE[32] rgbReserved;
+  }; 
+
+  extern(C) int MessageBoxA(HWND hWnd, LPCSTR lpText, LPCSTR lpCaption, UINT uType);
+  extern(C) void OutputDebugStringA(LPCSTR lpOutputString);
+  extern(C) HMODULE GetModuleHandleA(LPCSTR lpModuleName);
+
+  extern(C) BOOL ShowWindow(HWND hWnd, int nCmdShow);
+  extern(C) BOOL UpdateWindow(HWND hWnd);
+
+  extern(C) BOOL GetMessageA(MSG* lpMsg, HWND hWnd, UINT wMsgFilterMin, UINT wMsgFilterMax);
+
+  extern(C) BOOL TranslateMessage(const MSG *lpMsg);
+
+  extern(C) BOOL DestroyWindow(HWND hWnd);
+
+
+  extern(C) HWND CreateWindowExA(
+    DWORD     dwExStyle,
+    LPCSTR    lpClassName,
+    LPCSTR    lpWindowName,
+    DWORD     dwStyle,
+    int       X,
+    int       Y,
+    int       nWidth,
+    int       nHeight,
+    HWND      hWndParent,
+    HMENU     hMenu,
+    HINSTANCE hInstance,
+    LPVOID    lpParam
+  );
+
+
+  extern(C) ATOM RegisterClassExA(const WNDCLASSEXA *unnamedParam1);
+  extern(C) void GetStartupInfoA(STARTUPINFO_A* lpStartupInfo);
+
+  extern(C) HICON   LoadIconA  (HINSTANCE hInstance, LPCSTR lpIconName);
+  extern(C) HCURSOR LoadCursorA(HINSTANCE hInstance, LPCSTR lpCursorName);
+  extern(C) LRESULT DispatchMessageA(const MSG *lpMsg);
+  extern(C) void PostQuitMessage(int nExitCode);
+
+  extern(C) LRESULT DefWindowProcA(  HWND hWnd, UINT Msg
+                                   , WPARAM wParam, LPARAM lParam);
+
+  extern(C) HDC  BeginPaint(HWND hWnd,       PAINTSTRUCT* lpPaint);
+  extern(C) BOOL EndPaint  (HWND hWnd, const PAINTSTRUCT* lpPaint);
+
+  extern(C) BOOL TextOutA(HDC hdc, int x, int y, LPCSTR lpString, int c);
+  extern(C) BOOL Ellipse(HDC hdc, int left, int top, int right, int bottom);
+  extern(C) BOOL Rectangle(HDC hdc, int left, int top, int right, int bottom);
+
+
+  const int IDI_APPLICATION  = 32512;
+  const int IDI_HAND         = 32513;
+  const int IDI_QUESTION     = 32514;
+  const int IDI_EXCLAMATION  = 32515;
+  const int IDI_ASTERISK     = 32516;
+  const int IDI_WINLOGO      = 32517;
+  const int IDC_ARROW        = 32512;
+
+  const DWORD WS_OVERLAPPEDWINDOW = 0xcf0000;
+  const DWORD WM_NULL     = 0;
+  const DWORD WM_CREATE   = 1;
+  const DWORD WM_DESTROY  = 2;
+  const DWORD WM_ENABLE   = 10;
+  const DWORD WM_CLOSE    = 16;
+  const DWORD WM_QUIT     = 18;
+  const DWORD WM_PAINT    = 15;
+  const DWORD WM_MOVE     = 3;
+
+
+  const DWORD COLOR_WINDOW = 5;
+  const DWORD MB_USERICON = 128;
+  const DWORD MB_ICONASTERISK = 64;
+  const DWORD MB_ICONEXCLAMATION = 0x30;
+  const DWORD MB_ICONWARNING = 0x30;
+  const DWORD MB_ICONERROR = 16;
+  const DWORD MB_ICONHAND = 16;
+  const DWORD MB_ICONQUESTION = 32;
+  const DWORD MB_OK = 0;
+  const DWORD MB_ABORTRETRYIGNORE = 2;
+  const DWORD MB_APPLMODAL = 0;
+  const DWORD MB_DEFAULT_DESKTOP_ONLY = 0x20000;
+  const DWORD MB_HELP              = 0x4000;
+  const DWORD MB_RIGHT            = 0x80000;
+  const DWORD MB_RTLREADING       = 0x100000;
+  const DWORD MB_TOPMOST          = 0x40000;
+  const DWORD MB_DEFBUTTON1       = 0;
+  const DWORD MB_DEFBUTTON2       = 256;
+  const DWORD MB_DEFBUTTON3       = 512;
+  const DWORD MB_DEFBUTTON4       = 0x300;
+  const DWORD MB_ICONINFORMATION  = 64;
+  const DWORD MB_ICONSTOP         = 16;
+  const DWORD MB_OKCANCEL         = 1;
+#+END_SRC
+
+ *Building* 
+
+Building for console subsystem: (default)
+
+#+BEGIN_SRC sh 
+  $ dmd wingui.d -of=wingui_console_subsystem.exe -m64 Kernel32.lib Ntdll.lib User32.lib Gdi32.lib  
+#+END_SRC
+
+Building for window subsystem: 
+
+#+BEGIN_SRC sh 
+  $ dmd wingui.d -of=wingui_window_subsystem.exe -m64 -L/SUBSYSTEM:WINDOWS -L/ENTRY:mainCRTStartup Kernel32.lib Ntdll.lib User32.lib Gdi32.lib 
+#+END_SRC
+
+ *Runninng* 
+
+#+BEGIN_SRC sh 
+  # Console subsystem =>> Opens a terminal window when user clicks 
+  # at the executable. 
+  $ .\wingui_console_subsystem.exe
+
+  # Window subsystem version => Prints nothing in the terminal. 
+  $ .\wingui_window_subsystem.exe
+#+END_SRC
+*** GUI Without WinMain in Rust 
+
+Note:  This Rust rewrite shows a blank GUI window and a message box
+when the window is closed.  This code is still incomplete and still
+needs porting the GDI structs for 2D drawing on the window. 
 
  *Files:*
  
