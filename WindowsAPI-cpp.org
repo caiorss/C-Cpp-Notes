@@ -3173,6 +3173,7 @@ File: _sysinfo.rs_
 #+END_SRC
 
 ** Windows Shortcut - LNK
+*** Overview 
 
 The following code snippet creates several Windows shortcuts, also
 known as Windows Shell Link (*.lnk files), which are similar to Unix's
@@ -3184,6 +3185,8 @@ are structured binary files, as a result, they only can be viewed
 by using Windows facilities or by using a hexadecimal editor.
 
  *Documentation*
+
+   + [[https://docs.microsoft.com/en-us/windows/win32/shell/links][Shell Links]] 
 
    + [[https://docs.microsoft.com/en-us/windows/win32/api/unknwn/nn-unknwn-iunknown][IUnknown COM Interface]] (header: unknown.h)
      + Brief: "Enables clients to get pointers to other interfaces on
@@ -3237,6 +3240,12 @@ X11 Free Desktop Shortcut Specification (for comparison)
   + [[https://wiki.archlinux.org/title/desktop_entries][ArchLinux - Desktop Entries ]]
 
   + [[https://developer.gnome.org/integration-guide/stable/desktop-files.html.en][Desktop files: putting your application in the desktop menus]]
+*** Creating shell link
+
+This sample application instantiates an object of COM (Component
+Object Model) class ShellLink and obtains the two interface pointers
+to the object, IShellLinkA and IPersistFile for creating Windows shell
+links, LNK shortcut files. 
 
  *Files*
 
@@ -3511,7 +3520,334 @@ Run shortcut from command line:
   # Run shortcutr that opens the directory C:\\Users\user_001 (%USERPROFILE%) directory
   $ HomeDirectory.lnk
 #+END_SRC
+*** Reading shell link 
 
+This application prints information about Windows shell link files LNK
+(extension .lnk). It displays the path to shell link file, the command
+line arguments passed to the executable, the working directory and the
+icon path.
+
+ *Files:*
+
+File: _lnkdump.cpp_ 
+
+#+BEGIN_SRC cpp
+  #include <iostream>
+  #include <string>
+  #include <cassert>
+
+  #define INITGUID      // Necessary for MINGW
+  #include <windows.h>
+
+  #include <shlobj.h>
+  #include <shobjidl.h>
+  #include <shlguid.h>
+  #include <comdef.h>
+  #include <comdefsp.h>
+
+  std::string guid_to_string(GUID g);
+
+  int main(int argc, char** argv)
+  {
+    if(argc < 2)
+    {
+      std::fprintf( stderr
+                   , "\n Read Windows shell link shortcut files LNK (*.lnk extension) "
+                     "\n Usage: "
+                     "\n  $ lnkdump <SHELL-LINK-FILE> "
+                  );
+
+      return EXIT_FAILURE;
+    }
+
+    std::string file = argv[1];
+  
+    // Display UUID of COM interfaces and classes 
+    if( file == "guid" ) 
+    {
+      std::fprintf( stderr, " [INFO] (class)       CLSID_ShellLink = %s \n"
+                    , guid_to_string(CLSID_ShellLink).c_str() );
+      std::fprintf( stderr, " [INFO] (interface)      IID_IUnknown = %s  \n"
+                  , guid_to_string(IID_IUnknown).c_str());
+      std::fprintf( stderr, " [INFO] (interface)     IID_IDispatch = %s  \n"
+                  , guid_to_string(IID_IDispatch).c_str());
+      std::fprintf( stderr, " [INFO] (interface)    IID_IShellLink = %s  \n"
+                  , guid_to_string(IID_IShellLink).c_str());
+      std::fprintf( stderr, " [INFO] (interface)  IID_IPersistFile = %s  \n"
+                    , guid_to_string(IID_IPersistFile).c_str());
+
+      return EXIT_SUCCESS;
+    }
+
+    // Intialize COM
+    CoInitializeEx( NULL, 0 );
+
+    // Pointer to COM interface
+    IShellLinkA* ptr_com = nullptr;
+
+    HRESULT hres = CoCreateInstance(
+                             CLSID_ShellLink
+                           , NULL
+                           , CLSCTX_INPROC_SERVER
+                           , IID_IShellLink
+                           , reinterpret_cast<void**>(&ptr_com)
+                         );
+
+    if( !SUCCEEDED(hres) ){ return FALSE; }
+    assert( ptr_com != nullptr );
+
+    // Pointer to IPersisteFile => Not allocated by the caller.
+    IPersistFile* ptr_com2;
+
+    // Retrieve interface from COM object
+    hres = ptr_com->QueryInterface( IID_IPersistFile, (void**) &ptr_com2);
+    assert( SUCCEEDED(hres) );
+    assert( ptr_com2 != nullptr );
+
+    WCHAR fpath_wchar[MAX_PATH];
+    // Convert to UTF16 unicode wide character
+    MultiByteToWideChar(CP_ACP, 0, file.c_str(), -1, fpath_wchar, MAX_PATH);
+
+    hres = ptr_com2->Load(fpath_wchar, STGM_READ);
+    assert( SUCCEEDED(hres) && "Failed to read shortcut" );
+
+    // Resolve shell link
+    hres = ptr_com->Resolve(nullptr, 0);
+    assert( SUCCEEDED(hres) && "Failed to resolve shell link" );
+
+    // ===== Read shortcut LNK data ======================///
+
+    std::string path, arguments, description, directory, icon;
+
+    char buffer[MAX_PATH];
+
+    // Get shortcut description
+    hres = ptr_com->GetDescription(buffer, MAX_PATH);
+    if( !SUCCEEDED(hres) ){ std::fprintf(stderr, " [WARN] Failed to get description \n" ); }
+    description  = buffer;
+
+    // Get path to shell link target, application called by the
+    // shell link.
+    WIN32_FIND_DATA wfd;
+    hres = ptr_com->GetPath( buffer
+                           , MAX_PATH
+                           , reinterpret_cast<WIN32_FIND_DATA*>(&wfd)
+                           , SLGP_SHORTPATH
+                           );
+    assert( SUCCEEDED(hres) );
+    path = buffer;
+
+    // Get working directory of shell link
+    hres = ptr_com->GetWorkingDirectory(buffer, MAX_PATH);
+    assert( SUCCEEDED(hres) );
+    directory = buffer;
+
+    // Get working directory of shell link
+    hres = ptr_com->GetArguments(buffer, MAX_PATH);
+    assert( SUCCEEDED(hres) );
+    arguments = buffer;
+
+    // Get Icon location
+    int n = 0;
+    hres = ptr_com->GetIconLocation(buffer, MAX_PATH, &n);
+    assert( SUCCEEDED(hres) );
+    icon = buffer;
+
+    // Get hotkey
+    WORD Hotkey = 0;
+    hres = ptr_com->GetHotkey(&Hotkey);
+    assert( SUCCEEDED(hres) );
+
+    std::cout << " [*]          Path  = " <<  path        << '\n';
+    std::cout << " [*]      Arguments = " <<  arguments   << '\n';
+    std::cout << " [*]    Description = " <<  description << '\n';
+    std::cout << " [*]   Working dir  = " <<  directory   << '\n';
+    std::cout << " [*]           Icon = " <<  icon        << '\n';
+    std::cout << " [*]         Hotkey = " <<  Hotkey      << '\n';
+
+    // Release COM interface pointers
+    ptr_com->Release();
+    ptr_com2->Release();
+
+    // Shutdown COM
+    CoUninitialize();
+
+    return EXIT_SUCCESS;
+
+  } // ------ End of main -----------//
+
+     // ================================//
+
+
+  // Print GUID (Global Unique Identifier)
+  //or UUID (Universal Unique Identifier)
+  std::string 
+  guid_to_string(GUID g)
+  {
+    constexpr size_t size = 300;
+    char buffer[size];
+    memset(buffer, '\0' ,size);
+
+    snprintf( buffer, size
+              , "{%08lX-%04hX-%04hX-%02hhX%02hhX-%02hhX%02hhX%02hhX%02hhX%02hhX%02hhX}"
+              , g.Data1, g.Data2, g.Data3
+              , g.Data4[0], g.Data4[1], g.Data4[2], g.Data4[3]
+              , g.Data4[4], g.Data4[5], g.Data4[6], g.Data4[7]);
+
+     std::string out = buffer;
+     return out;
+  }
+#+END_SRC
+
+ *Building:*
+
+#+BEGIN_SRC sh 
+  $ g++ lnkdump.cpp -o lnkdump.exe -lole32 -loleaut32 -lcomctl32 -luuid -std=c++1z -Wall -Wextra -g
+#+END_SRC
+
+ *Running* 
+
+Show help: 
+
+#+BEGIN_SRC sh 
+  $ lnkdump.exe
+
+   Read Windows shell link shortcut files LNK (*.lnk extension)
+   Usage:
+    $ lnkdump <SHELL-LINK-FILE>
+#+END_SRC
+
+Display the GUID (Global Unique Identifier) of COM interfaces and
+classes: 
+
+#+BEGIN_SRC sh 
+  $ lnkdump.exe  guid
+   [INFO] (class)       CLSID_ShellLink = {00021401-0000-0000-C000-000000000046}
+   [INFO] (interface)      IID_IUnknown = {00000000-0000-0000-C000-000000000046}
+   [INFO] (interface)     IID_IDispatch = {00020400-0000-0000-C000-000000000046}
+   [INFO] (interface)    IID_IShellLink = {000214EE-0000-0000-C000-000000000046}
+   [INFO] (interface)  IID_IPersistFile = {0000010B-0000-0000-C000-000000000046}
+#+END_SRC
+
+Inspect LNK (Windows shortcut) files: 
+
+#+BEGIN_SRC sh 
+  $ lnkdump.exe  "x64 Native Tools Command Prompt for VS 2019.lnk"
+   [*]          Path  = C:\Windows\System32\cmd.exe
+   [*]      Arguments = /k "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
+   [*]    Description = Open Visual Studio 2019 Tools Command Prompt for targeting x64
+   [*]   Working dir  = C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\
+   [*]           Icon =
+   [*]         Hotkey = 0
+
+
+  $ lnkdump.exe  "x64 Native Tools Command Prompt for VS 2019.lnk"
+   [*]          Path  = C:\Windows\System32\cmd.exe
+   [*]      Arguments = /k "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
+   [*]    Description = Open Visual Studio 2019 Tools Command Prompt for targeting x64
+   [*]   Working dir  = C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\
+   [*]           Icon =
+   [*]         Hotkey = 0
+
+  $ lnkdump.exe Device_Manager.lnk
+   [*]          Path  = C:\WINDOWS\system32\RunDll32.exe
+   [*]      Arguments = devmgr.dll DeviceManager_Execute
+   [*]    Description = Shortcut for device manager.
+   [*]   Working dir  =
+   [*]           Icon =
+   [*]         Hotkey = 0
+
+  $ lnkdump.exe "Print Management.lnk"
+   [*]          Path  = C:\WINDOWS\system32\printmanagement.msc
+   [*]      Arguments =
+   [*]    Description = Manages local printers and remote print servers.
+   [*]   Working dir  =
+   [*]           Icon = %systemroot%\system32\pmcsnap.dll
+   [*]         Hotkey = 0
+
+  $ lnkdump.exe  "Component Services.lnk"
+   [*]          Path  = C:\WINDOWS\system32\comexp.msc
+   [*]      Arguments =
+   [*]    Description = Manage COM+ applications, COM and DCOM system configuration, and the Distributed Transaction Coordinator.
+   [*]   Working dir  =
+   [*]           Icon = %systemroot%\system32\comres.dll
+   [*]         Hotkey = 0
+#+END_SRC
+
+Find COM In-process Server (DLL - shared library) that provides the
+COM class _CLSID_ShellLink_ by using Powershell on the Visual Studio
+developer's prompt. 
+
+#+BEGIN_SRC 
+  $ powershell
+  Windows PowerShell
+  Copyright (C) Microsoft Corporation. All rights reserved.
+
+  Try the new cross-platform PowerShell https://aka.ms/pscore6
+
+  PS C:\> Get-ChildItem Registry::"HKCR\CLSID\{00021401-0000-0000-C000-000000000046}"
+
+
+      Hive: HKCR\CLSID\{00021401-0000-0000-C000-000000000046}
+
+
+  Name                           Property
+  ----                           --------
+  Implemented Categories
+  InProcServer32                 (default)      : C:\Windows\System32\windows.storage.dll
+                                 ThreadingModel : Both
+  OverrideFileSystemProperties   System.Kind : 1
+  ProgID                         (default) : lnkfile
+  shellex
+
+#+END_SRC
+
+View DLL symbols: 
+
+#+BEGIN_SRC sh 
+   PS C:\> dumpbin.exe /exports C:\Windows\System32\windows.storage.dll
+   Microsoft (R) COFF/PE Dumper Version 14.28.29335.0
+   Copyright (C) Microsoft Corporation.  All rights reserved.
+
+
+   Dump of file C:\Windows\System32\windows.storage.dll
+
+   File Type: DLL
+
+     Section contains the following exports for Windows.Storage.dll
+
+       00000000 characteristics
+       1FA0233D time date stamp
+           0.00 version
+              2 ordinal base
+           2008 number of functions
+            242 number of names
+
+       ordinal hint RVA      name
+
+             8    0 000651D0 AssocCreateForClasses
+     ...   ...   ...   ...   ...   ...   ...   ...   ...   ... 
+     ...   ...   ...   ...   ...   ...   ...   ...   ...   ... 
+
+            46   28 0018BF80 DllCanUnloadNow                # <=== Functions that 
+            47   29 00184BA0 DllGetActivationFactory        # must be implemented by a COM server.
+            48   2A 000C6FE0 DllGetClassObject
+            49   2B 001C1A30 DllMain
+            50   2C 001AEFB0 DllRegisterServer
+            51   2D 001AEFB0 DllUnregisterServer
+      ... ...... ..... ....   ... ...... ..... ....   ... ...... ..... .... 
+     ... ...... ..... ....   ... ...... ..... ....   ... ...... ..... .... 
+
+     Summary
+
+           9000 .data
+           3000 .didat
+          52000 .pdata
+         184000 .rdata
+          1F000 .reloc
+           4000 .rsrc
+         58A000 .text
+#+END_SRC
 ** Windows Registry 
 *** Overview 
 
@@ -3563,9 +3899,7 @@ value, which a entry comprised of a label and value.
     + Brief: "Retrieves the data associated with the default or
       unnamed value of a specified registry key. The data must be a
       null-terminated string."
-
-
-  *Notable Registry Locations* 
+*** Notable Registry Locations
 
    + Root Keys
      + ~HKLM~ or ~HKEY_LOCAL_MACHINE~
@@ -3615,7 +3949,11 @@ value, which a entry comprised of a label and value.
      + System-wide environment variables (defined for all users).
 
    + ~HKEY_CURRENT_USER\Environment~
-     + User-specific environment variables.     
+     + User-specific environment variables.
+
+   + ~HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\KnownDLLs~
+     + See: [[https://docs.microsoft.com/en-us/windows/win32/dlls/dynamic-link-library-search-order?redirectedfrom=MSDN][Dynamic Linker library search order]]
+
 
   *Windows Registry Files* 
 
@@ -3756,6 +4094,58 @@ from terminal:
    WRITE.EXE                      (default) : "C:\Program Files\Windows NT\Accessories\WORDPAD.EXE"
 #+END_SRC
 
+Query all known DLLs: 
+
+#+BEGIN_SRC sh 
+  $ powershell
+  Windows PowerShell
+  Copyright (C) Microsoft Corporation. All rights reserved.
+
+  Try the new cross-platform PowerShell https://aka.ms/pscore6
+
+  PS> ItemProperty Registry::"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\KnownDLLs"
+
+
+  _wow64cpu    : wow64cpu.dll
+  _wowarmhw    : wowarmhw.dll
+  _xtajit      : xtajit.dll
+  advapi32     : advapi32.dll
+  clbcatq      : clbcatq.dll
+  combase      : combase.dll
+  COMDLG32     : COMDLG32.dll
+  coml2        : coml2.dll
+  DifxApi      : difxapi.dll
+  gdi32        : gdi32.dll
+  gdiplus      : gdiplus.dll
+  IMAGEHLP     : IMAGEHLP.dll
+  IMM32        : IMM32.dll
+  kernel32     : kernel32.dll
+  MSCTF        : MSCTF.dll
+  MSVCRT       : MSVCRT.dll
+  NORMALIZ     : NORMALIZ.dll
+  NSI          : NSI.dll
+  ole32        : ole32.dll
+  OLEAUT32     : OLEAUT32.dll
+  PSAPI        : PSAPI.DLL
+  rpcrt4       : rpcrt4.dll
+  sechost      : sechost.dll
+  Setupapi     : Setupapi.dll
+  SHCORE       : SHCORE.dll
+  SHELL32      : SHELL32.dll
+  SHLWAPI      : SHLWAPI.dll
+  user32       : user32.dll
+  WLDAP32      : WLDAP32.dll
+  wow64        : wow64.dll
+  wow64win     : wow64win.dll
+  WS2_32       : WS2_32.dll
+  PSPath       : Microsoft.PowerShell.Core\Registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session
+                 Manager\KnownDLLs
+  PSParentPath : Microsoft.PowerShell.Core\Registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session
+                 Manager
+  PSChildName  : KnownDLLs
+  PSProvider   : Microsoft.PowerShell.Core\Registry
+
+#+END_SRC
 
  *See* 
   
