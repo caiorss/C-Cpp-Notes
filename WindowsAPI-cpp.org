@@ -1902,7 +1902,7 @@ File: _windows-envvars.cpp_
   + Second run after setting custom environment variables. 
 
 #+BEGIN_SRC sh 
-  $ set CUSTOM_USER_SUPPLIED="Hello world! (EN) ola mundo! (PT) hola mundo! (ES) - halo Welt! (DE)"
+  $ set CUSTOM_USER_SUPPLIED="Hello world! (EN) ola mundo! (PT) hola mundo! (ES) - hallo Welt! (DE)"
   $ set LOGGING_ENABLED=TRUE
 
   λ .\out.exe
@@ -1922,7 +1922,7 @@ File: _windows-envvars.cpp_
    [ENV] ProgramFiles(x86) = C:\Program Files (x86)
    [ENV] CommonProgramFiles = C:\Program Files\Common Files
    [ENV] CommonProgramFiles(x86) = C:\Program Files (x86)\Common Files
-   [ENV] CUSTOM_USER_SUPPLIED = "Hello world! (EN) ola mundo! (PT) hola mundo! (ES) - halo Welt! (DE)"
+   [ENV] CUSTOM_USER_SUPPLIED = "Hello world! (EN) ola mundo! (PT) hola mundo! (ES) - hallo Welt! (DE)"
 
     ============= EXPERIMENT 2 ==============
    [ENV2] SystemDrive = C:
@@ -1939,7 +1939,7 @@ File: _windows-envvars.cpp_
    [ENV2] ProgramFiles(x86) = C:\Program Files (x86)
    [ENV2] CommonProgramFiles = C:\Program Files\Common Files
    [ENV2] CommonProgramFiles(x86) = C:\Program Files (x86)\Common Files
-   [ENV2] CUSTOM_USER_SUPPLIED = "Hello world! (EN) ola mundo! (PT) hola mundo! (ES) - halo Welt! (DE)"
+   [ENV2] CUSTOM_USER_SUPPLIED = "Hello world! (EN) ola mundo! (PT) hola mundo! (ES) - hallo Welt! (DE)"
   ======== CONFIG TEST =================
    [TRACE] p = 1
    [TRACE] p = 2
@@ -3817,13 +3817,23 @@ Inspect LNK (Windows shortcut) files:
    [*]         Hotkey = 0
 
 
-  $ lnkdump.exe  "x64 Native Tools Command Prompt for VS 2019.lnk"
-   [*]          Path  = C:\Windows\System32\cmd.exe
-   [*]      Arguments = /k "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
-   [*]    Description = Open Visual Studio 2019 Tools Command Prompt for targeting x64
-   [*]   Working dir  = C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\
-   [*]           Icon =
+  $ lnkdump.exe "Windows PowerShell (x86).lnk"
+   [*]          Path  = C:\Windows\SysWOW64\WindowsPowerShell\v1.0\powershell.exe
+   [*]      Arguments =
+   [*]    Description = Performs object-based (command-line) functions
+   [*]   Working dir  = %HOMEDRIVE%%HOMEPATH%
+   [*]           Icon = %SystemRoot%\syswow64\WindowsPowerShell\v1.0\powershell.exe
    [*]         Hotkey = 0
+
+
+  $ lnkdump.exe "Windows PowerShell ISE.lnk"
+   [*]          Path  = C:\Windows\system32\WindowsPowerShell\v1.0\PowerShell_ISE.exe
+   [*]      Arguments =
+   [*]    Description = Windows PowerShell Integrated Scripting Environment. Performs object-based (command-line) functions
+   [*]   Working dir  = %HOMEDRIVE%%HOMEPATH%
+   [*]           Icon = %SystemRoot%\system32\WindowsPowerShell\v1.0\powershell_ise.exe
+   [*]         Hotkey = 0
+
 
   $ lnkdump.exe Device_Manager.lnk
    [*]          Path  = C:\WINDOWS\system32\RunDll32.exe
@@ -4605,6 +4615,278 @@ File: _registry.cpp_
    ...  ...  ...  ...  ...  ...  ...  ...  ...  ... 
    ...  ...  ...  ...  ...  ...  ...  ...  ...  ... 
 #+END_SRC
+** Capturing OutputDebugString output
+
+Logging and printing output to terminal with std::cout, printf or
+fprintf, does not work for any executable compiled for the window
+subsystem, even if it was launched from the terminal. As a result,
+applications built for the window subsystem, often uses the Windows
+API _OutputDebugString()_ for logging that can be viewed using the
+DebugView sysinternal tool. 
+
+In this experiment, the program testprog.exe logs its execution
+through OutputDebugString() api and the program logview.exe waits for
+any OutputDebugString() call and displays the OutputDebugString
+message, process PID, and path to process' executable. 
+
+Apis Used: 
+
+  + [[https://docs.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-openmutexw][OpenMutexW()]]
+
+  + [[https://docs.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-createmutexa][CreateMutexA()]]
+
+  + [[https://docs.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-createeventa][CreateEventA()]]
+
+  + [[https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createfilemappinga][CreateFileMappingA()]]
+
+  + [[https://docs.microsoft.com/en-us/windows/win32/sync/using-event-objects][Using Event Objects (Synchronization)]]
+
+  + [[https://docs.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-mapviewoffile][MapViewOfFile()]]
+
+  + [[https://docs.microsoft.com/en-us/windows/win32/api/debugapi/nf-debugapi-outputdebugstringa][OutputDebugStringA()]] [ANSI]
+
+  + [[https://docs.microsoft.com/en-us/windows/win32/api/debugapi/nf-debugapi-outputdebugstringw][OutputDebugStringW()]] [UNICODE]
+
+ReactOS implementation of OutputDebugString:
+
+  + [[https://github.com/reactos/reactos/blob/3fa57b8ff7fcee47b8e2ed869aecaf4515603f3f/dll/win32/kernel32/client/debugger.c#L728][File - debugger.c - line 728]]
+
+ *Project Files* 
+
+File: _logview.cpp_ 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <cassert>
+
+  #include <windows.h>
+  #include <tchar.h>
+
+  struct alignas(4) OutputDebugStringBuffer
+  {
+      DWORD pid;
+      // 4KiB - 4 Kbytes buffer 
+      char data[4096 - sizeof(DWORD)];
+  };
+
+  std::string get_process_path(int pid);
+
+  // Link against this function without any headers containing this declaration.
+  extern "C" void QueryFullProcessImageNameA(HANDLE hProc, int n, char* buffer, DWORD* buffer_size);
+
+
+  int main()
+  {
+    static_assert( sizeof(OutputDebugStringBuffer) == 4096 );
+  
+    // ---- The following constansts must have those exact name ----- //
+    constexpr const char* strDBWinMutex         = "DBWinMutex";
+    constexpr const char* strDBWIN_BUFFER_READY = "DBWIN_BUFFER_READY";
+    constexpr const char* strDBWIN_DATA_READY   = "DBWIN_DATA_READY";
+    constexpr const char* strDBWIN_BUFFER       = "DBWIN_BUFFER";
+
+    // Instatiate mutex 
+    HANDLE dbWinMutex = ::OpenMutex(MUTEX_ALL_ACCESS, FALSE, strDBWinMutex);
+
+    if(dbWinMutex == nullptr)
+    {
+      dbWinMutex =  ::CreateMutex(nullptr, FALSE, strDBWinMutex);
+    }
+
+    HANDLE bufferReady = OpenEvent(EVENT_MODIFY_STATE, FALSE, strDBWIN_BUFFER_READY);
+  
+    if(bufferReady == nullptr)
+    {
+      bufferReady = ::CreateEvent(nullptr, FALSE, TRUE, strDBWIN_BUFFER_READY);
+    }
+
+
+    HANDLE dataReady = ::OpenEvent(EVENT_MODIFY_STATE, FALSE, strDBWIN_DATA_READY);
+
+    if(dataReady == nullptr)
+    {
+      dataReady = ::CreateEvent(nullptr, FALSE, FALSE, strDBWIN_DATA_READY);
+    }
+
+    HANDLE bufferMap =::OpenFileMapping(FILE_MAP_READ, FALSE, strDBWIN_BUFFER); 
+
+    if(bufferMap == nullptr)
+    {
+      std::cerr << "Creating file mapping" << std::endl;
+
+      // Memory mapped file segment (shared memory)
+      // that can be accessed by multiple processes.
+      bufferMap = CreateFileMapping(  INVALID_HANDLE_VALUE
+                                    , nullptr
+                                    , PAGE_READWRITE
+                                    , 0
+                                    , sizeof(OutputDebugStringBuffer)
+                                    , strDBWIN_BUFFER
+                                    );
+    }
+
+    auto wbuffer = reinterpret_cast<OutputDebugStringBuffer*>( ::MapViewOfFile(bufferMap, SECTION_MAP_READ, 0, 0, 0) );
+
+    if(wbuffer == nullptr)
+    {
+      std::cerr << "Error: failed to get buffer view" << std::endl;
+      return EXIT_FAILURE;
+    }
+
+    std::cout << "Waiting messages ..." << std::endl;
+
+    for(;;)
+    {
+      // Block current thread until any other process calls OutputDebugString()
+      // function. 
+      auto r = WaitForSingleObject(dataReady, INFINITE);    
+
+      if(r == WAIT_OBJECT_0)
+      {
+        std::fprintf( stdout
+                    , " PID = %ld ; Exe = %s \n"
+                      " >> %s             \n\n"
+                    , wbuffer->pid
+                    , get_process_path(wbuffer->pid).c_str()
+                    , wbuffer->data
+                     );
+      }
+      SetEvent(bufferReady);
+    
+
+    }  
+  
+    return 0;
+  }
+
+
+  std::string get_process_path(int pid)
+  {
+        // Process handle      
+        HANDLE hProc = OpenProcess( PROCESS_QUERY_INFORMATION  | PROCESS_VM_READ, FALSE, pid);
+        // If hProc is null, it means that the function OpenProcess() has failed.
+        assert( hProc != 0);
+      
+        DWORD size = MAX_PATH;
+        char buffer[MAX_PATH];
+      
+        // Obtain path to proces image (executable path)
+        // Note: This function does not work with Unicode path names containing non
+        // ascii characters such as Korean Hangul characters
+        // For dealing with unicde use the API - QueryFullProcessImageNameW() instead.
+        QueryFullProcessImageNameA(hProc, 0, buffer, &size);
+        // Close proces handle disposing this reosurce.
+        CloseHandle(hProc);
+
+        return std::string{buffer};
+  }
+
+#+END_SRC
+
+File: _testprog.cpp_ 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <windows.h>
+
+  int main()
+  {
+    int sum = 0;
+    char buffer[1000];
+    // Initialize buffer 
+    memset(buffer, '0', 1000);
+
+  
+    for(int i = 0; i < 5; i++)
+    {
+      std::snprintf(buffer, 1000, " [INFO] i = %d ; sum = %d ", i, sum);
+      sum += sum + i * i;
+      OutputDebugStringA(buffer);
+      std::fprintf(stdout, "%s\n", buffer);
+
+      // Block current thread for about 5 seconds.
+      Sleep(500);
+    }
+
+    std::snprintf(buffer, 1000, " [INFO] Shutdown gracefully Ok. ");
+    std::fprintf(stdout, "%s\n", buffer);  
+    OutputDebugStringA(buffer);
+
+    return 0;
+  }
+#+END_SRC
+
+ *Building* 
+
+#+BEGIN_SRC sh 
+  $ g++ logview.cpp -o logview.exe -std=c++1z -Wall -Wextra -g
+  $ g++ testprog.cpp -o testprog.exe -std=c++1z -Wall -Wextra -g
+#+END_SRC
+
+Running _logview.exe_ from terminal 1 
+
+#+BEGIN_SRC sh 
+  $ .\logview.exe
+  Creating file mapping
+  Waiting messages ...
+   PID = 8088 ; Exe = C:\Users\User_001\Desktop\output_debug\testprog.exe
+   >>  [INFO] i = 0 ; sum = 0
+
+   PID = 8088 ; Exe = C:\Users\User_001\Desktop\output_debug\testprog.exe
+   >>  [INFO] i = 1 ; sum = 0
+
+   PID = 8088 ; Exe = C:\Users\User_001\Desktop\output_debug\testprog.exe
+   >>  [INFO] i = 2 ; sum = 1
+
+   PID = 8088 ; Exe = C:\Users\User_001\Desktop\output_debug\testprog.exe
+   >>  [INFO] i = 3 ; sum = 6
+
+   PID = 8088 ; Exe = C:\Users\User_001\Desktop\output_debug\testprog.exe
+   >>  [INFO] i = 4 ; sum = 21
+
+   PID = 8088 ; Exe = C:\Users\User_001\Desktop\output_debug\testprog.exe
+   >>  [INFO] Shutdown gracefully Ok.
+
+   PID = 7940 ; Exe = C:\Users\User_001\Desktop\output_debug\testprog.exe
+   >>  [INFO] i = 0 ; sum = 0
+
+   PID = 7940 ; Exe = C:\Users\User_001\Desktop\output_debug\testprog.exe
+   >>  [INFO] i = 1 ; sum = 0
+
+   PID = 7940 ; Exe = C:\Users\User_001\Desktop\output_debug\testprog.exe
+   >>  [INFO] i = 2 ; sum = 1
+
+   PID = 7940 ; Exe = C:\Users\User_001\Desktop\output_debug\testprog.exe
+   >>  [INFO] i = 3 ; sum = 6
+
+   PID = 7940 ; Exe = C:\Users\User_001\Desktop\output_debug\testprog.exe
+   >>  [INFO] i = 4 ; sum = 21
+
+   PID = 7940 ; Exe = C:\Users\User_001\Desktop\output_debug\testprog.exe
+   >>  [INFO] Shutdown gracefully Ok.
+
+#+END_SRC
+
+Running _testprog.exe_ from terminal 2
+
+#+BEGIN_SRC sh 
+  $ .\testprog.exe
+   [INFO] i = 0 ; sum = 0
+   [INFO] i = 1 ; sum = 0
+   [INFO] i = 2 ; sum = 1
+   [INFO] i = 3 ; sum = 6
+   [INFO] i = 4 ; sum = 21
+   [INFO] Shutdown gracefully Ok.
+
+
+  $ .\testprog.exe
+   [INFO] i = 0 ; sum = 0
+   [INFO] i = 1 ; sum = 0
+   [INFO] i = 2 ; sum = 1
+   [INFO] i = 3 ; sum = 6
+   [INFO] i = 4 ; sum = 21
+   [INFO] Shutdown gracefully Ok.
+#+END_SRC
 ** Listing Windows and Related Processes 
 
 The following code lists all visible windows titles, the related process ID
@@ -4780,6 +5062,893 @@ File: _enum-windows.cpp_
 
 #+END_SRC
  
+** Access Tokens
+*** Overview 
+
+An access tokens are Windows kernel objects that contain information
+about user identity, capabilities, privileges, domain and groups that
+the user belongs to. They are generated when an user logs on and is
+successfully authenticated. When any process is startd, it receives
+the user access token. As a result, the process capabilities are
+limited to the same permissions and capabilities granted by the user's
+token. 
+
+Tokens can also used for applying the principle of least privilege
+which advices that an application should be granted the minimum
+necessary privilege to perform its work. For instance, several system
+operations including, loading device drivers, set system time or read
+a process' memory, require a token to be granted with the specific
+privilege that enables the operation. For instance, loading device
+driver requies the token to have the _SeLoadDriverPrivilege_, reading a
+process' memory requires _SeDugPrivilege_ and so on.
+
+Some windows privileges contanst [[https://docs.microsoft.com/en-us/windows/win32/secauthz/privilege-constants][(MSDN)]]
+
+  + SeBackupPrivilege
+    * Constant: ~SE_BACKUP_NAME~ 
+    * Privilege required for debugging operations. 
+
+  + SeCreateGlobalPrivilege
+    * constant: ~SE_CREATE_GLOBAL_NAME~ 
+    * Privilege required for creating named pipes, file mapping or
+      shared memory namespaces in global namespace. 
+
+  + SeCreateSymbolicLinkPrivilege
+    * constant: ~SE_CREATE_SYMBOLIC_LINK_NAME~
+    * Privilege required for creating symbolic links.
+
+  + SeDebugPrivilege
+    * Constant: ~SE_DEBUG_NAME~
+    * Privilege needed for enabling debugging operations on processes
+      not owned by the user, for instance, reading process virtual
+      memory, writing to process virtual memory.
+
+  + SeLoadDriverPrivilege
+    + Constant: ~SE_LOAD_DRIVER_NAME~
+    + Privilegy necessary for loading device drivers.
+
+
+Widely Terminology:
+
+  + UNC - Universal Name Convention
+
+  + UAC - User Account Control 
+
+  + ACE - Access Control Entries 
+
+  + ACL - Access Control List
+
+  + DACL - Discretionary Access Control List 
+
+  + SACL - System Access Control List 
+
+  + SID - Security Identifier (User account unique identifer or ID)
+
+  + LSA - Local Security Authority
+
+  + LSAS - Local Security Subsystem Service
+
+  + SCM - Service Control Manager 
+
+
+ *Relevant documentation reading* 
+
+  + [[https://docs.microsoft.com/en-us/windows/win32/secauthz/access-control][MSDN - Access Control (Authorization)]]
+
+  + [[https://docs.microsoft.com/en-us/windows/win32/secauthz/authorization-functions][MSDN - Authorization Functions (Authorization)]]
+
+  + [[https://docs.microsoft.com/en-us/windows/win32/secauthz/how-dacls-control-access-to-an-object][How AccessCheck Works]] [MUST-READ]
+
+  + [[https://docs.microsoft.com/en-us/windows/win32/secauthz/access-tokens][MSDN - Access Tokens]] [MUST-READ]
+
+  + [[https://docs.microsoft.com/en-us/windows/desktop/SecAuthZ/privilege-constants][MSDN - Privilege Constants]] [MUST-READ]
+
+  + [[https://docs.microsoft.com/en-us/windows/win32/secauthz/well-known-sids][MSDN - Well-known SIDs]] [MUST-READ]
+
+  + [[https://docs.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-luid][LUID structure (winnt.h)]]
+
+  + [[https://docs.microsoft.com/en-us/windows/win32/secauthz/aces-to-control-access-to-an-object-s-properties][ACEs to Control Access to an Object's Properties]]
+
+  + [[https://docs.microsoft.com/en-us/windows/win32/secauthn/lsa-authentication][MSDN - LSA Authentication]] 
+
+  + [[https://docs.microsoft.com/en-us/windows/win32/procthread/isolated-user-mode--ium--processes][MSDN - Isolated User Mode (IUM) Processes]]
+
+  + [[https://docs.microsoft.com/en-us/windows/win32/secauthz/securable-objects][MSDN - Securable Objects]]
+
+  + [[https://docs.microsoft.com/en-us/windows/win32/secauthz/enabling-and-disabling-privileges-in-c][Enabling and Disabling Privileges in C++]]--
+
+  + [[https://docs.microsoft.com/en-us/windows/win32/secauthz/finding-the-owner-of-a-file-object-in-c][MSDN - Finding the Owner of a File Object in C++]]
+
+
+ *Token and Process Windows APIs*
+
+ + [[https://docs.microsoft.com/en-us/windows/win32/api/handleapi/nf-handleapi-closehandle][CloseHandle()]]
+   + Brief: "Closes an open object handle."
+
+#+BEGIN_SRC cpp 
+  BOOL CloseHandle(HANDLE hObject);
+#+END_SRC
+
+ + [[https://docs.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getcurrentprocessid][GetCurrentPRocessId()]]
+   + Brief: "Retrieves the process identifier of the calling process." 
+
+#+BEGIN_SRC cpp 
+  DWORD GetCurrentProcessId();
+#+END_SRC
+
+ + [[https://docs.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-openprocess][OpenProcess()]]
+   + Brief: "Opens an existing local process object."
+
+#+BEGIN_SRC cpp 
+  HANDLE OpenProcess(
+    DWORD dwDesiredAccess,
+    BOOL  bInheritHandle,
+    DWORD dwProcessId
+  );
+#+END_SRC 
+
+ + [[https://docs.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-isprocesscritical][IsProcessCritical()]]
+   + Brief: "Determines whether the specified process is considered critical." 
+
+#+BEGIN_SRC cpp 
+  BOOL IsProcessCritical(HANDLE hProcess, PBOOL Critical);
+#+END_SRC
+
+
+ + [[https://docs.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getcurrentprocess][GetCurrentProcess()]]
+   + Brief: "Retrieves a pseudo handle for the current process."
+
+#+BEGIN_SRC cpp 
+  HANDLE GetCurrentProcess();
+#+END_SRC
+
+
+ + [[https://docs.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-openprocesstoken][OpenProcessToken()]]
+
+#+BEGIN_SRC cpp 
+  BOOL OpenProcessToken(
+    HANDLE  ProcessHandle,
+    DWORD   DesiredAccess,
+    PHANDLE TokenHandle
+  );
+#+END_SRC
+
+
+ + [[https://docs.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-gettokeninformation][GetTokenInformation()]]
+    + Brief: "The GetTokenInformation function retrieves a specified
+      type of information about an access token. The calling process
+      must have appropriate access rights to obtain the information." 
+
+#+BEGIN_SRC cpp 
+  BOOL GetTokenInformation(
+    HANDLE                  TokenHandle,
+    TOKEN_INFORMATION_CLASS TokenInformationClass,
+    LPVOID                  TokenInformation,
+    DWORD                   TokenInformationLength,
+    PDWORD                  ReturnLength
+  );
+#+END_SRC
+
+ + [[https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-lookupaccountsida][LookupAccountSidA()]]
+   + Brief: "The LookupAccountSid function accepts a security
+     identifier (SID) as input. It retrieves the name of the account
+     for this SID and the name of the first domain on which this SID
+     is found." 
+
+#+BEGIN_SRC cpp 
+  BOOL LookupAccountSidA(
+    LPCSTR        lpSystemName,
+    PSID          Sid,
+    LPSTR         Name,
+    LPDWORD       cchName,
+    LPSTR         ReferencedDomainName,
+    LPDWORD       cchReferencedDomainName,
+    PSID_NAME_USE peUse
+  );
+#+END_SRC
+
+  + [[https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-lookupprivilegevaluea][LookupPrivilegeValueA()]] [ANSI-VERSION]
+    + Brief: "The LookupPrivilegeValue function retrieves the locally
+      unique identifier (LUID) used on a specified system to locally
+      represent the specified privilege name." 
+
+#+BEGIN_SRC cpp 
+  BOOL LookupPrivilegeValueA(
+    LPCSTR lpSystemName,
+    LPCSTR lpName,
+    PLUID  lpLuid
+  );
+#+END_SRC
+
+ + [[https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-lookupprivilegevaluew][LookupPrivilegeValueW()]] [UNICODE-VERSION]
+
+#+BEGIN_SRC cpp 
+  BOOL LookupPrivilegeValueW(
+    LPCWSTR lpSystemName,
+    LPCWSTR lpName,
+    PLUID   lpLuid
+  );
+#+END_SRC 
+
+ 
+  + [[https://docs.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-adjusttokengroups][AdjustTokenGroups()]]
+    + Brief: "The AdjustTokenGroups function enables or disables
+      groups already present in the specified access token. Access to
+      TOKEN_ADJUST_GROUPS is required to enable or disable groups in
+      an access token." 
+
+#+BEGIN_SRC cpp 
+  BOOL AdjustTokenGroups(
+    HANDLE        TokenHandle,
+    BOOL          ResetToDefault,
+    PTOKEN_GROUPS NewState,
+    DWORD         BufferLength,
+    PTOKEN_GROUPS PreviousState,
+    PDWORD        ReturnLength
+  );
+#+END_SRC
+
+  + [[https://docs.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-adjusttokenprivileges][AdjustTokenPrivileges()]]
+    + Brief: "The AdjustTokenPrivileges function enables or disables
+      privileges in the specified access token. Enabling or disabling
+      privileges in an access token requires TOKEN_ADJUST_PRIVILEGES
+      access." 
+
+#+BEGIN_SRC cpp 
+  BOOL AdjustTokenPrivileges(
+    HANDLE            TokenHandle,
+    BOOL              DisableAllPrivileges,
+    PTOKEN_PRIVILEGES NewState,
+    DWORD             BufferLength,
+    PTOKEN_PRIVILEGES PreviousState,
+    PDWORD            ReturnLength
+  );
+#+END_SRC
+
+
+  + [[https://docs.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-duplicatetoken][DuplicateToken()]]
+    + Brief: "The DuplicateToken function creates a new access token
+      that duplicates one already in existence." 
+
+
+#+BEGIN_SRC cpp 
+  BOOL DuplicateToken(
+    HANDLE                       ExistingTokenHandle,
+    SECURITY_IMPERSONATION_LEVEL ImpersonationLevel,
+    PHANDLE                      DuplicateTokenHandle
+  );
+#+END_SRC
+
+
+  + [[https://docs.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-istokenrestricted][IsTokenRestricted()]]
+    + Brief: "The IsTokenRestricted function indicates whether a token
+      contains a list of restricted security identifiers (SIDs)." 
+
+#+BEGIN_SRC cpp 
+  BOOL IsTokenRestricted( HANDLE TokenHandle );
+#+END_SRC
+
+
+  + [[https://docs.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createprocessasusera][CreateProcessAsUserA()]]
+    + Brief: "Creates a new process and its primary thread. The new
+      process runs in the security context of the user represented by
+      the specified token." 
+
+#+BEGIN_SRC cpp 
+  BOOL CreateProcessAsUserA(
+    HANDLE                hToken,
+    LPCSTR                lpApplicationName,
+    LPSTR                 lpCommandLine,
+    LPSECURITY_ATTRIBUTES lpProcessAttributes,
+    LPSECURITY_ATTRIBUTES lpThreadAttributes,
+    BOOL                  bInheritHandles,
+    DWORD                 dwCreationFlags,
+    LPVOID                lpEnvironment,
+    LPCSTR                lpCurrentDirectory,
+    LPSTARTUPINFOA        lpStartupInfo,
+    LPPROCESS_INFORMATION lpProcessInformation
+  );
+#+END_SRC
+
+  + [[https://docs.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createprocessasuserw][CreateProcessAsUserW()]]
+    + Brief: "Creates a new process and its primary thread. The new
+      process runs in the security context of the user represented by
+      the specified token." 
+
+#+BEGIN_SRC cpp 
+  BOOL CreateProcessAsUserW(
+    HANDLE                hToken,
+    LPCWSTR               lpApplicationName,
+    LPWSTR                lpCommandLine,
+    LPSECURITY_ATTRIBUTES lpProcessAttributes,
+    LPSECURITY_ATTRIBUTES lpThreadAttributes,
+    BOOL                  bInheritHandles,
+    DWORD                 dwCreationFlags,
+    LPVOID                lpEnvironment,
+    LPCWSTR               lpCurrentDirectory,
+    LPSTARTUPINFOW        lpStartupInfo,
+    LPPROCESS_INFORMATION lpProcessInformation
+  );
+#+END_SRC
+*** Inspecting process tokens 
+
+This code demmonstrates the usage of many Windows NT token APIs
+application programming interfaces by querying token information and
+privilege from system processes passed as PID command line argument.
+
+ *Project Files* 
+
+File: _tokeninfo.cpp_ 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+  #include <cassert>
+
+  #include <windows.h>
+
+
+  extern "C" void QueryFullProcessImageNameA( HANDLE hProc, int n
+                                             , char* buffer, DWORD* buffer_size);
+
+  extern "C" BOOL IsProcessCritical(HANDLE hProcess, PBOOL  Critical);
+
+  extern "C" BOOL ConvertSidToStringSidA(PSID Sid,  LPSTR* StringSid);
+
+  bool            tokenHasPrivilege( HANDLE hToken, const char* privilege);
+  void           showTokenPrivilege( HANDLE hToken, const char* privilege);
+  void show_process_token_privilege( int pid);
+  BOOL              isTokenElevated( HANDLE hToken );
+  BOOL                 SetPrivilege( HANDLE  hToken, LPCTSTR lpszPrivilege, BOOL bEnablePrivilege); 
+
+
+  // ======================================================================//
+
+  int main(int argc, char** argv)
+  {
+
+    if( argc < 2 )
+    {
+      std::printf("\n Usage: %s [COMMAND] [ARGUMENT]", argv[0] );
+
+      std::printf("\n => Show process token information");
+      std::printf("\n $ .%s proc [PID] \n", argv[0] );
+    
+      std::printf("\n => Set debug privilege and show current privileges");
+      std::printf("\n $ %s priv \n", argv[0] );    
+      return EXIT_FAILURE;
+    }
+
+    auto command = std::string{ argv[1] };
+
+    if( command == "proc" )
+    {
+       DWORD pid =  std::stoi(argv[2]);
+
+       // If pid == 0 => Show privileges of current process.
+       if( pid == 0){ pid = GetCurrentProcessId(); }
+       show_process_token_privilege( pid );
+       return EXIT_SUCCESS;
+    }
+
+    if( command == "priv" )
+    {
+
+      HANDLE hProc = GetCurrentProcess();
+      HANDLE hToken = nullptr;
+
+      if( !OpenProcessToken(hProc, TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hToken) )
+      { 
+        std::printf("Error - unable to open process Token. => Check GetLastError() error code. \n");
+        std::abort();
+      }
+
+      assert( hToken != nullptr );
+
+    
+      std::printf( " Is process elevated (admin)? = %s \n"
+                  , isTokenElevated(hToken) ? "TRUE" : "FALSE" );
+    
+      // Set debug privilege => Necessary for reading or writing to/from process memory.
+      // Note: SE_DEBUG_NAME == 'SeDebugPrivilege'
+      SetPrivilege( hToken, SE_DEBUG_NAME, TRUE);
+      showTokenPrivilege( hToken, SE_DEBUG_NAME );    
+
+      // Backup privilege 
+      SetPrivilege( hToken, "SeBackupPrivilege", TRUE);
+      showTokenPrivilege( hToken, "SeBackupPrivilege" );
+
+      // Privilege for creating global objects 
+      SetPrivilege( hToken, "SeCreateGlobalPrivilege", TRUE);
+      showTokenPrivilege( hToken, "SeCreateGlobalPrivilege" );
+
+      // Privilege for loading drivers 
+      SetPrivilege( hToken, "SeLoadDriverPrivilege", TRUE);
+      showTokenPrivilege( hToken, "SeLoadDriverPrivilege" );
+    
+      return EXIT_SUCCESS;
+    }
+
+    
+    return EXIT_SUCCESS;
+  }
+
+
+  // ======= I M P L E M E N T A T I O N  S ================ //
+
+  // Check whether process is running with administrative privilege (admin)
+  BOOL isTokenElevated( HANDLE hToken )
+  {
+
+    TOKEN_ELEVATION elevation;
+    DWORD size = sizeof( TOKEN_ELEVATION );
+    if( !GetTokenInformation( hToken, TokenElevation, &elevation
+                              , sizeof( TOKEN_ELEVATION), &size ) )
+    {
+      return FALSE;
+    }
+    return elevation.TokenIsElevated;
+  }
+
+
+  bool tokenHasPrivilege(HANDLE hToken, const char* privilege)
+  {
+      LUID luid;
+      PRIVILEGE_SET prvset;
+    
+      if( !LookupPrivilegeValue(nullptr, privilege, &luid) )
+      {
+         fprintf(stderr, "Function LookipPrivilegeAndValue() failed. \n");
+         std::abort();
+      }
+
+      prvset.Control                 = PRIVILEGE_SET_ALL_NECESSARY;
+      prvset.Privilege[0].Luid       = luid;
+      prvset.Privilege[0].Attributes = SE_PRIVILEGE_ENABLED;;
+      prvset.PrivilegeCount          = 1;
+
+      BOOL ret;
+      PrivilegeCheck(hToken, &prvset, &ret);
+      return ret == TRUE;
+  }
+
+
+  void showTokenPrivilege(HANDLE hToken, const char* privilege)
+  {
+
+    bool p = tokenHasPrivilege(hToken, privilege);
+    std::fprintf( stdout, "\n [*] Has privilege? %s = %s \n"
+                 , privilege, p ? "TRUE" : "FALSE" );
+    
+  }
+
+  void show_process_token_privilege(int pid)
+  {
+    // Get handle to process
+    // ----------------------------------------------
+    assert( pid > 0 );
+    HANDLE hProc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+    if( hProc == nullptr )
+    {  
+      std::printf( " Error => Unable to open process => Error code = %ld"
+                  , GetLastError()); 
+      std::abort();
+    }
+
+    // Get path to process
+    // ---------------------------------------------------
+    DWORD size = MAX_PATH;
+    char buffer[MAX_PATH];      
+    // Obtain path to proces image (executable path)
+    // Note: This function does not work with Unicode path names containing non
+    // ascii characters such as Korean Hangul characters.
+    QueryFullProcessImageNameA(hProc, 0, buffer, &size);
+
+    // Get process' access token
+    //----------------------------------------------------------------
+    HANDLE hToken = nullptr;
+    if( !OpenProcessToken(hProc, TOKEN_QUERY, &hToken) )
+    { 
+       std::printf("Error - unable to open process Token. => Check GetLastError() error code. \n");
+       std::abort();
+    }
+
+
+    // Retrieve information about user which created the process 
+    //--------------------------------------------------------------
+
+    DWORD needed;
+    // Determine the buffer size
+    GetTokenInformation( hToken, TokenUser, NULL, 0, &needed);
+    auto tuser = reinterpret_cast<TOKEN_USER*>( LocalAlloc( LPTR, needed) );    
+    assert( tuser != nullptr );
+    GetTokenInformation( hToken, TokenUser, tuser, needed, &needed);
+
+    PSID psid = tuser->User.Sid;
+    char buffer_user[500];
+    char buffer_domain[500];
+    DWORD size_user   = sizeof(buffer_user);
+    DWORD size_domain = sizeof(buffer_domain);
+
+    SID_NAME_USE snu;
+    if( !LookupAccountSid( nullptr, psid
+                           , buffer_user,  &size_user
+                           , buffer_domain, &size_domain
+                           , &snu ) )
+    {
+      std::printf( "Error. Function LookupAccountSid() failed => Last error code = %ld"
+                  , GetLastError());
+      std::abort();
+    }
+
+    /// Note: This string is allocated by the calee (function);
+    char* pBuffer_sid = nullptr;
+
+    // Convert SID (Security identifier) to string
+    assert( ConvertSidToStringSidA(psid, &pBuffer_sid) );
+
+    // Display process information 
+    // ----------------------------------------------------------
+    std::printf(" [TOKEN] >> Pid = %d ; EXE = %s \n", pid, buffer);
+    std::printf(" User account = %s \n", buffer_user   );
+    std::printf(" User domain  = %s \n", buffer_domain );
+    std::printf(" SID          = %s \n", pBuffer_sid   );
+
+    BOOL is_critical = FALSE;
+    IsProcessCritical(hProc, &is_critical);
+    std::printf(" Is process critical = %s \n", is_critical ? "TRUE" : "FALSE" );
+
+    std::printf(" Is process elevated (admin)? = %s \n", isTokenElevated(hToken) ? "TRUE" : "FALSE" );
+
+    std::printf(" Is token restricted = %s \n", IsTokenRestricted(hToken) ? "TRUE" : "FALSE" );
+
+  
+    // Display privileges that the token grants to  the process.
+    //---------------------------------------------------
+    //
+    // SeAssignPrimaryTokenPrivilege => Allows replacing process-level token 
+    showTokenPrivilege( hToken, SE_ASSIGNPRIMARYTOKEN_NAME);
+    // SeBackupPrivilege => Allows files and directories backup (access to any file)
+    showTokenPrivilege( hToken, SE_BACKUP_NAME );
+    // SeDebugPrivilege => Allows opening process memory and performing debugging operations 
+    showTokenPrivilege( hToken, SE_DEBUG_NAME );
+    // SeIncreaseQuotaPrivilege
+    showTokenPrivilege( hToken, SE_INCREASE_QUOTA_NAME );
+    // SeTcbPrivilege => 
+    showTokenPrivilege( hToken, SE_TCB_NAME );
+    // Impersonate a client after authentication
+ 
+    showTokenPrivilege( hToken, "SeImpersonatePrivilege");
+    //  Load and unload device drivers
+    showTokenPrivilege( hToken, "SeLoadDriverPrivilege");
+    // Change system time 
+    showTokenPrivilege( hToken, "SeSystemtimePrivilege" );
+    //  Create global objects
+    showTokenPrivilege( hToken, "SeCreateGlobalPrivilege");
+    // Create symbolic links 
+    showTokenPrivilege( hToken, "SeCreateSymbolicLinkPrivilege");
+    // Managing and auditig the security log
+    showTokenPrivilege( hToken, "SeSecurityPrivilege");
+
+    CloseHandle(hProc);
+    CloseHandle(hToken);
+  }
+
+  // Source: MSDN Example 
+  BOOL SetPrivilege(
+        HANDLE  hToken            // access token handle
+      , LPCTSTR lpszPrivilege     // name of privilege to enable/disable
+      , BOOL    bEnablePrivilege  // to enable or disable privilege
+      ) 
+  {
+      TOKEN_PRIVILEGES tp;
+      LUID luid;
+
+      if ( !LookupPrivilegeValue(NULL, lpszPrivilege, &luid ) )        
+      {
+          printf("LookupPrivilegeValue error: %ld\n", GetLastError() ); 
+          return FALSE; 
+      }
+
+      tp.PrivilegeCount = 1;
+      tp.Privileges[0].Luid = luid;
+      if (bEnablePrivilege)
+          tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+      else
+          tp.Privileges[0].Attributes = 0;
+
+      // Enable the privilege or disable all privileges.
+
+      if ( !AdjustTokenPrivileges(
+             hToken, 
+             FALSE, 
+             &tp, 
+             sizeof(TOKEN_PRIVILEGES), 
+             (PTOKEN_PRIVILEGES) NULL, 
+             (PDWORD) NULL) )
+      { 
+            printf("AdjustTokenPrivileges error: %ld\n", GetLastError() ); 
+            return FALSE; 
+      } 
+
+      if (GetLastError() == ERROR_NOT_ALL_ASSIGNED)
+
+      {
+            printf("The token does not have the specified privilege. \n");
+            return FALSE;
+      } 
+
+      return TRUE;
+  }
+
+#+END_SRC
+
+Building: 
+
+#+BEGIN_SRC sh 
+  $ g++ tokeninfo.cpp -o tokeninfo.exe -std=c++1z -Wall -Wextra -g
+#+END_SRC
+
+ *Experiment 1* - run as non administrator -querying process own privilge
+
+#+BEGIN_SRC sh 
+  λ .\tokeninfo.exe proc 0
+   [TOKEN] >> Pid = 3100 ; EXE = C:\Users\User_001\Desktop\tokeninfo.exe
+   User account = User_001
+   User domain  = DESKTOP-FA8FC0Q
+   SID          = S-1-5-20-3640651439-4294530408-2125417441-1261
+   Is process critical = FALSE
+   Is process elevated (admin)? = FALSE
+   Is token restricted = FALSE
+
+   [*] Has privilege? SeAssignPrimaryTokenPrivilege = FALSE
+
+   [*] Has privilege? SeBackupPrivilege = FALSE
+
+   [*] Has privilege? SeDebugPrivilege = FALSE
+
+   [*] Has privilege? SeIncreaseQuotaPrivilege = FALSE
+
+   [*] Has privilege? SeTcbPrivilege = FALSE
+
+   [*] Has privilege? SeImpersonatePrivilege = FALSE
+
+   [*] Has privilege? SeLoadDriverPrivilege = FALSE
+
+   [*] Has privilege? SeSystemtimePrivilege = FALSE
+
+   [*] Has privilege? SeCreateGlobalPrivilege = FALSE
+
+   [*] Has privilege? SeCreateSymbolicLinkPrivilege = FALSE
+
+   [*] Has privilege? SeSecurityPrivilege = FALSE
+
+#+END_SRC
+
+Check user privileges with command _whoami_:
+
+#+BEGIN_SRC sh 
+  $ whoami /priv
+
+  PRIVILEGES INFORMATION
+  ----------------------
+
+  Privilege Name                Description                          State
+  ============================= ==================================== ========
+  SeShutdownPrivilege           Shut down the system                 Disabled
+  SeChangeNotifyPrivilege       Bypass traverse checking             Enabled
+  SeUndockPrivilege             Remove computer from docking station Disabled
+  SeIncreaseWorkingSetPrivilege Increase a process working set       Disabled
+  SeTimeZonePrivilege           Change the time zone                 Disabled
+#+END_SRC
+
+ *Experiment 2* - run as administrator - querying process own privilge
+
+#+BEGIN_SRC cpp 
+  $ .\tokeninfo.exe proc 0
+   [TOKEN] >> Pid = 3100 ; EXE = C:\Users\User_001\Desktop\tokeninfo.exe
+   User account = User_001
+   User domain  = DESKTOP-FA8FC0Q
+   SID          = S-1-5-20-3640651439-4294530408-2125417441-1261
+   Is process critical = FALSE
+   Is process elevated (admin)? = FALSE
+   Is token restricted = FALSE
+
+   [*] Has privilege? SeAssignPrimaryTokenPrivilege = FALSE
+
+   [*] Has privilege? SeBackupPrivilege = FALSE
+
+   [*] Has privilege? SeDebugPrivilege = FALSE
+
+   [*] Has privilege? SeIncreaseQuotaPrivilege = FALSE
+
+   [*] Has privilege? SeTcbPrivilege = FALSE
+
+   [*] Has privilege? SeImpersonatePrivilege = FALSE
+
+   [*] Has privilege? SeLoadDriverPrivilege = FALSE
+
+   [*] Has privilege? SeSystemtimePrivilege = FALSE
+
+   [*] Has privilege? SeCreateGlobalPrivilege = FALSE
+
+   [*] Has privilege? SeCreateSymbolicLinkPrivilege = FALSE
+
+   [*] Has privilege? SeSecurityPrivilege = FALSE
+
+#+END_SRC
+
+Check user privileges with command _whoami_:
+
+#+BEGIN_SRC sh 
+  $ whoami /priv
+
+  PRIVILEGES INFORMATION
+  ----------------------
+
+  Privilege Name                            Description                                                        State
+  ========================================= ================================================================== ========
+  SeIncreaseQuotaPrivilege                  Adjust memory quotas for a process                                 Disabled
+  SeSecurityPrivilege                       Manage auditing and security log                                   Disabled
+  SeTakeOwnershipPrivilege                  Take ownership of files or other objects                           Disabled
+  SeLoadDriverPrivilege                     Load and unload device drivers                                     Disabled
+  SeSystemProfilePrivilege                  Profile system performance                                         Disabled
+  SeSystemtimePrivilege                     Change the system time                                             Disabled
+  SeProfileSingleProcessPrivilege           Profile single process                                             Disabled
+  SeIncreaseBasePriorityPrivilege           Increase scheduling priority                                       Disabled
+  SeCreatePagefilePrivilege                 Create a pagefile                                                  Disabled
+  SeBackupPrivilege                         Back up files and directories                                      Disabled
+  SeRestorePrivilege                        Restore files and directories                                      Disabled
+  SeShutdownPrivilege                       Shut down the system                                               Disabled
+  SeDebugPrivilege                          Debug programs                                                     Disabled
+  SeSystemEnvironmentPrivilege              Modify firmware environment values                                 Disabled
+  SeChangeNotifyPrivilege                   Bypass traverse checking                                           Enabled
+  SeRemoteShutdownPrivilege                 Force shutdown from a remote system                                Disabled
+  SeUndockPrivilege                         Remove computer from docking station                               Disabled
+  SeManageVolumePrivilege                   Perform volume maintenance tasks                                   Disabled
+  SeImpersonatePrivilege                    Impersonate a client after authentication                          Enabled
+  SeCreateGlobalPrivilege                   Create global objects                                              Enabled
+  SeIncreaseWorkingSetPrivilege             Increase a process working set                                     Disabled
+  SeTimeZonePrivilege                       Change the time zone                                               Disabled
+  SeCreateSymbolicLinkPrivilege             Create symbolic links                                              Disabled
+  SeDelegateSessionUserImpersonatePrivilege Obtain an impersonation token for another user in the same session Disabled
+
+#+END_SRC
+
+ *Experiment 3* - Enable debug, backup and load driver privileges
+ checking whether they are enabled. 
+
+#+BEGIN_SRC sh 
+  # Note: Executed as administrator. 
+  $ .\tokeninfo.exe priv
+   Is process elevated (admin)? = TRUE
+
+   [*] Has privilege? SeDebugPrivilege = TRUE
+
+   [*] Has privilege? SeBackupPrivilege = TRUE
+
+   [*] Has privilege? SeCreateGlobalPrivilege = TRUE
+
+   [*] Has privilege? SeLoadDriverPrivilege = TRUE
+#+END_SRC
+
+ *Experiment 4* 
+
+List system services and their PIDs (Process unique identifiers): 
+
+#+BEGIN_SRC sh 
+  $ sc queryex  
+
+  SERVICE_NAME: WSearch
+  DISPLAY_NAME: Windows Search
+          TYPE               : 10  WIN32_OWN_PROCESS
+          STATE              : 4  RUNNING
+                                  (STOPPABLE, NOT_PAUSABLE, ACCEPTS_SHUTDOWN)
+          WIN32_EXIT_CODE    : 0  (0x0)
+          SERVICE_EXIT_CODE  : 0  (0x0)
+          CHECKPOINT         : 0x0
+          WAIT_HINT          : 0x0
+          PID                : 5508
+          FLAGS              :
+
+  SERVICE_NAME: cbdhsvc_3c648
+  DISPLAY_NAME: Clipboard User Service_3c648
+          TYPE               : f0   ERROR
+          STATE              : 4  RUNNING
+                                  (STOPPABLE, NOT_PAUSABLE, IGNORES_SHUTDOWN)
+          WIN32_EXIT_CODE    : 0  (0x0)
+          SERVICE_EXIT_CODE  : 0  (0x0)
+          CHECKPOINT         : 0x0
+          WAIT_HINT          : 0x0
+          PID                : 4120
+          FLAGS              :
+
+  SERVICE_NAME: CDPUserSvc_3c648
+  DISPLAY_NAME: Connected Devices Platform User Service_3c648
+          TYPE               : f0   ERROR
+          STATE              : 4  RUNNING
+                                  (STOPPABLE, NOT_PAUSABLE, IGNORES_SHUTDOWN)
+          WIN32_EXIT_CODE    : 0  (0x0)
+          SERVICE_EXIT_CODE  : 0  (0x0)
+          CHECKPOINT         : 0x0
+          WAIT_HINT          : 0x0
+          PID                : 4388
+          FLAGS              :
+    ...   ...   ...   ...   ...   ...   ...   ...   ...   ...   ... 
+    ...   ...   ...   ...   ...   ...   ...   ...   ...   ...   ... 
+#+END_SRC
+
+Inspect token information of process (PID = 2664)
+
+#+BEGIN_SRC sh 
+  $ .\tokeninfo.exe proc 2664
+   [TOKEN] >> Pid = 2664 ; EXE = C:\Program Files (x86)\SPICE Guest Tools\drivers\Balloon\w10\amd64\blnsvr.exe
+   User account = SYSTEM
+   User domain  = NT AUTHORITY
+   SID          = S-1-5-18
+   Is process critical = FALSE
+   Is process elevated (admin)? = TRUE
+   Is token restricted = FALSE
+
+   [*] Has privilege? SeAssignPrimaryTokenPrivilege = FALSE
+
+   [*] Has privilege? SeBackupPrivilege = FALSE
+
+   [*] Has privilege? SeDebugPrivilege = TRUE
+
+   [*] Has privilege? SeIncreaseQuotaPrivilege = FALSE
+
+   [*] Has privilege? SeTcbPrivilege = TRUE
+
+   [*] Has privilege? SeImpersonatePrivilege = TRUE
+
+   [*] Has privilege? SeLoadDriverPrivilege = FALSE
+
+   [*] Has privilege? SeSystemtimePrivilege = FALSE
+
+   [*] Has privilege? SeCreateGlobalPrivilege = TRUE
+
+   [*] Has privilege? SeCreateSymbolicLinkPrivilege = TRUE
+
+   [*] Has privilege? SeSecurityPrivilege = FALSE
+#+END_SRC
+
+Inspect token information of process (PID = 636)
+
+#+BEGIN_SRC sh 
+  $ .\tokeninfo.exe proc 636
+   [TOKEN] >> Pid = 636 ; EXE = C:\Windows\System32\lsass.exe
+   User account = SYSTEM
+   User domain  = NT AUTHORITY
+   SID          = S-1-5-18
+   Is process critical = FALSE
+   Is process elevated (admin)? = TRUE
+   Is token restricted = FALSE
+
+   [*] Has privilege? SeAssignPrimaryTokenPrivilege = FALSE
+
+   [*] Has privilege? SeBackupPrivilege = FALSE
+
+   [*] Has privilege? SeDebugPrivilege = TRUE
+
+   [*] Has privilege? SeIncreaseQuotaPrivilege = FALSE
+
+   [*] Has privilege? SeTcbPrivilege = TRUE
+
+   [*] Has privilege? SeImpersonatePrivilege = TRUE
+
+   [*] Has privilege? SeLoadDriverPrivilege = FALSE
+
+   [*] Has privilege? SeSystemtimePrivilege = FALSE
+
+   [*] Has privilege? SeCreateGlobalPrivilege = TRUE
+
+   [*] Has privilege? SeCreateSymbolicLinkPrivilege = TRUE
+
+   [*] Has privilege? SeSecurityPrivilege = FALSE
+
+#+END_SRC
+
 ** CODE - Display information about current process 
 
 Print information about current process and copy itself to desktop
