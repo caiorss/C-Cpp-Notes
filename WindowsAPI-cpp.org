@@ -5664,7 +5664,6 @@ File: _tokeninfo.cpp_
       } 
 
       if (GetLastError() == ERROR_NOT_ALL_ASSIGNED)
-
       {
             printf("The token does not have the specified privilege. \n");
             return FALSE;
@@ -5940,6 +5939,677 @@ Inspect token information of process (PID = 636)
    [*] Has privilege? SeSecurityPrivilege = FALSE
 
 #+END_SRC
+
+** Reading and writing process memory 
+*** Overview 
+
+Windows NT family operating systems provide APIs OpenProcess(),
+ReadProcessMemory() and WriteProcessMemory() which allow the calling
+code to manipulate the memory of other processes. Those functions are
+meant to support the implementation of debuggers such as Visual Studio
+Debugger, Windb or GDB (GNU Debugger), which need to be able to read,
+write and inspect the virtual memory of any process. 
+
+Note: Debug privilege is required for inspecting the memory of
+processes not created by the user of the calling code. 
+
+Documentation of APIs used:
+  
+  * [[https://docs.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-openprocess][OpenProcess()]]
+
+  * [[https://docs.microsoft.com/en-us/windows/win32/api/handleapi/nf-handleapi-closehandle][CloseHandle()]]
+
+  * [[https://docs.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getcurrentprocessid][GetCurrentProcessId()]]
+    + Brief: "Retrieves the process identifier of the calling process."
+
+  * [[https://docs.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getcurrentprocess][GetCurrentProcess()]]
+    + Brief: "Retrieves a pseudo handle for the current process."
+
+  * [[https://docs.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-readprocessmemory][ReadProcessMemory()]]
+    + Brief: "ReadProcessMemory copies the data in the specified
+      address range from the address space of the specified process
+      into the specified buffer of the current process. Any process
+      that has a handle with PROCESS_VM_READ access can call the
+      function."
+
+  * [[https://docs.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-writeprocessmemory][WriteProcessMemory()]]
+    + Brief: "Writes data to an area of memory in a specified
+      process. The entire area to be written to must be accessible or
+      the operation fails."
+
+  * [[https://docs.microsoft.com/en-us/windows/win32/api/psapi/nf-psapi-getmodulebasenamea][GetModuleBaseName()]]
+    + Brief: "Retrieves the base name of the specified module."
+
+  * [[https://docs.microsoft.com/en-us/windows/win32/api/wow64apiset/nf-wow64apiset-iswow64process][IsWow64Process()]]
+    + Brief: "Determines whether the specified process is running
+      under WOW64 or an Intel64 of x64 processor." 
+
+  * [[https://docs.microsoft.com/en-us/windows/win32/api/winternl/nf-winternl-ntqueryinformationprocess][NtQueryInformationProcess()]] [INTERNAL-API] [UNDOCUMENTED-API]
+    + Brief: "Retrieves information about the specified process."
+    + Note: It is unstable internal Windows API, as a result, it may
+      removed without notice on future Windows releases. This API is
+      not supposed to be used by any application code. However, there
+      is no way to get a process full command line path without this
+      "undocumented function".
+
+  * [[https://docs.microsoft.com/en-us/windows/win32/api/winternl/ns-winternl-peb][PEB structure]]  [INTERNAL-API] [UNDOCUMENTED-API]
+    + Brief: Process Enviroment Block data structure.
+
+  * [[https://docs.microsoft.com/en-us/windows/win32/api/winternl/ns-winternl-peb_ldr_data][PEB_LDR_DATA structure]] [INTERNAL-API] [UNDOCUMENTED-API]
+    + Brief: Contains information about the loaded modules for the process.
+
+  * [[https://docs.microsoft.com/en-us/windows/win32/api/winternl/ns-winternl-rtl_user_process_parameters][RTL_USER_PROCESS_PARAMETERS structure]] [INTERNAL-API] [UNDOCUMENTED-API]
+    + Brief: Contains process parameter information.
+    + Note: Contains process command line arguments.
+
+Structs: 
+
+#+BEGIN_SRC cpp 
+   typedef struct _PEB {
+     BYTE                          Reserved1[2];
+     BYTE                          BeingDebugged;
+     BYTE                          Reserved2[1];
+     PVOID                         Reserved3[2];
+     PPEB_LDR_DATA                 Ldr;
+     PRTL_USER_PROCESS_PARAMETERS  ProcessParameters;
+     PVOID                         Reserved4[3];
+     PVOID                         AtlThunkSListPtr;
+     PVOID                         Reserved5;
+     ULONG                         Reserved6;
+     PVOID                         Reserved7;
+     ULONG                         Reserved8;
+     ULONG                         AtlThunkSListPtr32;
+     PVOID                         Reserved9[45];
+     BYTE                          Reserved10[96];
+     PPS_POST_PROCESS_INIT_ROUTINE PostProcessInitRoutine;
+     BYTE                          Reserved11[128];
+     PVOID                         Reserved12[1];
+     ULONG                         SessionId;
+   } PEB, *PPEB;
+
+   typedef struct _RTL_USER_PROCESS_PARAMETERS {
+     BYTE           Reserved1[16];
+     PVOID          Reserved2[10];
+     UNICODE_STRING ImagePathName;
+     UNICODE_STRING CommandLine;
+   } RTL_USER_PROCESS_PARAMETERS, *PRTL_USER_PROCESS_PARAMETERS;
+
+  typedef struct _PEB_LDR_DATA {
+    BYTE       Reserved1[8];
+    PVOID      Reserved2[3];
+    LIST_ENTRY InMemoryOrderModuleList;
+  } PEB_LDR_DATA, *PPEB_LDR_DATA;
+
+  struct UNICODE_STRING
+  {
+    USHORT Length;         // unsigned short (16 bits)
+    USHORT MaximumLength;  // unsigned short (16 bits)
+    PWSTR  Buffer;         // type WCHAR* 
+  };
+#+END_SRC
+
+*** Sample code 
+
+This sample code uses memory inspection APIs for manipulating the
+virtual memory of a target process and also for obtaining the full
+command line used for instantiating a given process. 
+
+ *Project files*
+
+File: _target.cpp_ => Sample target process. 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string> 
+  #include <cstring> 
+
+  #include <windows.h>
+
+  char static_allocated_buffer[300];
+
+  int main()
+  {
+
+    int number = 300;
+    std::string cppstr = "Hallo Welt";
+
+    strcpy(static_allocated_buffer, "Strcpy is an unsafe C function! BE AWARE!");
+
+    const DWORD pid = GetCurrentProcessId();
+
+    std::printf(" [*]          Number = %d  \n", number );
+    std::printf(" [*]        cppstr   = %s  \n", cppstr.c_str());
+    std::printf(" [*] Global buffer   = %s  \n", static_allocated_buffer);
+  
+    std::printf(" [*]     Current process PID = %ld \n", pid);
+    std::printf(" [*]          Number address = %p  \n", &number );
+    std::printf(" [*]        cppstr address   = %p  \n", cppstr.data());
+    std::printf(" [*] Global buffer address   = %p  \n", static_allocated_buffer);  
+
+    std::printf("\n =>> Type RETURN to resume execution \n");
+    std::cin.ignore();
+
+    std::printf(" [*]          Number = %d  \n", number );
+    std::printf(" [*]        cppstr   = %s  \n", cppstr.c_str());
+    std::printf(" [*] Global buffer   = %s  \n", static_allocated_buffer);
+
+    std::printf("\n =>> Type RETURN to resume execution \n");  
+    std::cin.ignore();
+  }
+#+END_SRC
+
+File: _memorydump.cpp_ 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string>
+  #include <cassert>
+
+  #include <windows.h>
+  #include <psapi.h>
+
+  #include <winternl.h>
+
+  // Declare linkage to C symbol only when using on MING (GCC) compiler.
+  #if !defined(__MINGW64__) || defined(__MINGW32__)
+    extern "C" BOOL QueryFullProcessImageNameA(HANDLE hProcess, DWORD  dwFlags
+                                               , LPSTR  lpExeName, PDWORD lpdwSize );
+  #endif
+
+  std::string process_basename(HANDLE hProc);
+  std::string process_full_path(HANDLE hProc);
+  void        enableDebugPrivilege(BOOL enable);
+  BOOL        setPrivilege(HANDLE hToken, LPCTSTR privilege, BOOL enable_privilege);
+
+  // Type alias to Windows API function pointer. 
+  using NtQueryInformationProcess_t = NTSTATUS (*) (
+                                                HANDLE           ProcessHandle,
+                                                PROCESSINFOCLASS ProcessInformationClass,
+                                                PVOID            ProcessInformation,
+                                                ULONG            ProcessInformationLength,
+                                                PULONG           ReturnLength
+                                              );
+
+  // Show process command line arguments by reading its virtual memory.
+  // Note: This function requires debug privilege enabled if the process
+  // does not belong to the current user.
+  void show_process_cli(DWORD pid);
+
+  int main(int argc, char** argv)
+  {
+    if( argc < 2)
+    {
+      std::fprintf(stderr, "Error: expected process PID \n");
+      return -1;
+    }
+
+    // Set debug privilege for current process token
+    // Note: It only works if this application is run with
+    // administrative privilege.
+    //---------------------------------------------------
+    enableDebugPrivilege( TRUE );
+
+    auto command = std::string{ argv[1] };
+
+    // Obains information about commmand line used to start the process.
+    if( command == "cli" )
+    {
+
+      int pid = std::stoi( argv[2] );
+      show_process_cli(pid);
+      return 0;
+    }
+
+    // Dump a buffer from target process memory.
+    if( command == "read-str" )
+    {
+      // Pid of target process .
+      int pid     = std::stoi( argv[2] );
+      // Buffer memory address to be read from target process
+      // (in hexadecimal base, base 16)
+      int address = std::stoi( argv[3], 0, 16 );
+      // Buffer Lenght
+      int lenght = std::stoi( argv[4] );
+
+      HANDLE hProc = OpenProcess( PROCESS_QUERY_INFORMATION  | PROCESS_VM_READ, FALSE, pid);
+      assert( hProc != nullptr );
+
+      // Create heap-allocated string buffer with length characters
+      // set as '\0' null characters.
+      auto buffer = std::string(lenght, '\0');
+      ReadProcessMemory( hProc, (LPVOID) address, buffer.data(), lenght, nullptr);
+      std::printf(" Buffer value = %s \n", buffer.c_str());
+      std::printf(" Address      = %x \n", address);    
+
+      CloseHandle( hProc );
+      return 0;
+    }
+
+    // Write to buffer from target process 
+    if( command == "write-str" )
+    {
+      // Pid of target process .
+      int pid     = std::stoi( argv[2] );
+      // Buffer memory address to be read from target process
+      // (in hexadecimal base, base 16)
+      int address = std::stoi( argv[3], 0, 16 );
+      // Data to be written to buffer process memory
+      auto str = std::string{ argv[4] };
+
+      const DWORD flags = PROCESS_QUERY_INFORMATION  | PROCESS_VM_READ | PROCESS_VM_WRITE;
+      const HANDLE hProc = OpenProcess( flags, FALSE, pid);
+      assert( hProc != nullptr );
+
+      WriteProcessMemory( hProc, (LPVOID) address, str.data(), str.length(), nullptr);
+
+      auto buffer = std::string(str.length(), '\0');
+      ReadProcessMemory( hProc, (LPVOID) address, buffer.data(), str.length(), nullptr);
+    
+      std::printf(" Buffer value = %s \n", buffer.c_str());
+      std::printf(" Address      = %x \n", address);    
+
+      CloseHandle( hProc );
+      return 0;
+    }
+  
+    // Read number from target process memory.
+    if( command == "read-num" )
+    {
+      // Pid of target process .
+      int pid     = std::stoi( argv[2] );
+      // Buffer memory address to be read from target process
+      // (in hexadecimal base, base 16)
+      int address = std::stoi( argv[3], 0, 16 );
+      HANDLE hProc = OpenProcess( PROCESS_QUERY_INFORMATION  | PROCESS_VM_READ, FALSE, pid);
+      assert( hProc != nullptr );
+
+      int buffer = 0;
+      ReadProcessMemory( hProc, (LPVOID) address, &buffer, sizeof(buffer), nullptr);
+      std::printf(" [*] Number value = %d \n", buffer);
+
+      return 0;
+    }
+
+
+    // Write number to target process memory.
+    if( command == "write-num" )
+    {
+      // Pid of target process .
+      int pid     = std::stoi( argv[2] );
+      // Buffer memory address to be read from target process
+      // (in hexadecimal base, base 16)
+      int address = std::stoi( argv[3], 0, 16 );
+      int number  = std::stoi( argv[4] );
+    
+      const DWORD flags = PROCESS_QUERY_INFORMATION  | PROCESS_VM_READ | PROCESS_VM_WRITE;
+      const HANDLE hProc = OpenProcess( flags, FALSE, pid);
+      assert( hProc != nullptr );
+
+      WriteProcessMemory( hProc, (LPVOID) address, &number, sizeof(number), nullptr);
+    
+      int buffer = 0;
+      ReadProcessMemory( hProc, (LPVOID) address, &buffer, sizeof(buffer), nullptr);
+      std::printf(" [*] Number value = %d \n", buffer);
+
+      return 0;
+    }
+  
+    std::fprintf(stderr, " [TRACE] Error => Unable to find command.");
+
+    return -1;
+  }
+
+     // ============= I M P L E M E N T A T I O N S ================= //
+
+  std::string process_basename(HANDLE hProc)
+  {
+    // Note: This function fails if the process executable uses non aciii characters
+    // such as Japanese Kanji, Hiragrama or Katakana. But this function was 
+    // chosen due to it be easier to deal with than GetModuleBaseNameW().
+    size_t size = 260;
+    auto buffer = std::string('0', size);
+    assert( GetModuleBaseNameA(hProc, nullptr, buffer.data(), size) != 0 );
+    return buffer;
+  }
+
+  std::string process_full_path(HANDLE hProc)
+  {
+        DWORD size = MAX_PATH;
+        char buffer[MAX_PATH];
+        QueryFullProcessImageNameA(hProc, 0, buffer, &size);
+        CloseHandle(hProc);
+        return std::string{buffer};
+  }
+
+
+  BOOL setPrivilege(HANDLE hToken, LPCTSTR privilege, BOOL enable_privilege)
+  {
+      TOKEN_PRIVILEGES tp;
+      LUID luid;
+
+      if ( !LookupPrivilegeValue(NULL, privilege, &luid ) )
+      {
+          printf("LookupPrivilegeValue error: %ld\n", GetLastError() );
+          return FALSE;
+      }
+
+      tp.PrivilegeCount = 1;
+      tp.Privileges[0].Luid = luid;
+      if (enable_privilege)
+          tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+      else
+          tp.Privileges[0].Attributes = 0;
+
+      // Enable the privilege or disable all privileges.
+
+      if ( !AdjustTokenPrivileges(
+             hToken,
+             FALSE,
+             &tp,
+             sizeof(TOKEN_PRIVILEGES),
+             (PTOKEN_PRIVILEGES) NULL,
+             (PDWORD) NULL) )
+      {
+          printf("AdjustTokenPrivileges error: %ld\n", GetLastError() );
+          return FALSE;
+      }
+
+      if (GetLastError() == ERROR_NOT_ALL_ASSIGNED)
+      {
+         printf("The token does not have the specified privilege. \n");
+         return FALSE;
+      }
+
+      return TRUE;
+  }
+
+
+  // Enable Debug privilege for current process
+  void enableDebugPrivilege(BOOL enable)
+  {
+     // Current process' hProc handle
+     HANDLE hProc = GetCurrentProcess();
+     // Current process' token
+     HANDLE hToken = nullptr;
+
+     if( !OpenProcessToken(hProc, TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hToken) )
+     {
+       std::printf("Error - unable to open process Token. => Check GetLastError() error code. \n");
+       std::abort();
+     }
+
+     setPrivilege( hToken, "SeDebugPrivilege" , enable);
+     std::printf(" [INFO] Enable debug privilege Ok. \n");
+  }
+
+  void show_process_cli(DWORD pid)
+  {
+      HANDLE hProc = OpenProcess( PROCESS_QUERY_INFORMATION  | PROCESS_VM_READ, FALSE, pid);
+
+      if( hProc == nullptr )
+      {
+        std::fprintf(stderr, "Error: unable to open process");
+        std::exit(-1);
+      }
+
+
+      // Check whether proces is wow64 (32 bits)
+      BOOL is_wow64;
+      IsWow64Process( hProc, &is_wow64);
+      std::printf(" [*] Is Wow64 (32 bits) process = %s \n", is_wow64 == TRUE ? "TRUE" : "FALSE" );
+
+      // Check whether current process is 32 bits (wow64)
+      HANDLE hThisProc = GetCurrentProcess();
+      IsWow64Process( hThisProc, &is_wow64);
+      std::printf(" [*] Is this process Wow64 (32 bits) process = %s \n", is_wow64 == TRUE ? "TRUE" : "FALSE" );    
+    
+      // Load function native function NtQueryInformationProcess from Ntdll.dll
+      //-----------------------------------------
+      HMODULE hnd = LoadLibraryA("Ntdll.dll");
+      assert( hnd != nullptr );
+      FARPROC hnd_fun =  GetProcAddress(hnd, "NtQueryInformationProcess");
+      assert( hnd_fun != nullptr );
+      auto func_NtQueryInformationProcess = reinterpret_cast<NtQueryInformationProcess_t>(hnd_fun);
+
+      PROCESS_BASIC_INFORMATION pinfo;
+      DWORD pinfo_size = sizeof(PROCESS_BASIC_INFORMATION);
+      DWORD needed = 0;
+      NTSTATUS result = func_NtQueryInformationProcess(  hProc
+                                                       , ProcessBasicInformation
+                                                       , &pinfo
+                                                       , pinfo_size
+                                                       , &needed
+                                                       );
+
+      assert( result >= 0 && "NtQuery failed." );
+
+      DWORD res = 0;
+      // PEB - Process Environment Block data structure.    
+      _PEB peb;
+      // Proces parameter - field of PEB.
+      RTL_USER_PROCESS_PARAMETERS param;
+    
+
+      // Read PEB from target process' memory.    
+      res = ReadProcessMemory( hProc
+                            , pinfo.PebBaseAddress
+                            , &peb
+                            , sizeof(_PEB)
+                            , nullptr
+                            );
+      assert( res != 0 );
+
+      // Read RTL_USER_PROCESS_PARAMETERS from process' memory.
+      res = ReadProcessMemory( hProc
+                             , peb.ProcessParameters 
+                             , &param
+                             , sizeof(param)
+                             , nullptr
+                             );
+      assert( res != 0 );
+   
+      auto cmdline = param.CommandLine;
+      auto buffer = std::wstring(cmdline.Length, 0);
+
+      res = ReadProcessMemory( hProc, cmdline.Buffer, buffer.data(), cmdline.Length, nullptr);
+      assert( res != 0 );
+
+      std::printf("\n [*] Process base name = %s ", process_basename(hProc).c_str()  );
+      std::printf("\n [*] Process full path = %s \n", process_full_path(hProc).c_str() );        
+      std::printf(" [*] Unique process ID (PID)  = %d \n", pinfo.UniqueProcessId );
+      std::printf(" [*] Parent process ID (PPID) = %d \n", pinfo.InheritedFromUniqueProcessId );
+      std::printf(" [*] Process PEB address      = 0x%X \n", pinfo.PebBaseAddress  );
+    
+      // Display process command line arguments 
+      std::wcout << L"\n Cmdline = " << buffer << L"\n";    
+    
+      // Dispose library handle
+      FreeLibrary( hnd );
+  }
+#+END_SRC
+
+ *Building* 
+
+Building target.exe:
+
+#+BEGIN_SRC sh 
+  $ g++ target.cpp -o target.exe -std=c++1z -Wall -Wextra -g -O3
+#+END_SRC
+
+Building memdump.exe:
+
+#+BEGIN_SRC sh 
+  $ g++ memdump.cpp -o memdump.exe -std=c++1z -Wall -Wextra -g -pedantic-errors -lpsapi
+#+END_SRC
+
+ *Experiment 1 => Obtain process full command line arguments* 
+
+STEP 1 - List all processes with tasklist. 
+
+#+BEGIN_SRC sh 
+  $ tasklist
+
+  Image Name                     PID Session Name        Session#    Mem Usage
+  ========================= ======== ================ =========== ============
+    ...   ...   ...   ...   ...   ...   ...   ...   ...   ...   ... 
+    ...   ...   ...   ...   ...   ...   ...   ...   ...   ...   ... 
+
+  LockApp.exe                   7632 Console                    1      8,456 K
+  RuntimeBroker.exe             2024 Console                    1      3,372 K
+  dllhost.exe                   1244 Console                    1      3,220 K
+  svchost.exe                   7096 Services                   0      1,548 K
+  svchost.exe                   6528 Services                   0      1,000 K
+  YourPhone.exe                 5376 Console                    1     12,340 K
+  RuntimeBroker.exe             2168 Console                    1      2,672 K
+  svchost.exe                   1416 Services                   0      4,120 K
+  dllhost.exe                    684 Console                    1        860 K
+  DataExchangeHost.exe          8012 Console                    1        672 K
+  svchost.exe                   1992 Services                   0      2,356 K
+  SecurityHealthHost.exe        3880 Console                    1        616 K
+  SearchUI.exe                  5136 Console                    1     98,284 K
+  RuntimeBroker.exe             6352 Console                    1     11,000 K
+  smartscreen.exe               5716 Console                    1     17,440 K
+  MicrosoftEdge.exe             1412 Console                    1        540 K
+  browser_broker.exe            7924 Console                    1        392 K
+  Windows.WARP.JITService.e     7508 Services                   0        348 K
+  MicrosoftEdgeSH.exe           2324 Console                    1        208 K
+  MicrosoftEdgeCP.exe           5080 Console                    1        476 K
+  Windows.WARP.JITService.e     3472 Services                   0        340 K
+  svchost.exe                   1336 Services                   0      3,064 K
+  svchost.exe                   8424 Services                   0      7,484 K
+    ....   ....   ....   ....   ....   ....   ....   ....   ....   .... 
+    ....   ....   ....   ....   ....   ....   ....   ....   ....   .... 
+    ....   ....   ....   ....   ....   ....   ....   ....   ....   .... 
+#+END_SRC
+
+STEP 2 - Show process information. Note: This procedure requires
+running a terminal with elevated privilege.
+
+#+BEGIN_SRC sh 
+  $ .\memdump.exe cli 1992
+   [INFO] Enable debug privilege Ok.
+   [*] Is Wow64 (32 bits) process = FALSE
+   [*] Is this process Wow64 (32 bits) process = FALSE
+
+   [*] Process base name = svchost.exe
+   [*] Process full path = C:\Windows\System32\svchost.exe
+   [*] Unique process ID (PID)  = 1992
+   [*] Parent process ID (PPID) = 628
+   [*] Process PEB address      = 0x244F2000
+
+   Cmdline = C:\Windows\system32\svchost.exe -k netsvcs -p -s lfsvc
+
+  $ .\memdump.exe cli 5080
+   [INFO] Enable debug privilege Ok.
+   [*] Is Wow64 (32 bits) process = FALSE
+   [*] Is this process Wow64 (32 bits) process = FALSE
+
+   [*] Process base name = MicrosoftEdgeCP.exe
+   [*] Process full path = C:\Windows\System32\MicrosoftEdgeCP.exe
+   [*] Unique process ID (PID)  = 5080
+   [*] Parent process ID (PPID) = 828
+   [*] Process PEB address      = 0x88D6000
+
+   Cmdline = "C:\Windows\System32\MicrosoftEdgeCP.exe" -ServerName:Windows.Internal.WebRuntime.ContentProcessServer
+
+  $ .\memdump.exe cli 1208
+   [INFO] Enable debug privilege Ok.
+   [*] Is Wow64 (32 bits) process = TRUE
+   [*] Is this process Wow64 (32 bits) process = FALSE
+
+   [*] Process base name = OneDrive.exe
+   [*] Process full path = C:\Users\unix\AppData\Local\Microsoft\OneDrive\OneDrive.exe
+   [*] Unique process ID (PID)  = 1208
+   [*] Parent process ID (PPID) = 4220
+   [*] Process PEB address      = 0x68D000
+
+   Cmdline =  /updateInstalled /background
+
+
+  $ .\memdump.exe cli 5376
+   [INFO] Enable debug privilege Ok.
+   [*] Is Wow64 (32 bits) process = FALSE
+   [*] Is this process Wow64 (32 bits) process = FALSE
+
+   [*] Process base name = YourPhone.exe
+   [*] Process full path = C:\Program Files\WindowsApps\Microsoft.YourPhone_1.21042.137.0_x64__8wekyb3d8bbwe\YourPhone.exe
+   [*] Unique process ID (PID)  = 5376
+   [*] Parent process ID (PPID) = 828
+   [*] Process PEB address      = 0xD05D8000
+
+   Cmdline = "C:\Program Files\WindowsApps\Microsoft.YourPhone_1.21042.137.0_x64__8wekyb3d8bbwe\YourPhone.exe" -ServerName:App.AppX9yct9q388jvt4h7y0gn06smzkxcsnt8m.mca
+
+#+END_SRC
+
+ *Experiment 2 - Manipulate target process virtula memory* 
+
+STEP 1 => Run target.exe executable.
+
+#+BEGIN_SRC sh 
+  C:\Users\unix\Desktop>.\target.exe
+   [*]          Number = 300
+   [*]        cppstr   = Hallo Welt
+   [*] Global buffer   = Strcpy is an unsafe C function! BE AWARE!
+   [*]     Current process PID = 1536
+   [*]          Number address = 000000000063fdec
+   [*]        cppstr address   = 000000000063fe00
+   [*] Global buffer address   = 000000000040c040
+
+   =>> Type RETURN to resume execution
+
+   [*]          Number = 98164
+   [*]        cppstr   = Windows NT
+   [*] Global buffer   = Replace strcpy with strncpy! NOWBE AWARE!
+
+   =>> Type RETURN to resume execution
+#+END_SRC
+
+STEP 2 => Run the following commands from another terminal. 
+
+#+BEGIN_SRC sh 
+  ## ========= Read process memory ================//
+
+  $ .\memdump.exe read-num 1536 0x63fdec
+   [INFO] Enable debug privilege Ok.
+   [*] Number value = 300
+
+  $ .\memdump.exe read-str 1536 0x63fe00 20
+   [INFO] Enable debug privilege Ok.
+   Buffer value = Hallo Welt
+   Address      = 63fe00
+
+  $ .\memdump.exe read-str 1536 0x40c040 50
+   [INFO] Enable debug privilege Ok.
+   Buffer value = Strcpy is an unsafe C function! BE AWARE!
+   Address      = 40c040
+
+  ## ========= Write to process memory ================//
+
+  $ .\memdump.exe write-num 1536 0x63fdec 98164
+   [INFO] Enable debug privilege Ok.
+   [*] Number value = 98164
+
+
+  $ .\memdump.exe write-str 1536 0x63fe00 "Windows NT"
+   [INFO] Enable debug privilege Ok.
+   Buffer value = Windows NT
+   Address      = 63fe00
+
+  $ .\memdump.exe write-str 1536 0x40c040 "Replace strcpy with strncpy! NOW"
+   [INFO] Enable debug privilege Ok.
+   Buffer value = Replace strcpy with strncpy! NOW
+   Address      = 40c040
+
+#+END_SRC
+
+
+
+
+
+
+
+
+
 
 ** CODE - Display information about current process 
 
