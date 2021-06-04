@@ -1095,7 +1095,6 @@ SIMD CPU instructions.
  #+END_SRC
 
 
-
 *** std::variant 
 
  C++17 new std::variant which comes from Boost.Variant provides a
@@ -1620,4 +1619,144 @@ SIMD CPU instructions.
 
      Product => id = 200 ; name = Colombian coffee ; price = 100.56
  #+END_SRC
+
+*** Format Utility Library 
+
+The C++20 format library, modeled after [[https://github.com/fmtlib/fmt][fmtlib]], allows formatting
+strings in a extensible, concise and type-safe way in a similar
+fashion to C-printf and Python text formatting features. Despite the
+C++20 format utility library benefits, most C++ compilers still do
+not implement this library yet and not all features of fmtlib were
+ported to C++20. 
+
+Note: This experiment was carried out on MSVC comiler 19.29.30037 on a
+Windows 10 QEMU Virtual Machine running on a Linux host.
+
+References: 
+
+  + [[https://en.cppreference.com/w/cpp/utility/format/format][Cppreference - std::format]]
+
+  + [[https://en.cppreference.com/w/cpp/utility/format/formatter][Cppreference - std::formatter]] 
+
+Fmtlib (for comparison)
+  
+  + http://fmtlib.net/latest/index.html
+
+  + https://github.com/fmtlib/fmt 
+
+
+  *Sample code* 
+
+File: _cpp20-format.cpp_ 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string> 
+  #include <format>
+  #include <vector> 
+
+  int main()
+  {
+
+    std::puts("\n=============== EXPERIMENT 1 ==========================");
+    {
+      std::cout << std::format(" true == {0} ; false == {1} \n", true, false)
+                << std::endl;
+    }
+  
+
+    std::puts("\n=============== EXPERIMENT 2 / Numeric base ==========\n");
+    {
+
+       auto fm = std::format(" [BASES] => dec: {0:d} ; hex = 0x{0:X} "
+                             " ; oct = {0:o} ; bin = 0b{0:b} \n", 241 );
+       std::cout << fm << std::endl;
+    }
+
+    std::puts("\n============== EXPERIMENT 3 / Numeric output ===========\n");
+    {
+
+      double x = 20.0;
+      std::cout << std::format("The square root of x = {}\n", std::sqrt(x));
+
+      x = 28524.0;
+    
+      std::cout << std::format(" log(x) = {:.2F}  (2 digit precision)\n", std::log(x));
+      std::cout << std::format(" log(x) = {:+.6F} (6 digit precision)\n", std::log(x));
+      std::cout << std::format(" 2000 * log(x) = {:+.6G} (6 digit precision)\n", 1e5 * std::log(x));
+
+      std::cout << std::format("  log(x) = {0:+.8E} ; sqrt(x) = {1:+8E} (8 digit precision)\n",
+                               std::log(x), std::sqrt(x));
+   
+    }
+
+    std::puts("\n============ EXPERIMENT 4 - Print numeric table ==================");
+    {
+
+      int i = 0;
+      for(double x = 0.0; x <= 4.0; x += 0.5)
+      {
+        auto s = std::format("{0:8d}{1:10.5F}{2:10.5F}\n", i++, x, std::exp(x));
+        std::cout << s;
+      }
+    }
+  
+    return 0;
+  }
+#+END_SRC
+
+ *Building and running* 
+
+Building: 
+
+#+BEGIN_SRC sh 
+  $ %comspec%  /k "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
+  $ cl.exe cpp20-format.cpp /std:c++latest /EHsc /Zi /DEBUG
+
+  Microsoft (R) C/C++ Optimizing Compiler Version 19.29.30037 for x64
+  Copyright (C) Microsoft Corporation.  All rights reserved.
+
+  /std:c++latest is provided as a preview of language features from the latest C++
+  working draft, and we're eager to hear about bugs and suggestions for improvements.
+  However, note that these features are provided as-is without support, and subject
+  to changes or removal as the working draft evolves. See
+  https://go.microsoft.com/fwlink/?linkid=2045807 for details.
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC sh 
+  $ .\cpp20-format.exe
+
+  =============== EXPERIMENT 1 ==========================
+   true == true ; false == false
+
+
+  =============== EXPERIMENT 2 / Numeric base ==========
+
+   [BASES] => dec: 241 ; hex = 0xF1  ; oct = 361 ; bin = 0b11110001
+
+
+  ============== EXPERIMENT 3 / Numeric output ===========
+
+  The square root of x = 4.47213595499958
+   log(x) = 10.26  (2 digit precision)
+   log(x) = +10.258501 (6 digit precision)
+   2000 * log(x) = +1.02585E+06 (6 digit precision)
+    log(x) = +1.02585011E+01 ; sqrt(x) = +1.688905E+02 (8 digit precision)
+
+  ============ EXPERIMENT 4 - Print numeric table ==================
+         0   0.00000   1.00000
+         1   0.50000   1.64872
+         2   1.00000   2.71828
+         3   1.50000   4.48169
+         4   2.00000   7.38906
+         5   2.50000  12.18249
+         6   3.00000  20.08554
+         7   3.50000  33.11545
+         8   4.00000  54.59815
+
+#+END_SRC
+
+
 
