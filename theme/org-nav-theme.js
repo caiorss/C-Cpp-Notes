@@ -1,4 +1,5 @@
 
+
 /** Load Javascript at runtime */
 async function load_javascript (url, location){
     var scriptTag = document.createElement('script');
@@ -305,9 +306,10 @@ const id_selector_content_font = "selector-content-font";
 
 const storage_content_font = new LocalStorageList("content-font", 0, 
     [
-          {text: "monospace", value: "monospace"   }
-        , {text: "spectral",  value: "spectral"}
-        , {text: "arial",     value: "arial"   }
+          {text: "monospace", value: "monospace"        }
+        , {text: "spectral",  value: "spectral"         }
+        , {text: "arial",     value: "arial"            }
+        , {text: "hornet",    value: "hornet"           }
     ]); 
 
 storage_content_font.add_observer(sender => {
@@ -317,9 +319,10 @@ storage_content_font.add_observer(sender => {
 
 const storage_code_font_type = new LocalStorageList("code-font-type", 1, 
     [
-          {text: "monospace", value: "monospace"    }
-        , {text: "Iosevka",   value: "code-Iosevka" }
-        , {text: "arial",     value: "arial"        }
+          {text: "monospace", value: "monospace"       }
+        , {text: "Iosevka",   value: "code-Iosevka"    }
+	, {text: "tech mono", value: "share-tech-mono" }
+        , {text: "arial",     value: "arial"           }
     ]);
 
 storage_code_font_type.add_observer( sender => {
@@ -543,8 +546,7 @@ var init = async function(){
     storage_content_font.notify();
 
     storage_content_font.bind_list("#" + id_selector_content_font);
-
-        
+    
   /*   var dom_content = document.querySelector("#content");
     dom_content.classList.toggle("theme-light-content");     */
 }
