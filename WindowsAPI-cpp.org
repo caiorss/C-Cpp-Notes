@@ -6607,8 +6607,241 @@ STEP 2 => Run the following commands from another terminal.
 
 
 
+** Running machine code at runtime 
+
+This code uses the windows APIs VirtuaAlloc, for allocating memory for
+the machine code payload which is copied to the allocated memory, and
+VirtualProtect for making the allocated memory executable allowing the
+machine code to be run. This technique is used by JIT compilers from
+interpreted languages, such as C# or Java, for speeding up
+computations and reduce the byte code interpretation overhead.
+
+Documentation: 
+
+  * [[https://docs.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualalloc][VirtualAlloc()]]
+    + "Reserves, commits, or changes the state of a region of pages in
+      the virtual address space of the calling process. Memory
+      allocated by this function is automatically initialized to
+      zero." 
+
+  * [[https://docs.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualprotect][VirtualProtect()]]
+    + "Changes the protection on a region of committed pages in the
+      virtual address space of the calling process. To change the
+      access protection of any process, use the VirtualProtectEx
+      function."
+
+  * [[https://docs.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualfree][VirtualFree()]]
+    + Brief: "Releases, decommits, or releases and decommits a region
+      of pages within the virtual address space of the calling
+      process.To free memory allocated in another process by the
+      VirtualAllocEx function, use the VirtualFreeEx function."
+
+  *Sample code* 
+
+File: _winmmap.cpp_ 
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <string> 
+  #include <vector>
+  #include <cassert>
+  #include <cstring> // std::memcpy() 
+
+  #include <windows.h>
+
+  void* load_machine_code(const std::uint8_t* buffer, size_t size)
+  {
+      void* pmap = VirtualAlloc( // lpAddress
+                                  nullptr                        
+                                 // dwSize - Size of memory to be allocated.
+                                , size 
+                                 // 
+                                , MEM_COMMIT | MEM_RESERVE
+                                  // Memory is writeable, readable, but not executable.		
+                                , PAGE_READWRITE 
+                               );
+      assert( pmap != nullptr && "Allocation failed." );
+      // Copy machine code to allocated memory
+      std::memcpy(pmap, buffer, size);
+      // Set memory permission to executable.
+      BOOL result = FALSE;
+      // Sto9res previous memory protection flags.
+      DWORD prev_protection = 0;
+      //  Set the allocated memory only as readable and executable (code is data!)
+      // ,but not writeable.
+      result = VirtualProtect(  pmap, size, PAGE_EXECUTE_READ , &prev_protection );
+      assert( result == TRUE && "Failed to change memory protection flags." );
+      return pmap;
+  }
 
 
+  /** 
+      0000000000401550 <factorial>:
+      401550:       55                      push   rbp
+      401551:       48 89 e5                mov    rbp,rsp
+      401554:       48 83 ec 10             sub    rsp,0x10
+      401558:       89 4d 10                mov    DWORD PTR [rbp+0x10],ecx
+      40155b:       c7 45 fc 01 00 00 00    mov    DWORD PTR [rbp-0x4],0x1
+      401562:       c7 45 f8 01 00 00 00    mov    DWORD PTR [rbp-0x8],0x1
+      401569:       eb 0e                   jmp    401579 <factorial+0x29>
+      40156b:       8b 45 fc                mov    eax,DWORD PTR [rbp-0x4]
+      40156e:       0f af 45 f8             imul   eax,DWORD PTR [rbp-0x8]
+      401572:       89 45 fc                mov    DWORD PTR [rbp-0x4],eax
+      401575:       83 45 f8 01             add    DWORD PTR [rbp-0x8],0x1
+      401579:       8b 45 f8                mov    eax,DWORD PTR [rbp-0x8]
+      40157c:       3b 45 10                cmp    eax,DWORD PTR [rbp+0x10]
+      40157f:       7c ea                   jl     40156b <factorial+0x1b>
+      401581:       8b 45 fc                mov    eax,DWORD PTR [rbp-0x4]
+      401584:       48 83 c4 10             add    rsp,0x10
+      401588:       5d                      pop    rbp
+      401589:       c3                      ret
+   ,*/
+  std::uint8_t asm_factorialA[] = {
+        0x55                      
+       ,0x48, 0x89, 0xe5                
+       ,0x48, 0x83, 0xec, 0x10             
+       ,0x89, 0x4d, 0x10                
+       ,0xc7, 0x45, 0xfc, 0x01, 0x00, 0x00, 0x00    
+       ,0xc7, 0x45, 0xf8, 0x01, 0x00, 0x00, 0x00    
+       ,0xeb, 0x0e                   
+       ,0x8b, 0x45, 0xfc                
+       ,0x0f, 0xaf, 0x45, 0xf8             
+       ,0x89, 0x45, 0xfc                
+       ,0x83, 0x45, 0xf8, 0x01             
+       ,0x8b, 0x45, 0xf8                
+       ,0x3b, 0x45, 0x10                
+       ,0x7c, 0xea                   
+       ,0x8b, 0x45, 0xfc                
+       ,0x48, 0x83, 0xc4, 0x10             
+       ,0x5d
+       ,0xc3
+  };
+
+
+  // Same as asm_factorialA but encoded as hexadecimal.
+  std::uint8_t asm_factorialB[] = "\x55\x48\x89\xe5\x48\x83\xec\x10\x89\x4d\x10\xc7"
+                                 "\x45\xfc\x01\x00\x00\x00\xc7\x45\xf8\x01\x00\x00"
+                                 "\x00\xeb\x0e\x8b\x45\xfc\x0f\xaf\x45\xf8\x89\x45"
+                                 "\xfc\x83\x45\xf8\x01\x8b\x45\xf8\x3b\x45\x10\x7c"
+                                 "\xea\x8b\x45\xfc\x48\x83\xc4\x10\x5d\xc3"
+                                ;
+
+  // Calls MessageBoxA() showing the message: "hasta la vista."
+  std::uint8_t assembly_show_message []  =
+    "\x55\x48\x89\xe5\x48\x81\xec\xc0\x00\x00\x00\xc7\x45"
+    "\x84\x60\x00\x00\x00\x8b\x45\x84\x65\x48\x8b\x00\x48"
+    "\x89\x85\x78\xff\xff\xff\x48\x8b\x85\x78\xff\xff\xff"
+    "\x48\x89\x45\xf0\x48\x8b\x45\xf0\x48\x8b\x40\x18\x48"
+    "\x8b\x40\x20\x48\x8b\x00\x48\x8b\x00\x48\x83\xe8\x10"
+    "\x48\x89\x45\xe8\x48\x8b\x45\xe8\x48\x8b\x40\x30\x48"
+    "\x89\x45\xe0\x48\x8b\x45\xe0\x8b\x40\x3c\x48\x98\x48"
+    "\x8b\x55\xe0\x48\x01\xd0\x48\x89\x45\xd8\x48\x8b\x45"
+    "\xd8\x8b\x80\x88\x00\x00\x00\x89\xc2\x48\x8b\x45\xe0"
+    "\x48\x01\xd0\x48\x89\x45\xd0\x48\x8b\x45\xd0\x8b\x40"
+    "\x20\x89\xc2\x48\x8b\x45\xe0\x48\x01\xd0\x48\x89\x45"
+    "\xc8\x48\xb8\x47\x65\x74\x50\x72\x6f\x63\x41\x48\x89"
+    "\x85\x60\xff\xff\xff\xc7\x45\xfc\x00\x00\x00\x00\xeb"
+    "\x04\x83\x45\xfc\x01\x8b\x45\xfc\x48\x98\x48\x8d\x14"
+    "\x85\x00\x00\x00\x00\x48\x8b\x45\xc8\x48\x01\xd0\x8b"
+    "\x00\x48\x98\x48\x8b\x55\xe0\x48\x01\xd0\x48\x8b\x10"
+    "\x48\x8b\x85\x60\xff\xff\xff\x48\x39\xc2\x75\xce\x48"
+    "\x8b\x45\xd0\x8b\x40\x24\x89\xc2\x48\x8b\x45\xe0\x48"
+    "\x01\xd0\x48\x89\x45\xc0\x48\x8b\x45\xd0\x8b\x40\x1c"
+    "\x89\xc2\x48\x8b\x45\xe0\x48\x01\xd0\x48\x89\x45\xb8"
+    "\x8b\x45\xfc\x48\x98\x48\x8d\x14\x00\x48\x8b\x45\xc0"
+    "\x48\x01\xd0\x0f\xb7\x00\x48\x0f\xbf\xc0\x48\x8d\x14"
+    "\x85\x00\x00\x00\x00\x48\x8b\x45\xb8\x48\x01\xd0\x8b"
+    "\x00\x48\x98\x48\x8b\x55\xe0\x48\x01\xd0\x48\x89\x45"
+    "\xb0\x48\x8b\x45\xe0\x48\x89\x45\xa8\x48\xb8\x4c\x6f"
+    "\x61\x64\x4c\x69\x62\x72\x48\x89\x85\x60\xff\xff\xff"
+    "\x48\xc7\x85\x68\xff\xff\xff\x61\x72\x79\x41\x48\x8d"
+    "\x85\x60\xff\xff\xff\x48\x8b\x4d\xa8\x4c\x8b\x45\xb0"
+    "\x48\x89\xc2\x41\xff\xd0\x48\x89\x45\xa0\x48\xb8\x75"
+    "\x73\x65\x72\x33\x32\x2e\x64\x48\x89\x85\x60\xff\xff"
+    "\xff\x48\xc7\x85\x68\xff\xff\xff\x6c\x6c\x00\x00\x48"
+    "\x8d\x85\x60\xff\xff\xff\x48\x8b\x55\xa0\x48\x89\xc1"
+    "\xff\xd2\x48\x89\x45\x98\x48\xb8\x4d\x65\x73\x73\x61"
+    "\x67\x65\x42\x48\x89\x85\x60\xff\xff\xff\x48\xc7\x85"
+    "\x68\xff\xff\xff\x6f\x78\x41\x00\x48\x8d\x85\x60\xff"
+    "\xff\xff\x48\x8b\x4d\x98\x4c\x8b\x45\xb0\x48\x89\xc2"
+    "\x41\xff\xd0\x48\x89\x45\x90\x48\xb8\x48\x61\x73\x74"
+    "\x61\x20\x6c\x61\x48\x89\x85\x60\xff\xff\xff\x48\xb8"
+    "\x20\x76\x69\x73\x74\x61\x21\x00\x48\x89\x85\x68\xff"
+    "\xff\xff\x48\x8d\x85\x60\xff\xff\xff\x48\x83\xc0\x08"
+    "\x48\x83\xc0\x07\x48\x8d\x95\x60\xff\xff\xff\x4c\x8b"
+    "\x55\x90\x41\xb9\x00\x00\x00\x00\x49\x89\xc0\xb9\x00"
+    "\x00\x00\x00\x41\xff\xd2\x48\xb8\x45\x78\x69\x74\x50"
+    "\x72\x6f\x63\x48\x89\x85\x60\xff\xff\xff\x48\xc7\x85"
+    "\x68\xff\xff\xff\x65\x73\x73\x00\x48\x8d\x85\x60\xff"
+    "\xff\xff\x48\x8b\x4d\xa8\x4c\x8b\x45\xb0\x48\x89\xc2"
+    "\x41\xff\xd0\x48\x89\x45\x88\x48\x8b\x45\x88\xb9\xff"
+    "\xff\xff\xff\xff\xd0\x90\x48\x81\xc4\xc0\x00\x00\x00"
+    "\x5d\xc3";
+
+  int main()
+  {
+
+
+    auto data_size = std::size(asm_factorialA);
+    std::printf(" Data size in bytes = %d \n", data_size);
+
+
+    // Function pointer alias.
+    using funptr_factorial = int (*) (int n);
+  
+    auto factorialA = (funptr_factorial) load_machine_code( asm_factorialA
+                                                          , std::size(asm_factorialA));
+
+    std::printf(" [*] Factorial(4)(A) = %d  \n", factorialA(4));  
+    std::printf(" [*] Factorial(5)(A) = %d  \n", factorialA(5));
+    std::printf(" [*] Factorial(6)(A) = %d  \n", factorialA(6));
+    std::printf(" [*] Factorial(7)(A) = %d  \n", factorialA(7));  
+    std::printf(" [*] Factorial(8)(A) = %d  \n", factorialA(8));
+
+
+    auto factorialB = (funptr_factorial) load_machine_code( asm_factorialB
+                                                          , std::size(asm_factorialB));
+
+    std::printf(" [*] Factorial(4)(B) = %d  \n", factorialB(4));  
+    std::printf(" [*] Factorial(5)(B) = %d  \n", factorialB(5));
+    std::printf(" [*] Factorial(6)(B) = %d  \n", factorialB(6));
+    std::printf(" [*] Factorial(7)(B) = %d  \n", factorialB(7));  
+    std::printf(" [*] Factorial(8)(B) = %d  \n", factorialB(8));
+
+  
+    using funptr_show_message = void (*) ();
+
+    auto show_message = (funptr_show_message) load_machine_code(  assembly_show_message
+                                                               , std::size(assembly_show_message) );
+ 
+    show_message();
+
+  
+    std::printf("\n ====== Finish Execution Ok. [ PART 1 ] =======\n");
+    return 0;
+  }
+#+END_SRC
+
+ *Building and running* 
+
+#+BEGIN_SRC sh 
+   $ g++ winmmap.cpp -o winmmap.exe -std=c++1z -Wall -Wextra -g
+
+   $ .\winmmap.exe
+    Data size in bytes = 58
+    [*] Factorial(4)(A) = 6
+    [*] Factorial(5)(A) = 24
+    [*] Factorial(6)(A) = 120
+    [*] Factorial(7)(A) = 720
+    [*] Factorial(8)(A) = 5040
+    [*] Factorial(4)(B) = 6
+    [*] Factorial(5)(B) = 24
+    [*] Factorial(6)(B) = 120
+    [*] Factorial(7)(B) = 720
+    [*] Factorial(8)(B) = 5040
+
+   # Display message box containing 'Hast la vista' text.
+#+END_SRC
 ** CODE - Display information about current process 
 
 Print information about current process and copy itself to desktop
