@@ -13268,8 +13268,141 @@ key, which is unique for every connection.
   * _OFB_ - Output FeedBack Mode 
 
   * _ECB_ - Electronic Code Book Mode
+    
 
-  *Further Reading* 
+    *Asymetric Key Cryptography Diagram for secure communication* 
+ 
+
+#+BEGIN_SRC text 
+                         Message from Bob to Alice 
+
+
+                    Bob side                                           Alice side
+            .................................                       ..........................................
+                                            .                       .
+    Unencrypted         +-------------+     .                       .      +--------------+  Unencrypted  
+    (plain text)        |  Alice's    |     .   Encrypted data      .      |  Alice's     |  data (plain text)    
+    -------->>>-------->+ Public      +--------->>>--------->>>-----.---->>+ Private key  +--------->>>
+                        |    Key      |     .   (channel)           .      |              |
+                        +-------------+     .                       .      +--------------+
+                            |               .                       .              |
+                    Bob encrypts the        .                       .      Alice decrypts the                 
+                    message to Alice        .                       .      message using her
+                    using her public key.   .                       .       private key
+                    
+
+                         Message from Alice to Bob 
+
+
+                    Bob side                                            Alice side
+            .................................                       ..........................................
+                                            .                       .
+    Unencrypted         +-------------+     .                       .      +--------------+  Unencrypted  
+    (plain text)        |  Bob's      |     .   Encrypted data      .      |  Bob's       |  data (plain text)    
+    ---<<----------<<---+  private     +---------<<---------<<<-----.--<<--+ public key   +--------<<<----
+                        |    Key      |     .                       .      |              |
+                        +-------------+     .                       .      +--------------+
+                            |               .                       .              |
+                    Bob decrypts the        .                       .      Alice encrypts the                 
+                    message using his       .                       .      message using Bob's
+                    private key.            .                       .      public key.  
+ 
+#+END_SRC
+
+
+   *Digital Signature Schema* 
+
+  * Use-cases:
+
+    * Ensuring that message (plain text, data or file) sent was not
+      tampered (data integrity) and that it really was authored by the
+      holder of the private key corresponding to the public key on the
+      recipient-side.
+
+    * Digital signature of legal documents for providing
+      non-repudiation assurance and guarantee their authenticity.
+
+    * Trusted execution or app notarization: Only applications with
+      digital signature matching public keys (built-in) trusted by the
+      system vendor, are allowed to run. Examples: MacOSX app
+      notarization; Android notarization; digital signature of Windows
+      executable; UEFI firmware and so etc.
+
+    * Password-less login. Assuming that the server-side has the
+      public key of the client-side. The server sends a challenge to
+      the client. The challenge can be any random data. Then the client
+      sends the data digital signature to the server, which checks
+      whether it matches the data and the public key. If that
+      is the case, then the user is authenticated and is allowed to sign
+      in. If the digital signature fails, the user authentication fails. 
+
+    * Signature of TLS/SSL certificates by CA - certificate authorities.
+
+
+#+BEGIN_SRC text 
+            Bobs sends a message to its digital signature to Alice. 
+ 
+
+                                   Data, plain text
+                                or file authored by Bob.
+                                          |
+                         +------<<--------+----->>--------+
+                         │                                │
+                         │                                │
+                         ▼                                │
+                         │                                │
+                  ┌──────▼───────┐                        │
+                  │     Hash     │                        │
+                  │   Function   │                        │
+                  │              │                        │
+                  └──────┬───────┘                        │
+                         │                                │
+                         │                                │
+                         ▼ Data hash                      │
+                         │                                │
+                         │                                │
+                  ┌──────▼───────┐                        │
+                  │ Bob's private│                        │
+                  │     key      │                        │
+                  │              │                        │
+                  └─────┬────────┘                        │
+                        │  digital signature              │ Unencrypted
+                        │                                 │   data
+                        │  Encrypted                      │
+                        │  data hash                      │
+                        │                                 ▼
+                        │                                 │
+                        ▼            Bob side (sender)    │
+          --------------│---------------------------------│---------
+                        │     Insecure channel            │
+          --------------│---------------------------------│----------
+                        │                                 │
+                        │           Alice side            │
+                        │           (Recipient)           │
+                  ┌─────▼─────────┐                 ┌─────▼──────────┐
+                  │ Bob's public  │                 │                │
+                  │     key       │                 │ Hash Function  │
+                  │               │                 │                │
+                  │               │                 │                │
+                  └─────┬─────────┘                 └─────┬──────────┘
+                        │                                 │
+                        │Data hash (A)                    │   Data hash
+                        │                                 │   computed by Alice (B)
+                        │                                 │
+                        │                                 │
+                        │                                 │
+                        └────>>>>────[ = ]───<<<──────────┘
+                                       |
+                                       | Compare hashes extracted from 
+                                       | digital signature (A)
+                                       | and the hash computed by Alice (B). 
+                                         If both hashes are equal, then Alice   
+                                         can be sure that the data was really authored
+                                         by Bob and it was not tamperd.
+#+END_SRC
+
+
+*** Further Reading 
 
 Technical standards and specifications: 
 
@@ -15784,7 +15917,7 @@ X-Server by using:
     BSD variants, X11 server does not use TCP/IP connections, instead
     it uses only Unix-domain sockets.
 
-  * Another problem that affects X11 servers is the _lack of isolation_
+  * Another problem that affects X11 servers is the _lack of isolation
     of X11 clients. Any remote X11 client or a x11 client running a
     container connected to the current X11 server is able to take
     screenshots, capture type keys and list windows. Some solutions
@@ -16016,6 +16149,9 @@ only works on X11 (X Windows System).
 
 Some commands for changing keyboard layout: 
 
+ * Reset Capslock/Escape/Ctrl customization
+   * /$ setxkbmap -option/
+
  * Swap Ctrl and Capslock (Friendly to Emacs users):
    * /$ setxkbmap -option ctrl:swapcaps/
 
@@ -16077,21 +16213,31 @@ Some commands for changing keyboard layout:
  * [[https://en.wikipedia.org/wiki/Hebrew_keyboard][Hebrew]] language keyboard layout:
    * /$ setxkbmap il/
 
- * Turkish Language keyboard layout:
+ * [[https://en.wikibooks.org/wiki/Turkish/Computing_in_Turkish][Turkısh]] Language keyboard layout:
    * $ /setxkbmap tr/
 
  * [[https://commons.wikimedia.org/wiki/File:KB_Spanish.svg][Spanish]] language - Latin America keyboard layout:
    * /$ setxkbmap latam/
-   * Makes easier to type Spanish grammar symbols (?, ¿, ¡)
+   * Makes easier to type Spanish grammar symbols (?, ¿, ¡, ñ)
 
- * Portuguese language ABNT2: 
-   * /$ setxkbmap -model abnt2 -layout br -variant abnt2/
+ * Spanish/English keyboard layout:
+   * /$ /setxkbmap -layout latam,us -option grp:alt_shift_toggle/
 
- * Portuguese language ABNT2 and APL, switching layout is similar to American keyboard.
-   * /$ setxkbmap -model abnt2 -layout br,apl -variant abnt2 -option grp:win_switch/
+ * Portuguese language keyboard layout 
+   * /$ setxkbmap br/
 
- * Portuguese language ABNT2 and Greek (For typing math formulas)
-   * /$ setxkbmap -model abnt2 -layout br,gr -variant abnt2 -option grp:win_switch/
+ * Portuguese language and APL keyboard layouts, switching layout is similar to American keyboard.
+   * /$ setxkbmap -layout br,apl -option grp:win_switch/
+
+ * Portuguese language and Greek keyboard layouts (For typing math formulas)
+   * /$ setxkbmap  -layout br,gr  -option grp:win_switch/
+
+ * Portuguse/American English keyboard layout: (Use-case: programming)
+   * $ /setxkbmap -layout br,us -option grp:alt_shift_toggle/
+   * Note: The American English keyboard layout is more convenient for
+     programming due to characters such as quotes, double quotes,
+     colon, semicolon,  slash (/ and \) and bar be closer to the left
+     fingers.  
 
 See also: 
 
