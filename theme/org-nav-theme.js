@@ -304,25 +304,53 @@ storage_text_font_size.add_observer( sender => {
 const id_selector_content_font = "selector-content-font";
 
 
-const storage_content_font = new LocalStorageList("content-font", 0, 
+const storage_heading_font = new LocalStorageList("font-heading", 0, 
     [
-          {text: "monospace", value: "monospace"        }
-        , {text: "spectral",  value: "spectral"         }
-        , {text: "arial",     value: "arial"            }
-        , {text: "hornet",    value: "hornet"           }
+          {text: "Orbitron",    value: "orbitron"    }
+        , {text: "Denmark",     value: "denmark"     }
+        , {text: "Arial",       value: "arial"       }
+        , {text: "Hornet",      value: "hornet"      }
+        , {text: "Stencil 1",   value: "stencil1"    }
+        , {text: "Stencil 2",   value: "stencil2"    }
+        , {text: "StkMedieval", value: "stkmedieval" }
+        , {text: "Fraktur",     value: "fraktur"     }
+        
+    ]); 
+
+storage_heading_font.add_observer(sender => {
+    let font = sender.getSelectedValue(); 
+    // CSS property containing font name is changed by this callback.
+    document.documentElement.style.setProperty('--font-headers', font);
+});
+
+
+
+const storage_content_font = new LocalStorageList("font-content", 0, 
+    [
+            // Label is the font type and value is the font CSS typeface name defined 
+            // in the file org-nav-theme.css 
+          {text: "monospace",  value: "monospace"        }
+        , {text: "spectral",   value: "spectral"         }
+        , {text: "arial",      value: "arial"            }
+        , {text: "hornet",     value: "hornet"           }
+        , {text: "fira code",  value: "fira-code-mono"   }
+        , {text: "Go mono",    value: "go-mono"   }
+        , {text: "Go regular", value: "go-regular"   }
     ]); 
 
 storage_content_font.add_observer(sender => {
     let font = sender.getSelectedValue(); 
-    document.documentElement.style.setProperty('--content-font', font);
+    document.documentElement.style.setProperty('--font-content', font);
 });
 
 const storage_code_font_type = new LocalStorageList("code-font-type", 1, 
     [
-          {text: "monospace", value: "monospace"       }
-        , {text: "Iosevka",   value: "code-Iosevka"    }
-	, {text: "tech mono", value: "share-tech-mono" }
-        , {text: "arial",     value: "arial"           }
+          {text: "monospace",        value: "monospace"              }
+        , {text: "Iosevka",          value: "code-Iosevka"           }
+	    , {text: "tech mono",        value: "share-tech-mono"        }
+        , {text: "fira code",        value: "fira-code-mono"         }
+        , {text: "fira code medium", value: "fira-code-medium-mono"  }
+        , {text: "Go mono",          value: "go-mono"                }
     ]);
 
 storage_code_font_type.add_observer( sender => {
@@ -341,6 +369,13 @@ function startControlPanel(isMobile) {
         <button class="util-btn" id="btn-config" title="User settings">
             <svg height="21" viewBox="0 0 21 21" width="21" xmlns="http://www.w3.org/2000/svg"><g fill="none" fill-rule="evenodd" transform="translate(3 5)"><g stroke="#2a2e3b" stroke-linecap="round" stroke-linejoin="round"><path d="m4.5 1.5h8"/><path d="m4.5 5.498h5"/><path d="m4.5 9.5h8"/></g><path d="m1.49884033 2.5c.5 0 1-.5 1-1s-.5-1-1-1-.99884033.5-.99884033 1 .49884033 1 .99884033 1zm0 4c.5 0 1-.5 1-1s-.5-1-1-1-.99884033.5-.99884033 1 .49884033 1 .99884033 1zm0 4c.5 0 1-.5 1-1s-.5-1-1-1-.99884033.5-.99884033 1 .49884033 1 .99884033 1z" fill="#2a2e3b"/></g></svg>
         </button>
+
+        <button class="util-btn" id="btn-navigate" title="Faster navigation">
+            <svg  height="21" viewBox="0 0 21 21" width="21"  xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+                    <path class="heroicon-ui" d="M16.32 14.9l5.39 5.4a1 1 0 0 1-1.42 1.4l-5.38-5.38a8 8 0 1 1 1.41-1.41zM10 16a6 6 0 1 0 0-12 6 6 0 0 0 0 12z"></path>
+                </svg>
+        </button>
+ 
         
         <button class="util-btn" id="btn-top" title="Go to top of page">
             <svg height="21" viewBox="0 0 21 21" width="21" xmlns="http://www.w3.org/2000/svg"><g fill="none" fill-rule="evenodd" stroke="#2a2e3b" stroke-linecap="round" stroke-linejoin="round" transform="matrix(0 -1 1 0 2 19)"><circle cx="8.5" cy="8.5" r="8"/><path d="m11.621 6.379v4.242h-4.242" transform="matrix(.70710678 .70710678 .70710678 -.70710678 -3.227683 7.792317)"/><path d="m8.5 4.5v8" transform="matrix(0 1 -1 0 17 0)"/></g></svg>
@@ -391,6 +426,14 @@ function startControlPanel(isMobile) {
                 </th> 
             </tr> 
             
+           <tr> 
+                <th class="row-label">Heading font type</th>
+                <th class="row-item"> 
+                    <select id="selector-font-heading" title="Select heading (titles) font">                    
+                    </select>
+                </th> 
+            </tr>             
+
             <tr> 
                 <th class="row-label">Content font type</th>
                 <th class="row-item"> 
@@ -466,6 +509,99 @@ function startControlPanel(isMobile) {
 
     dialogPolyfill.registerDialog(dialog);
 
+    /** ------------- Search Dialog  ---------------------  */
+
+    var dialog_navigate_code = `
+        <dialog id="dialog-navigate" class="config-dialog">
+            <h3>Navigation helper / Jump to heading</h3>
+            <p>
+              Type the section you want to jump here. 
+              Note: This text  entry input has auto html5 completion. 
+            </p>
+            <b>Dialog Shortcut</b>
+            The shortcut for this dialog on the keyboard is (.) dot key.
+            <hr>
+            </br>
+            <label>Seaction:</label>
+            <input id="entry-navigation" list="nav-datalist">
+            <datalist id="nav-datalist"></datalist>
+            </br>
+            <hr>
+            <button id="btn-nav-go">Go</button> 
+            <button id="btn-nav-clear">Clear</button> 
+            <button id="btn-nav-close">Close</button> 
+        </dialog>
+    `;
+
+    dialog_navigate = append_html(document.body, dialog_navigate_code);
+    dialogPolyfill.registerDialog(dialog_navigate);
+
+    dialog_navigate.querySelector("#btn-nav-close").addEventListener("click", () => {
+        dialog_navigate.close();
+    });
+
+    elem.querySelector("#btn-navigate").addEventListener("click", () => {
+        // alert(" I was clicked."); 
+        dialog_navigate.showModal();
+    });
+
+    // Install keyboard shortcut. dot (.) for showing navigation modal dialog
+    document.onkeydown = (keyDownEvent) => {
+        // keyDownEvent.preventDefault();
+        if( keyDownEvent.key == "."){ dialog_navigate.showModal(); }
+    };
+
+    let datalist = dialog_navigate.querySelector("#nav-datalist");
+    let links = document.querySelectorAll("#table-of-contents a");
+
+    for(let a of links){
+        let opt = document.createElement("option");
+        opt.value = a.innerText;
+        opt.setAttribute("data-key", a.href);
+        console.log(" [TRACE] opt = ", opt);
+        datalist.appendChild(opt);
+    }
+
+    let entry_box = dialog_navigate.querySelector("#entry-navigation");
+
+    function navigate_go(){
+        let entry = entry_box.value;
+        let nodes = datalist.childNodes;
+        console.log(" [CALLED] btn-nav-go!");
+        console.log(" Entry = ", entry);
+        // Get the node selected by user
+        for(let n of nodes){
+            console.trace(" [TRACE] Node = ", n);
+            if(n.value == entry){
+                console.log(" [TRACE] node = ", n);
+                // Go to page location that the user selected
+                location.href = n.getAttribute("data-key");
+                break;
+            }
+        }
+
+        dialog_navigate.close();
+    }
+
+    entry_box.addEventListener("keypress", (event) => {
+        // User hit RETURN
+        if(event.keyCode == 13){
+            console.log(" [INFO] User hit RETURN key");
+            navigate_go(); 
+        }
+    });
+
+
+    dialog_navigate.querySelector("#btn-nav-go").addEventListener("click", () => {
+        navigate_go();
+    });
+
+    dialog_navigate.querySelector("#btn-nav-clear").addEventListener("click", () => {
+        entry_box.value = "";
+    });
+
+
+
     /** ---- Table of Content Folding button -------------- */
     if(isMobile){
         // alert(" MOBILE MODE");
@@ -536,8 +672,9 @@ var init = async function(){
 
     storage_code_font_size.bind_list("#selector-font-code");
     storage_text_font_size.bind_list("#selector-font-text");
+    storage_heading_font.bind_list("#selector-font-heading");
+
     storage_code_font_type.bind_list("#selector-font-code-type");
-  
    // storage_code_font_size.notify();
 
     storage_theme.notify();
