@@ -103,7 +103,6 @@ Build defining a different value for the version macro.
    => product = 720 
 #+END_SRC
 
-
 ** Temporarily disable a code block 
 
 A useful technique for during development of C or C++ applications is
@@ -259,6 +258,105 @@ Building and running:
    $ >> ./macro-args.bin 2> /dev/null 
    Result => The sum is equal to = 81 
 #+END_SRC
+
+** Do while 0 macro idiom  
+
+The do-while-0 macros defined as in the next code block are widely
+used in low level code such as Linux kernel, embedded systems, lots of
+C libraries and many other projects. This idiom is useful for creating
+multi-line macros that works everywhere, including loops and if-else
+statements where multi line macros would be interpreted in a way not
+expected by the user. 
+
+#+BEGIN_SRC cpp 
+  #define SOMETHING(X) do { /* <<code here>> */} while(0); 
+#+END_SRC
+
+It is usual to define macros with many statements: 
+
+#+BEGIN_SRC cpp 
+  #define SOME_MACRO(x) function1((x)) ; function2((x)) 
+#+END_SRC
+
+However, the macro subsititution fails in an if statement: 
+
+#+BEGIN_SRC cpp 
+  if(flag)
+     SOME_MACRO(x * x + 10);
+#+END_SRC
+
+The intent is to call function1 and function2 if the condition or flag
+is true and do anything else if the flag is false. However, the macro
+expands to: 
+
+#+BEGIN_SRC cpp 
+  if(flag) 
+    function1(x * x + 10); function2(x * x + 10);
+    
+  // ------- Same as  ------
+
+  if(flag){ function1(x * x + 10); } function2(x * x + 10);
+ 
+#+END_SRC
+
+If the flag is false, only the function2 is called as the previous
+code is the same as the next code block. 
+
+#+BEGIN_SRC cpp 
+  if(flag){
+    function1(x * x + 10); 
+  }
+  // Executed regardless if the flag is false or true.
+  function2(x * x + 10);
+#+END_SRC
+
+The solution is to wrap the function calls into a _do { ... ... } while(0)_
+macro. 
+
+#+BEGIN_SRC cpp 
+  #define MACRO_FIX(x) do { function1((x)); function2((x)) } while(0); 
+#+END_SRC
+
+The macro can also be written in a multiline way:
+
+#+BEGIN_SRC cpp 
+  #define MACRO_FIX(x) do { \
+                            function1((x)); \
+                            function2((x)) \
+                           } while(0); 
+#+END_SRC
+
+Note: GCC compile allows replicating the functionality of the
+do-whil-0 macro idiom with the following syntax: (WARNING: not
+portable, GCC only)
+
+#+BEGIN_SRC cpp 
+  #define MACRO_SEQUENTIANL1(x) ({ function1((x)); function2((x)); })
+
+  #define MACRO_SEQUENTIANL2(x) ({\
+                                function1((x));  \
+                                function2((x)); \
+                               })
+#+END_SRC
+
+
+Example: do-while-0 macro swaping integer variables. 
+
+#+BEGIN_SRC cpp 
+  #define SWAP_INT(a, b) \
+     do {                \
+          int tmp = (a); \
+          (a)     = (b); \
+          (b)     = tmp; \
+      } while(0)
+#+END_SRC
+
+Summary: 
+
+  + Benefits of this idiom:
+    * Allows a macro to be used everywhere, including if-else
+      statements.
+    * Allows declaring local variables limited to the do-while scope. 
 
 ** Custom Assertion Macro 
 *** Simple assertion macro 
