@@ -424,6 +424,28 @@ Lisp - SBCL (Steel Bank Common Lisp):
 
  *Source code for C-wrapper* 
 
+File: _Makefile_
+
+#+BEGIN_SRC makefile
+    # Build C wrapper to Qt library
+    wrapper:
+            cmake -H. -B_build -DCMAKE_BUILD_TYPE=Debug
+            cmake --build _build --target 
+
+    # Run python client code
+    python:
+            env LD_LIBRARY_PATH=$(PWD)/_build ./pywrapper.py
+
+    # Build and run dotnet client code
+    dotnet:
+            env LD_LIBRARY_PATH=$(PWD)/_build dotnet build myapp.csproj
+            env LD_LIBRARY_PATH=$(PWD)/_build ./bin/myapp 
+
+    # Build rust client
+    rust:
+            rustc rustclient.rs -l qtwrapper -L_build/
+#+END_SRC
+
 File: _CMakeLists.txt_
 
 #+BEGIN_SRC cmake
@@ -2007,6 +2029,142 @@ User Interface Screenshot:
 #+CAPTION: User interface for Dlang (D Language)
 [[file:images/cwrapper-qt5-3.png][file:images/cwrapper-qt5-3.png]]
 
+*** TODO Rust client code 
+ 
+File: _rustclient.rs_
+
+#+BEGIN_SRC cpp 
+    use std::os;
+    use std::path::Path;
+
+    use std::os::raw::{c_int, c_char, c_long, c_void, c_uint, c_short};
+    use std::ffi::CString;
+    use std::mem;
+
+    type c_str  = *const c_char;
+
+    type LPVOID  = *mut c_void;
+    type QObject = LPVOID;
+    type QWidget = LPVOID;
+    type QLabel  = LPVOID;
+    type QApplication = LPVOID;
+    type QPushButton = LPVOID;
+
+    // void* null pointer
+    const null_ptr: LPVOID = std::ptr::null_mut();
+
+    const WIDGET_WINDOW:          c_int = 0;
+    const WIDGET_WINDOW_MAIN:     c_int = 2;
+    const WIDGET_QPUSH_BUTTON:    c_int = 3;
+    const WIDGET_QLABEL:          c_int = 4;
+    const WIDGET_QLINE_EDIT:      c_int = 5;
+    const WIDGET_QDOUBLE_SPINBOX: c_int = 6;
+    const LAYOUT_QFORM_LAYOUT:    c_int = 3;
+
+
+    // Function pointer type alias 
+    // type qt_object_del_t = unsafe extern "C" fn(this: QObject) -> c_void;
+
+    #[no_mangle]
+    extern "C" fn btn_callback1(this: QWidget, ctx: LPVOID) -> LPVOID 
+    {
+        unsafe {
+            let mut& counter = ctx as *mut c_int;
+            *counter = *counter + 1;
+            println!(" [TRACE] Button clicked Ok  => counter = {}", *counter);
+        }
+        return null_ptr;
+    }
+
+
+    fn main(){
+        println!(" Hello world!");
+
+        let qapp: QApplication = app_new(); 
+
+        let button: QWidget = widget_new(null_ptr, WIDGET_QPUSH_BUTTON);
+        widget_set_text(button, "Click me now!");
+
+        unsafe{ qt_widget_show(button) };
+
+        let mut counter: c_int = 0;
+
+        unsafe{ qt_button_onClicked(button, counter as *mut _, btn_callback1); }
+
+        // Run QT event loop and block current thread 
+        app_exec(qapp);
+    }
+
+    // void (* callback) (void* ctx) )
+    type button_callback = unsafe extern "C" fn(this: QWidget, ctx: LPVOID) -> LPVOID;
+
+
+    #[link(name = "qtwrapper")]
+    extern "C" {
+
+        fn qt_object_del(this: QObject) -> c_void;
+
+        fn qt_app_new2() -> QApplication;
+        fn qt_app_exec(this: QApplication) -> c_void;
+
+        fn qt_widget_new(parent: QWidget, typ: c_int) -> QWidget;
+
+        fn qt_widget_show(this: QWidget) -> c_void;
+
+        fn qt_QPushButton_new(parent: QWidget, label: c_str) -> QPushButton;
+
+        fn qt_msgbox_info(parent: QWidget, title: c_str, text: c_str) -> c_void;
+
+            // void qt_widget_setText(QWidget* self, const char* text)
+        fn qt_widget_setText(this: QWidget, text: c_str);
+
+        // void  qt_button_onClicked(QAbstractButton* self, void* ctx, void (* callback) (void*) );
+
+        fn qt_button_onClicked(this: QWidget, ctx: LPVOID, callback: button_callback) -> c_void;
+        }
+
+    // -------- Safe wrappers to unsafe operations ------------//
+
+    fn app_new() -> QApplication
+    {
+        let qapp: QApplication = unsafe { qt_app_new2() };
+        return qapp;
+    }
+
+    fn app_exec(qapp: QApplication) 
+    {
+        unsafe{ qt_app_exec(qapp) };
+    }
+
+    fn widget_set_text(this: QWidget, text: &str)
+    {
+        let text = CString::new(text).unwrap(); 
+        unsafe {
+            qt_widget_setText(this, text.as_ptr() );
+        }
+    }
+
+    fn widget_new(parent: LPVOID, typ: c_int) -> QWidget
+    {
+        let wdg: QWidget = unsafe{ qt_widget_new(parent, typ) };
+        return wdg;
+    }
+
+
+#+END_SRC
+
+Building: 
+
+#+BEGIN_SRC sh 
+ $ rustc rustclient.rs -l qtwrapper -L_build/
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC sh 
+  $ ./rustclient 
+#+END_SRC
+
 *** Common Lisp client code 
 
 This common lisp client code, more specifically Stell Bank Common Lisp
@@ -2177,3 +2335,4 @@ User interface screenshot:
 
 #+CAPTION: User interface for Common Lisp (SBCL) client code. 
 [[file:images/cwrapper-qt5-4.png][file:images/cwrapper-qt5-4.png]]
+
