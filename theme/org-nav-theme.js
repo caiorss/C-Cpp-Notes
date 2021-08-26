@@ -180,7 +180,7 @@ class LocalStorageList {
     getSelectedValue() {
         var index = this.get();
         var opt   = this.options[index];
-        console.log(` Index = ${index} ; opt = ${opt} `);
+        // console.log(` Index = ${index} ; opt = ${opt} `);
         return opt["value"];
     }
     
@@ -195,11 +195,11 @@ class LocalStorageList {
         var selectbox = document.querySelector(list_like_widget);
         console.assert(selectbox, "selectbox not supposed to be null");
         
-        console.log(" this.options = ", this.options);
+        // console.log(" this.options = ", this.options);
 
         for(let row in this.options) {
             var opt   = document.createElement("option");
-            console.log(" row = ", row);
+            // console.log(" row = ", row);
             opt.text  = this.options[row]["text"];
             opt.value = this.options[row]["value"];
             selectbox.add(opt, -1);
@@ -358,6 +358,63 @@ storage_code_font_type.add_observer( sender => {
     document.documentElement.style.setProperty('--font-source-code', font);
 });
 
+function fold_event_install()
+{
+
+    var outlines = document.querySelectorAll(".outline-3");
+    for(let out of outlines){
+        let arr = [].slice.call(out.children);
+        let h2  = arr.shift();
+        arr.forEach(x => x.hidden = !x.hidden );
+    }
+
+    var outlines = document.querySelectorAll(".outline-4");
+    for(let out of outlines){
+        let arr = [].slice.call(out.children);
+        let h2  = arr.shift();
+        arr.forEach(x => x.hidden = !x.hidden );
+    }
+}
+
+function fold_content_install_event()
+{
+    var outlines = document.querySelectorAll(".outline-3");
+    for(let out of outlines){
+        let arr = [].slice.call(out.children);
+        let h2  = arr.shift();
+        h2.addEventListener("click", () => {
+            arr.forEach(x => x.hidden = !x.hidden );
+        })
+    }
+
+    var outlines = document.querySelectorAll(".outline-4");
+    for(let out of outlines){
+        let arr = [].slice.call(out.children);
+        let h2  = arr.shift();
+        h2.addEventListener("click", () => {
+            arr.forEach(x => x.hidden = !x.hidden );
+        })
+    }
+}
+
+function fold_content()
+{
+
+    var outlines = document.querySelectorAll(".outline-3");
+    for(let out of outlines){
+        let arr = [].slice.call(out.children);
+        let h2  = arr.shift();
+        arr.forEach(x => x.hidden = !x.hidden );
+    }
+
+    var outlines = document.querySelectorAll(".outline-4");
+    for(let out of outlines){
+        let arr = [].slice.call(out.children);
+        let h2  = arr.shift();
+        arr.forEach(x => x.hidden = !x.hidden );
+    }
+}
+
 function startControlPanel(isMobile) {
     var toc = document.querySelector("#table-of-contents");
     var to  = document.querySelector("#table-of-contents h2");
@@ -474,7 +531,7 @@ function startControlPanel(isMobile) {
     });
 
     elem.querySelector("#btn-top").addEventListener("click", () => {
-        console.log("Click Button TOP");
+        // console.log("Click Button TOP");
 
         var elem =  document.querySelector("#content");
         // var doc = document.documentElement || document;
@@ -544,11 +601,52 @@ function startControlPanel(isMobile) {
         // alert(" I was clicked."); 
         dialog_navigate.showModal();
     });
+    
+    let headers = document.querySelectorAll("#table-of-contents a");
+    console.log(" headers = ", headers);
+    let counter = 0;
+
+    let ctx = document.querySelector("#content");
+    let count = 0;
 
     // Install keyboard shortcut. dot (.) for showing navigation modal dialog
     document.onkeydown = (keyDownEvent) => {
-        // keyDownEvent.preventDefault();
-        if( keyDownEvent.key == "."){ dialog_navigate.showModal(); }
+        //console.log(" Key = ", keyDownEvent.key);
+       //  keyDownEvent.preventDefault()
+        if( keyDownEvent.key === "."){ dialog_navigate.showModal(); }
+
+        if( keyDownEvent.key == "u" )
+        {
+             //window.scrollTo(0,  window.scrollHeight / 2);           
+            window.scrollBy({top: -window.innerHeight / 2, left: 0,  });
+            console.log(" [TRACE] Scrolling up. Ok")
+        }
+
+        if( keyDownEvent.key == "d" )
+        {
+
+            window.scrollBy({top: +window.innerHeight / 2, left: 0, });
+            console.log(" [TRACE] Scrolling down. Ok")
+        }
+
+        // Scroll to top
+        if( keyDownEvent.key == "f")
+        {
+            console.log(" [TRACE] Called fold content - typed 'g' ")
+            fold_content();
+        }
+
+        // Go to next heading by typing '0' or '('
+        if( keyDownEvent.which == 48 && counter < headers.length ){
+           counter++;
+           document.location = headers[counter].href;
+        }
+        
+        // Go to previous heading by typing '9' or ')'
+        if( keyDownEvent.which == 57  && counter >= 0 ){
+            counter--;
+            document.location = headers[counter].href;
+        }
     };
 
     let datalist = dialog_navigate.querySelector("#nav-datalist");
@@ -605,6 +703,8 @@ function startControlPanel(isMobile) {
     /** ---- Table of Content Folding button -------------- */
     if(isMobile){
         // alert(" MOBILE MODE");
+
+        fold_content();
 
         var tocTitle = document.querySelector("#table-of-contents h2");
         tocTitle.textContent = "TOC";
@@ -666,7 +766,7 @@ var init = async function(){
         ctpanel.style.width  = "50px";
         ctpanel.style.top  = "200px"; 
         ctpanel.style.left = "1080px";
-        console.log("Control panel style = ", ctpanel.style);
+        // console.log("Control panel style = ", ctpanel.style);
     }    
 
 
@@ -683,6 +783,9 @@ var init = async function(){
     storage_content_font.notify();
 
     storage_content_font.bind_list("#" + id_selector_content_font);
+
+    // ----- Fold Menu --------------//
+    fold_content_install_event();
     
   /*   var dom_content = document.querySelector("#content");
     dom_content.classList.toggle("theme-light-content");     */
