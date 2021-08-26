@@ -958,6 +958,8 @@ debugging.
 | $ htop                                | Similar to htop, but with colors and more functionality.                   |   |
 | $ kill <PROCESS-PID>                  | Terminate a process given its PID (unique identifier)                      |   |
 | $ pgrep <PATTERN> --list-full         | List all processes PIDs and paths that match a given pattern such as name. |   |
+| $ pkill <PROCESS-NAME>                | Terminate all processes with a given name                                  |   |
+| $ pkill nvim                          | Terminate all neovim processes (executable name is 'nvim')                 |   |
 |                                       |                                                                            |   |
 |---------------------------------------+----------------------------------------------------------------------------+---|
 | *Hardware information*                  |                                                                            |   |
@@ -10409,6 +10411,180 @@ is terminated.
   fish: “./shmem1.bin client” terminated by signal SIGABRT (Abort)
 #+END_SRC
 
+** memfd_create syscall - Loading from memory
+   
+This sample code illustrates how the Linux system call _memfd_create_
+can be used for loading shared libraries and executable directly from
+memory without writing them to disk.
+
+Documentation: 
+
+   + https://man7.org/linux/man-pages/man2/memfd_create.2.html
+
+Download _incbin.h_ for embedding files in the executable _memfd_test.bin_
+
+#+BEGIN_SRC sh 
+  $ curl -O -L  "https://raw.githubusercontent.com/graphitemaster/incbin/8cefe46d5380bf5ae4b4d87832d811f6692aae44/incbin.h"
+#+END_SRC
+
+ *Files*
+
+File: _memfd_test.cpp_
+
+#+BEGIN_SRC cpp 
+    #include <iostream>
+    #include <string>
+
+    #include <cstring>
+    #include <cassert>
+
+    #include <fcntl.h>
+    #include <stdlib.h>
+    #include <unistd.h>
+    #include <linux/memfd.h>
+    #include <sys/mman.h>
+    #include <sys/syscall.h>
+    #include <dlfcn.h>
+
+    // Incbin will embed the file named 'binary' in this executable.
+    #define INCBIN_STYLE INCBIN_STYLE_SNAKE
+    #define INCBIN_PREFIX g_
+    #include "incbin.h"
+    INCBIN(asset, "executable.bin");
+    INCBIN(shlib, "shlib.so");
+
+    // #include <sys/memfd.h>
+
+    // Execute ELF64 binary from memory
+    void execv_mem(const char* file_name, const std::byte* buffer, size_t buffer_size)
+    {
+
+        int fd = memfd_create(file_name, MFD_ALLOW_SEALING);
+
+        assert( fd != - 1);
+        // Write from memory to anonymous file
+        write(fd, buffer, buffer_size );
+        char path[100];
+        memset(path, 0x00, 100);
+        sprintf(path, "/proc/self/fd/%d", fd);
+
+    // close(fd);
+
+        // - Process name can be anything -----------
+        const char* process_name = "ghost";
+        const char* args[] = { process_name, nullptr };
+        execvp(path, (char* const*) args);
+    }
+
+    // Load shared library from memory without writing to disk!!
+    void* dlopen_mem(const char* file_name, const std::byte* buffer, size_t buffer_size)
+    {
+
+        int fd = memfd_create(file_name, MFD_ALLOW_SEALING);
+
+        assert( fd != - 1);
+        // Write from memory to anonymous file
+        write(fd, buffer, buffer_size );
+        char path[100];
+        memset(path, 0x00, 100);
+        sprintf(path, "/proc/self/fd/%d", fd);
+
+
+        void* handle = dlopen(path, RTLD_LAZY | RTLD_GLOBAL);
+        return handle;
+    }
+
+
+    using tfunc = int (*) (const char* param);
+
+    int main(int argc, char** argv)
+    {
+        // --------- Load library from memory ---------------//
+        //
+        void* hnd = dlopen_mem("dummyname", (std::byte*) g_shlib_data, g_shlib_size );
+        assert(hnd != nullptr);
+
+        tfunc exported_func = (tfunc) dlsym(hnd, "exported_function");
+        assert(exported_func != nullptr);
+
+        exported_func("Passed to memory loaded library Ok");
+
+        // --------- Run executable from memory ------------------//
+        //
+        fprintf(stderr, " [TRACE] Executing ELF64 file from memory. Ok \n");
+        execv_mem("anon-file", (std::byte*) g_asset_data, g_asset_size);
+        // execvp(path, (char* const*) args);
+    }
+
+#+END_SRC
+
+File: _app.cpp_ (Executable to be run from memory)
+
+#+BEGIN_SRC cpp 
+#include <iostream>
+
+int main()
+{
+    std::cout << " [*] Hello world / Hallo Welt! (Deustche) " << std::endl;
+    return 0;
+}
+
+#+END_SRC
+
+File: _shlib.cpp_ (Shared library to be loaded from memory)
+
+#+BEGIN_SRC cpp 
+    #include <iostream>
+    #include <cstring>
+
+    #define EXTERN_C extern "C"
+
+    EXTERN_C
+    int exported_function(const char* param)
+    {
+        fprintf(stderr, " [TRACE] (Library) User parameter = %s \n", param);
+        return 1002 + strlen(param);
+    }
+
+#+END_SRC
+
+  *Building* 
+
+Build the shared library:
+
+#+BEGIN_SRC sh 
+  $ g++ shlib.cpp -o shlib.so -fPIC -shared -ldl -Wall -g
+#+END_SRC
+
+Build the executable: 
+
+#+BEGIN_SRC sh 
+  $ g++ app.cpp -o executable.bin
+#+END_SRC
+
+Build the loader: 
+
+#+BEGIN_SRC sh 
+   $ g++ memfd_test.cpp -o memfd_test.bin -ldl -std=c++1z -Wall -Wextra -g
+#+END_SRC
+
+  *Running* 
+
+After the loader is built, delete shlib.so and executable.bin binary
+artifacts:  
+
+#+BEGIN_SRC sh 
+  $ rm shlib.so executable.bin
+#+END_SRC
+
+Finally, run the loader: 
+
+#+BEGIN_SRC sh 
+    $ ./memfd_test.bin
+    [TRACE] (Library) User parameter = Passed to memory loaded library Ok 
+    [TRACE] Executing ELF64 file from memory. Ok 
+    [*] Hello world / Hallo Welt! (Deustche) 
+#+END_SRC
 ** Syslog - System Message Logging
 *** Overview 
 
