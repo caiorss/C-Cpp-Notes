@@ -1759,8 +1759,7 @@ Running:
 #+END_SRC
 
 
-
-*** Ranges Libraries Algorithms
+*** Ranges Library / Algorithms
 
 Documentation:
  
@@ -1934,4 +1933,78 @@ Program output: (GCC 11 - [[https://coliru.stacked-crooked.com/a/d73b4fa783e3477
     === EXPERIMENT 6 - find ===
     [OK] Found value == 10 => *it = 10
     Position = 3
+#+END_SRC
+*** Ranges Library / Views 
+
+File: _views.cpp_
+
+#+BEGIN_SRC cpp
+  #include <iostream>
+  #include <vector>
+  #include <ranges>
+  #include <algorithm>
+
+  namespace views = std::ranges::views;
+
+  template<typename Element>
+  std::ostream&
+  operator<<(std::ostream& os, std::vector<Element> const& xs )
+  {
+      os << "[" << xs.size() << "]( ";
+      for(const auto&  x: xs)
+         os << x << " ";
+      return os << " )";
+  }
+
+  int main()
+  {
+    auto data = std::vector<int>{ -40, 20, 100, -80, 100, -5, 2, 73, 19, 11, 125};
+
+    // Note: Those computations are performed lazily
+    auto result = data | views::transform([](int x){ return 3 * x + 25; })
+                       | views::filter([](int x){ return x >= 0; })
+                       | views::drop(3)
+                       | views::reverse
+                       | views::filter([](int x){ return x >= 0; })
+                       ;
+ 
+    std::cout << "\n --- C++ Ranges - Iterating over view -----------" << std::endl;
+
+    int i = 0;
+
+    for(auto k: result)
+    {
+        std::cout << " result[" << i++ << "] = " << k << std::endl;
+    }
+
+    std::cout << "\n --- C++ Ranges - Copying a view to a vector -------" << std::endl;
+
+    auto result_vector =  std::vector(result.begin(), result.end());
+    std::cout << "result_vector = " << result_vector << std::endl;
+
+    return 0;
+  }
+#+END_SRC
+
+Building with GCC-11 docker:
+
+#+BEGIN_SRC sh 
+    $ docker run --rm --interactive --tty --workdir /cwd --volume=$PWD:/cwd gcc:latest
+    $ g++ views.cpp -o views.bin -std=c++20 -Wall -Wextra -g 
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC sh 
+    $ ./views.bin 
+    --- C++ Ranges - Iterating over view -----------
+    result[0] = 400
+    result[1] = 58
+    result[2] = 82
+    result[3] = 244
+    result[4] = 31
+    result[5] = 10
+
+    --- C++ Ranges - Copying a view to a vector -------
+    result_vector = [6]( 400 58 82 244 31 10  )
 #+END_SRC
