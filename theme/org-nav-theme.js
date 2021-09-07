@@ -334,8 +334,9 @@ const storage_content_font = new LocalStorageList("font-content", 0,
         , {text: "arial",      value: "arial"            }
         , {text: "hornet",     value: "hornet"           }
         , {text: "fira code",  value: "fira-code-mono"   }
-        , {text: "Go mono",    value: "go-mono"   }
-        , {text: "Go regular", value: "go-regular"   }
+        , {text: "Go mono",    value: "go-mono"          }
+        , {text: "Go regular", value: "go-regular"       }
+        , {text: "Liden Hill", value: "liden-hill"       }
     ]); 
 
 storage_content_font.add_observer(sender => {
@@ -629,8 +630,8 @@ function startControlPanel(isMobile) {
             console.log(" [TRACE] Scrolling down. Ok")
         }
 
-        // Scroll to top
-        if( keyDownEvent.key == "f")
+        // Fold content
+        if( keyDownEvent.key == "F")
         {
             console.log(" [TRACE] Called fold content - typed 'g' ")
             fold_content();
@@ -704,7 +705,7 @@ function startControlPanel(isMobile) {
     if(isMobile){
         // alert(" MOBILE MODE");
 
-        fold_content();
+       // fold_content();
 
         var tocTitle = document.querySelector("#table-of-contents h2");
         tocTitle.textContent = "TOC";
