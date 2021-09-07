@@ -6616,7 +6616,6 @@ STEP 2 => Run the following commands from another terminal.
 
 
 
-
 ** Running machine code at runtime 
 
 This code uses the windows APIs VirtuaAlloc, for allocating memory for
@@ -9819,6 +9818,208 @@ Main function:
    + [[http://blog.lekevin.com/computer/using-the-wininet-api-to-access-the-internet-from-visual-basic-6/][Using the WinInet API to access the internet from Visual Basic 6 - Le Kevin]]
 
    + [[http://www.devx.com/getHelpOn/10MinuteSolution/20373][WinInet API Programming]]
+** Embed Resources into Executables 
+   
+The Windows API has several loading embedded resource, such data such
+as strings, icon, menus and any arbitrary data from PE32 executables
+and dynamic linked libraries DLLs. Cross platform applications should
+avoid using the Windows APIs to be listed in this section, since they
+are specific to Windows, therefore not portable. Applications aiming
+portability can use libraries like [[https://github.com/graphitemaster/incbin/][incbin]] libraries [[https://github.com/vector-of-bool/cmrc][cmrc]] (CMake-Resource
+Compiler) and also resource compilers from frameworks such as Qt and
+WxWidgets. 
+
+Windows APIs for dealing with resources:
+
+   + [[https://docs.microsoft.com/en-us/windows/win32/menurc/resources][Menus and Other Resources]]
+     
+   + [[https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-findresourcea][FindResourceA()]]
+     + "Determines the location of a resource with the specified type
+       and name in the specified module."
+
+   + [[https://docs.microsoft.com/en-us/windows/win32/api/libloaderapi/nf-libloaderapi-lockresource][LockResource]]
+     + "Retrieves a pointer to the specified resource in memory."
+
+   + [[https://docs.microsoft.com/en-us/windows/win32/api/libloaderapi/nf-libloaderapi-loadresource][LoadResource()]]
+     + "Retrieves a handle that can be used to obtain a pointer to the
+       first byte of the specified resource in memory." 
+
+   + [[https://docs.microsoft.com/en-us/windows/win32/api/libloaderapi/nf-libloaderapi-sizeofresource][SizeofResource()]]
+     + "Retrieves the size, in bytes, of the specified resource."
+
+
+ *Project Files*
+
+File: _CMakeLists.txt_
+
+#+BEGIN_SRC cmake
+    cmake_minimum_required(VERSION 3.0)
+    project(cpp-windows)
+
+    set(CMAKE_CXX_STANDARD 17)
+    set(CMAKE_CXX_STANDARD_REQUIRED ON)
+    set(CMAKE_VERBOSE_MAKEFILE ON)
+
+    add_executable(winapp app.cpp art.rc)
+#+END_SRC
+
+File: _app.cpp_
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <cassert>
+
+  #include <windows.h>
+
+  struct Buffer{
+          char*  ptr;
+          size_t size;
+  };
+
+  Buffer 
+  find_resouce(HMODULE hMod, const char* name, const char* type)
+  {
+	
+          HRSRC rsrc = FindResourceA(hMod, name, type);
+          assert( rsrc != nullptr );
+	
+          HGLOBAL hGlobal = LoadResource(hMod, rsrc);
+          assert( hGlobal != nullptr );
+
+          // Pointer to first byte of resource in memory
+          LPVOID pRes = LockResource(hGlobal);
+          assert( pRes != nullptr );
+
+          // Size of resource in bytes 
+          DWORD size = SizeofResource(hMod, rsrc);
+
+          return { static_cast<char*>(pRes), size };
+  }
+
+  std::string
+  find_resouce_text(HMODULE hMod, const char* name, const char* type)
+  {
+	
+          Buffer b = find_resouce(hMod, name, type);
+          auto data = std::string(b.ptr, b.ptr + b.size);
+          return data;
+  }
+
+  void enumerate_resources(HMODULE hMod, const char* type)
+  {
+          auto callback = [](HMODULE hMod, const char* type, char* name, LONG_PTR param)
+                                          {
+                                                  std::cout << " [*] Resource type = " << type
+                                                                    << " ; name = " << name << std::endl;
+                                                  return TRUE;
+                                          };
+
+          long long int status = 0;
+          BOOL result = EnumResourceNamesA(hMod, type, callback, status);
+	
+  }
+
+
+  int main()
+  {
+          HMODULE hMod = GetModuleHandleA(nullptr);
+          assert( hMod != nullptr );
+
+          enumerate_resources(hMod, RT_RCDATA);
+
+          std::cout << "\n ----- Display ASCII Art Resource -----" << std::endl;
+
+          auto data = find_resouce_text(hMod, "ASCIIART", RT_RCDATA);
+	
+          std::cout << " [*] Resource data = \n" << data << std::endl;
+	
+          std::cin.get();
+          return 0;
+  }
+
+#+END_SRC
+
+File: _art.rc_ (Resource script - processed by the resource compiler)
+
+#+BEGIN_SRC txt 
+  ASCIIART RCDATA "art.txt"
+#+END_SRC
+
+File: _art.txt_ (resource to be embedded).
+
+#+BEGIN_SRC 
+File with this resource:
+
+    _    ____   ____ ___ ___      _         _        _             _     _           
+   / \  / ___| / ___|_ _|_ _|    / \   _ __| |_     / \   _ __ ___| |__ (_)_   _____ 
+  / _ \ \___ \| |    | | | |    / _ \ | '__| __|   / _ \ | '__/ __| '_ \| \ \ / / _ \
+ / ___ \ ___) | |___ | | | |   / ___ \| |  | |_   / ___ \| | | (__| | | | |\ V /  __/
+/_/   \_\____/ \____|___|___| /_/   \_\_|   \__| /_/   \_\_|  \___|_| |_|_| \_/ \___|
+
+.-----------------------------------------------------------------------------.
+||Es| |F1 |F2 |F3 |F4 |F5 | |F6 |F7 |F8 |F9 |F10|                  C= AMIGA   |
+||__| |___|___|___|___|___| |___|___|___|___|___|                             |
+| _____________________________________________     ________    ___________   |
+||~  |! |" |§ |$ |% |& |/ |( |) |= |? |` || |<-|   |Del|Help|  |{ |} |/ |* |  |
+||`__|1_|2_|3_|4_|5_|6_|7_|8_|9_|0_|ß_|´_|\_|__|   |___|____|  |[ |]_|__|__|  |
+||<-  |Q |W |E |R |T |Z |U |I |O |P |Ü |* |   ||               |7 |8 |9 |- |  |
+||->__|__|__|__|__|__|__|__|__|__|__|__|+_|_  ||               |__|__|__|__|  |
+||Ctr|oC|A |S |D |F |G |H |J |K |L |Ö |Ä |^ |<'|               |4 |5 |6 |+ |  |
+||___|_L|__|__|__|__|__|__|__|__|__|__|__|#_|__|       __      |__|__|__|__|  |
+||^    |> |Y |X |C |V |B |N |M |; |: |_ |^     |      |A |     |1 |2 |3 |E |  |
+||_____|<_|__|__|__|__|__|__|__|,_|._|-_|______|    __||_|__   |__|__|__|n |  |
+|   |Alt|A  |                       |A  |Alt|      |<-|| |->|  |0    |. |t |  |
+|   |___|___|_______________________|___|___|      |__|V_|__|  |_____|__|e_|  |
+|                                                                             |
+`-----------------------------------------------------------------------------'
+#+END_SRC
+
+ *Building and running*
+
+Building: 
+
+#+BEGIN_SRC sh 
+ $ cmake -B_build -G "MinGW Makefiles"
+ $ cmake --build _build --target all 
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC 
+   
+$ .\_build\winapp.exe
+ [*] Resource type =
+ ----- Display ASCII Art Resource -----
+ [*] Resource data =
+File with this resource:
+
+    _    ____   ____ ___ ___      _         _        _             _     _
+   / \  / ___| / ___|_ _|_ _|    / \   _ __| |_     / \   _ __ ___| |__ (_)_   _____
+  / _ \ \___ \| |    | | | |    / _ \ | '__| __|   / _ \ | '__/ __| '_ \| \ \ / / _ \
+ / ___ \ ___) | |___ | | | |   / ___ \| |  | |_   / ___ \| | | (__| | | | |\ V /  __/
+/_/   \_\____/ \____|___|___| /_/   \_\_|   \__| /_/   \_\_|  \___|_| |_|_| \_/ \___|
+
+.-----------------------------------------------------------------------------.
+||Es| |F1 |F2 |F3 |F4 |F5 | |F6 |F7 |F8 |F9 |F10|                  C= AMIGA   |
+||__| |___|___|___|___|___| |___|___|___|___|___|                             |
+| _____________________________________________     ________    ___________   |
+||~  |! |" |┬º |$ |% |& |/ |( |) |= |? |` || |<-|   |Del|Help|  |{ |} |/ |* |  |
+||`__|1_|2_|3_|4_|5_|6_|7_|8_|9_|0_|├ƒ_|┬┤_|\_|__|   |___|____|  |[ |]_|__|__|  |
+||<-  |Q |W |E |R |T |Z |U |I |O |P |├£ |* |   ||               |7 |8 |9 |- |  |
+||->__|__|__|__|__|__|__|__|__|__|__|__|+_|_  ||               |__|__|__|__|  |
+||Ctr|oC|A |S |D |F |G |H |J |K |L |├û |├ä |^ |<'|               |4 |5 |6 |+ |  |
+||___|_L|__|__|__|__|__|__|__|__|__|__|__|#_|__|       __      |__|__|__|__|  |
+||^    |> |Y |X |C |V |B |N |M |; |: |_ |^     |      |A |     |1 |2 |3 |E |  |
+||_____|<_|__|__|__|__|__|__|__|,_|._|-_|______|    __||_|__   |__|__|__|n |  |
+|   |Alt|A  |                       |A  |Alt|      |<-|| |->|  |0    |. |t |  |
+|   |___|___|_______________________|___|___|      |__|V_|__|  |_____|__|e_|  |
+|                                                                             |
+`-----------------------------------------------------------------------------'
+
+#+END_SRC
+
+
+
 ** Graphical User Interfaces - WinAPI 
 *** Minimal GUI Program - "hello world"
 **** Overview 
