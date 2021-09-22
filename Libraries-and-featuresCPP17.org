@@ -1758,7 +1758,6 @@ Running:
 
 #+END_SRC
 
-
 *** Ranges Library / Algorithms
 
 Documentation:
@@ -2007,4 +2006,204 @@ Running:
 
     --- C++ Ranges - Copying a view to a vector -------
     result_vector = [6]( 400 58 82 244 31 10  )
+#+END_SRC
+*** std::span library 
+
+The C++20 templated class std::span is a _non-owning_ view of a
+contiguous sequence of objects, such as buffers represented by
+pointer and size, arrays, static allocated arrays, heap-allocated
+arrays, std::array, std::vector and std::string. This class wraps a
+pointer to the first sequence element and sequence size. Non-owning
+means that the std::span neither allocates nor releases memory related
+to the sequence pointed by the class.
+
+Benefits and observations: 
+
+  + A function that takes a std::span as parameter can accept
+    std::string, std::vector, std::array, pointer-size pair (buffers)
+    and C-style arrays without any code modification or creating more
+    overloading functions for each of the stated types.
+    
+  + Avoid bugs related to C-style arrays and C-style buffers that are
+    originated rom arrays decaying to pointers. 
+
+Documentation: 
+
+  + [[https://en.cppreference.com/w/cpp/container/span][cppreference - std::span]]
+  + [[https://docs.microsoft.com/en-us/cpp/standard-library/span-class?view=msvc-160][Microsoft - MSVC - std::span]]
+
+Other implementations:
+
+  + [[https://github.com/microsoft/GSL/blob/main/include/gsl/span][gsl::span]]  (GSL - Library)
+  + [[https://github.com/abseil/abseil-cpp/blob/master/absl/types/span.h#L153][absl::span]] (Google's abseil library)
+     
+ *Example code* 
+
+File: _main.cpp_ ([[https://coliru.stacked-crooked.com/a/a892d95fd8ff8574][Online Compiler]])
+
+#+BEGIN_SRC cpp 
+  #include <iostream>
+  #include <iomanip>
+  #include <memory>
+  #include <vector>
+  #include <array>
+  #include <algorithm>
+  #include <numeric>
+  #include <span>
+
+  void display_span(const char* name, std::span<int> xs)
+  {
+      std::cout << "  => " << name << " = [ ";
+      for(auto const& x: xs){ std::cout << x << ", "; }
+      std::cout <<  " ]\n";
+  }
+
+  void display_sum(const char* name, std::span<int> xs)
+  {
+      auto result = std::accumulate(xs.begin(), xs.end(), 0);
+      std::cout << " [SUM] sum(" << name << ") = " << result << std::endl;
+  }
+
+  template<typename T>
+  void disp(const char* label, T&& value)
+  {
+      std::cout << std::setw(5)  << "  =>> "
+                << std::setw(10) << label
+                << std::setw(4) << "="
+                << std::setw(6) << value
+                << std::endl;
+  }
+
+
+
+  int main()
+  {
+
+
+      std::puts("\n ==== EXPERIMENT 1 - std::span variable =====================\n");
+      {
+          // Variable span, non owning view that can refere to any contiguous memory,
+          // C-array buffers; buffers (pointer, size) tuple; std::vector; std::array
+          std::span<int> sp;
+
+          int carray [] = {10, 5, 8, 5, 6, 15};
+          sp = carray;
+
+          int* ptr_data = sp.data();
+          display_sum("carray", carray);
+          display_span("carray [A]", sp);
+          display_span("carray [B]", carray);
+          disp(" *(carray.data + 0) ", *ptr_data);
+          disp(" *(carray.data + 0) ", *(ptr_data + 1));
+
+
+          // Display buffer defined by tuple (pointer, size)
+          int*   buffer_ptr  = carray;
+          size_t buffer_size = std::size(carray);
+          sp = std::span(buffer_ptr, buffer_size);
+          display_span("buffer", sp);
+        
+          std::cout << std::endl;
+
+          std::vector<int> vector1 = {10, 256, -15, 20, -8};
+          sp = vector1; // View refers to vector1
+          display_sum("vector1", vector1);
+          display_span("vector1 [A]", sp);
+          display_span("vector1 [B]", sp);
+
+          // Just a nice C++ wrapper for a C stack-allocated or static-allocated array
+          // It encapsulates the array: int [] std_array = {100, ...}
+          std::array<int, 7> std_array = {100, -56, 6, 87, 61, 25, 151};
+          sp = std_array;
+          display_sum("std_array", std_array);
+          display_span("std_array [A]", sp);
+          display_span("std_array [B]", sp);
+      }
+
+      std::puts("\n ==== EXPERIMENT 2 - std::span with std algorithms  ======\n");
+      {
+          int carray [] = {8, 10, 5, 90, 0, 14};
+          std::span<int> sp;
+          sp = carray;
+          display_sum("carray", carray);
+          display_span("carray <before>", sp);
+          std::sort(sp.begin(), sp.end());
+          display_span("carray <after>", sp);
+
+          auto sum = std::accumulate(sp.begin(), sp.end(), 0);
+          std::cout << " [INFO] sum of all elements  = " << sum << std::endl;
+      }
+
+      std::puts("\n ==== EXPERIMENT 3 - std::span methods ==================\n");
+
+       {
+           int carrayA [] = {10, 15, -8, 251, 56, 15, 100};
+           auto sp = std::span{carrayA};        
+
+           std::cout << std::boolalpha;
+
+           // Returns true if the view points to an empty location
+           disp("sp.empty()", sp.empty());
+           // Returns the number of elements
+           disp("sp.size()", sp.size());
+           // Returns the total size in bytes
+           disp("sp.size_byte()", sp.size_bytes());                  
+
+           // --- Access to elements with array-index operator [] -------//
+           // Note: The bound checking only happens in the debug build.
+           //       In the release build, it is disabled.
+           disp("sp[0]", sp[0]);
+           disp("sp[4]", sp[4]);
+           disp("sp[5]", sp[5]);
+
+           sp[0] = 100;
+ 
+       }
+
+
+      return 0;
+  }
+#+END_SRC
+
+Building: 
+
+#+BEGIN_SRC sh 
+ $ g++ -std=c++20 -O2 -Wall -pedantic -pthread main.cpp && ./a.out
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC sh 
+    ==== EXPERIMENT 1 - std::span variable =====================
+
+    [SUM] sum(carray) = 49
+    => carray [A] = [ 10, 5, 8, 5, 6, 15,  ]
+    => carray [B] = [ 10, 5, 8, 5, 6, 15,  ]
+    =>>  *(carray.data + 0)    =    10
+    =>>  *(carray.data + 0)    =     5
+    => buffer = [ 10, 5, 8, 5, 6, 15,  ]
+
+    [SUM] sum(vector1) = 263
+    => vector1 [A] = [ 10, 256, -15, 20, -8,  ]
+    => vector1 [B] = [ 10, 256, -15, 20, -8,  ]
+    [SUM] sum(std_array) = 374
+    => std_array [A] = [ 100, -56, 6, 87, 61, 25, 151,  ]
+    => std_array [B] = [ 100, -56, 6, 87, 61, 25, 151,  ]
+
+    ==== EXPERIMENT 2 - std::span with std algorithms  ======
+
+    [SUM] sum(carray) = 127
+    => carray <before> = [ 8, 10, 5, 90, 0, 14,  ]
+    => carray <after> = [ 0, 5, 8, 10, 14, 90,  ]
+    [INFO] sum of all elements  = 127
+
+    ==== EXPERIMENT 3 - std::span methods ==================
+
+    =>> sp.empty()   = false
+    =>>  sp.size()   =     7
+    =>> sp.size_byte()   =    28
+    =>>      sp[0]   =    10
+    =>>      sp[4]   =    56
+    =>>      sp[5]   =    15
+
 #+END_SRC
