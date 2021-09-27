@@ -6615,7 +6615,6 @@ STEP 2 => Run the following commands from another terminal.
 
 
 
-
 ** Running machine code at runtime 
 
 This code uses the windows APIs VirtuaAlloc, for allocating memory for
@@ -9480,8 +9479,8 @@ Cleanup Winsock, release resource and exit application.
    return EXIT_SUCCESS;
 #+END_SRC
 
-*** WinlNet and UrlMon - Windows high level APIs for HTTP and FTP protocol
-**** Overview 
+** WinlNet and UrlMon - APIs for HTTP and FTP protocol
+*** Overview 
 
 Windows provides many ready-to-use high level APIs for accessing
 most used internet procols such as Http and Ftp, which makes easier to
@@ -9554,7 +9553,7 @@ exposed through the DLLs _wininet.dll_ and _urlmon.dll_.
      LPDWORD   lpdwNumberOfBytesRead
  );
  #+END_SRC
-**** Example 
+*** Example 
 
 Source: 
 
@@ -9809,7 +9808,7 @@ Main function:
     return 0;
 #+END_SRC
 
-**** Reference
+*** Reference
   
    + [[https://codereview.stackexchange.com/questions/69801/wininet-c-wrapper][http - WinInet C++ Wrapper - Code Review Stack Exchange]]
 
@@ -9817,7 +9816,439 @@ Main function:
 
    + [[http://blog.lekevin.com/computer/using-the-wininet-api-to-access-the-internet-from-visual-basic-6/][Using the WinInet API to access the internet from Visual Basic 6 - Le Kevin]]
 
-   + [[http://www.devx.com/getHelpOn/10MinuteSolution/20373][WinInet API Programming]]
+   + [[http://www.devx.com/getHelpOn/10MinuteSolution/20373][WinInet
+     API Programming]]
+** Remote repl - telnet-like application 
+   
+The following remote repl (Read-Eval-Print-Loop) application allows
+accessing Windows shells, such as Powershell or cmd.exe, from remote
+machines, including Linux or MacOSX machines. The application can work
+in server-mode, which the programs waits for remote client to connect,
+or in client-mode, which the program connects to an already running
+netcat server. The sample application was used for remotely accessing
+a Windows 10 virtual machine from Linux through a NAT (Network Address
+Translator) network interface.
+
+  *Project Files*
+
+File: _CMakeLists.txt_ 
+
+#+BEGIN_SRC cmake
+  cmake_minimum_required(VERSION 3.0)
+  project(cpp-windows)
+
+  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_CXX_STANDARD_REQUIRED ON)
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+
+         add_executable(remote-repl remote-repl.cpp)
+  target_link_libraries(remote-repl ws2_32)
+#+END_SRC
+
+File: _remote-repl.cpp_
+
+#+BEGIN_SRC cpp
+   #include <iostream>
+  #include <string>
+  #include <cassert>
+  // #include <exception>
+  // #include <new>
+
+  #include <winsock2.h>
+  #include <windows.h>
+
+
+  class Socket
+  {
+  private:
+    std::string m_host;
+    bool        m_cleanup;
+    int         m_port;
+    SOCKET      m_socket;
+    SOCKADDR_IN m_addr;
+    static bool isInitialized;
+
+  public:
+
+    // Disable copy contructor
+    Socket(const Socket& sock) = delete;
+
+    Socket(Socket&& ) = default;
+
+    Socket()
+    {
+      // Set up client 2.2
+      WSADATA wsaData;
+      WSAStartup(MAKEWORD(2,2), &wsaData);
+      // m_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+      m_socket = WSASocket( AF_INET
+                            ,SOCK_STREAM
+                            ,IPPROTO_TCP
+                            ,NULL
+                            ,static_cast<unsigned int>(NULL)
+                            ,static_cast<unsigned int>(NULL)
+                            ); 
+      
+      if(m_socket == INVALID_SOCKET){
+        throw std::runtime_error("Error, I cannot create socket");
+      }
+      memset(&m_addr, 0, sizeof(m_addr));
+    }
+
+
+    Socket(SOCKET sock, SOCKADDR_IN addr)
+    {
+      m_socket = sock;
+      m_addr = addr;
+    }
+
+    ~Socket()
+    {
+      if(m_cleanup){
+        std::cerr  << " [INFO ] Cleanup OK." << std::endl;
+        closesocket(m_socket);
+        WSACleanup();
+      }
+    }
+
+    bool isValid() const 
+    {
+       return m_socket != -1;
+    }
+
+    void setNotCleanup()
+    {
+      m_cleanup = false;
+    }
+    
+    // For client-socket only 
+    void connect(std::string hostname, int port)
+    {
+      std::cout << "Connecting to server" << std::endl;
+      // throw std::runtime_error("Connection failure.");
+      m_host                 = hostname;
+      m_port                 = port;    
+      m_addr.sin_family      = AF_INET;
+      m_addr.sin_addr.s_addr = inet_addr(hostname.c_str());
+      m_addr.sin_port        = htons(port);
+      int connval = WSAConnect(m_socket,
+                               reinterpret_cast<SOCKADDR*>(&m_addr),
+                               sizeof(m_addr), NULL, NULL, NULL, NULL
+                               );
+      if(connval == SOCKET_ERROR){
+        throw std::runtime_error("Error: cannot connect to server <" + m_host + ":" + std::to_string(m_port) + ">");
+        // throw std::runtime_error("Error: cannot connect to server");
+      }
+      std::cout << "I am connected. OK." << std::endl;    
+    }
+
+    // For server-socket (aka listening socket only)
+    void bind(std::string hostname, int port, int backlog = 5)
+    {
+      m_host                 = hostname;
+      m_port                 = port;    
+      m_addr.sin_family      = AF_INET;
+      m_addr.sin_addr.s_addr = inet_addr(hostname.c_str());
+      m_addr.sin_port        = htons(port);
+ 
+      // TODO => Implement error handler
+      assert( ::bind( m_socket, (SOCKADDR*) &m_addr , sizeof(m_addr)) != -1 );
+
+      assert( listen(m_socket, backlog) != -1 );
+
+      // int enable = 1;  
+      // int result =  setsockopt( m_socket, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int) ); 
+      // assert( resutl != -1);
+    }
+
+    // For server socket only =>> 
+    // Block current thread and wait for new client connection. 
+    Socket accept()
+    {
+      SOCKET client ;
+      SOCKADDR_IN addr;
+      int len = sizeof(addr);
+      client = ::accept(m_socket, (SOCKADDR*) &addr, &len);
+      // assert( client != -1);
+      return Socket(client, addr);
+    }
+
+    void disconnect()
+    {
+      closesocket(m_socket);
+    }
+ 
+    void send(const char* buffer, size_t len, int flags = 0) const 
+    {
+      ::send(m_socket, buffer, len, flags);
+    } 
+
+    int recev(char* buffer, size_t len, int flags  = 0) const
+    {
+      return ::recv(m_socket, buffer, len , flags);
+    }
+ 
+    void sendText(const std::string& text) const
+    {
+      ::send(m_socket, text.c_str(), text.size(), 0);
+    }
+ 
+    void sendLine(const std::string& line) const 
+    {
+      this->sendText(line + "\n");
+    }  
+
+    std::string recevText(size_t size)
+    {
+      std::string buffer(size, 0);
+      int n = ::recv(m_socket, &buffer[0], size , 0);
+      buffer.resize(n);
+      return buffer;
+    }
+
+    HANDLE handle() const 
+    {
+      return reinterpret_cast<HANDLE>(m_socket);
+    }
+    
+  }; //---- EoF class ClientSocket ---- //
+
+
+  void makeRemoteRepl(const Socket& sock, const std::string& cmdline, bool waitFlag = false);
+
+
+  int main(int argc, char** argv)
+  {
+    if( argc < 5 )
+    {
+      std::cout << " [TRACE] Usage " 
+                << " \n $ client " << argv[0] << " <HOSTNAME> <PORT> <PROGRAM> "
+                << " \n $ server " << argv[0] << " <HOSTNAME> <PORT> <PROGRAM> "
+                << std::endl;
+
+      return EXIT_FAILURE;
+    }
+
+    const std::string command  = argv[1];  
+    const std::string address  = argv[2]; 
+    const DWORD       port     = std::stoi(argv[3]);
+    const std::string shell    = argv[4];
+    
+    std::cerr << "Running main" << std::endl;
+
+    if( command == "server" )
+    {
+      Socket server;
+      server.bind(address, port, 5);
+
+      // Socket server infinite loop  
+      for(;;)
+      {
+          std::cout << " [TRACE] Waiting client connection. " << std::endl;
+          Socket client = server.accept();
+          if(! client.isValid() ){ continue; }
+          makeRemoteRepl(client, shell, true);
+      }
+    }
+
+    if( command == "client")
+    {
+      for (;;)
+      {
+        Socket client;
+        client.setNotCleanup();
+
+        while (true)
+        {
+          try
+          {
+            std::cerr << "Trying to connect to server" << std::endl;
+            client.connect(address, port);
+            break;
+          }
+          catch (const std::exception &e)
+          {
+            std::cerr << e.what() << std::endl;
+            //exit(EXIT_FAILURE);
+          }
+        }
+        std::cout << "Socket connected OK." << std::endl;
+        client.sendLine(" [LOG] Client socket running OK!");
+        makeRemoteRepl(client, shell, true);
+      }
+    }
+
+    // Connection loop - 
+    std::cerr << "End successfully" << std::endl;
+    
+    // Returns status code 0
+    return EXIT_SUCCESS;
+  }
+
+  // ----------------------------------------------------- // 
+
+
+  void makeRemoteRepl( const Socket& sock
+                      , const std::string& cmdline
+                      , bool waitFlag 
+                      )
+  {
+    // Create process 
+    PROCESS_INFORMATION pi;
+    STARTUPINFO sui;
+    memset(&sui, 0, sizeof(sui));  
+    sui.cb          = sizeof(sui);
+    sui.dwFlags     = STARTF_USESTDHANDLES ; // | STARTF_USESHOWWINDOW;
+    sui.wShowWindow = SW_HIDE;
+    sui.hStdInput   = sock.handle();
+    sui.hStdOutput  = sock.handle(); 
+    sui.hStdError   = sock.handle();
+
+    int bSuccess = CreateProcessA( NULL, const_cast<LPSTR>(cmdline.c_str())
+                  , NULL, NULL, TRUE, CREATE_NO_WINDOW, NULL, NULL, &sui, &pi);
+
+    if(bSuccess)
+    {
+      sock.sendLine(" [INFO ] Remote repl session started OK.!");
+      sock.sendLine(" [INFO ] Success code    = " + std::to_string(bSuccess));
+      DWORD pid = GetProcessId(pi.hProcess);
+      sock.sendLine(" [INFO ] Process ID <PID> = " + std::to_string(pid));
+    } else {
+      sock.sendLine(" [ERROR] Failed to create process.");
+    }
+    if(waitFlag){
+      WaitForSingleObject( pi.hProcess, INFINITE );
+      CloseHandle( pi.hProcess );
+      CloseHandle( pi.hThread );
+      sock.sendLine(" [LOG] Process finished.");
+    }
+  }
+#+END_SRC
+
+  *Building* 
+
+#+BEGIN_SRC sh 
+  $ cmake -B_build -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Debug
+  $ cmake --build --target all
+#+END_SRC
+
+
+  *Running application in client mode* 
+
+Linux Remote terminal: (netcat server)
+
+#+BEGIN_SRC sh 
+    # User types commands here that are sent to Windows machine.
+
+    # Run netcat as server 
+    $ rlwrap nc -nlvp 9010
+    Listening on 0.0.0.0 9010
+    Connection received on 192.168.1.105 53950
+    [LOG] Client socket running OK!
+    [INFO ] Remote repl session started OK.!
+    [INFO ] Success code    = 1
+    [INFO ] Process ID <PID> = 1552
+    Windows PowerShell
+    Copyright (C) Microsoft Corporation. All rights reserved.
+
+    Try the new cross-platform PowerShell https://aka.ms/pscore6
+    
+    PS C:\> whoami
+    whoami
+
+    desktop-36ar81f\nixuserp
+
+
+    PS C:\> netstat -a
+    netstat -a
+
+    Active Connections
+
+    Proto  Local Address          Foreign Address        State
+    TCP    0.0.0.0:135            184-86-53-99:0         LISTENING
+    TCP    0.0.0.0:445            184-86-53-99:0         LISTENING
+    TCP    0.0.0.0:5357           184-86-53-99:0         LISTENING
+    TCP    0.0.0.0:5985           184-86-53-99:0         LISTENING
+    TCP    0.0.0.0:47001          184-86-53-99:0         LISTENING
+    TCP    0.0.0.0:49664          184-86-53-99:0         LISTENING
+
+    ... ...     ... ...   ... ...   ... ...   ... ...   ... ...   ... ... 
+    ... ...   ... ...   ... ...   ... ...   ... ...   ... ...   ... ... 
+
+    PS C:\> exit
+    exit
+    [LOG] Process finished.
+#+END_SRC
+
+Windows terminal: (client)
+
+#+BEGIN_SRC sh 
+    $ remote-repl.exe client 192.168.1.115 9010 powershell
+
+    Running main
+    Trying to connect to server
+    Connecting to server
+    I am connected. OK.
+    Socket connected OK.
+
+#+END_SRC
+
+  *Running application in server mode* 
+
+Windows terminal: (server)
+  
+#+BEGIN_SRC sh 
+    $ remote-repl.exe server 0.0.0.0 9010 powershell
+    Running main
+    [TRACE] Waiting client connection.
+
+#+END_SRC
+
+Linux remote terminal (client)
+
+#+BEGIN_SRC sh 
+    # User types commands here that are sent to Windows machine.
+
+    $ rlwrap nc 192.168.1.105 9010
+    [INFO ] Remote repl session started OK.!
+    [INFO ] Success code    = 1
+    [INFO ] Process ID <PID> = 4912
+    Windows PowerShell
+    Copyright (C) Microsoft Corporation. All rights reserved.
+
+    Try the new cross-platform PowerShell https://aka.ms/pscore6
+
+    PS C:\> whoami
+    whoami
+
+    desktop-36ar81f\nixuserp
+    PS C:\> 
+
+
+    PS C:\> ls -Force /
+    ls -Force /
+
+
+        Directory: C:\
+
+
+    Mode                LastWriteTime         Length Name                                                                  
+    ----                -------------         ------ ----                                                                  
+    d--hs-        9/19/2021   9:47 AM                $Recycle.Bin                                                          
+    d--hs-        9/27/2021  11:53 AM                Config.Msi                                                            
+    d--hsl        9/19/2021   9:40 AM                Documents and Settings                                                
+    d-----        3/18/2019   9:52 PM                PerfLogs                                                              
+    d-r---        9/27/2021  11:53 AM                Program Files                                                         
+    d-r---        9/27/2021  11:53 AM                Program Files (x86)                                                   
+    d--h--        9/27/2021  11:53 AM                ProgramData                                                           
+    d--hs-        9/19/2021   9:41 AM                Recovery                                                              
+    d--hs-        9/27/2021  11:46 AM                System Volume Information                                             
+    d-r---        9/19/2021   6:02 AM                Users                                                                 
+    d-----        9/19/2021   9:48 AM                Windows                                                               
+    -a-hs-        9/27/2021   5:58 PM      872415232 pagefile.sys                                                          
+    -a-hs-        9/27/2021   5:58 PM      268435456 swapfile.sys                                                          
+
+#+END_SRC 
 ** Embed Resources into Executables 
    
 The Windows API has several facilities for loading embedded resource,
@@ -10048,7 +10479,6 @@ Running:
     doloribus asperiores repellat."
 
 #+END_SRC
-
 
 
 ** Graphical User Interfaces - WinAPI 
@@ -11567,7 +11997,7 @@ File: _rust-wingui.rs_
           }
       }
 
-      // sssssssssssssssssssssssmessage_box_info("Application terminated Ok", "Notification");    
+      // message_box_info("Application terminated Ok", "Notification");    
       println!(" [TRACE] Terminated. Ok!");
     
   } // --- End of main() --- //
