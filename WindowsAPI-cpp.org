@@ -9853,15 +9853,15 @@ Windows APIs for dealing with resources:
 
 File: _CMakeLists.txt_
 
-#+BEGIN_SRC cmake
-    cmake_minimum_required(VERSION 3.0)
-    project(cpp-windows)
+#+BEGIN_SRC cmake 
+  cmake_minimum_required(VERSION 3.0)
+  project(cpp-windows)
 
-    set(CMAKE_CXX_STANDARD 17)
-    set(CMAKE_CXX_STANDARD_REQUIRED ON)
-    set(CMAKE_VERBOSE_MAKEFILE ON)
+  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_CXX_STANDARD_REQUIRED ON)
+  set(CMAKE_VERBOSE_MAKEFILE ON)
 
-    add_executable(winapp app.cpp art.rc)
+  add_executable(winapp app.cpp myresource.rc VERSIONINFO.rc)
 #+END_SRC
 
 File: _app.cpp_
@@ -9873,107 +9873,146 @@ File: _app.cpp_
   #include <windows.h>
 
   struct Buffer{
-          char*  ptr;
-          size_t size;
+    char*  ptr;
+    size_t size;
   };
 
   Buffer 
   find_resouce(HMODULE hMod, const char* name, const char* type)
   {
-	
-          HRSRC rsrc = FindResourceA(hMod, name, type);
-          assert( rsrc != nullptr );
-	
-          HGLOBAL hGlobal = LoadResource(hMod, rsrc);
-          assert( hGlobal != nullptr );
 
-          // Pointer to first byte of resource in memory
-          LPVOID pRes = LockResource(hGlobal);
-          assert( pRes != nullptr );
+    HRSRC rsrc = FindResourceA(hMod, name, type);
+    assert( rsrc != nullptr );
 
-          // Size of resource in bytes 
-          DWORD size = SizeofResource(hMod, rsrc);
+    HGLOBAL hGlobal = LoadResource(hMod, rsrc);
+    assert( hGlobal != nullptr );
 
-          return { static_cast<char*>(pRes), size };
+    // Pointer to first byte of resource in memory
+    LPVOID pRes = LockResource(hGlobal);
+    assert( pRes != nullptr );
+
+    // Size of resource in bytes 
+    DWORD size = SizeofResource(hMod, rsrc);
+
+    return { static_cast<char*>(pRes), size };
   }
 
   std::string
   find_resouce_text(HMODULE hMod, const char* name, const char* type)
   {
-	
-          Buffer b = find_resouce(hMod, name, type);
-          auto data = std::string(b.ptr, b.ptr + b.size);
-          return data;
+
+    Buffer b = find_resouce(hMod, name, type);
+    auto data = std::string(b.ptr, b.ptr + b.size);
+    return data;
   }
 
   void enumerate_resources(HMODULE hMod, const char* type)
   {
-          auto callback = [](HMODULE hMod, const char* type, char* name, LONG_PTR param)
-                                          {
-                                                  std::cout << " [*] Resource type = " << type
-                                                                    << " ; name = " << name << std::endl;
-                                                  return TRUE;
-                                          };
+    auto callback = [](HMODULE hMod, const char* type, char* name, LONG_PTR param)
+    {
+      std::cout << " [*] Resource type = " << type
+                << " ; name = " << name << std::endl;
+      return TRUE;
+    };
 
-          long long int status = 0;
-          BOOL result = EnumResourceNamesA(hMod, type, callback, status);
-	
+    long long int status = 0;
+    BOOL result = EnumResourceNamesA(hMod, type, callback, status);
+
   }
 
 
   int main()
   {
-          HMODULE hMod = GetModuleHandleA(nullptr);
-          assert( hMod != nullptr );
+    HMODULE hMod = GetModuleHandleA(nullptr);
+    assert( hMod != nullptr );
 
-          enumerate_resources(hMod, RT_RCDATA);
+    enumerate_resources(hMod, RT_RCDATA);
 
-          std::cout << "\n ----- Display ASCII Art Resource -----" << std::endl;
+    std::cout << "\n ----- Display ASCII Art Resource -----" << std::endl;
 
-          auto data = find_resouce_text(hMod, "ASCIIART", RT_RCDATA);
-	
-          std::cout << " [*] Resource data = \n" << data << std::endl;
-	
-          std::cin.get();
-          return 0;
+    auto data = find_resouce_text(hMod, "MYRESOURCE", RT_RCDATA);
+
+    std::cout << " [*] Resource data = \n" << data << std::endl;
+
+    std::cin.get();
+    return 0;
   }
 
 #+END_SRC
 
-File: _art.rc_ (Resource script - processed by the resource compiler)
+File: _myresource.rc_ (Resource script - processed by the resource compiler)
 
 #+BEGIN_SRC txt 
-  ASCIIART RCDATA "art.txt"
+   MYRESOURCE RCDATA "myresource.txt"
 #+END_SRC
 
-File: _art.txt_ (resource to be embedded).
+File: _myresource.txt_ (resource to be embedded).
 
-#+BEGIN_SRC 
-File with this resource:
+#+BEGIN_SRC txt 
+    File with this resource.
 
-    _    ____   ____ ___ ___      _         _        _             _     _           
-   / \  / ___| / ___|_ _|_ _|    / \   _ __| |_     / \   _ __ ___| |__ (_)_   _____ 
-  / _ \ \___ \| |    | | | |    / _ \ | '__| __|   / _ \ | '__/ __| '_ \| \ \ / / _ \
- / ___ \ ___) | |___ | | | |   / ___ \| |  | |_   / ___ \| | | (__| | | | |\ V /  __/
-/_/   \_\____/ \____|___|___| /_/   \_\_|   \__| /_/   \_\_|  \___|_| |_|_| \_/ \___|
-
-.-----------------------------------------------------------------------------.
-||Es| |F1 |F2 |F3 |F4 |F5 | |F6 |F7 |F8 |F9 |F10|                  C= AMIGA   |
-||__| |___|___|___|___|___| |___|___|___|___|___|                             |
-| _____________________________________________     ________    ___________   |
-||~  |! |" |§ |$ |% |& |/ |( |) |= |? |` || |<-|   |Del|Help|  |{ |} |/ |* |  |
-||`__|1_|2_|3_|4_|5_|6_|7_|8_|9_|0_|ß_|´_|\_|__|   |___|____|  |[ |]_|__|__|  |
-||<-  |Q |W |E |R |T |Z |U |I |O |P |Ü |* |   ||               |7 |8 |9 |- |  |
-||->__|__|__|__|__|__|__|__|__|__|__|__|+_|_  ||               |__|__|__|__|  |
-||Ctr|oC|A |S |D |F |G |H |J |K |L |Ö |Ä |^ |<'|               |4 |5 |6 |+ |  |
-||___|_L|__|__|__|__|__|__|__|__|__|__|__|#_|__|       __      |__|__|__|__|  |
-||^    |> |Y |X |C |V |B |N |M |; |: |_ |^     |      |A |     |1 |2 |3 |E |  |
-||_____|<_|__|__|__|__|__|__|__|,_|._|-_|______|    __||_|__   |__|__|__|n |  |
-|   |Alt|A  |                       |A  |Alt|      |<-|| |->|  |0    |. |t |  |
-|   |___|___|_______________________|___|___|      |__|V_|__|  |_____|__|e_|  |
-|                                                                             |
-`-----------------------------------------------------------------------------'
+    "At vero eos et accusamus et iusto odio dignissimos ducimus qui
+    blanditiis praesentium voluptatum deleniti atque corrupti quos dolores
+    et quas molestias excepturi sint occaecati cupiditate non provident,
+    similique sunt in culpa qui officia deserunt mollitia animi, id est
+    laborum et dolorum fuga. Et harum quidem rerum facilis est et expedita
+    distinctio. Nam libero tempore, cum soluta nobis est eligendi optio
+    cumque nihil impedit quo minus id quod maxime placeat facere possimus,
+    omnis voluptas assumenda est, omnis dolor repellendus. Temporibus
+    autem quibusdam et aut officiis debitis aut rerum necessitatibus saepe
+    eveniet ut et voluptates repudiandae sint et molestiae non
+    recusandae. Itaque earum rerum hic tenetur a sapiente delectus, ut aut
+    reiciendis voluptatibus maiores alias consequatur aut perferendis
+    doloribus asperiores repellat."
 #+END_SRC
+
+File: _VERSIONINFO.rc_ (Contains metadata indicating version, vendor, product name and so on.)
+
+#+BEGIN_SRC conf 
+    #include <winver.h>
+    #include <ntdef.h>
+
+    #ifdef RC_INVOKED
+
+    #if DBG
+    #define VER_DBG VS_FF_DEBUG
+    #else
+    #define VER_DBG 0
+    #endif
+
+    VS_VERSION_INFO VERSIONINFO
+    FILEVERSION             1,0,0,0                 // 1.0.0.0 - Application version 
+    PRODUCTVERSION          1,0,0,0                 // 1.0.0.0 - Produce version     
+    FILEFLAGSMASK           VS_FFI_FILEFLAGSMASK
+    FILEFLAGS               VER_DBG
+    FILEOS                  VOS_NT
+    FILETYPE                VFT_DRV
+    FILESUBTYPE             VFT2_DRV_SYSTEM
+    BEGIN
+            BLOCK "StringFileInfo"
+            BEGIN
+                    BLOCK "040904b0"
+            BEGIN
+                    VALUE "Comments",         "SomeProduct awesome"
+                    VALUE "CompanyName",      "Some company XYZWK, Inc."
+                    VALUE "FileDescription",  "MyProduct"
+                    VALUE "FileVersion",      "V1.0.0.0"
+                    VALUE "InternalName",     "Some super product"
+                    VALUE "LegalCopyright",   "(C)2018 Some company XYZWK .Incorporated."
+                    VALUE "OriginalFilename", "winapp.exe"
+                    VALUE "ProductName",      "SomeProduct"
+                    VALUE "ProductVersion",	  "V1.2.3.0"
+            END
+            END
+            BLOCK "VarFileInfo"
+            BEGIN
+                    VALUE "Translation", 0x0409,1200
+            END
+    END
+    #endif
+#+END_SRC
+
+
 
  *Building and running*
 
@@ -9986,36 +10025,27 @@ Building:
 
 Running: 
 
-#+BEGIN_SRC 
-   
-$ .\_build\winapp.exe
- [*] Resource type =
- ----- Display ASCII Art Resource -----
- [*] Resource data =
-File with this resource:
+#+BEGIN_SRC sh 
+    $ _build\winapp.exe
 
-    _    ____   ____ ___ ___      _         _        _             _     _
-   / \  / ___| / ___|_ _|_ _|    / \   _ __| |_     / \   _ __ ___| |__ (_)_   _____
-  / _ \ \___ \| |    | | | |    / _ \ | '__| __|   / _ \ | '__/ __| '_ \| \ \ / / _ \
- / ___ \ ___) | |___ | | | |   / ___ \| |  | |_   / ___ \| | | (__| | | | |\ V /  __/
-/_/   \_\____/ \____|___|___| /_/   \_\_|   \__| /_/   \_\_|  \___|_| |_|_| \_/ \___|
+    [*] Resource type =
+    ----- Display ASCII Art Resource -----
+    [*] Resource data =
+    File with this resource.
 
-.-----------------------------------------------------------------------------.
-||Es| |F1 |F2 |F3 |F4 |F5 | |F6 |F7 |F8 |F9 |F10|                  C= AMIGA   |
-||__| |___|___|___|___|___| |___|___|___|___|___|                             |
-| _____________________________________________     ________    ___________   |
-||~  |! |" |┬º |$ |% |& |/ |( |) |= |? |` || |<-|   |Del|Help|  |{ |} |/ |* |  |
-||`__|1_|2_|3_|4_|5_|6_|7_|8_|9_|0_|├ƒ_|┬┤_|\_|__|   |___|____|  |[ |]_|__|__|  |
-||<-  |Q |W |E |R |T |Z |U |I |O |P |├£ |* |   ||               |7 |8 |9 |- |  |
-||->__|__|__|__|__|__|__|__|__|__|__|__|+_|_  ||               |__|__|__|__|  |
-||Ctr|oC|A |S |D |F |G |H |J |K |L |├û |├ä |^ |<'|               |4 |5 |6 |+ |  |
-||___|_L|__|__|__|__|__|__|__|__|__|__|__|#_|__|       __      |__|__|__|__|  |
-||^    |> |Y |X |C |V |B |N |M |; |: |_ |^     |      |A |     |1 |2 |3 |E |  |
-||_____|<_|__|__|__|__|__|__|__|,_|._|-_|______|    __||_|__   |__|__|__|n |  |
-|   |Alt|A  |                       |A  |Alt|      |<-|| |->|  |0    |. |t |  |
-|   |___|___|_______________________|___|___|      |__|V_|__|  |_____|__|e_|  |
-|                                                                             |
-`-----------------------------------------------------------------------------'
+    "At vero eos et accusamus et iusto odio dignissimos ducimus qui
+    blanditiis praesentium voluptatum deleniti atque corrupti quos dolores
+    et quas molestias excepturi sint occaecati cupiditate non provident,
+    similique sunt in culpa qui officia deserunt mollitia animi, id est
+    laborum et dolorum fuga. Et harum quidem rerum facilis est et expedita
+    distinctio. Nam libero tempore, cum soluta nobis est eligendi optio
+    cumque nihil impedit quo minus id quod maxime placeat facere possimus,
+    omnis voluptas assumenda est, omnis dolor repellendus. Temporibus
+    autem quibusdam et aut officiis debitis aut rerum necessitatibus saepe
+    eveniet ut et voluptates repudiandae sint et molestiae non
+    recusandae. Itaque earum rerum hic tenetur a sapiente delectus, ut aut
+    reiciendis voluptatibus maiores alias consequatur aut perferendis
+    doloribus asperiores repellat."
 
 #+END_SRC
 
