@@ -306,15 +306,16 @@ const id_selector_content_font = "selector-content-font";
 
 const storage_heading_font = new LocalStorageList("font-heading", 0, 
     [
-          {text: "Orbitron",    value: "orbitron"    }
-        , {text: "Denmark",     value: "denmark"     }
-        , {text: "Arial",       value: "arial"       }
-        , {text: "Hornet",      value: "hornet"      }
-        , {text: "Stencil 1",   value: "stencil1"    }
-        , {text: "Stencil 2",   value: "stencil2"    }
-        , {text: "StkMedieval", value: "stkmedieval" }
-        , {text: "Fraktur",     value: "fraktur"     }
-        
+          {text: "Orbitron",        value: "orbitron"       }
+        , {text: "Denmark",         value: "denmark"        }
+        , {text: "Arial",           value: "arial"          }
+        , {text: "Hornet",          value: "hornet"         }
+        , {text: "Stencil 1",       value: "stencil1"       }
+        , {text: "Stencil 2",       value: "stencil2"       }
+        , {text: "StkMedieval",     value: "stkmedieval"    }
+        , {text: "Fraktur",         value: "fraktur"        }
+        , {text: "Hermite Regular", value: "hermit-regular" }
+        , {text: "Iceland",         value: "iceland"        }
     ]); 
 
 storage_heading_font.add_observer(sender => {
@@ -329,14 +330,19 @@ const storage_content_font = new LocalStorageList("font-content", 0,
     [
             // Label is the font type and value is the font CSS typeface name defined 
             // in the file org-nav-theme.css 
-          {text: "monospace",  value: "monospace"        }
-        , {text: "spectral",   value: "spectral"         }
-        , {text: "arial",      value: "arial"            }
-        , {text: "hornet",     value: "hornet"           }
-        , {text: "fira code",  value: "fira-code-mono"   }
-        , {text: "Go mono",    value: "go-mono"          }
-        , {text: "Go regular", value: "go-regular"       }
-        , {text: "Liden Hill", value: "liden-hill"       }
+          {text: "monospace",       value: "monospace"      }
+        , {text: "spectral",        value: "spectral"       }
+        , {text: "arial",           value: "arial"          }
+        , {text: "hornet",          value: "hornet"         }
+        , {text: "fira code",       value: "fira-code-mono" }
+        , {text: "Go mono",         value: "go-mono"        }
+        , {text: "Go regular",      value: "go-regular"     }
+        , {text: "Liden Hill",      value: "liden-hill"     }
+        , {text: "Hermit Regular",  value: "hermit-regular" }
+        , {text: "Rajdhani",        value: "rajdhani"       }
+        , {text: "Literata",        value: "literata"       }
+        , {text: "Roboto Serif",    value: "roboto"         }
+
     ]); 
 
 storage_content_font.add_observer(sender => {
@@ -352,6 +358,8 @@ const storage_code_font_type = new LocalStorageList("code-font-type", 1,
         , {text: "fira code",        value: "fira-code-mono"         }
         , {text: "fira code medium", value: "fira-code-medium-mono"  }
         , {text: "Go mono",          value: "go-mono"                }
+        , {text: "JetBrains mono",   value: "jetbrains-mono"         }
+        , {text: "Hermit Regular",   value: "hermit-regular" }
     ]);
 
 storage_code_font_type.add_observer( sender => {
@@ -787,6 +795,18 @@ var init = async function(){
 
     // ----- Fold Menu --------------//
     fold_content_install_event();
+
+    let links = document.querySelectorAll("a");
+    let origin = document.location.origin;
+
+    // Open links with origin not equal to the current page origin in a new tab.
+    links.forEach(lnk => {
+        if( lnk.origin == origin ){ return; }
+        lnk.addEventListener("click", (event) => {
+            event.preventDefault();
+            const tab = window.open(lnk.href, "_blank");
+        });
+    })
     
   /*   var dom_content = document.querySelector("#content");
     dom_content.classList.toggle("theme-light-content");     */
