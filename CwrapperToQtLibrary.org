@@ -309,9 +309,103 @@ Program output:
 ** Calling Qt5 Widgets library from many languages 
 *** Overview
 
-This sample code provides a C wrapper to the QT5 Widgets GUI
-library. This C-wrapper allows calling Qt5 from C, Julia language and
-also D-language.
+The technique used in this sample code is the _hourglass-design
+pattern_, that exposes C++ classes and methods through a thin C-89 API
+for ensuring better ABI stability, allowing C++ client codes built
+with any other C++ compiler to link against the library and making the
+it friendlier to other programming languages via FFI -
+foreign-function interfaces or linking against C-compatible
+functions. In this pattern, classes are only accessible to client code
+as opaque types or void pointers and member functions (class methods)
+are only accessible through functions without name mangling, that are
+annoted with _extern "C"_. A C++ SDK (Software Development Kit) wrapping
+the thin C-89 API can also be provided for making the library usage
+easier by C++ client codes.  This sample code provides a C wrapper to
+the QT5 Widgets GUI library. The hourglass design-patter is not
+exclusive to C++, it can also be applied other programming languages
+such as Rust, D - DLang-language, Nim, Pascal and Zig as those
+languages allow exposing C-compatible functions without name mangling
+via a extern "C" like annotations.
+
+
+This C-wrapper allows calling Qt5 widgets library from C, Python,
+Common Lisp, Nim, Rust, Julia language and also D-language.
+
+Hourglass Design pattern Schema: 
+
+#+BEGIN_SRC text 
+ 
+        +-------------------+                                         +------------------------+
+        |                   |      Library                 Library    | Library'sPrivate C++   |
+        | C++ client code   +<<<- (C++ SDK) -(+)----<<-- (C-89 API) --+ Implementation         |
+        |                   |      wrapper                   |        | no exposed             |
+        +-------------------+                                |        +------------------------+
+                                                             |
+        +---------------------+                             \ / 
+        | Client code in      |                              |
+        | higher level        |       FFI Foreign-Function   | 
+        | language            +<<<--- Interface Wrapper <<---/               
+        | (C#, Python, Ruby)  |       or Linkage against 
+        +---------------------+       the  C-89 API 
+#+END_SRC          
+
+This technique can be used for many purposes, including: 
+
+  * Build C++ libraries that can be distributed as pre-compiled
+    binaries and can be used with any other C++ compiler as long as
+    the client code only uses the C-89 thin API (Application
+    Programming Interface).
+    
+  * Shipping proprietary, closed source libraries, that can be linked
+    against by C++ source code built with any other compiler without
+    any ABI issues as long as the client code only links against the
+    C-89 thin API.
+    
+  * Making it easier for client code written in high level languages,
+    such as Python, Julia, Ruby or C# (CSharp) to use the library
+    through a FFI - Foreign Function Interface or linkage against the
+    C89 thin API.
+
+  * Create C-bindings to already existing C++ libraries for allowing
+    them to be used via FFI - Foreign-Function Interfaces.
+
+  * Implement C libraries in C++, Rust, D (Dlang), Nim or Zig
+    programming languages.
+
+
+Known uses of the hourglass technique:
+
+  1. [[https://github.com/tensorflow/tensorflow/search?q=extern+%2522C%2522][Tensorflow library for Machine Learning]]
+     + Leading machine learning library with bindings to many
+       languages including Python, JavaScript, C++, Java, Julia,
+       Matlab, R, Ruby, Rust and so on.
+     + Note: Despite Tensorflow be implemented in C++, the library
+       only exposes a C-89 interface.
+     + See: https://www.tensorflow.org/api_docs
+       
+  2. [[https://github.com/TileDB-Inc/TileDB/search?q=extern+%2522C%2522][TileDB]]
+     + Embeddable database that can store time-series, geospatial
+       data, arrays, matrices, sparse matrices and tensors (multi
+       dimensional arrays).
+
+  3. [[https://github.com/randombit/botan/tree/master/src/lib/ffi][Botan C++ TLS crytography library]]
+     + C++ library alternative to OpenSSL for TLS (Transport Layer
+       Security) or SSL (Socket Layer Security) for encryption of data
+       at transit of TCP or UDP network protocols. This library has
+       C-89 API and bindings for Python, Ruby, Java, Rust, Haskell and
+       Odin programming languages. Note that the [[https://github.com/randombit/botan/blob/master/src/python/botan2.py][Python binding]] uses
+       ctypes for loading the C-89 thin API symbols from the botan
+       shared library. 
+       
+  4. [[https://github.com/albertodemichelis/squirrel/search?q=extern+%2522C%2522][Squirrel]]
+     + An embedded scripting language, for adding scripting capabilities
+       to C or C++ applications, written in C++, but only exposed as
+       a C-89 library. 
+
+
+Futhere reading: 
+
+ + [[https://www.slideshare.net/StefanusDuToit/cpp-con-2014-hourglass-interfaces-for-c-apis][CPpCon2014 - Hourglass Interfaces for C++ APIs]] 
 
 
  *Documentation of features used in this experiment*
@@ -401,6 +495,23 @@ D Language (DLang:
 
   + [[https://dlang.org/spec/cpp_interface.html][Interfacing to C++ - D Programming Language]]
 
+
+Nim Programming Language:
+
+  + https://narimiran.github.io/nim-basics/
+    
+  + [[https://forum.nim-lang.org/t/6399][Nim Forum - Lambda syntax is awkard]]
+
+  + [[https://dev.to/juancarlospaco/python-cython-nim-cheatsheet-hjj][Python/Cython/Nim CheatSheet - DEV Community]]
+
+  + [[https://github.com/nim-lang/Nim/wiki/Nim-for-Python-Programmers][Nim for Python Programmers · nim-lang/Nim Wiki · GitHub]]
+
+  + [[https://github.com/nimterop/nimterop][GitHub - nimterop/nimterop]]
+    + Nimterop is a Nim package that aims to make C/C++ interop seamless
+
+  + [[https://github.com/khchen/winim][GitHub - khchen/winim: Nim's Windows API and COM Library]]
+
+
 Lisp - SBCL (Steel Bank Common Lisp): 
 
   + http://www.sbcl.org/ - Steel Bank Common Lisp
@@ -416,7 +527,7 @@ Lisp - SBCL (Steel Bank Common Lisp):
   + [[https://gist.github.com/lagagain/df1b97eb08e57c2759c950efc3a2c7dd][practice - Common Lisp hello CFFI (Common Lisp + C) · GitHub]]
 
   + [[https://www.xach.com/lisp/buildapp/][Buildapp - Create executables with SBCL or CCL]]
-
+    
 *** Wrapper Files 
 
   + GIST with all sources:
@@ -1845,7 +1956,7 @@ Running the application:
 
 Running the application via dotnet core tool: 
 
-#+BEGIN_SRC sh 
+#+BEGIN_SRC sh
    $ ~/dotnet/dotnet run --project=myapp.csproj
 #+END_SRC
 
@@ -2028,6 +2139,182 @@ User Interface Screenshot:
 
 #+CAPTION: User interface for Dlang (D Language)
 [[file:images/cwrapper-qt5-3.png][file:images/cwrapper-qt5-3.png]]
+
+*** Nim language - Nim Client Code
+    
+File: _nim_app.nim_
+
+#+BEGIN_SRC python 
+  # Necessary for defining lambdas in Nim, otherwise compilation errors happen.
+  import sugar
+  
+  # For converting number to string
+  import strutils
+  
+  const qlib = "libqtwrapper.so"
+  
+  type 
+      QApplication   = pointer 
+      QObject        = pointer
+      QLineEdit      = pointer 
+      QWidget        = pointer  
+      QPushButton    = pointer
+      QFormLayout    = pointer 
+      QDoubleSpinBox = pointer
+      Context        = pointer
+      QLayout        = pointer 
+  
+  type 
+      callback_clicked = proc(ctx: Context): void
+      callback_onValueChanged = proc(ctx: Context): void
+  
+  
+  const 
+      WIDGET_WINDOW           = 1 
+      WIDGET_WINDOW_MAIN      = 2 
+      WIDGET_QPUSH_BUTTON     = 3
+      WIDGET_QLABEL           = 4
+      WIDGET_QLINE_EDIT       = 5 
+      WIDGET_QDOUBLE_SPINBOX  = 6
+      LAYOUT_QFORM_LAYOUT     = 3
+  
+  
+  proc qt_app_new2(): QApplication {.importc: "qt_app_new2", dynlib: qlib}
+  
+  proc qt_app_exec2(qapp: QApplication): void {.importc: "qt_app_exec", dynlib: qlib}
+  
+  proc qt_qobject_del(self: QWidget): void  {.importc: "qt_qobject_del", dynlib: qlib}
+  
+  # Set text and label
+  proc qt_widget_setText(self: QWidget, text: cstring): void 
+      {.importc: "qt_widget_setText", dynlib: qlib}
+  
+  # Factory function for instantiating any QT widget
+  proc qt_widget_new(parent: QWidget, ntype: cint): QPushButton
+      {.importc: "qt_widget_new", dynlib: qlib}
+  
+  proc qt_widget_show(self: QWidget): void
+      {.importc: "qt_widget_show", dynlib: qlib}
+  
+  #  void  qt_button_onClicked(QAbstractButton* self, void* ctx, void (* callback) (void*) );
+  proc qt_button_onClicked(self: QPushButton, ctx: Context, callback: callback_clicked ): void
+      {.importc: "qt_button_onClicked", dynlib: qlib}
+  
+  proc qt_msgbox_info(parent: QWidget, title: cstring, text: cstring): void
+      {.importc: "qt_msgbox_info", dynlib: qlib}
+  
+  # Retrieves text from QLineEdit widget
+  proc qt_QLineEdit_text(self: QLineEdit): cstring
+      {.importc: "qt_QLineEdit_text", dynlib: qlib}
+  
+  proc qt_layout_new(parent: QWidget, ntype: cint): QFormLayout
+      {.importc: "qt_layout_new", dynlib: qlib}
+  
+  proc qt_QFormLayout_addWidgetAndLabel(self: QFormLayout, nype: cint, label: cstring): QObject
+      {.importc: "qt_QFormLayout_addWidgetAndLabel", dynlib: qlib}
+  
+  proc qt_QDoubleSpinBox_value(self: QDoubleSpinBox): cdouble
+      {.importc: "qt_QDoubleSpinBox_value", dynlib: qlib}
+  
+  proc qt_QDoubleSpinBox_setValue(self: QDoubleSpinBox, value: cdouble): void 
+      {.importc: "qt_QDoubleSpinBox_setValue", dynlib: qlib}
+  
+  
+  proc qt_QDoubleSpinBox_onValueChanged( self: QDoubleSpinBox
+                                        ,ctx: Context
+                                        ,callback: callback_onValueChanged 
+                                        )
+      {.importc: "qt_QDoubleSpinBox_onValueChanged", dynlib: qlib}
+  
+  
+      #-------------------------------------------------#
+      #             QT Application                      #
+      #-------------------------------------------------#
+  
+  echo " [TRACE] Staring application OK."
+  
+  var app = qt_app_new2()
+  
+  # The window is immediately shown after created.
+  var window = qt_widget_new(nil, WIDGET_WINDOW_MAIN)
+  
+  # UFS - Universal function call => the object is the first function parameter
+  ## Same as:  qt_widget_setText(window, "NIM + Qt5-Widgets Application")
+  window.qt_widget_setText("NIM + Qt5-Widgets Application")
+  # Instantiate QT widgets 
+  var form    = qt_layout_new(window, LAYOUT_QFORM_LAYOUT)
+  var buttonA = form.qt_QFormLayout_addWidgetAndLabel(WIDGET_QPUSH_BUTTON, "ButtonA's label")
+  var buttonB = form.qt_QFormLayout_addWidgetAndLabel(WIDGET_QPUSH_BUTTON, "ButtonB's label")
+  var buttonC = form.qt_QFormLayout_addWidgetAndLabel(WIDGET_QPUSH_BUTTON, "ButtonC's label")
+  var spinbox = qt_QFormLayout_addWidgetAndLabel(form, WIDGET_QDOUBLE_SPINBOX, "Price")
+  var entry   = qt_QFormLayout_addWidgetAndLabel(form, WIDGET_QLINE_EDIT, "User entry")
+  
+  qt_widget_setText(buttonC, "ButtonC")
+  # Set button text using (UFS) universal function call
+  buttonA.qt_widget_setText("ButtonA")
+  buttonB.qt_widget_setText("ButtonB")
+  
+   #--------- Install event handlers (callbacks) -----------#
+  
+  var counter = 0 
+  
+  qt_button_onClicked(buttonA, nil, (ctx: Context) => (block: 
+      counter = counter + 1
+      echo " [INFO] ButtonA clicked => counter = " & counter.intToStr
+      entry.qt_widget_setText "Counter changed to " & counter.intToStr
+  ))
+  
+  buttonB.qt_button_onClicked(nil, (ctx: Context) => (block: 
+      counter = counter - 1    
+      echo " [INFO] ButtonB clicked => counter = " & counter.intToStr
+      entry.qt_widget_setText "Counter changed to " & counter.intToStr
+  ))
+  
+  buttonC.qt_button_onClicked(nil) do (ctx: Context):
+      counter = 100
+      qt_msgbox_info( nil
+                    , "Button A notification"
+                    , "[INFO] ButtonC => reset counter to = " & counter.intToStr)
+      entry.qt_widget_setText " [BUTTON C] Counter changed to " & counter.intToStr
+      echo " [BUTTON C] Counter changed to " & counter.intToStr
+  
+  spinbox.qt_QDoubleSpinBox_onValueChanged(nil) do (ctx: Context) -> void:
+      let value = spinbox.qt_QDoubleSpinBox_value
+      # echo " [INFO] Spbinbox Value changed to ", value
+      entry.qt_widget_setText "Spinbox value changed to = " &  $value
+  
+   #---------- Run QT applicaton ---------------------------#
+   #
+  
+  # Display root widget  
+  qt_widget_show(window)
+  
+  # Run QT application and block current thread 
+  qt_app_exec2(app)
+  
+    # ---- Dispose QT objects -------------#
+    # 
+  qt_qobject_del(window)
+  qt_qobject_del(app)
+  
+  echo " [TRACE] Application terminated. Ok."
+#+END_SRC
+
+Copy the shared library to the project's root directory:
+
+#+BEGIN_SRC sh
+   $ >> cp -v _build/libqtwrapper.so .
+  '_build/libqtwrapper.so' -> './libqtwrapper.so'
+#+END_SRC
+
+Compile and run in a single step: 
+
+#+BEGIN_SRC sh
+ $ nim c -r nim_app.nim
+#+END_SRC
+
+#+CAPTION: Qt5 GUI written in NIM programming language.
+[[file:images/cwrapper-qt5-nim.png][file:images/cwrapper-qt5-nim.png]]
 
 *** TODO Rust client code 
  
