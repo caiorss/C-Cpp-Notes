@@ -6781,7 +6781,7 @@ Headers and libraries:
    }
 #+END_SRC
 
-*** GTK3/GTK2 GUI using dynamic loading - low level 
+*** Loading Gtk2/Gtk3 - low level 
 
 The following sample code is a GTk3 or GTK2 GUI graphical user
 interface application with GTK functions loaded from a GTK shared
@@ -7009,7 +7009,7 @@ Screenshot:
 #+CAPTION: Screenshot of GTk Window created using dlopen() API 
 [[file:images/gtk-dlopen-screen1.png][file:images/gtk-dlopen-screen1.png]]
 
-*** GTK3/GTK2 GUI using dynamic loading - high level C++ wrapper 
+*** Loading Gtk2/Gtk3 - high level C++ wrapper 
 
 This proof-of-concept code contains a high-level wrapper class
 SharedLibrary for abstracting away the dlopen() API. This class is
@@ -7388,6 +7388,372 @@ Screenshots:
 
 #+CAPTION: Gtk modal dialog screenshot 2 
 [[file:images/gtk-dlopen-screen3.png][file:images/gtk-dlopen-screen3.png]]
+*** Loading Gtk2/Gtk3 using Nim language
+    
+The following code creates a sample Gtk2 or Gtk3 graphics interface by
+dynamic loading Gtk symbols using [[https://nim-lang.org/docs/dynlib.html][dynlib]] Nim module, a
+dlopen()/dlclose() cross-platform wrapper, without linking against
+neither Gtk2 nor Gtk3 shared libraries at compile-time. 
+
+Reading: 
+
+  + https://docs.gtk.org/gtk3/index.html
+    + => Search GTK functions and their type signatures.
+      
+  + https://nim-lang.org/
+
+  + [[https://en.wikipedia.org/wiki/Nim_(programming_language)][Nim (programming language)]]
+      
+  + [[https://en.wikipedia.org/wiki/Uniform_Function_Call_Syntax][UFS - Universal Function Call]]
+
+  + https://nim-lang.org/docs/dynlib.html
+    + => Cross-platform wrapper to dlopen() on Unix-like operating
+      systems and LoadLibrary() on Windows.
+      
+File: _gtk_dlopen.nim_
+
+#+CAPTION: file - gtk_dlopen.nim 
+#+BEGIN_SRC python      
+  import std/dynlib  
+  import os
+  
+  type
+     gchar         = cchar    # char 
+     gshort        = cshort   # short 
+     glong         = clong    # long 
+     gint          = cint     # int 
+     gboolean      = gint     
+     guchar        = cuchar   # unsigned char   
+     gushort       = cushort  # unsigned short  
+     gulong        = culong   # unsigned long   
+     guint         = cint     # unsigned int    
+     gfloat        = cfloat   
+     gdouble       = cdouble  
+     gpointer      = pointer  # void*  (Opaque pointer)
+     gconstpointer = pointer  # const void*     
+  
+  type 
+     GtkWidget      = pointer  
+     GConnectFlags  = cint     
+     GtkDialogFlags = cint
+     GtkMessageType = cint   
+     GtkButtonsType = cint  
+  
+  # Enumeration: GtkWindowType
+  const 
+      
+      GTK_WINDOW_TOPLEVEL = 0 
+      GTK_WINDOW_POPUP    = 1 
+  
+      # Enumeration: GConnectFlags 
+      G_CONNECT_AFTER   = 1
+      G_CONNECT_SWAPPED = 2
+  
+  # Enumeration: GtkMessageType
+  const 
+      GTK_MESSAGE_INFO     = 0
+      GTK_MESSAGE_WARNING  = 1
+      GTK_MESSAGE_QUESTION = 2
+      GTK_MESSAGE_ERROR    = 3
+      GTK_MESSAGE_OTHER    = 4
+  
+  # Enumeration: GtkDialogFlags  
+  const 
+      GTK_DIALOG_MODAL               = 1
+      GTK_DIALOG_DESTROY_WITH_PARENT = 2 
+      GTK_DIALOG_USE_HEADER_BAR      = 4
+  
+  # Enumeration: GtkButtonsType
+  const 
+      GTK_BUTTONS_NONE      = 0 
+      GTK_BUTTONS_OK        = 1 
+      GTK_BUTTONS_CLOSE     = 2
+      GTK_BUTTONS_CANCEL    = 3
+      GTK_BUTTONS_YES_NO    = 4
+      GTK_BUTTONS_OK_CANCEL = 5
+  
+    #-------------------------------------------------#
+    #         GTK Function Pointers Definitions       #
+    #-------------------------------------------------#
+  
+  type 
+      # using gtk_init_check_t = gboolean (*) (int* argc, char*** argv);
+      # See: https://stackoverflow.com/questions/55646129/nim-argv-equivalent 
+      gtk_init_check_t = proc (argc: ptr cint, argv: cstringArray): gboolean {.gcsafe, stdcall.} 
+  
+      # using gkt_window_new_t = GtkWidget* (*) (int);
+      gtk_window_new_t = proc(param: cint): GtkWidget {.gcsafe, stdcall.}
+  
+      # void (*) (GtkWidget*)
+      gtk_widget_show_t = proc(widget: GtkWidget): void {.gcsafe, stdcall.}
+  
+      # void (*) ()
+      gtk_main_t = proc(): void {.gcsafe, stdcall.}
+  
+      # using gtk_window_set_title_t = void (*) (GtkWidget* window, const gchar* title);
+      gtk_window_set_title_t = proc(window: GtkWidget, title: cstring): void {.gcsafe, stdcall.}
+   
+      # using gtk_widget_set_size_t = void (*) (GtkWidget*, gint, gint);
+      gtk_widget_set_size_t = proc(widget: GtkWidget, width: gint, height: gint): void {.gcsafe, stdcall.}
+  
+      # void gtk_widget_show_all ( GtkWidget* widget)
+      gtk_widget_show_all_t = proc (widget: GtkWidget): void {.gcsafe, stdcall.}
+  
+      # GtkWidget* gtk_button_new_with_label ( const gchar* label)
+      gtk_button_new_with_label_t = proc(label: cstring): GtkWidget {.gcsafe, stdcall.}
+  
+      # void gtk_container_add ( GtkContainer* container, GtkWidget* widget)
+      # See: https://docs.gtk.org/gtk3/method.Container.add.html 
+      gtk_container_add_t = proc(container: GtkWidget, widget: GtkWidget ): void {.gcsafe, stdcall.}
+  
+      # void gtk_widget_set_size_request ( GtkWidget* widget, gint width, gint height)
+      # See: https://docs.gtk.org/gtk3/method.Widget.set_size_request.html 
+      gtk_widget_set_size_request_t = proc( widget: GtkWidget
+                                          , width:  gint
+                                          , height: gint)  {.gcsafe, stdcall.}
+  
+      # void (*) () 
+      gtk_main_quit_t = proc(): void {.gcsafe, stdcall.}
+  
+      # void* (void pointer - opaque pointer)
+      GClosure = pointer
+  
+      #  void  (*) (void);
+      GCallback = proc(): void {.gcsafe, stdcall.}
+  
+      # void  (*) (gpointer data, GClosure* closure);
+      GClosureNotify = proc(data: gpointer, closure: GClosure): void 
+  
+      ClickedCallback = proc(): void  {.gcsafe, stdcall.}
+  
+      g_signal_connect_data_t = proc( instance:        gpointer
+                                    , detailed_signal: cstring
+                                    , c_handler:       GCallback
+                                    , data:            gpointer
+                                    , destroy_data:    GClosureNotify
+                                    , connect_flag:    GConnectFlags 
+                                    ): gulong {.gcsafe, stdcall.}
+  
+      gtk_message_dialog_new_t = proc( parent:         GtkWidget
+                                     , flags:          GtkDialogFlags
+                                     , ttype:          GtkMessageType
+                                     , buttons:        GtkButtonsType
+                                     , message_format: cstring 
+                                    ): GtkWidget {.gcsafe, stdcall.}
+  
+      # gint (*) (void* dialog);
+      gtk_dialog_run_t = proc(dialog: GtkWidget): gint {.gcsafe, stdcall.}
+  
+      # using gtk_widget_destroy_t = void (*) (GtkWidget* widget);
+      gtk_widget_destroy_t = proc(widget: GtkWidget): void  {.gcsafe, stdcall.}
+  
+      # guint gtk_get_major_version (void)
+      gtk_get_major_version_t = proc(): void {.gcsafe, stdcall.}
+  
+    #---------------------------------------------------#
+    # Load Function GTK Pointers from shared library    #
+    #                                                   #
+    # GTK functions' type signature can be searched at: #
+    #   -  https://docs.gtk.org/gtk3                    #
+    #---------------------------------------------------#
+  
+  proc loadSym(lib: dynlib.LibHandle, symbol: string): pointer =  
+      echo " [TRACE] Loading symbol = " & symbol
+      let p = lib.symAddr(symbol)
+      assert p != nil, ("Cannot load symbol = " & symbol)
+      return p
+  
+  
+  echo "\n\n ======== Program started Ok =============="
+  
+  let dll = os.getEnv("GTK_LIB", "libgtk-3.so.0")
+  
+  let lib = dynlib.loadLib(dll)
+  assert lib != nil, "Cannot load shared library"
+  echo " [TRACE] Shared library " & dll & " loaded Ok."
+  
+  let gtk_init_check               = cast[gtk_init_check_t]( lib.loadSym("gtk_init_check") )
+  let gtk_window_new               = cast[gtk_window_new_t]( lib.loadSym("gtk_window_new") )
+  let gtk_widget_show              = cast[gtk_widget_show_t]( lib.loadSym("gtk_widget_show") )
+  let gtk_main                     = cast[gtk_main_t]( lib.loadSym("gtk_main") )
+  let gtk_window_set_title         = cast[gtk_window_set_title_t]( lib.loadSym("gtk_window_set_title") )
+  let gtk_widget_set_size          = cast[gtk_widget_set_size_t]( lib.loadSym("gtk_widget_set_size_request") )
+  let gtk_main_quit                = cast[gtk_main_quit_t]( lib.loadSym("gtk_main_quit") )
+  let g_signal_connect_data        = cast[g_signal_connect_data_t]( lib.loadSym("g_signal_connect_data") )
+  let gtk_widget_show_all          = cast[gtk_widget_show_all_t]( lib.loadSym("gtk_widget_show_all") )
+  let gtk_button_new_with_label    = cast[gtk_button_new_with_label_t]( lib.loadSym("gtk_button_new_with_label") )
+  let gtk_container_add            = cast[gtk_container_add_t]( lib.loadSym("gtk_container_add") )
+  let gtk_widget_set_size_request  = cast[gtk_widget_set_size_request_t]( lib.loadSym("gtk_widget_set_size_request") )
+  let gtk_dialog_run               = cast[gtk_dialog_run_t]( lib.loadSym("gtk_dialog_run") )
+  let gtk_message_dialog_new       = cast[gtk_message_dialog_new_t]( lib.loadSym("gtk_message_dialog_new") )
+  let gtk_widget_destroy           = cast[gtk_widget_destroy_t]( lib.loadSym("gtk_widget_destroy") )
+  let gtk_get_major_version        = cast[gtk_get_major_version_t]( lib.symAddr("gtk_get_major_version") )
+  
+  
+  if gtk_get_major_version == nil:
+      echo " [TRACE] Running Gtk - 2.X"
+  else: 
+      echo " [TRACE] Running Gtk - 3.X"
+  
+  # gtk_main_quit() wrapper for logging
+  proc gtk_app_quit(): void  {.gcsafe, stdcall.}  = 
+      echo " [TRACE] Quit GTK - Shutdown GTK event loop and unblocks current thread."
+      gtk_main_quit()
+  
+  proc on_clicked(button: GtkWidget, callback: ClickedCallback): void = 
+      echo "I was clicked"
+      discard g_signal_connect_data(button, "clicked", callback, nil, nil, cint 0)
+  
+  proc msgbox_info(parent: GtkWidget, title: cstring, text: cstring): void  = 
+      let dialog = gtk_message_dialog_new( parent, GTK_DIALOG_MODAL, GTK_MESSAGE_INFO
+                                         , GTK_BUTTONS_OK, text)
+      assert dialog != nil 
+      gtk_window_set_title dialog, title
+      discard gtk_dialog_run dialog 
+      gtk_widget_destroy dialog 
+  
+  # Start GTK widgets 
+  proc gtk_start(): void = 
+      var nargv =  newSeq[string](paramCount())
+      var x = 0
+      while x < paramCount():
+         nargv[x] = paramStr(x+1)  # first is program name
+         x += 1
+      var argv: cStringArray = nargv.allocCStringArray()
+      var argc: cint = cint paramCount()
+      # Call  gboolean gtk_init_check (int* argc, char*** argv);
+      discard gtk_init_check(addr argc, argv)
+      echo " [TRACE] Gtk started. Ok."
+  
+  
+    #---------------------------------------------------#
+    #             Create GTK GUI                        #
+    #---------------------------------------------------#
+  
+  echo " [TRACE] Shared library library loaded Ok."
+  
+  # Encapsulates gtk_init_check(int &argc, char **argv)
+  # gtk_init_check must always be called before calling any other GTK 
+  # function, otherwise a runtime error will happen.
+  gtk_start()
+  
+  let window: GtkWidget = gtk_window_new( GTK_WINDOW_TOPLEVEL )
+  assert window != nil 
+  
+  # Alternative ways to write the same code in the next non-comment line: 
+  #  =>> gtk_widget_set_size( window, 400, 500)
+  #  =>> gtk_widget_set_size  window, 400, 500 
+  #  =>> window.gtk_widget_set_size( 400, 500 )
+  #  =>> window.gtk_widget_set_size 400, 500 
+  window.gtk_widget_set_size 400, 500
+  
+  window.gtk_window_set_title "My GTK Windows called from Nim"
+  
+  
+  let button = gtk_button_new_with_label("Click me now!")
+  assert button != nil, "Failed to create button"
+  button.gtk_widget_set_size_request 70, 30
+  gtk_container_add(window, button)
+  
+  # gtk_widget_show( window ) ->> UFS - Universal Function Call
+  # window.gtk_widget_show()
+  gtk_widget_show_all(window)
+  
+  # Discard annotation discards the function return value 
+  discard g_signal_connect_data( window, "destroy", gtk_app_quit, nil, nil, cint 0)
+  
+  var counter = 0
+  
+  # Set button callback using a lambda syntax sugar 
+  # for better code asthetics and readability
+  button.on_clicked do:
+      counter = counter + 1
+      let message = " [INFO] Button was clicked " & $counter & " times. "
+      echo message
+      msgbox_info(nil, "Notification", message)
+  
+  # Run GTK event loop and block current thread 
+  gtk_main()
+  
+  echo " [TRACE] GTK application shutdown OK."
+#+END_SRC
+
+
+ *Screenshot* 
+
+#+CAPTION: Gtk2/Gtk3 graphics interface created using NIM language
+[[file:images/nim_dlopen.png][file:images/nim_dlopen.png]]
+
+
+ *Building and Running*
+
+Building:
+
+#+BEGIN_SRC sh 
+  $ nim c gtk_dlopen.nim
+#+END_SRC
+
+Running loading Gtk 3: 
+
+#+BEGIN_SRC sh 
+   $ ./gtk_dlopen
+  
+   ======== Program started Ok ==============
+   [TRACE] Shared library libgtk-3.so.0 loaded Ok.
+   [TRACE] Loading symbol = gtk_init_check
+   [TRACE] Loading symbol = gtk_window_new
+   [TRACE] Loading symbol = gtk_widget_show
+   [TRACE] Loading symbol = gtk_main
+   [TRACE] Loading symbol = gtk_window_set_title
+    ... ... ...    ... ... ...   ... ... ...   ... ... ... 
+    ... ... ...   ... ... ...   ... ... ...   ... ... ... 
+   [TRACE] Loading symbol = gtk_message_dialog_new
+   [TRACE] Loading symbol = gtk_widget_destroy
+   [TRACE] Running Gtk - 3.X
+   [TRACE] Shared library library loaded Ok.
+   [TRACE] Gtk started. Ok.
+  I was clicked
+   [INFO] Button was clicked 1 times. 
+   [INFO] Button was clicked 2 times. 
+   [INFO] Button was clicked 3 times. 
+   [INFO] Button was clicked 4 times. 
+   [INFO] Button was clicked 5 times. 
+   [INFO] Button was clicked 6 times. 
+   [TRACE] Quit GTK - Shutdown GTK event loop and unblocks current thread.
+   [TRACE] GTK application shutdown OK.
+#+END_SRC
+
+Running loading Gtk 2: 
+
+#+BEGIN_SRC sh
+   $ >> env GTK_LIB="libgtk-x11-2.0.so.0" ./gtk_dlopen
+  
+   ======== Program started Ok ==============
+   [TRACE] Shared library libgtk-x11-2.0.so.0 loaded Ok.
+   [TRACE] Loading symbol = gtk_init_check
+   [TRACE] Loading symbol = gtk_window_new
+   [TRACE] Loading symbol = gtk_widget_show
+   [TRACE] Loading symbol = gtk_main
+   [TRACE] Loading symbol = gtk_window_set_title
+   [TRACE] Loading symbol = gtk_widget_set_size_request
+  
+   ....   ....  ....  ....  ....  ....  .... 
+   ....   ....  ....  ....  ....  ....  .... 
+  
+   [TRACE] Running Gtk - 2.X
+   [TRACE] Shared library library loaded Ok.
+   [TRACE] Gtk started. Ok.
+  I was clicked
+   [INFO] Button was clicked 1 times. 
+   [INFO] Button was clicked 2 times. 
+   
+   ....   ....  ....  ....  ....  ....  .... 
+   ....   ....  ....  ....  ....  ....  .... 
+  
+   [INFO] Button was clicked 15 times. 
+   [TRACE] Quit GTK - Shutdown GTK event loop and unblocks current thread.
+   [TRACE] GTK application shutdown OK.
+#+END_SRC
 ** Library calls hooking/interception with LD_PRELOAD 
 *** Overview 
 
