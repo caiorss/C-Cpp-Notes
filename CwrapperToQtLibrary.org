@@ -1198,8 +1198,102 @@ Run executable:
 
 User Interface Screenshot: 
 
-#+CAPTION: User interface for C client code. 
+#+CAPTION: C client code user interface
 [[file:images/cwrapper-qt5-1.png][file:images/cwrapper-qt5-1.png]] 
+*** C++ client code 
+    
+File: _cpp-client.cpp_
+
+#+BEGIN_SRC cpp
+  #include <iostream>
+  #include <functional>
+  #include <cassert>
+  
+  // Indicates that symbols from this header file have C linkage (C ABI)
+  // rather than C++ ABI.
+  extern "C" {
+      #include "qtwrapper.h"
+  }
+  
+  const int WIDGET_WINDOW           = 1; 
+  const int WIDGET_WINDOW_MAIN      = 2; 
+  const int WIDGET_QPUSH_BUTTON     = 3;
+  const int WIDGET_QLABEL           = 4;
+  const int WIDGET_QLINE_EDIT       = 5; 
+  const int WIDGET_QDOUBLE_SPINBOX  = 6;
+  
+  const int LAYOUT_QFORM_LAYOUT = 3;
+  
+  using ButtonCallck = std::function<void ()>;
+  
+  // Implementation with type erasure and dynamic allocations
+  // Note: std::functions<> uses dynamic allocaiton underneath 
+  void onClicked(QPushButton* btn, ButtonCallck func)
+  {
+  
+      qt_button_onClicked(btn, &func, [](void* ctx){
+          auto callback = reinterpret_cast<ButtonCallck*>(ctx);
+          callback->operator()();
+      });
+  }
+  
+  // Implementation without dynamic allocation 
+  // DOES NOT WORK: segmentation fault 
+  template<typename Callback>
+  void onClicked_tpl(QPushButton* btn, Callback func)
+  {
+      qt_button_onClicked(btn, &func, [](void* ctx){
+          // auto callback = (Callback*) ctx;  
+          auto callback = reinterpret_cast<Callback*>(ctx);
+          //callback();
+          callback->operator()();
+      });
+  }
+  
+  int main(int argc, char** argv)
+  {
+  
+      QApplication* qapp = qt_app_new2();
+  
+      QPushButton* win = qt_widget_new(NULL, WIDGET_WINDOW_MAIN);
+      qt_widget_setText(win, "Window Title");
+      assert(win != NULL);
+  
+      QFormLayout* form = qt_layout_new(win, LAYOUT_QFORM_LAYOUT);
+      assert(form != NULL);
+  
+      QPushButton* btn1 = qt_QFormLayout_addWidgetAndLabel(form, WIDGET_QPUSH_BUTTON, "");
+      qt_widget_setText(btn1, "Button 1");
+  
+      QLabel*  disp = qt_QFormLayout_addWidgetAndLabel(form, WIDGET_QLABEL, "Result");
+  
+      // qt_widget_setText(btn1, "Button 1");
+      int counter = 0;
+  
+      onClicked(btn1, [&counter, disp]{
+          std::cout << " [TRACE] (*) Counter = " << counter++ << "\n";
+          auto text = std::string(" Counter set to = ") + std::to_string(counter);
+          qt_widget_setText(disp, text.c_str());
+  
+          if( counter > 10 ){
+              qt_msgbox_info(nullptr, "Notification", "Counter greater than 10");
+          }
+      });
+  
+      // Blocks current thread until window is closed. 
+      qt_app_exec(qapp);
+  
+      // Dispose QT objects 
+      qt_qobject_del(win);
+      qt_qobject_del(qapp);
+  }
+#+END_SRC
+
+Screenshot: 
+
+#+CAPTION: C++ client code user interface  
+[[file:images/cwrapper-qt5-cpp-client.png][file:images/cwrapper-qt5-cpp-client.png]]
+
 *** Python3 Client Code 
 
 The following python script, loads the C shared library wrapper for
