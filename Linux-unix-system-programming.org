@@ -7388,6 +7388,293 @@ Screenshots:
 
 #+CAPTION: Gtk modal dialog screenshot 2 
 [[file:images/gtk-dlopen-screen3.png][file:images/gtk-dlopen-screen3.png]]
+*** Loading Gtk2/Gtk3 using D DLang language
+
+The following code creates Gtk graphics user interface by loading Gtk
+function pointers from Gtk shared library using D (DLang) programming
+language.
+    
+File: _gtk_dlopen.d_
+
+#+BEGIN_SRC cpp 
+  import core.stdc.stdio;
+  import io = std.stdio;
+  import std.range: empty;
+  import std.algorithm : map, joiner;
+  import std.string;
+  import str = std.string;
+  import std.array: array;
+  import std.conv: to;
+  import DLL = core.sys.posix.dlfcn;
+  import core.sys.posix.dlfcn;
+  
+  
+  struct ButtonState 
+  {
+    int counter = 0;
+    gtk_message_dialog_new_t gtk_message_dialog_new = null;
+    gtk_window_set_title_t   gtk_window_set_title   = null; 
+    gtk_dialog_run_t         gtk_dialog_run         = null; 
+    gtk_widget_destroy_t     gtk_widget_destroy     = null;
+  }
+  
+  extern(C) 
+  void buttonCallback(GtkWidget* widget, gpointer data)
+  {
+    auto state = cast(ButtonState*) data;
+    state.counter = state.counter + 1;
+    io.writeln(" [TRACE] Button Called => Counter  = ", state.counter);
+    auto message = " [INFO] Counter changed to " ~ to!string(state.counter);
+    auto dialog = state.gtk_message_dialog_new( null
+                                              , GtkDialogFlags.GTK_DIALOG_MODAL
+                                              , GtkMessageType.GTK_MESSAGE_INFO
+                                              , GtkButtonsType.GTK_BUTTONS_OK
+                                              , message.toStringz
+                                              );
+    state.gtk_window_set_title(dialog, "Gtk Info dialog from DLang");
+    // io.writeln(" [TRACE] Run message dialog ");
+    state.gtk_dialog_run(dialog);
+    // Dispose GTk object 
+    state.gtk_widget_destroy(dialog);
+  }
+  
+  int main(string[] args)
+  {
+    printf(" [TRACE] Application started Ok. \n");
+  
+    void* dll = DLL.dlopen("libgtk-3.so.0", DLL.RTLD_GLOBAL | DLL.RTLD_LAZY);
+    if (!dll)
+    {
+        fprintf(stderr, " [ERROR] dlopen error: %s\n", DLL.dlerror());
+        return 1;
+    }
+  
+    //-------------------------------------------//
+    //    Load GTK Function pointers             //
+    //-------------------------------------------//
+  
+    auto gtk_init_check               = cast(gtk_init_check_t)( dll.dlsym("gtk_init_check") );
+    auto gtk_window_new               = cast(gtk_window_new_t)( dll.dlsym("gtk_window_new") );
+    auto gtk_widget_show              = cast(gtk_widget_show_t)( dll.dlsym("gtk_widget_show") );
+    auto gtk_main                     = cast(gtk_main_t)( dll.dlsym("gtk_main") );
+    auto gtk_window_set_title         = cast(gtk_window_set_title_t)( dll.dlsym("gtk_window_set_title") );
+    auto gtk_widget_set_size          = cast(gtk_widget_set_size_t)( dll.dlsym("gtk_widget_set_size_request") );
+    auto gtk_main_quit                = cast(gtk_main_quit_t)( dll.dlsym("gtk_main_quit") );
+    auto g_signal_connect_data        = cast(g_signal_connect_data_t)( dll.dlsym("g_signal_connect_data") );
+    auto gtk_widget_show_all          = cast(gtk_widget_show_all_t)( dll.dlsym("gtk_widget_show_all") );
+    auto gtk_button_new_with_label    = cast(gtk_button_new_with_label_t)( dll.dlsym("gtk_button_new_with_label") );
+    auto gtk_container_add            = cast(gtk_container_add_t)( dll.dlsym("gtk_container_add") );
+    auto gtk_widget_set_size_request  = cast(gtk_widget_set_size_request_t)( dll.dlsym("gtk_widget_set_size_request") );
+    auto gtk_dialog_run               = cast(gtk_dialog_run_t)( dll.dlsym("gtk_dialog_run") );
+    auto gtk_message_dialog_new       = cast(gtk_message_dialog_new_t)( dll.dlsym("gtk_message_dialog_new") );
+    auto gtk_widget_destroy           = cast(gtk_widget_destroy_t)( dll.dlsym("gtk_widget_destroy") );
+    auto gtk_get_major_version        = cast(gtk_get_major_version_t)( dll.dlsym("gtk_get_major_version") );
+    assert(gtk_message_dialog_new != null);
+  
+    if( gtk_get_major_version == null)
+    {
+      printf(" [TRACE] Running Gtk - 2.X \n");
+    } else {
+      printf(" [TRACE] Running Gtk - 3.X \n");
+    }
+  
+    //------------------------------------//
+    //      Initialize GTK                //
+    //------------------------------------//
+  
+    int n = cast(int) args.length;
+    auto argarr = args.map!( a => (a.dup ~ '\0' ).ptr ).array;
+    auto argv = argarr.ptr;
+    // This function must always be called before 
+    // calling any other GTK function/procedure. 
+    gtk_init_check(&n, &argv);
+  
+    //------------------------------------//
+    //      Build GTK Widgets             //
+    //------------------------------------//
+  
+    auto window = gtk_window_new( GtkWindowType.GTK_WINDOW_TOPLEVEL );
+    assert( window != null );
+    gtk_widget_set_size_request(window, 399, 500);
+    gtk_window_set_title(window, "My Gtk Window from Dlang (D)".toStringz );
+    auto button = gtk_button_new_with_label("Click me now");
+    assert( button != null );
+    gtk_container_add(window, button);
+    gtk_widget_show_all( window );
+    
+    //--------------------------------------//
+    //      Set up event handlers           //
+    //--------------------------------------//
+  
+    // Call gtk_main_quit() function when the user closes the window. 
+    g_signal_connect_data(  window
+                          ,"destroy".toStringz
+                          , gtk_main_quit
+                          , null
+                          , null
+                          , cast(GConnectFlags) 0
+                          );
+  
+    ButtonState state;
+    state.counter                = 100;
+    state.gtk_message_dialog_new = gtk_message_dialog_new;              
+    state.gtk_widget_destroy     = gtk_widget_destroy;
+    state.gtk_window_set_title   = gtk_window_set_title;   
+    state.gtk_dialog_run         = gtk_dialog_run;
+    gtk_widget_destroy           = gtk_widget_destroy; 
+  
+    g_signal_connect_data( button
+                         , "clicked".toStringz
+                         , &buttonCallback
+                         , &state  
+                         , null  
+                         , cast(GConnectFlags) 0 
+                         );
+  
+    printf(" [TRACE] Connect button event ");
+  
+    //--------------------------------------//
+    //        Run Event Loop                //
+    //--------------------------------------//
+    // Blocks current thread and run GTK event loop.
+    gtk_main(); 
+  
+    return 0;
+  }
+  
+      // ------------------------------------------ //
+  
+  alias gchar    = char;
+  alias gshort   = short;
+  alias glong    = long;
+  alias gint     = int;
+  alias gboolean = gint;
+  alias guchar   = ushort; // unsigned short 
+  alias gulong   = ulong;  // unsigned long 
+  alias guint    = uint;
+  alias gfloat   = float;
+  alias gdouble  = double;
+  alias gpointer = void*;          
+  alias gconstpointer = const void*;
+  
+  alias GClosure = void*;
+  alias GtkWidget = void;
+  alias GtkWindow = void;
+  alias GtkDialog = void;
+  
+  enum GtkWindowType {
+     GTK_WINDOW_TOPLEVEL = 0 
+    ,GTK_WINDOW_POPUP    = 1
+  }
+  
+  enum GConnectFlags {
+      G_CONNECT_AFTER   = 1
+    , G_CONNECT_SWAPPED = 2 
+  }
+  
+  enum GtkMessageType {
+      GTK_MESSAGE_INFO
+    , GTK_MESSAGE_WARNING
+    , GTK_MESSAGE_QUESTION
+    , GTK_MESSAGE_ERROR
+    , GTK_MESSAGE_OTHER
+  }
+  
+  enum  GtkDialogFlags {
+        GTK_DIALOG_MODAL               = 1 << 0
+      , GTK_DIALOG_DESTROY_WITH_PARENT = 1 << 1
+      , GTK_DIALOG_USE_HEADER_BAR      = 1 << 2
+  }
+  
+  enum  GtkButtonsType
+  {
+      , GTK_BUTTONS_NONE
+      , GTK_BUTTONS_OK
+      , GTK_BUTTONS_CLOSE
+      , GTK_BUTTONS_CANCEL
+      , GTK_BUTTONS_YES_NO
+      , GTK_BUTTONS_OK_CANCEL
+  }
+  
+    
+  alias gtk_init_check_t = extern(C) gboolean function (int* argc, char*** argv);
+  
+  alias gtk_dialog_run_t       = extern(C) gint function (void* dialog);
+  alias gtk_widget_destroy_t   = extern(C) void function (GtkWidget* widget);
+  alias gtk_main_quit_t        = extern(C) void function ();
+  
+  alias gtk_window_set_title_t = extern(C) void function (GtkWidget* window, const gchar* title);
+  
+  // alias GCallback      = extern(C)  void function ();
+  alias GCallback = extern(C) void function(GtkWidget* widget, gpointer data);
+  
+  alias GClosureNotify = extern(C)  void function (gpointer data, GClosure* closure);
+  
+  
+  alias gtk_window_new_t = extern(C) GtkWidget* function (int);  
+  
+  alias gtk_widget_show_t = extern(C) void function(GtkWidget*);
+  
+  alias gtk_widget_set_size_t =  extern(C) void function (GtkWidget* widget, gint width, gint height);
+  
+  alias gtk_widget_show_all_t = extern(C) void function (GtkWidget* widget);
+  
+  alias gtk_main_t =  extern(C) void function();
+  
+  alias gtk_button_new_with_label_t = extern(C) GtkWidget* function(const char* label);
+  
+  alias gtk_container_add_t =  extern(C) void function(GtkWidget* container, GtkWidget* widget);
+  
+  
+  alias gtk_widget_set_size_request_t = extern(C) void function(GtkWidget* widget, gint width, gint height); 
+  
+  
+  alias gtk_get_major_version_t = extern(C) void function ();
+  
+  alias g_signal_connect_data_t =  extern(C) gulong function ( 
+                                                gpointer        instance
+                                              , const gchar*    detailed_signal
+                                              , void*           c_handler 
+                                             // , GCallback       c_handler
+                                              , gpointer        data
+                                              , GClosureNotify  destroy_data
+                                              , GConnectFlags   connect_flags
+                                              );
+  
+  
+  alias gtk_message_dialog_new_t = extern(C) GtkWidget* function ( 
+                                        GtkWindow       *parent,
+                                        GtkDialogFlags  flags,
+                                        GtkMessageType  type,
+                                        GtkButtonsType  buttons,
+                                        const gchar*    message_format
+                                      );
+  
+
+#+END_SRC
+
+Building:
+
+#+BEGIN_SRC sh 
+  $ dmd -g gtk_dlopen.d
+#+END_SRC
+
+Building with docker (run the compiler without installing it): 
+
+#+BEGIN_SRC sh 
+  $  docker run --rm --interactive --tty --volume="$PWD":/pwd --workdir=/pwd dlangchina/dlang-dmd dmd -g gtk_dlopen.d
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC sh 
+  $ ./gtk_dlopen 
+#+END_SRC
+
+#+CAPTION: Gtk Gui built using Dlang 
+[[file:images/gtk_dlopen_dlang.png][file:images/gtk_dlopen_dlang.png]]
+
+
 *** Loading Gtk2/Gtk3 using Nim language
     
 The following code creates a sample Gtk2 or Gtk3 graphics interface by
