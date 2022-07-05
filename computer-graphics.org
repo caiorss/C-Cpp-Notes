@@ -6577,86 +6577,91 @@ OpenGL subroutines used:
   + The CMakeLists.txt (version 2) contains a macro for defining
     OpenGL applications without the boilerplate needed for linking
     against OpenGL companion libraries and statically linking against
-    MINGW runtimme libraries. 
+    MINGW runtimme libraries.
+
+  + Note:
+    + This URL no longer works  https://megalink.dl.sourceforge.net/project/glew/glew/2.1.0/glew-2.1.0-win32.zip
+    + Replace with this URL: https://ufpr.dl.sourceforge.net/project/glew/glew/2.1.0/glew-2.1.0-win32.zip
+
 
 File: _CMakeLists.txt_ (Version 1)
 
 #+BEGIN_SRC cmake 
-   make_minimum_required(VERSION 3.5)
-   project(OpenGL_Draw2D_VBO)
-
-   set(CMAKE_CXX_STANDARD 17)
-   set(CMAKE_CXX_STANDARD_REQUIRED ON)
-   set(CMAKE_VERBOSE_MAKEFILE ON)
-
-   #================ GLFW Settings  ===============#
-
-   find_package(OpenGL REQUIRED)
-
-   include(FetchContent)
-
-   # Set GLFW Options before FectchContent_MakeAvailable
-   set( GLFW_BUILD_EXAMPLES OFF CACHE BOOL  "GLFW lib only" )
-   set( GLFW_BUILD_TESTS    OFF CACHE BOOL  "GLFW lib only" )
-   set( GLFW_BUILD_DOCS     OFF CACHE BOOL  "GLFW lib only" )
-   set( GLFW_BUILD_INSTALL  OFF CACHE BOOL  "GLFW lib only" )
-
-   # Donwload GLFW library
-   FetchContent_Declare(
-     glfwlib
-     URL   https://github.com/glfw/glfw/releases/download/3.3.2/glfw-3.3.2.zip
-   )
-   FetchContent_MakeAvailable(glfwlib)
-
-   # Download pre-compiled GLEW when building under Windows NT OS (x64)
-   IF(WIN32)
-      FetchContent_Declare(
-         glew-release 
-         URL     https://megalink.dl.sourceforge.net/project/glew/glew/2.1.0/glew-2.1.0-win32.zip
-         # https://github.com/nigels-com/glew/archive/glew-2.2.0.zip
-      )
-      FetchContent_MakeAvailable(glew-release)
-      include_directories( ${glew-release_SOURCE_DIR}/include  ${glm_SOURCE_DIR} )        
-      link_directories(  ${glew-release_SOURCE_DIR}/lib/Release/x64 )
-
-      set( GLEW_LIB_PATH1 ${glew-release_SOURCE_DIR}/lib/Release/x64/glew32.lib )
-      set( GLEW_LIB_PATH2 ${glew-release_SOURCE_DIR}/lib/Release/x64/glew32s.lib )
-   ENDIF()
-
-      # ======= T A R G E T S ============================#
-      #                                                   #
-
-
-          add_executable( draw2d-raw  draw2d-raw.cpp )
-   target_link_libraries( draw2d-raw  glfw
-                                      OpenGL::GL
-                                      ${GLEW_LIB_PATH1} ${GLEW_LIB_PATH2}  )
-
-   # For MINGW (GCC Ported to Windows)				 
-   IF(MINGW)
-      # Statically link against MINGW dependencies
-      # for making easier to deploy on other machines. 
-      target_link_options( draw2d-raw PRIVATE                                 
-                               -static-libgcc
-                               -static-libstdc++
-
-                               -Wl,-Bstatic,--whole-archive -lwinpthread
-                                 -Wl,--no-whole-archive				     
-                               )
-   ENDIF()       
-
-
-   # Copy GLEW DLL shared library to same directory as the executable.				 
-   IF(WIN32)				 
-      add_custom_command(TARGET draw2d-raw POST_BUILD 
-                     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                     "${glew-release_SOURCE_DIR}/bin/Release/x64/glew32.dll"              
-                     $<TARGET_FILE_DIR:draw2d-raw>)
-   ENDIF()	   
-
+  cmake_minimum_required(VERSION 3.5)
+  project(OpenGL_Draw2D_VBO)
+  
+  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_CXX_STANDARD_REQUIRED ON)
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+  
+  #================ GLFW Settings  ===============#
+  
+  find_package(OpenGL REQUIRED)
+  
+  include(FetchContent)
+  
+  # Set GLFW Options before FectchContent_MakeAvailable
+  set( GLFW_BUILD_EXAMPLES OFF CACHE BOOL  "GLFW lib only" )
+  set( GLFW_BUILD_TESTS    OFF CACHE BOOL  "GLFW lib only" )
+  set( GLFW_BUILD_DOCS     OFF CACHE BOOL  "GLFW lib only" )
+  set( GLFW_BUILD_INSTALL  OFF CACHE BOOL  "GLFW lib only" )
+  
+  # Donwload GLFW library
+  FetchContent_Declare(
+    glfwlib
+    URL   https://github.com/glfw/glfw/releases/download/3.3.2/glfw-3.3.2.zip
+  )
+  FetchContent_MakeAvailable(glfwlib)
+  
+  # Download pre-compiled GLEW when building under Windows NT OS (x64)
+  IF(WIN32)
+     FetchContent_Declare(
+        glew-release 
+        URL  https://ufpr.dl.sourceforge.net/project/glew/glew/2.1.0/glew-2.1.0-win32.zip
+        # No longer valid URL 
+        ## URL     https://megalink.dl.sourceforge.net/project/glew/glew/2.1.0/glew-2.1.0-win32.zip
+     )
+     FetchContent_MakeAvailable(glew-release)
+     include_directories( ${glew-release_SOURCE_DIR}/include  ${glm_SOURCE_DIR} )        
+     link_directories(  ${glew-release_SOURCE_DIR}/lib/Release/x64 )
+  
+     set( GLEW_LIB_PATH1 ${glew-release_SOURCE_DIR}/lib/Release/x64/glew32.lib )
+     set( GLEW_LIB_PATH2 ${glew-release_SOURCE_DIR}/lib/Release/x64/glew32s.lib )
+  ENDIF()
+  
+     # ======= T A R G E T S ============================#
+     #                                                   #
+  
+  
+         add_executable( draw2d-raw  draw2d-raw.cpp )
+  target_link_libraries( draw2d-raw  glfw
+                                     OpenGL::GL
+                                     ${GLEW_LIB_PATH1} ${GLEW_LIB_PATH2}  )
+  
+  # For MINGW (GCC Ported to Windows)                              
+  IF(MINGW)
+     # Statically link against MINGW dependencies
+     # for making easier to deploy on other machines. 
+     target_link_options( draw2d-raw PRIVATE                                 
+                              -static-libgcc
+                              -static-libstdc++
+  
+                              -Wl,-Bstatic,--whole-archive -lwinpthread
+                                -Wl,--no-whole-archive                                 
+                              )
+  ENDIF()       
+  
+  
+  # Copy GLEW DLL shared library to same directory as the executable.                              
+  IF(WIN32)                                
+     add_custom_command(TARGET draw2d-raw POST_BUILD 
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${glew-release_SOURCE_DIR}/bin/Release/x64/glew32.dll"              
+                    $<TARGET_FILE_DIR:draw2d-raw>)
+  ENDIF()  
 #+END_SRC
 
-File: _CMakeLists.txt_ (Version 2)
+File: _CMakeLists.txt_ (Version 2) - This version provides a macro for automating the definition of OpenGL projects with _ADD_OPENGL_ command.
 
 #+BEGIN_SRC cmake 
    cmake_minimum_required(VERSION 3.5)
@@ -6689,7 +6694,7 @@ File: _CMakeLists.txt_ (Version 2)
    IF(WIN32)
       FetchContent_Declare(
          glew-release 
-         URL     https://megalink.dl.sourceforge.net/project/glew/glew/2.1.0/glew-2.1.0-win32.zip
+         URL  https://ufpr.dl.sourceforge.net/project/glew/glew/2.1.0/glew-2.1.0-win32.zip   
          # https://github.com/nigels-com/glew/archive/glew-2.2.0.zip
       )
       FetchContent_MakeAvailable(glew-release)
@@ -6736,6 +6741,134 @@ File: _CMakeLists.txt_ (Version 2)
 
    ADD_OPENGL_APP( draw2-raw draw2d-raw.cpp )
 #+END_SRC
+
+File: _CMakeLists.txt_ (Version 3) - last resort if the SourceForge link
+no longer works. In this case, it is assumed that Glew library was
+download manually from SourceForge via the URL [[https://sourceforge.net/projects/glew/files/glew/2.1.0/glew-2.1.0.zip/download][(glew-2.1.0 - download)]].
+Then the ZIP  _glew-2.1.0-win32.zip_ is saved in the project root
+directory and extracted to a directory named ./glew-2.1.0/
+
+#+BEGIN_SRC cmake 
+   # Used when Glew library is download manually 
+   cmake_minimum_required(VERSION 3.5)
+   project(OpenGL_Draw2D_VBO)
+   
+   set(CMAKE_CXX_STANDARD 17)
+   set(CMAKE_CXX_STANDARD_REQUIRED ON)
+   set(CMAKE_VERBOSE_MAKEFILE ON)
+   
+   #================ GLFW Settings  ===============#
+   
+   find_package(OpenGL REQUIRED)
+   
+   include(FetchContent)
+   
+   # Set GLFW Options before FectchContent_MakeAvailable
+   set( GLFW_BUILD_EXAMPLES OFF CACHE BOOL  "GLFW lib only" )
+   set( GLFW_BUILD_TESTS    OFF CACHE BOOL  "GLFW lib only" )
+   set( GLFW_BUILD_DOCS     OFF CACHE BOOL  "GLFW lib only" )
+   set( GLFW_BUILD_INSTALL  OFF CACHE BOOL  "GLFW lib only" )
+   
+   # Donwload GLFW library
+   FetchContent_Declare(
+     glfwlib
+     URL   https://github.com/glfw/glfw/releases/download/3.3.2/glfw-3.3.2.zip
+   )
+   FetchContent_MakeAvailable(glfwlib)
+   
+   # Download pre-compiled GLEW when building under Windows NT OS (x64)
+   IF(WIN32)
+      include_directories( ${CMAKE_CURRENT_LIST_DIR}/glew-2.1.0/include  ${glm_SOURCE_DIR} )        
+      link_directories(  ${CMAKE_CURRENT_LIST_DIR}/glew-2.1.0/lib/Release/x64 )
+   
+      set( GLEW_LIB_PATH1  ${CMAKE_CURRENT_LIST_DIR}/glew-2.1.0/lib/Release/x64/glew32.lib )
+      set( GLEW_LIB_PATH2  ${CMAKE_CURRENT_LIST_DIR}/glew-2.1.0/lib/Release/x64/glew32s.lib )
+   ENDIF()
+   
+      # ======= T A R G E T S ============================#
+      #                                                   #
+   
+          add_executable( draw2d-raw  draw2d-raw.cpp )
+   target_link_libraries( draw2d-raw  glfw
+                                      OpenGL::GL
+                                      ${GLEW_LIB_PATH1} ${GLEW_LIB_PATH2}  )
+   
+   # For MINGW (GCC Ported to Windows)                              
+   IF(MINGW)
+      # Statically link against MINGW dependencies
+      # for making easier to deploy on other machines. 
+      target_link_options( draw2d-raw PRIVATE                                 
+                               -static-libgcc
+                               -static-libstdc++
+   
+                               -Wl,-Bstatic,--whole-archive -lwinpthread
+                                 -Wl,--no-whole-archive                                 
+                               )
+   ENDIF()       
+   
+   
+   # Copy GLEW DLL shared library to same directory as the executable.                              
+   IF(WIN32)                                
+      add_custom_command(TARGET draw2d-raw POST_BUILD 
+                     COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                     "${CMAKE_CURRENT_LIST_DIR}/glew-2.1.0/bin/Release/x64/glew32.dll"              
+                     $<TARGET_FILE_DIR:draw2d-raw>)
+   ENDIF()   
+#+END_SRC
+
+Downloading glew manually with curl for usage with the previous CMakeLists.txt file: 
+
+#+BEGIN_SRC sh 
+  $ curl -L -o glew32.zip  https://ufpr.dl.sourceforge.net/project/glew/glew/2.1.0/glew-2.1.0-win32.zip
+  
+  $ unzip -l glew32.zip 
+  Archive:  glew32.zip
+    Length      Date    Time    Name
+  ---------  ---------- -----   ----
+          0  2017-07-31 08:46   glew-2.1.0/
+          0  2017-07-31 08:41   glew-2.1.0/bin/
+          0  2017-07-31 08:42   glew-2.1.0/bin/Release/
+          0  2017-07-31 08:42   glew-2.1.0/bin/Release/Win32/
+     389632  2017-07-31 08:42   glew-2.1.0/bin/Release/Win32/glew32.dll
+     482304  2017-07-31 08:42   glew-2.1.0/bin/Release/Win32/glewinfo.exe
+     294912  2017-07-31 08:42   glew-2.1.0/bin/Release/Win32/visualinfo.exe
+          0  2017-07-31 08:42   glew-2.1.0/bin/Release/x64/
+     422912  2017-07-31 08:42   glew-2.1.0/bin/Release/x64/glew32.dll
+     539648  2017-07-31 08:42   glew-2.1.0/bin/Release/x64/glewinfo.exe
+     338432  2017-07-31 08:42   glew-2.1.0/bin/Release/x64/visualinfo.exe
+     ... ... ... ... ... ... ... ... ... ... ... ... ... ... .. 
+     ... ... ... ... ... ... ... ... ... ... ... ... ... ... .. 
+     
+          0  2017-07-31 08:42   glew-2.1.0/lib/Release/
+          0  2017-07-31 08:46   glew-2.1.0/lib/Release/Win32/
+     712098  2017-07-31 08:42   glew-2.1.0/lib/Release/Win32/glew32.lib
+    2443636  2017-07-31 08:42   glew-2.1.0/lib/Release/Win32/glew32s.lib
+          0  2017-07-31 08:46   glew-2.1.0/lib/Release/x64/
+     701288  2017-07-31 08:42   glew-2.1.0/lib/Release/x64/glew32.lib
+    2584968  2017-07-31 08:42   glew-2.1.0/lib/Release/x64/glew32s.lib
+       3870  2017-07-31 08:46   glew-2.1.0/LICENSE.txt
+  ---------                     -------
+   10662952                     47 files
+  
+  $ unzip -x glew32.zip 
+  Archive:  glew32.zip
+     creating: glew-2.1.0/
+     creating: glew-2.1.0/bin/
+     creating: glew-2.1.0/bin/Release/
+     creating: glew-2.1.0/bin/Release/Win32/
+    inflating: glew-2.1.0/bin/Release/Win32/glew32.dll  
+    inflating: glew-2.1.0/bin/Release/Win32/glewinfo.exe 
+   ... ... ... ... ... ... ... ... ... ... ... ... ... ...  
+   ... ... ... ... ... ... ... ... ... ... ... ... ... ...  
+     inflating: glew-2.1.0/lib/Release/Win32/glew32.lib  
+    inflating: glew-2.1.0/lib/Release/Win32/glew32s.lib  
+     creating: glew-2.1.0/lib/Release/x64/
+    inflating: glew-2.1.0/lib/Release/x64/glew32.lib  
+    inflating: glew-2.1.0/lib/Release/x64/glew32s.lib  
+    inflating: glew-2.1.0/LICENSE.txt  
+   
+#+END_SRC
+
 
 File: _draw2d-raw.cpp_
 
