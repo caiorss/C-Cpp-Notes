@@ -6821,15 +6821,15 @@ Downloading glew manually with curl for usage with the previous CMakeLists.txt f
 #+BEGIN_SRC sh 
   $ curl -L -o glew32.zip  https://ufpr.dl.sourceforge.net/project/glew/glew/2.1.0/glew-2.1.0-win32.zip
  
-  # File hash - unique identifier for the file  
+  # File hash (file signature) - unique identifier for the file  
   $ md5sum glew32.zip 
   32a72e6b43367db8dbea6010cd095355  glew32.zip
  
-  # File hash - unique identifier for the file  
+  # File hash (file signature) - unique identifier for the file  
   $ sha256sum glew32.zip 
   80cfc88fd295426b49001a9dc521da793f8547ac10aebfc8bdc91ddc06c5566c  glew32.zip
 
-  # File hash - unique identifier for the file  
+  # File hash (file signature) - unique identifier for the file  
   $ sha1sum glew32.zip 
   f505a67ad884b75648639a9b01bf0245bfcfa731  glew32.zip
   
@@ -10741,7 +10741,7 @@ File: _draw2d-ibo-triangles.cpp_
       glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0 );
   }
 #+END_SRC
-** 3D Graphics - Rotating cube
+** 3D Graphics - Rotating cube/box
 
 This sample application contains: two cubes; two grid planes for
 visual reference; a coordinate axis for visual debugging and a camera
@@ -10800,47 +10800,92 @@ Fragment Shader Code:
 
 File: CmakeLists.txt
 
-#+BEGIN_SRC cmake
-   cmake_minimum_required(VERSION 3.5)
-   project(GLFW_project)
-
-   set(CMAKE_CXX_STANDARD 17)
-   set(CMAKE_CXX_STANDARD_REQUIRED ON)
-   set(CMAKE_VERBOSE_MAKEFILE ON)
-
-   #================ GLFW Settings  ===============#
-
-   find_package(OpenGL REQUIRED)
-
-   include(FetchContent)
-
-   # Set GLFW Options before FectchContent_MakeAvailable
-   set( GLFW_BUILD_EXAMPLES OFF CACHE BOOL  "GLFW lib only" )
-   set( GLFW_BUILD_TESTS    OFF CACHE BOOL  "GLFW lib only" )
-   set( GLFW_BUILD_DOCS     OFF CACHE BOOL  "GLFW lib only" )
-   set( GLFW_BUILD_INSTALL  OFF CACHE BOOL  "GLFW lib only" )
-
-   # Donwload GLFW library
-   FetchContent_Declare(
-     glfwlib
-     URL   https://github.com/glfw/glfw/releases/download/3.3.2/glfw-3.3.2.zip
-   )
-   FetchContent_MakeAvailable(glfwlib)
-
-   # Download GLM (OpenGL math library for matrix and vectors transformation)
-   FetchContent_Declare(
-     glm
-     URL  https://github.com/g-truc/glm/archive/0.9.8.zip
-   )
-   FetchContent_MakeAvailable(glm)
-
-   message( [DEBUG] " glm_SOURCE_DIR = ${glm_SOURCE_DIR} ")
-   include_directories(${glm_SOURCE_DIR})
-
-     # ======= TARGETS ===========================#
-
-          add_executable( draw3d-cube  draw2d-cube.cpp   )
-   target_link_libraries( draw3d-cube  glfw OpenGL::GL GLU )
+#+BEGIN_SRC cmake 
+  cmake_minimum_required(VERSION 3.5)
+  project(GLFW_project)
+  
+  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_CXX_STANDARD_REQUIRED ON)
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+  
+  #================ GLFW Settings  ===============#
+  
+  find_package(OpenGL REQUIRED)
+  
+  include(FetchContent)
+  
+  # Set GLFW Options before FectchContent_MakeAvailable
+  set( GLFW_BUILD_EXAMPLES OFF CACHE BOOL  "GLFW lib only" )
+  set( GLFW_BUILD_TESTS    OFF CACHE BOOL  "GLFW lib only" )
+  set( GLFW_BUILD_DOCS     OFF CACHE BOOL  "GLFW lib only" )
+  set( GLFW_BUILD_INSTALL  OFF CACHE BOOL  "GLFW lib only" )
+  
+  # Donwload GLFW library
+  FetchContent_Declare(
+    glfwlib
+    URL   https://github.com/glfw/glfw/releases/download/3.3.2/glfw-3.3.2.zip
+  )
+  FetchContent_MakeAvailable(glfwlib)
+  
+  # Download GLM (OpenGL math library for matrix and vectors transformation)
+  FetchContent_Declare(
+    glm
+    URL  https://github.com/g-truc/glm/archive/0.9.8.zip
+  )
+  FetchContent_MakeAvailable(glm)
+  
+  # Download pre-compiled GLEW when building under Windows NT OS (x64)
+  IF(WIN32)
+     FetchContent_Declare(
+        glew-release 
+        URL  https://ufpr.dl.sourceforge.net/project/glew/glew/2.1.0/glew-2.1.0-win32.zip
+     )
+     FetchContent_MakeAvailable(glew-release)
+     include_directories( ${glew-release_SOURCE_DIR}/include  ${glm_SOURCE_DIR} )        
+     link_directories(  ${glew-release_SOURCE_DIR}/lib/Release/x64 )
+  
+     set( GLEW_LIB_PATH1 ${glew-release_SOURCE_DIR}/lib/Release/x64/glew32.lib )
+     set( GLEW_LIB_PATH2 ${glew-release_SOURCE_DIR}/lib/Release/x64/glew32s.lib )
+  ENDIF()
+  
+  
+  message( [DEBUG] " glm_SOURCE_DIR = ${glm_SOURCE_DIR} ")
+  include_directories(${glm_SOURCE_DIR})
+  
+  MACRO(ADD_OPENGL_APP target sources)
+     add_executable( ${target} ${sources} )
+     message([TRACE] " Add OpenGL executable = ${target} ")
+  
+     target_link_libraries( ${target} glfw
+                                      OpenGL::GL
+                                      ${GLEW_LIB_PATH1}
+                                      ${GLEW_LIB_PATH2} )
+  
+      IF(MINGW)
+          # Statically link against MINGW dependencies
+          # for making easier to deploy on other machines. 
+          target_link_options( ${target} PRIVATE                                 
+                                   -static-libgcc
+                                   -static-libstdc++
+                                   -Wl,-Bstatic,--whole-archive -lwinpthread
+                                   -Wl,--no-whole-archive                                    
+                                   )
+       ENDIF()       
+  
+  
+       # Copy GLEW DLL shared library to same directory as the executable.                 
+       IF(WIN32)                           
+          add_custom_command(TARGET ${target} POST_BUILD 
+                         COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                         "${glew-release_SOURCE_DIR}/bin/Release/x64/glew32.dll"              
+                         $<TARGET_FILE_DIR:${target}>)
+       ENDIF()                                       
+  ENDMACRO()     
+  
+  
+    # ======= TARGETS ===========================#
+  
+    ADD_OPENGL_APP( draw3d-cube draw3d-cube.cpp )
 #+END_SRC
 
 File: draw3d-cube.cpp
@@ -10857,6 +10902,11 @@ File: draw3d-cube.cpp
   //
   #define GL_GLEXT_PROTOTYPES 1 // Necessary for OpenGL >= 3.0 functions
   #define GL3_PROTOTYPES      1 // Necessary for OpenGL >= 3.0 functions
+
+  #if defined(_WIN32)
+     #include <windows.h>
+     #include <GL/glew.h>
+  #endif
 
   #include <GL/gl.h>
   #include <GLFW/glfw3.h>
@@ -11512,6 +11562,63 @@ File: draw3d-cube.cpp
       return Geometry{ vertices, colors };
   }
 #+END_SRC
+
+ *Building on Linux*
+
+#+BEGIN_SRC sh
+  $ cmake -H. -B_build_linux -DCMAKE_BUILD_TYPE=Debug
+  $ cmake --build _build_linux --target
+  
+  $ ls _build_linux/
+  CMakeCache.txt  cmake_install.cmake  draw3d-cube*
+  CMakeFiles/     _deps/               Makefile
+#+END_SRC
+
+Run the application:
+
+#+BEGIN_SRC sh
+  $ >> _build_linux/draw3d-cube
+  [TRACE] vao_cube = 1 
+#+END_SRC
+
+ *Cross-compiling for Windows and testing  with wine*
+
+STEP 1: Cmake configuration step 
+ 
+#+BEGIN_SRC sh
+  $ docker run -it --rm --user=$(id -u):$(id -g)  \
+         --volume=$PWD:/cwd --workdir=/cwd  dockcross/windows-static-x64 \
+         cmake -H. -B_build_cross -DCMAKE_BUILD_TYPE=Debug
+#+END_SRC
+
+STEP 2: Cmake building step 
+
+#+BEGIN_SRC sh 
+  $ docker run -it --rm --user=(id -u):(id -g)  \
+      --volume=$PWD:/cwd --workdir=/cwd  dockcross/windows-static-x64 \
+      cmake --build _build_cross --target
+#+END_SRC
+
+STEP 3: Check compiled files
+
+#+BEGIN_SRC sh
+  $ >> ls _build_cross/
+  CMakeCache.txt  cmake_install.cmake  draw3d-cube.exe*  Makefile
+  CMakeFiles/     _deps/               glew32.dll*
+#+END_SRC
+
+STEP 4: Run the application with Wine 
+
+#+BEGIN_SRC sh
+   $ file _build_cross/draw3d-cube.exe 
+  _build_cross/draw3d-cube.exe: PE32+ executable (console) x86-64, for MS Windows
+  
+   $ file _build_cross/glew32.dll 
+  _build_cross/glew32.dll: PE32+ executable (DLL) (console) x86-64, for MS Windows
+  
+  $ wine _build_cross/draw3d-cube.exe
+#+END_SRC
+
 ** 3D Graphics - Quaternion
 
 The class Transform has the fields, position for setting the object
