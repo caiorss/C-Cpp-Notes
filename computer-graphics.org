@@ -7147,6 +7147,106 @@ Run executable:
 #+END_SRC
 
  *Building with Xmake building system*
+ 
+List repositories: 
+
+  + $ xrepo list-repo 
+
+#+BEGIN_SRC sh 
+  $ xrepo list-repo
+  global repositories:
+      build-artifacts https://gitlab.com/xmake-mirror/build-artifacts.git main 
+      xmake-repo https://gitlab.com/tboox/xmake-repo.git master 
+      builtin-repo /home/user/.local/share/xmake/repository 
+  
+  3 repositories were found!
+#+END_SRC
+
+
+Search Xmake packages: 
+
+  + $ xrepo search <PACKAGE>
+
+#+BEGIN_SRC sh 
+  $ xrepo search boost
+  The package names:
+      boost: 
+        -> boost-1.79.0: Collection of portable C++ source libraries. (in xmake-repo)
+  
+  $ xrepo search glut
+  The package names:
+      glut: 
+        -> freeglut-3.2.2: A free-software/open-source alternative to the OpenGL Utility Toolkit (GLUT) library. (in xmake-repo)
+        -> glut: OpenGL utility toolkit (in xmake-repo)
+
+#+END_SRC
+
+Install package: 
+
+  + $ xrepo install <PACKAGE>
+
+#+BEGIN_SRC sh 
+   $ xrepo install boost
+  
+  note: install or modify (m) these packages (pass -y to skip confirm)?
+  in xmake-repo:
+    -> bzip2 1.0.8 [from:boost]
+    -> boost 1.79.0 
+  please input: y (y/n/m)
+  y
+    => download https://sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz .. ok
+#+END_SRC
+
+
+List package information: 
+  
+  + $ xrepo info <PACKAGE>
+
+#+BEGIN_SRC sh 
+   $ >> xrepo info glm
+  The package info of project:
+      require(glm): 
+        -> description: OpenGL Mathematics (GLM)
+        -> version: 0.9.9+8
+        -> urls:
+           -> https://github.com/g-truc/glm/archive/0.9.9.8.tar.gz
+              -> 7d508ab72cb5d43227a3711420f06ff99b0a0cb63ee2f93631b162bfe1fe9592
+           -> https://github.com/g-truc/glm.git
+              -> 0.9.9+8
+        -> repo: xmake-repo https://gitlab.com/tboox/xmake-repo.git master
+        -> cachedir: /home/user/.xmake/cache/packages/2208/g/glm/0.9.9+8
+        -> installdir: /home/user/.xmake/packages/g/glm/0.9.9+8/65b1ad153bda4a43b0454eba7969327f
+        -> searchdirs: 
+        -> searchnames: 0.9.9.8.tar.gz, glm.git, glm-0.9.9+8.tar.gz, glm-0.9.9+8
+        -> fetchinfo: 0.9.9+8
+            -> sysincludedirs: /home/user/.xmake/packages/g/glm/0.9.9+8/65b1ad153bda4a43b0454eba7969327f/include
+            -> version: 0.9.9+8
+        -> platforms: all
+        -> requires:
+           -> plat: linux
+           -> arch: x86_64
+           -> configs:
+              -> debug: false
+              -> pic: true
+              -> shared: false
+        -> configs:
+        -> configs (builtin):
+           -> debug: Enable debug symbols. (default: false)
+           -> shared: Build shared library. (default: false)
+           -> pic: Enable the position independent code. (default: true)
+           -> lto: Enable the link-time build optimization. (type: boolean)
+           -> vs_runtime: Set vs compiler runtime.
+              -> values: {"MT","MTd","MD","MDd"}
+           -> toolchains: Set package toolchains only for cross-compilation.
+           -> cflags: Set the C compiler flags.
+           -> cxflags: Set the C/C++ compiler flags.
+           -> cxxflags: Set the C++ compiler flags.
+           -> asflags: Set the assembler flags.
+        -> references:
+           -> 220814: /dev/shm/.xmake1000/220814/xrepo/working
+           -> 220813: /home/user/opengl1
+#+END_SRC
+
 
 List project information:
 
@@ -8284,6 +8384,194 @@ File: _qt-opengl.cpp_
 
    # Run application 
    $ >> ./_build_meson/qt-opengl
+#+END_SRC
+
+** Minimal WebGL-OpenGL project (html, javascript)
+   
+WebGL is a web standard supported by most modern web browsers for a
+low-level 3D graphics API accelerated by GPU based on OpenGL ES. By
+using WebGL as in this next code, it is possible to play with OpenGL
+3D computer graphics without the hassle of C or C++ dealing with
+compilation, dependencies and building systems since WebGL API is
+already available in any web browser and the API is exposed as
+JavaScript API, that resembles OpenGL C API.
+
+  + Live example available at: https://jsfiddle.net/prxbmqof/
+
+[[file:images/opengl-webgl-basic.png][file:images/opengl-webgl-basic.png]]
+
+ *Complete Html Code* 
+
+#+BEGIN_SRC html 
+  <!DOCTYPE html>
+  <html> 
+     <head> 
+         <title> Web Page Title </title>
+         <script src="https://somehost.com/jequey.js"></script>
+  
+     </head>
+  
+     <body>
+         <h1>WebGL Experiment 1 - Draw a triangle</h1>
+         <canvas id="glCanvas" width="480" height="480">
+     </body>
+    <script>
+      // Source: https://webglfundamentals.org/webgl/lessons/webgl-fundamentals.html
+      function createShader(gl, type, source) 
+      
+        ... ... ... ... ... ... ... ... ... ... .. 
+        ... ... ... ... ... ... ... ... ... ... ... 
+  
+      // Draw Square 
+      console.log(" [TRACE] Draw sqaure in WebGL");
+      gl.bindBuffer( gl.ARRAY_BUFFER, vbo_square );
+      gl.vertexAttribPointer(attr_position, 2, gl.FLOAT, false, 0, 0);
+      gl.drawArrays(gl.LINE_LOOP, 0, 4);
+  
+      console.log(" [TRACE] Loaded Ok.");
+    </script>
+  
+  </html> 
+#+END_SRC
+
+JavaScript part: 
+
+#+BEGIN_SRC js 
+  // Source: https://webglfundamentals.org/webgl/lessons/webgl-fundamentals.html
+  function createShader(gl, type, source) 
+  {
+    var shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    var success = gl.getShaderParameter(shader, gl.COMPILE_STATUS);
+    if (success) {
+      return shader;
+    }
+  
+    console.log(gl.getShaderInfoLog(shader));
+    gl.deleteShader(shader);
+  }
+  
+  // Source:  https://webglfundamentals.org/webgl/lessons/webgl-fundamentals.html
+  function createProgram(gl, vertexShader, fragmentShader) 
+  {
+    var program = gl.createProgram();
+    gl.attachShader(program, vertexShader);
+    gl.attachShader(program, fragmentShader);
+    gl.linkProgram(program);
+    var success = gl.getProgramParameter(program, gl.LINK_STATUS);
+    if (success) {
+      return program;
+    }
+  
+    console.log(gl.getProgramInfoLog(program));
+    gl.deleteProgram(program);
+  }
+  
+  
+  function resizeCanvasToDisplaySize(canvas, multiplier) 
+  {
+      multiplier = multiplier || 1;
+      const width  = canvas.clientWidth  * multiplier | 0;
+      const height = canvas.clientHeight * multiplier | 0;
+      if (canvas.width !== width ||  canvas.height !== height) {
+        canvas.width  = width;
+        canvas.height = height;
+        return true;
+      }
+      return false;
+    }
+  
+  
+  const canvas = document.querySelector("#glCanvas");
+  const gl = canvas.getContext("webgl");
+  
+  if(  gl == null ){
+    alert(" [ABORT] Unable to initialized WebGL");
+  }
+  
+  // Vertex Shader code => Performs vertex coordinate transforms in the GPU 
+  // Defines the a 3D scene or 2D scene (by ignoring the Z axis).
+  let code_shader_vertex = `
+    attribute vec2 position;
+  
+    void main(){
+       // Coordinates: X, Y, Z = 0, W = 1 => Ignores the Z axis (2D Scene)
+       gl_Position = vec4(position, 0, 1.0);
+  
+    }
+  `;
+  
+  // Fragment shader code => Sets color, lights and illumination 
+  let code_shader_fragment = `
+    void main(){
+      // Color always green 
+      // Color in (R, G, B, W) => (Red, Green, Blue, W)
+      gl_FragColor = vec4(0.0, 1.0, 0.0, 1.0);
+    }
+  `;
+  
+  // Vertices of (x, y) coordinates 
+  let vertices_triangle = [
+      -0.25, -0.25
+    ,  0.00,  0.25
+    ,  0.25, -0.25
+  ];
+  
+  let vertices_square = [
+      -0.3, -0.3
+    , -0.3,  0.3
+    ,  0.3,  0.3
+    ,  0.3, -0.3
+  
+  ];
+  
+  
+  let shader_vert = createShader(gl, gl.VERTEX_SHADER, code_shader_vertex);
+  let shader_frag = createShader(gl, gl.FRAGMENT_SHADER, code_shader_fragment);
+  let prog = createProgram(gl, shader_vert, shader_frag);
+  
+  let attr_position = gl.getAttribLocation(prog, "position");
+  console.log(" [TRACE] attr_position = ", attr_position);
+  
+  // resizeCanvasToDisplaySize(gl.canvas);
+  gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+  
+  // Screen background color is black => clearColor(Red intensity from 0 to 1, Green , Blue , Alpha)
+  gl.clearColor(0.0, 0.0, 0.0, 1.0);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.useProgram(prog);
+  
+  // -------- Upload triangle to GPU --------------------//
+  // GLuint vbo_triangle_ = 0;
+  // glGenBuffers(1 , &vbo_triangle_); 
+  let vbo_triangle = gl.createBuffer();
+  // Set this buffer as current buffer (global state)
+  gl.bindBuffer( gl.ARRAY_BUFFER, vbo_triangle );
+  // Upload vertices to  GPU 
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices_triangle), gl.STATIC_DRAW);
+  
+  // --------- Upload squares to GPU ----------------------//
+  let vbo_square = gl.createBuffer();
+  gl.bindBuffer( gl.ARRAY_BUFFER, vbo_square );
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices_square), gl.STATIC_DRAW);
+  
+  // ------ Drawing ----------------------------------------//
+  gl.enableVertexAttribArray(attr_position);
+  
+  // Draw triangle 
+  console.log(" [TRACE] Draw triangle in WebGL");
+  gl.bindBuffer( gl.ARRAY_BUFFER, vbo_triangle );
+  gl.vertexAttribPointer(attr_position, 2, gl.FLOAT, false, 0, 0);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  
+  // Draw Square 
+  console.log(" [TRACE] Draw sqaure in WebGL");
+  gl.bindBuffer( gl.ARRAY_BUFFER, vbo_square );
+  gl.vertexAttribPointer(attr_position, 2, gl.FLOAT, false, 0, 0);
+  gl.drawArrays(gl.LINE_LOOP, 0, 4);
+  
+  console.log(" [TRACE] Loaded Ok.");
 #+END_SRC
 
 ** Loading OpenGL without Glew 
