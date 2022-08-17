@@ -6614,7 +6614,6 @@ STEP 2 => Run the following commands from another terminal.
 #+END_SRC
 
 
-
 ** Running machine code at runtime 
 
 This code uses the windows APIs VirtuaAlloc, for allocating memory for
@@ -10480,7 +10479,6 @@ Running:
 
 #+END_SRC
 
-
 ** Graphical User Interfaces - WinAPI 
 *** Minimal GUI Program - "hello world"
 **** Overview 
@@ -12199,6 +12197,332 @@ Running:
 #+BEGIN_SRC sh 
   $ .\rust-wingui.exe 
 #+END_SRC
+
+** Cross-compiling WxWidgets for Windows from Linux 
+  
+WxWidget is a C++ full-featured cross-platform platform graphics
+interface framework based on MFC - Microsoft Foundations Classes, that
+supports native controls and platform-specific look and feel of
+several operating systems, including Microsoft Windows NT, Linux and
+Mac-OSX. WxWidgets framework also supports many different gaphics
+backends, including: Gtk (_wxGtk_); Windows API (win32) controls
+(_wxMSW_); MacOSX Cocoa (_wxOSX/Cocoa_); X11 - X Windows Systems (_wX11_);
+Qt Framework (_wxQt_) and Motiff (obsolete) _wxMotiff_. In addition to
+gaphics interfaces features, this framework also provide support for basic C++
+containers, sockets, multithreading, clipboard and sound and video
+playback. WxWidgets is released under [[https://www.wxwidgets.org/about/licence/][wxWindows License]] (based on
+L-GPL) with an _exception clause_ allowing the application to be either
+dynamically or statically linked against WxWidgets libraries without
+the need to redistribute application source code. This section
+presents how to cross-compile WxWidgets applications from Linux to
+Windows (Win32 API) using a _reproducible development environment_ based
+on a docker image.
+
+Advatanges: 
+
+  + Full-featured and cross-platform framework, just-like Qt Framework.
+  + Based on MFC - Microsoft Foundation Classes
+  + Supports many different operating systems and graphics backends
+  + More commercially friendly than Qt
+  + Closed-source and commercial applications can statically link
+    against WxWidgets without the need to disclose the source code.
+  + Suitable for porting applications based on MFC (Microsoft
+    Foundation Classes) or Windows Win32 API. 
+
+Drawbacks: 
+
+  + Poor documentation, not as good as Qt documentation.
+  + The library uses lots of macro (C++/C preprocessor) magic
+  + WxWidgets does not use modern C++ features 
+  + Library in C++98, C with-classes style
+  + Unlike Qt, this framework don't support embedded plaforms 
+
+    
+ *Building the docker image* (Reproducible Development and building environment) 
+
+File: _wxwidgets-windows-docker.conf_  
+
+   + Provides a reproducible development environment that allows
+     cross-compiling WxWidgets applications for Windows NT.
+ 
+#+BEGIN_SRC conf 
+  # Command to build this docker image: 
+  #  $ docker build  . -t wxwidgets-windows -f wxwidgets-windows-docker.conf
+  #
+  FROM dockcross/windows-static-x64  
+  
+  # ---------- Install XMake Building System --------------#
+  # 
+  ENV XMAKE_ROOT y
+  # Download Xmake installation script  
+  RUN curl -fsSL https://xmake.io/shget.text > /tmp/install.sh 
+  # Execute the installation script
+  RUN env CC= CXX= CPP=   bash /tmp/install.sh 
+  
+  # ---------- Install WxWidgets Library for Windows Cross-Compilation --------#
+  #
+  
+  RUN mkdir -p /build  
+  WORKDIR /build 
+  
+  RUN git clone --recurse-submodules https://github.com/wxWidgets/wxWidgets.git 
+   
+  WORKDIR wxWidgets 
+  RUN mkdir -p build-debug 
+  WORKDIR build-debug 
+  
+  # Create symbolic link to windres 
+  RUN ln -s /usr/src/mxe/usr/bin/x86_64-w64-mingw32.static-windres /bin/windres
+  
+  # Run configuration step 
+  RUN ../configure --enable-debug --host=x86_64-w64-mingw32 \
+            --with-msw --disable-shared --enable-monolithic --build=x86_64-linux --disable-xrc \
+            --disable-sys-libs --enable-unicode
+  
+  RUN make -j4 && make install 
+  
+  RUN mkdir -p /cwd 
+  WORKDIR /cwd 
+  RUN rm -rf /build 
+#+END_SRC
+
+Build the docker image (Wait a while, drink a coffee ...):
+
+#+BEGIN_SRC sh 
+  $ docker build  . -t wxwidgets-windows -f wxwidgets-windows-docker.conf
+#+END_SRC
+
+Checking the docker image: 
+
+#+BEGIN_SRC sh 
+  $  docker run --rm -it --user=(id -u):(id -g)  --workdir=/cwd --volume=$PWD:/cwd wxwidgets-windows bash
+  I have no name!@3c84b2b8cb95:/cwd$ 
+  I have no name!@3c84b2b8cb95:/cwd$ export PS1=" $ "
+  
+   $ echo $CC
+  /usr/src/mxe/usr/bin/x86_64-w64-mingw32.static-gcc
+  
+   $ echo $CXX
+  /usr/src/mxe/usr/bin/x86_64-w64-mingw32.static-g++
+  
+   $ echo $LD
+  /usr/src/mxe/usr/bin/x86_64-w64-mingw32.static-ld
+  
+   $ echo $CPP
+  /usr/src/mxe/usr/bin/x86_64-w64-mingw32.static-cpp
+  
+   $ echo $DEFAULT_DOCKCROSS_IMAGE 
+  dockcross/windows-static-x64:latest
+  
+   $ echo $CROSS_TRIPLE
+  x86_64-w64-mingw32.static
+  
+   $ echo $AR
+  /usr/src/mxe/usr/bin/x86_64-w64-mingw32.static-ar
+  
+   $ echo $AS
+  /usr/src/mxe/usr/bin/x86_64-w64-mingw32.static-as
+   
+   $ echo $CMAKE_TOOLCHAIN_FILE 
+  /usr/src/mxe/usr/x86_64-w64-mingw32.static/share/cmake/mxe-conf.cmake
+  
+   $ which wx-config   
+  /usr/local/bin/wx-config
+  
+   $ wx-config --cxxflags --libs
+  -I/usr/local/lib/wx/include/x86_64-w64-mingw32-msw-unicode-static-3.3 -I/usr/local/include/wx-3.3 -D_FILE_OFFSET_BITS=64 -D__WXMSW__ 
+  -L/usr/local/lib   -Wl,--subsystem,windows -mwindows /usr/local/lib/libwx_mswu-3.3-x86_64-w64-mingw32.a -limm32 -lwxtiff-3.3-x86_64-w64-mingw32 -lwxjpeg-3.3-x86_64-w64-mingw32 -lwxpng-3.3-x86_64-w64-mingw32 -lwxregexu-3.3-x86_64-w64-mingw32 -lwxscintilla-3.3-x86_64-w64-mingw32 -lwxexpat-3.3-x86_64-w64-mingw32 -lwxzlib-3.3-x86_64-w64-mingw32 -lrpcrt4 -loleaut32 -lole32 -luuid -luxtheme -lwinspool -lwinmm -lshell32 -lshlwapi -lcomctl32 -lcomdlg32 -ladvapi32 -lversion -lws2_32 -lgdi32 -loleacc -lwinhttp 
+  
+#+END_SRC
+
+Output of wx-config version: 
+
+#+BEGIN_SRC sh 
+ $ wx-config --version
+ 3.3.0
+#+END_SRC
+
+Output of command $ wx-config --cxxflags --libs 
+
+#+BEGIN_SRC text 
+  $  docker run --rm -it --user=(id -u):(id -g)  --workdir=/cwd --volume=$PWD:/cwd \
+    wxwidgets-windows wx-config --cxxflags --libs
+
+  Output of command: $ wx-config --cxxflags --libs
+  
+  Include Paths: 
+       -I/usr/local/lib/wx/include/x86_64-w64-mingw32-msw-unicode-static-3.3 
+       -I/usr/local/include/wx-3.3 
+  
+  Compiling definitions:  
+     -D_FILE_OFFSET_BITS=64 -D__WXMSW__ 
+  
+  Linking Directories: 
+    -L/usr/local/lib   
+  
+  Linker Commands: 
+    -Wl,--subsystem,windows -mwindows 
+  
+  Libraries to Link against: 
+    /usr/local/lib/libwx_mswu-3.3-x86_64-w64-mingw32.a 
+    -limm32 -lwxtiff-3.3-x86_64-w64-mingw32 -lwxjpeg-3.3-x86_64-w64-mingw32 -lwxpng-3.3-x86_64-w64-mingw32 
+    -lwxregexu-3.3-x86_64-w64-mingw32 -lwxscintilla-3.3-x86_64-w64-mingw32 -lwxexpat-3.3-x86_64-w64-mingw32 
+    -lwxzlib-3.3-x86_64-w64-mingw32 -lrpcrt4 -loleaut32 -lole32 -luuid -luxtheme -lwinspool -lwinmm -lshell32 
+    -lshlwapi -lcomctl32 -lcomdlg32 -ladvapi32 -lversion -lws2_32 -lgdi32 -loleacc -lwinhttp 
+#+END_SRC
+
+ *Files* 
+
+File: CMakeLists.txt 
+
+#+BEGIN_SRC cmake 
+  project(WxProject-Cross-Compile)
+  cmake_minimum_required(VERSION 3.0)
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+  
+  # DOES NOT WORK!!: find_package(wxWidgets COMPONENTS core base REQUIRED)
+    
+  # Note: Obtained from the output of command: $ wx-config --cxxflags --libs 
+  set(wxWidgets_LIBRARIES  /usr/local/lib/libwx_mswu-3.3-x86_64-w64-mingw32.a 
+     imm32 wxtiff-3.3-x86_64-w64-mingw32 wxjpeg-3.3-x86_64-w64-mingw32 wxpng-3.3-x86_64-w64-mingw32 
+     wxregexu-3.3-x86_64-w64-mingw32 wxscintilla-3.3-x86_64-w64-mingw32 wxexpat-3.3-x86_64-w64-mingw32 
+     wxzlib-3.3-x86_64-w64-mingw32 rpcrt4 oleaut32 ole32 uuid uxtheme winspool winmm shell32 
+     shlwapi comctl32 comdlg32 advapi32 version ws2_32 gdi32 oleacc winhttp 
+   )
+  
+  # Note: Obtained from the output of command: $ wx-config --cxxflags --libs 
+  set(wxWidgets_INCLUDES  
+        /usr/local/lib/wx/include/x86_64-w64-mingw32-msw-unicode-static-3.3 
+        /usr/local/include/wx-3.3 )
+  
+              add_executable(SimpleWindow SimpleWindow.cpp)
+  target_compile_definitions(SimpleWindow PRIVATE _FILE_OFFSET_BITS=64 __WXMSW__ )
+  target_include_directories(SimpleWindow PRIVATE ${wxWidgets_INCLUDES})
+            link_directories(SimpleWindow PRIVATE /usr/local/lib )
+       target_link_libraries(SimpleWindow PRIVATE ${wxWidgets_LIBRARIES})
+         target_link_options(SimpleWindow PRIVATE  -mwindows -Wl,--subsystem,windows) 
+#+END_SRC
+
+File: _SimpleWindow.cpp_  ([[https://moritzmolch.com/blog/2510.html][Moritzolch.com]])
+
+#+BEGIN_SRC cpp 
+  #include <wx/wx.h>
+  
+  class MyFrame : public wxFrame
+  {
+  public:
+      MyFrame()
+          : wxFrame(NULL, wxID_ANY, _("Test"))
+      {}
+  };
+  
+  class MyApp : public wxApp
+  {
+  public:
+      virtual bool OnInit() override
+      {
+          myFrame.Show();
+          return true;
+      }
+  
+  private:
+      MyFrame myFrame;
+  };
+  IMPLEMENT_APP(MyApp)
+#+END_SRC 
+
+ *Building Aproach 1 => Manual compilation* 
+
+#+BEGIN_SRC sh 
+  $ docker run --rm -it --user=(id -u):(id -g)  --workdir=/cwd \
+       --volume=$PWD:/cwd wxwidgets-windows bash
+   
+  I have no name!@4cca88463e97:/cwd$ export PS1="$ " 
+  
+  $ echo $CXX
+  /usr/src/mxe/usr/bin/x86_64-w64-mingw32.static-g++
+  
+  $ $CXX SimpleWindow.cpp -v -o SimpleWindow.exe `wx-config --cxxflags --libs`
+  
+  $ ls
+  CMakeLists.txt	Dockerfile.conf  SimpleWindow.cpp  SimpleWindow.exe  _build  out.log  winhello.cpp
+#+END_SRC
+
+ *Building Aproach 2 => Using CMake* 
+
+#+BEGIN_SRC sh 
+ # Configuration step 
+ $ docker run --rm -it --user=(id -u):(id -g)  --workdir=/cwd --volume=$PWD:/cwd \
+     wxwidgets-windows cmake  -B_build -DCMAKE_BUILD_TYPE=Debug 
+
+ # Building step 
+ $  docker run --rm -it --user=(id -u):(id -g)  --workdir=/cwd --volume=$PWD:/cwd \
+     wxwidgets-windows cmake  --build _build --target SimpleWindow
+#+END_SRC 
+
+Check CMake output: 
+
+#+BEGIN_SRC sh 
+  $ tree _build -L 1
+  _build
+  ├── CMakeCache.txt
+  ├── CMakeFiles
+  ├── cmake_install.cmake
+  ├── Makefile
+  └── SimpleWindow.exe
+  
+  1 directory, 4 files
+  
+  $ file _build/SimpleWindow.exe 
+  _build/SimpleWindow.exe: PE32+ executable (GUI) x86-64, for MS Windows
+  
+  $  du -h _build/SimpleWindow.exe
+  96M	_build/SimpleWindow.exe
+#+END_SRC
+
+Run the application using Wine: 
+
+#+BEGIN_SRC sh 
+ $ wine _build/SimpleWindow.exe
+#+END_SRC
+
+Screenshot: 
+
+[[file:images/wxwidgets-windows-cross-compilation.png][file:images/wxwidgets-windows-cross-compilation.png]]
+
+
+ *Further Reading* 
+
+  + https://www.wxwidgets.org (Official Website)
+
+  + https://www.wxwidgets.org/about
+
+  + https://www.wxwidgets.org/about/licence/
+
+  + https://www.wxwidgets.org/about/history/
+
+  + [[https://www.codeproject.com/articles/11515/introduction-to-wxwidgets][Introduction to wxWidgets]]
+    + Note: Show the similarity between WxWidgets and MFC
+      
+  + https://docs.wxwidgets.org/trunk/overview_install.html
+
+  + https://wiki.wxwidgets.org/Downloading_and_installing_wxWidgets
+    
+  + https://docs.wxwidgets.org/trunk/overview_install.html
+
+  + https://wiki.wxwidgets.org/Cross-Compiling_Under_Linux
+
+  + https://wiki.codeblocks.org/index.php/Cross_Compiling_wxWidgets_Applications_on_Linux
+
+  + [[https://moritzmolch.com/blog/2510.html][Moritzolch.com - A guide to set up wxWidgets with MinGW on Windows]]
+
+  + [[https://forums.wxwidgets.org/viewtopic.php?t=49000][Using wxWidgets with MinGW and Code::Blocks]]
+
+  + https://wiki.wxwidgets.org/Writing_Your_First_Application-Adding_A_Button
+
+  + [[https://www.codeproject.com/tips/630542/using-wxwidgets-under-windows][Using wxWidgets under Windows]]
+
+    
 
 ** Loading DLLs - shared libraries at runtime 
 *** Example 1 - Basic Dynamic Loading DLL 
