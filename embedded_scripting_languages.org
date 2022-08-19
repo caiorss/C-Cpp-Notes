@@ -1293,6 +1293,28 @@ File: _CMakeLists.txt_
 
 #+END_SRC
 
+ File: _xmake.lua_  
+
+  + Building script for [[https://xmake.io][XMake]] building system, which uses lua as
+    embedded scripting language and as a building system DSL (Domain
+    Specific Language) .
+  + Xmake packages: [[https://github.com/xmake-io/xmake-repo/blob/master/packages/s/sol2/xmake.lua][sol2]], [[https://github.com/xmake-io/xmake-repo/blob/master/packages/l/lua/xmake.lua][lua]], [[https://github.com/xmake-io/xmake-repo/blob/master/packages/l/luajit/xmake.lua][luajit]]
+
+#+BEGIN_SRC lua 
+  add_rules("mode.debug", "mode.release")
+  
+  includes_lua = false 
+  
+  add_requires("sol2 v3.2.1")
+  
+  target("embed-lua-sol")
+    set_kind("binary")
+    set_languages("c++17")
+    add_files("./embed-lua-sol.cpp")
+    add_packages("sol2")  
+#+END_SRC
+
+
  File: _embed-lua-sol.cpp_ 
 
 #+BEGIN_SRC cpp 
@@ -1604,6 +1626,88 @@ Run Lua repl executable (defined in CMake):
            sum = sum + v
          end
    return su
+#+END_SRC
+
+  *Building and running with Xmake*
+
+Building with Xmake: 
+
+#+BEGIN_SRC sh 
+   $ >> xmake build -P . -v 
+
+  [ 25%]: ccache compiling.release embed-lua-sol.cpp
+  /usr/bin/gcc -c -m64 -fvisibility=hidden -fvisibility-inlines-hidden -O3 -std=c++17 \
+          -isystem /home/user/.xmake/packages/s/sol2/v3.2.1/5fa1980e381b40ed942748bdef09488a/include \
+          -isystem /home/user/.xmake/packages/l/lua/v5.4.4/4de5c31814a64c0d9242d1e524082873/include/lua \
+           -DNDEBUG -o build/.objs/embed-lua-sol/linux/x86_64/release/embed-lua-sol.cpp.o embed-lua-sol.cpp
+           
+  [ 50%]: linking.release embed-lua-sol
+  /usr/bin/g++ -o build/linux/x86_64/release/embed-lua-sol build/.objs/embed-lua-sol/linux/x86_64/release/embed-lua-sol.cpp.o \
+       -m64 -L/home/user/.xmake/packages/l/lua/v5.4.4/4de5c31814a64c0d9242d1e524082873/lib -s -llua -ldl -lm
+  [100%]: build ok!
+#+END_SRC
+
+Generating a CMakeLists.txt file:
+
+#+BEGIN_SRC sh 
+   $ >> xmake project -v -k cmake -P . # Overrides CMakeLists.txt if it already exists
+
+  configure
+  {
+      plat = linux
+      buildir = build
+      arch = x86_64
+      mode = release
+      ccache = true
+      ndk_stdcxx = true
+      host = linux
+      kind = static
+  }
+  create ok!
+  
+
+#+END_SRC
+
+Running the application: 
+
+#+BEGIN_SRC sh 
+   $ >> xmake run -P .
+  
+   [EXPERIMENT 1] ==>> Evaluating string as code 
+   [LUA] Hello world lua 
+   [TRACE] addfun() => a = 10 ; b = 20
+  
+    [LUA] result =  30.0
+  
+    [LUA] Printing a vector 
+     -> v[1 ] = 0
+     -> v[2 ] = 3
+     -> v[3 ] = 6
+     -> v[4 ] = 9
+     -> v[5 ] = 12
+    [LUA] VAR points    = 2000
+    [LUA] VAR character = <Marcus Tulius Cicero>
+  
+  
+   [EXPERIMENT 2] ==>> Reading configuration 
+    [*] => asset_path = C:\\Users\myuser\data\files\
+    [*] => user_credits = 2000
+  
+  
+   [EXPERIMENT 3] ==>> Register C++ classes 
+    *=>> [StatefulFunctor] My new state is = 10
+    *=>> [StatefulFunctor] My new state is = 11
+    *=>> [StatefulFunctor] My new state is = 12
+  
+   ----->>> Calling C++ classes from Lua <----- 
+   [TRACE] Counter created with =>  {  name = untitled ; counter = 0 } 
+   [TRACE] increment event =>> counter = {  untitled ; 1 } 
+   [TRACE] increment event =>> counter = {  untitled ; 2 } 
+   [TRACE] increment event =>> counter = {  untitled ; 3 } 
+    [*] value of counter is equal to = 3
+   [TRACE] I was set to value 2000
+   [*] Counter value is equal to = 2000
+   [FROM C++] counter value = 2000
 #+END_SRC
 
 ** Squirrel Scripting Language 
