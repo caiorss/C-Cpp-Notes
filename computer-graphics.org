@@ -7147,6 +7147,83 @@ Run executable:
 #+END_SRC
 
  *Building with Xmake building system*
+
+Display Xmake version: 
+
+#+BEGIN_SRC sh
+  $ xmake --version | grep -i "cross-platform" 2> /dev/null
+  xmake v2.6.9+202208081520, A cross-platform build utility based on Lua
+#+END_SRC
+
+Enter XMake - Lua interactive REPL (Read-Eval-Print-Loop):
+
+#+BEGIN_SRC lua 
+  $ xmake lua 
+  xmake> 
+  
+  xmake> -- Get host operating system
+  xmake> os.host()
+  < "linux"
+  
+  xmake> -- Get host architecture
+  xmake> os.arch()
+  < "x86_64"
+  
+  xmake> -- Open Root Linux's directory
+  xmake> os.execv("xdg-open /")
+  < 1: 0
+  < 2: nil
+  
+  xmake> -- Check whether file exists
+  xmake> os.exists("./draw2d-raw.cpp")
+  < true
+  xmake> os.exists("./draw2d-raw.cpp.back")
+  < false
+  
+  xmake> -- Get current directory
+  xmake> os.curdir()
+  < "/home/user/opengl1"
+  
+  xmake> -- Get project directory
+  xmake> os.projectdir()
+  < "/home/user/opengl1"
+  
+  xmake> -- Get scripting directory 
+  xmake> os.scriptdir()
+  < "/home/user/.local/share/xmake/plugins/lua"
+  
+  xmake> -- Download file from http server
+  xmake> http = import("net.http")
+  xmake> http.download("https://github.com/glfw/glfw/releases/download/3.3.2/glfw-3.3.2.zip", "glfw-source.zip")
+  xmake> os.exists("glfw-source.zip")
+  < true
+  
+  xmake> -- Extract archive 
+  xmake> r = import("utils.archive")
+  xmake> r.extract("./glfw-source.zip", "/tmp/glfw-src")
+  
+  
+  -- Check current platform (All return false in the REPL)
+  xmake> is_plat("windows")
+  < false
+  xmake> is_plat("linux")
+  < false
+  xmake> is_plat("unix")
+  < false
+  
+  xmake> -- Check whether the current mode is Debug or Release (All fail in the REPL)
+  xmake> is_mode("debug")
+  < false
+  xmake> is_mode("release")
+  < false
+  
+  xmake> -- Join paths 
+  xmake> p = path.join( os.projectdir(), "build", "path1", "path2", "app.exe")
+  xmake> p
+  < "/home/user/opengl1/build/path1/path2/app.exe"
+
+#+END_SRC
+
  
 List repositories: 
 
@@ -7276,23 +7353,39 @@ List project information:
      projectfile: /home/user/opengl1/xmake.lua
 #+END_SRC
 
+Configure building for Linux: 
+
+ + $ xmake f -p linux 
+
+#+BEGIN_SRC sh 
+   $ >> xmake f -p linux
+  checking for architecture ... x86_64
+#+END_SRC
+
+
 Building: 
 
   + $ xmake build 
 
 #+BEGIN_SRC sh 
-  $ xmake build
-
-  note: install or modify (m) these packages (pass -y to skip confirm)?
-  in xmake-repo:
-    -> glfw 3.3.6 
-  please input: y (y/n/m)
-  y
-    => install glfw 3.3.6 .. ok
+   $ >> xmake build -v
   [ 25%]: ccache compiling.release draw2d-raw.cpp
+  /usr/bin/gcc -c -m64 -fvisibility=hidden -fvisibility-inlines-hidden -O3 -DGLEW_NO_GLU -D_GLFW_X11 -DGLFW_INCLUDE_NONE \
+                 -isystem /home/user/.xmake/packages/g/glew/2.2.0/2ac0c6940a2140f7b6506fcd8240f406/include \
+                 -isystem /home/user/.xmake/packages/g/glfw/3.3.8/aa037e96cc854680a09e144c4b5c8fe0/include \
+                 -isystem /usr/include/X11/dri -isystem /home/user/.xmake/packages/g/glm/0.9.9+8/65b1ad153bda4a43b0454eba7969327f/include \
+                 -DNDEBUG -o build/.objs/draw2d/linux/x86_64/release/draw2d-raw.cpp.o draw2d-raw.cpp
+  
   [ 50%]: linking.release draw2d
+  /usr/bin/g++ -o build/linux/x86_64/release/draw2d build/.objs/draw2d/linux/x86_64/release/draw2d-raw.cpp.o -m64 \
+                 -L/home/user/.xmake/packages/g/glew/2.2.0/2ac0c6940a2140f7b6506fcd8240f406/lib \
+                 -L/home/user/.xmake/packages/g/glfw/3.3.8/aa037e96cc854680a09e144c4b5c8fe0/lib \
+                  -L/usr/lib/x86_64-linux-gnu -s \
+                  -lglew -lglfw3 -lOpenGL -lXrandr -lXinerama -lXcursor -lXrender -lX11 -lXi -lXfixes \
+                  -lXext -lxcb -lssl -lcrypto -lffi -lz -lXau -lXdmcp -lGL -ldl -lpthread
   [100%]: build ok!
 #+END_SRC
+
 
 Inspecting compilation output:
 
