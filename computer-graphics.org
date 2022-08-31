@@ -8893,7 +8893,7 @@ including, CLion, QtCreator and Visual Studio Code happy.
   $ cmake --build _build --target 
 #+END_SRC
 
-** Minimal WebGL-OpenGL project (html, javascript)
+** Minimal WebGL-OpenGL project 
    
 WebGL is a web standard supported by most modern web browsers for a
 low-level 3D graphics API accelerated by GPU based on OpenGL ES. By
@@ -9484,7 +9484,7 @@ Building for Windows with Dockercross tool:
    [TRACE] Loading pointer to OpenGL subroutine = glVertexAttribPointer 
    [TRACE] Loading pointer to OpenGL subroutine = glDrawArrays 
 #+END_SRC
-** 2D Graphics - using VAO
+** 2D - using VAO
 
 A VAO (Vertex Array Object) is an object that stores all the
 information necessary to render a VBO (Vertex Buffer Object). For
@@ -9887,7 +9887,7 @@ File: _draw2d-vao.cpp_
       return pbuffer;
   }
 #+END_SRC
-** 2D Graphics - using shaders
+** 2D - using shaders
 
 OpenGL retained mode (programmable pipeline) uses shaders, which are
 programs that uses GLSL (OpenGL shading language) programming
@@ -10534,7 +10534,7 @@ File: _draw2d-shader.cpp_
   }
 #+END_SRC
 
-** 2D Graphics - Chart with orthographic projection
+** 2D - Chart with orthographic projection
 
 This sample applications draws a 2D chart by plotting two curves, the
 functions f(x) and g(x). It is possible to adjust the range displayed
@@ -11206,7 +11206,7 @@ File: _draw2d-chart.cpp_
   }
 
 #+END_SRC
-** 2D Graphics - IBO - Index Buffer Object 
+** 2D - IBO - Index Buffer Object 
 
 This code uses OpenGL IBO (Index Buffer Objects) for drawing triangles
 and lines OpenGL primitives. The IBO is useful for drawing complex
@@ -11747,7 +11747,7 @@ File: _draw2d-ibo-triangles.cpp_
       glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0 );
   }
 #+END_SRC
-** 3D Graphics - Rotating cube/box
+** 3D - Rotating cube/box
 
 This sample application contains: two cubes; two grid planes for
 visual reference; a coordinate axis for visual debugging and a camera
@@ -12625,7 +12625,1365 @@ STEP 4: Run the application with Wine
   $ wine _build_cross/draw3d-cube.exe
 #+END_SRC
 
-** 3D Graphics - Quaternion
+** 3D - WebGL 3D Scene with grid and cube 
+   
+By using WebGL API, it is possible to learn and prototype computer
+graphics without the complexity of dealing with building systems,
+compilation, memory management and C or C++ programming. This code
+takes advantage of the ubiquity and availability of JavaScript and
+WebGL on every modern web browser for demonstrating the usage of
+OpenGL and WebGL APIs for rendering a simple 3D scene containing a
+camera, grid, cube and tetrahedron. The sample WebGL application uses
+no external dependencies and implements everything from scratch which
+makes it easier to reason about the code and about 3D programming
+concepts.
+
+
+Since the code is written in JavaScript and html, it is possible to
+experiment and play with webGL APIs used in the code by opening the
+next link.
+
+  + Live example available at:  https://jsfiddle.net/kgqdocma/
+
+In the live example, there are the following controls:
+
+  + 'a' key => rotates the camera view upwards (forward vector)
+  + 's' key => rotates the camera view downwards (forward)
+  + arrow up => Moves the camera position (eye vector) in the
+    direction that camera is _looking at_ (forward vector).
+  + arrow down => Moves the camera position (eye vector) in the
+    opposite direction that the camera is looking at.
+  + arrow right => Rotates the camera around its _up_ vector (orientation).
+  + arrow left => Rotates the camera in the opposite direction around its _up_ vector (orientation).
+  + 'j' => Move the camera in the positive direction of Y axis
+  + 'k' => Move the camera in the negative direction of Y axis.
+  + 'q' => Rotates the cube.
+  + 'r' => Reset camera position (eye vector) and view (forward vector)
+
+
+[[file:images/opengl-webgl-cube3d-1.png][file:images/opengl-webgl-cube3d-1.png]]
+
+[[file:images/opengl-webgl-cube3d-2.png][file:images/opengl-webgl-cube3d-2.png]]   
+
+
+ *More about WebGL*
+
+  + [[https://blog.scottlogic.com/2019/11/27/drawing-area-polygons-with-webgl.html][Drawing Area Polygons with WebGL]]
+    
+  + https://learnwebgl.brown37.net/
+
+  + https://webglfundamentals.org/
+
+  + https://stackoverflow.com/questions/tagged/webgl
+
+  + [[https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API][WebGL: 2D and 3D graphics for the web]] - Mozilla
+
+  + https://webgl-shaders.com/
+
+  + https://web.dev/webgl-shaders/
+
+ 
+ *Complete Html Code*  (File: webgl2.html)
+
+#+BEGIN_SRC html 
+  <!DOCTYPE html>
+  <html> 
+     <head> 
+         <title>WebGL 3D Scene</title>
+      </script>
+     </head>
+  
+     <body>
+         <h1>WebGL 3D Scene with Cube</h1>
+         OpenGL version:  <label id="output1"></label>          <br/>
+         Shading language version: <label id="output2"></label> <br/> 
+         Camera Positon: <label id="output-camera"></label> <br/>
+         <canvas id="glCanvas" width="600" height="480">
+     </body>
+      <script>
+  // eye = [3, 10, 20]; at = [50, 25, 10]; up = [0, 1, 0];
+  
+  // RGB color constants (Red, Gree, Blue) (R, G, B) tuples
+  const COLOR_RED        = [1.0, 0.0, 0.0];
+  const COLOR_GREEN      = [0.0, 1.0, 0.0];
+  const COLOR_BLUE       = [0.0, 0.0, 1.0];
+  const COLOR_YELLLOW    = [ 0.80,  1.000, 0.100 ];
+  const COLOR_GRAY       = [ 0.47,  0.390, 0.380 ];
+  const COLOR_DARK_GREEN = [ 0.027, 0.392, 0.050 ];
+  const COLOR_DARK_BLUE  = [ 0.109, 0.066, 0.411 ];   
+  
+    ... ... ..... . ... .... ... ... ... ... 
+    ... ... ..... . ... .... ... ... ... ... 
+    
+      </script>
+    
+    </html> 
+#+END_SRC
+
+JavaScript part: 
+
+#+BEGIN_SRC js 
+   // eye = [3, 10, 20]; at = [50, 25, 10]; up = [0, 1, 0];
+
+   // RGB color constants (Red, Gree, Blue) (R, G, B) tuples
+   const COLOR_RED        = [1.0, 0.0, 0.0];
+   const COLOR_GREEN      = [0.0, 1.0, 0.0];
+   const COLOR_BLUE       = [0.0, 0.0, 1.0];
+   const COLOR_YELLLOW    = [ 0.80,  1.000, 0.100 ];
+   const COLOR_GRAY       = [ 0.47,  0.390, 0.380 ];
+   const COLOR_DARK_GREEN = [ 0.027, 0.392, 0.050 ];
+   const COLOR_DARK_BLUE  = [ 0.109, 0.066, 0.411 ];
+
+
+   // Normalize a vector 3x1 column vector (3 rows and 1 column)  
+   function normalize(vector)
+   {
+     let [x, y, z] = vector;
+     let norm = Math.sqrt( x * x + y * y + z * z);
+     return [ x / norm, y / norm, z / norm ];
+   }
+
+   // Computes the dot product (aka scalar) product between two vectors  
+   function dot(vectorA, vectorB)
+   {
+     let [xa, ya, za] = vectorA;
+     let [xb, yb, zb] = vectorB;
+     return xa * xb  + ya * yb + za * zb;
+   }
+
+   // Computs the cross product between two vectors 
+   function cross(vectorA, vectorB)
+   {
+     let [xa, ya, za] = vectorA;
+     let [xb, yb, zb] = vectorB;
+     return [ ya * zb - za * yb, za * xb - xa * zb, xa * yb - ya * xb ];
+   }
+
+   // Difference between two vectors 
+   function diff(vectorA, vectorB)
+   {
+     let [xa, ya, za] = vectorA;
+     let [xb, yb, zb] = vectorB;
+     return [xa - xb, ya - yb, za - zb];
+   }
+
+   class Quaternion
+   {
+     constructor(w, x, y, z)
+     {
+       // Default is the unit quaternion 
+       this._quat = [w, x, y, z];
+     }
+
+     /** @param {number} w
+     /*  @param {number} x 
+     /*  @param {number} y 
+     /*  @param {number} z 
+      */ 
+     static create(w, x, y, z)
+     {
+       return new Quaternion(w, x, y, z);
+     }
+
+     /** Create unit quaternion  */
+     static createUnit()
+     {
+       return new Quaternion(1.0, 0.0, 0.0, 0.0);
+     }
+
+     /** Create a imaginary quaternion */
+     static createFromVector(x, y, z)
+     {
+       return new Quaternion(0.0, x, y, z);
+     }
+
+     /** Create quaternion represeting a rotation around some axis 
+      * @param {number}   angle - Rotation angle in degrees 
+      * @param {number[]} axis  - Rotation axis
+      */
+     static createFromAxisAngle(angle, axis)
+     {
+       let [nx, ny, nz] = normalize(axis);
+       // Angle in radians 
+       let t = angle / 180.0 * Math.PI / 2;
+       let C = Math.cos(t);
+       let S = Math.sin(t);
+       return Quaternion.create(C, S * nx, S * ny, S * nz);
+     }
+
+     negate()
+     {
+       let [w, x, y, z] = this._quat;
+       return new Quaternion(-w, -x, -y, -z);
+     }
+
+     conjugate()
+     {
+       let [w, x, y, z] = this._quat;
+       return new Quaternion(w, -x, -y, -z);
+     }
+
+     // Note: It is assumed that the current quaternion is a unit quaternion 
+     rotateVector(v)
+     {
+       let qa = this;
+       let qb = Quaternion.createFromVector(...v);
+       // r1 = qa * qb 
+       let r1 = qa.multiply(qb);
+       let r2 = r1.multiply(qa.conjugate());
+       // r2 = qa * qb * qa.conjugage()
+       //let b = q.multiply( qa.conjugate() );
+       return r2.getVector();
+     }
+
+     /** Get imaginary part of a quaternion */
+     getVector()
+     {
+       let [w, x, y, z] = this._quat;
+       return [x, y, z];
+     }
+
+     /** Turn the quaternion into a homogeneous rotation matrix */
+     toMatrix()
+     {
+       // The quaternion is assumed to be a unit quaternion 
+       // otherwise the matrix result will be invalid
+       let [a, b, c, d] = this._quat;
+       let m = new Float32Array(16);
+       m[0] = a * a - c * c - d * d;
+       m[1] = 2 * (b * c + a * d);
+       m[2] = 2 * (b * d - a * c);
+       m[3] = 0.0;
+
+       m[4] = 2 * (b * c - a * d);
+       m[5] = a * a - b * b + c * c -  d * d;
+       m[6] = 2 * (c * d + a * b);
+       m[7] = 0.0;
+
+       m[8] = 2 * (b * d + a * c);
+       m[9] = 2 * (c * d - a * b);
+       m[10] = a * a - b * b - c * c + d * d;
+       m[11] = 0;
+    
+       m[12] = 0.0;
+       m[13] = 0.0;
+       m[14] = 0.0;
+       m[15] = 1.0;
+
+       return m;
+     }
+
+     /** Multiply a quaternion for another and returns a new quaternion 
+      * Note: JavaScript lacks operator overloading
+      * Note: Quaternion multiplication is not commutative 
+      * @param {Quaternio} q
+      **/
+     multiply( q )
+     {
+       let [w1, x1, y1, z1] = this._quat;
+       let [w2, x2, y2, z2] = q._quat; 
+       let result = [
+             w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2 
+           , x1 * w2 + w1 * x2 - z1 * y2 + y1 * z2
+           , y1 * w2 + z1 * x2 + w1 * y2 - x1 * z2 
+           , z1 * w2 - y1 * x2 + x1 * y2 + w1 * z2  
+       ];
+       return new Quaternion(...result);
+     }
+
+   }
+
+
+  
+   class Matrix4x4 
+   {
+
+     constructor()
+     {
+         this.mat = new Float32Array(16);
+         this.mat[0] = 1.0;
+         this.mat[5] = 1.0;
+         this.mat[10] = 1.0;
+         this.mat[15] = 1.0;
+     }
+
+     static create()
+     {
+       return new Matrix4x4();
+     }
+
+     at(i, j) 
+     {
+       return this.mat.at(j + 4 * i);
+     }
+
+     setToIdentity() 
+     {
+         this.mat = new Float32Array(16);
+         this.mat[0] = 1.0;
+         this.mat[5] = 1.0;
+         this.mat[10] = 1.0;
+         this.mat[15] = 1.0;
+         return this;
+     }
+
+     // this.matrix = this.matrix * translateMatrix(x, y, z)
+     /**
+      *  @param {number} x 
+      *  @param {number} y 
+      *  @param {number} z 
+      */ 
+     translate(x, y, z)
+     {
+       let matrix = [   1, 0, 0, 0
+                      , 0, 1, 0, 0 
+                      , 0, 0, 1, 0 
+                      , x, y, z, 1 
+                     ];
+       this.multiply(matrix);
+       return this;
+     }
+
+     translateV(vector)
+     {
+       this.translate(vector[0], vector[1], vector[2]);
+       return this;
+     }
+
+     /**
+      *  @param {number} sx 
+      *  @param {number} sy 
+      *  @param {number} sz 
+      */ 
+     scaleV(sx, sy, sz)
+     {
+       let matrix = [  sx,  0,  0, 0 
+                      , 0, sy,  0, 0 
+                      , 0,  0, sz, 0 
+                      , 0,  0,  0, 1 
+                     ];
+       this.multiply(matrix);
+       return this;
+     }
+
+     /**
+      *  @param {number} k
+      */ 
+     scale(k)  
+     {
+        let m = new Float32Array(16);
+        m[0] = k; 
+        m[5] = k; 
+        m[10] = k; 
+        m[15] = 1.0; 
+       this.multiply(m);
+       return this;
+     }
+
+     // Rotation around arbitrary axis (vector) designated by X, Y, Z
+     // the angle is in radians 
+     // this.matrix = this.matrix * rotate(angle, x, y, z)
+     rotate(angle, x, y, z)
+     {
+       let r = new Float32Array(16);
+       let t = angle * Math.PI / 180.0;
+       let C = Math.cos(t);
+       let S = Math.sin(t);
+       let K = 1 - C ;
+       r[0] = x*x + (1 - x*x)*C;
+       r[4] = x*y*K - z*S;
+       r[8] = x*z*K + y*S;
+       r[12] = 0;
+       r[1] = x*y*K + z*S;
+       r[5] = y*y + (1 - y*y)*C
+       r[9] = -x*S + y*z*K;
+       r[13] = 0;
+       r[2] = x*z*K - y*S;
+       r[6] = x*S + y*z*K;
+       r[10] = z*z + (1 - z*z)*C;
+       r[14] = 0;
+       r[3] = 0;
+       r[7] = 0;
+       r[11] = 0;
+       r[15] = 1;
+       this.multiply(r);
+       return this;
+     }
+
+     /** Rotate around Z axis 
+      * @param {number} angle - Rotation angle in degrees 
+      */  
+     rotateZ(angle)
+     {
+       // let r = new Float32Array(16);
+       let r = Array(16).fill(0.0);
+       let t = angle * Math.PI / 180.0;
+       let C = Math.cos(t);
+       let S = Math.sin(t);
+       r[0] = C; r[4] = -S;
+       r[1] = S; r[5] =  C;
+       r[10] = 1; r[15] = 1;
+
+       this.multiply(r);
+       //this.mat = r;
+       return this;
+     }
+
+     /** Rotate around some axis 
+      * @param  {number}    angle  - rotation angle in degrees
+      * @param  {number[]}  axis   - rotation axis as an array of 3 numbers 
+      */ 
+     rotateAxis(angle, axis)
+     {
+       let [x, y, z] = axis;
+       this.rotate(angle, x, y, z);
+       return this;
+     }
+
+     /** Rotate current matrix by multiplying it by the quaternion rotation matrix 
+      *  this.matrix = this.matrix * quaternion.RotMatrix 
+      * @param {Quaternion} q 
+      **/
+     rotateQuaternion(q)
+     {
+       let rotmatrix = q.toMatrix();
+       this.multiply(rotmatrix);
+       return this;
+     }
+
+     setLookAt(eye, at, up)
+     {
+       let Z = normalize( diff(eye, at) );
+       let X = normalize( cross(up, Z) );
+       let Y = normalize( cross(Z, X) );
+       let m = new Float32Array(16);
+       m[0]  = X[0]; m[4]  = X[1]; m[8]  = X[2];  m[12]  = -dot(X, eye);
+       m[1]  = Y[0]; m[5]  = Y[1]; m[9]  = Y[2];  m[13]  = -dot(Y, eye);
+       m[2]  = Z[0]; m[6]  = Z[1]; m[10] = Z[2];  m[14] = -dot(Z, eye);
+       m[3] = 0;     m[7] = 0;     m[11] = 0;     m[15] =  1; 
+       this.mat = m;
+       return this;
+     }
+
+     // FOV angle in degrees 
+     setPerspective(FOV, aspect, zNear, zFar)
+     {
+       // Angle in radians
+       let t = Math.PI * FOV / 180.0; 
+       let k = Math.tan(t / 2);
+       let m = new Float32Array(16);
+       m[0] = 1 / ( aspect * k ); 
+       m[5] = 1 / k;
+       m[10] = (zNear + zFar) / (zNear - zFar);
+       m[14] = 2 * zNear * zFar / (zNear - zFar);
+       m[11] = -1; 
+       this.mat = m; 
+       return this;
+     }
+
+     // In place matrix multiplication 
+     multiply( matrix )
+     {
+       let a = this.mat;
+       let b = matrix;
+       let c = new Float32Array(16);
+
+     // Matrix multiplication algorithm of column-major matrices borrowed from 
+     // https://github.com/yycho0108/Abstraction/blob/master/gl-matrix.min.js
+      var d = a[0], e = a[1], g = a[2], f = a[3], h = a[4], i = a[5], j = a[6], k = a[7]
+             , l = a[8], o = a[9], m = a[10], n = a[11], p = a[12], r = a[13], s = a[14];
+
+       a = a[15];
+       var A = b[0], B = b[1], t = b[2], u = b[3], v = b[4], w = b[5], x = b[6], y = b[7], z = b[8]
+           , C = b[9], D = b[10], E = b[11], q = b[12], F = b[13], G = b[14];
+
+       b = b[15];
+       c[0] = A * d + B * h + t * l + u * p;
+       c[1] = A * e + B * i + t * o + u * r;
+       c[2] = A * g + B * j + t * m + u * s;
+       c[3] = A * f + B * k + t * n + u * a;
+       c[4] = v * d + w * h + x * l + y * p;
+       c[5] = v * e + w * i + x * o + y * r;
+       c[6] = v * g + w * j + x * m + y * s;
+       c[7] = v * f + w * k + x * n + y * a;
+       c[8] = z * d + C * h + D * l + E * p;
+       c[9] = z * e + C * i + D * o + E * r;
+       c[10] = z *
+           g + C * j + D * m + E * s;
+       c[11] = z * f + C * k + D * n + E * a;
+       c[12] = q * d + F * h + G * l + b * p;
+       c[13] = q * e + F * i + G * o + b * r;
+       c[14] = q * g + F * j + G * m + b * s;
+       c[15] = q * f + F * k + G * n + b * a;
+       this.mat = c;
+     }  
+
+   }
+
+
+   function assertNotUndefined(variableName, variable)
+   {
+     if( typeof variable == "undefined" )
+     {
+       alert(` [ASSERT ERROR] ${variableName} is undefined.`);
+     }
+   }
+
+
+       // Based on:  https://webglfundamentals.org/webgl/lessons/webgl-fundamentals.html
+   function compileShaderProgram(gl, vertexShaderCode, fragmentShaderCode) 
+   {
+       function createShader(gl, type, source) 
+       {
+         assertNotUndefined("gl", gl);
+         var shader = gl.createShader(type);
+         gl.shaderSource(shader, source);
+         gl.compileShader(shader);
+         var success = gl.getShaderParameter(shader, gl.COMPILE_STATUS);
+         if (success) {
+           return shader;
+         }
+
+         console.log(" [SHADER ERROR] = \n" + source);
+         console.log(" [SHADER ERROR] "  + gl.getShaderInfoLog(shader) );
+         // alert(" [SHADER ERORR]  " + gl.getShaderInfoLog(shader) );
+         gl.deleteShader(shader);
+       }
+
+       let vertexShader = createShader(gl, gl.VERTEX_SHADER, vertexShaderCode);
+
+       let fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderCode);
+       console.log(" [TRACE] Compiled fragmentShader Ok.");
+
+       var program = gl.createProgram();
+       assertNotUndefined("program", program);
+       gl.attachShader(program, vertexShader);
+       console.log(" [TRACE] Attach vertex shader Ok");
+       gl.attachShader(program, fragmentShader);
+       console.log(" [TRACE] Attach fragment shader Ok");
+       gl.linkProgram(program);
+       var success = gl.getProgramParameter(program, gl.LINK_STATUS);
+       if (success) {
+         return program;
+       }
+
+       console.error(gl.getProgramInfoLog(program));
+       gl.deleteProgram(program);
+   }
+
+
+   function resizeCanvasToDisplaySize(canvas, multiplier) 
+   {
+       multiplier = multiplier || 1;
+       const width  = canvas.clientWidth  * multiplier | 0;
+       const height = canvas.clientHeight * multiplier | 0;
+       if (canvas.width !== width ||  canvas.height !== height) {
+         canvas.width  = width;
+         canvas.height = height;
+         return true;
+       }
+       return false;
+   }
+
+   // Vertex Buffer Object abstraction 
+   class Vbuffer 
+   {
+     constructor(gl, attr_position, attr_color)
+     {
+       this._gl = gl;
+       this._vbo = gl.createBuffer();   
+       this._data = new Float32Array(1);
+       this._attr_position = attr_position;
+       this._attr_color = attr_color;
+       this._vertices = 0;
+     }
+
+     unbind()
+     {
+       let gl = this._gl;
+       gl.bindBuffer(gl.ARRAY_BUFFER, null);
+     }
+
+     // Release the VBO from the GPU 
+     free()
+     {
+       let gl = this._gl;
+       gl.deleteBuffer(this._vbo);
+     }
+
+     setData(data, ncomps = 3, stride = 0, istride = 0 )
+     {
+       let gl = this._gl;
+       this._ncomps = ncomps;
+       this._stride = stride; 
+       this._istide = 0;
+       this._vertices = data.length;
+       gl.bindBuffer( gl.ARRAY_BUFFER, this._vbo );
+       this._data = new Float32Array(data);
+       // Send data to GPU
+       gl.bufferData(gl.ARRAY_BUFFER, this._data, gl.STATIC_DRAW);
+     }
+
+     drawTriangles()
+     {
+       let gl = this._gl;
+       this.draw(gl.TRIANGLES);
+     }
+
+     drawLines()
+     {
+       let gl = this._gl;
+       this.draw(gl.LINES);
+     }
+
+     drawLineLoop()
+     {
+
+       let gl = this._gl;
+       this.draw(gl.LINE_LOOP);
+     }
+
+     draw(drawType)
+     {
+       let gl = this._gl;
+       gl.bindBuffer( gl.ARRAY_BUFFER, this._vbo );
+
+       // Position data layout for each vertex 
+       gl.vertexAttribPointer(  this._attr_position  // Shader attribute 
+                              , 3                    // Number of components, coordinates
+                              , gl.FLOAT             // Type of each componente
+                              , false                // Normalized flag 
+                              , 24                   // Stride  = sizeof(Vertex) = sizeof(Position) + sizeof(Color) = 
+                                                     // Stride  = 3 * sizeof(Float in bytes) + 3 * sizeof(Float in bytes) 
+                                                     // Stride  = 3 * 4 + 3 * 4 = 12 
+                              , 0                    // offset  
+                             );
+
+       // Color data layout for each vertex  
+       gl.vertexAttribPointer(  this._attr_color     // Shader attribute 
+                              , 3                    // Number of components, coordinates
+                              , gl.FLOAT             // Type of each componente
+                              , false                // Normalized flag 
+                              , 24                   // Stride 
+                              , 12                   // offset - offset of color attribute 
+                             );
+
+
+       // Each vertex has 6 coordinates - 3 coordinates for position and 3 coordinates for color
+       gl.drawArrays(drawType, 0, this._vertices / 6);
+
+       // Unbind VBO and disable global state 
+       gl.bindBuffer( gl.ARRAY_BUFFER, null);
+     }
+   }
+
+   class Camera
+   {
+     constructor(gl, uniform_view, uniform_proj, uniform_eye)
+     {
+       // Current location of camera in world coordinates
+       this.eye     = [  2.0, 4.0,  5.0 ];
+       // Direction to where camera is looking at.
+       this.forward = [ -1.0, 0.0, -1.0 ];
+       // Direction to where camera is looking at.
+       this.up      = [  0.0, 1.0,  0.0 ];
+    
+       // Field of view angle stated in degrees  
+       this.fov_angle = 60.0; 
+       // Aspect ratio  
+       this.aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
+       // Far 
+       this.zFar = 100.0;
+       // Near 
+       this.zNear = 0.1;
+
+       this.gl = gl;
+       this.uniform_view = uniform_view;
+       this.uniform_proj = uniform_proj;
+       this.uniform_eye  = uniform_eye;
+
+       this.updateView();
+
+       console.log(" [TRACE] Crated Camera Ok.");
+     }
+
+     // Reset camera to initial position
+     reset()
+     {
+       // Current location of camera in world coordinates
+       this.eye     = [  2.0, 4.0,  5.0 ];
+       // Direction to where camera is looking at.
+       this.forward = [ -1.0, 0.0, -1.0 ];
+       // Direction to where camera is looking at.
+       this.up      = [  0.0, 1.0,  0.0 ];
+       // Field of view angle stated in radians. It is by default 60 degrees.
+       this.fov_angle = 60.0; //* Math.PI / 180.0;
+     }
+
+     // Rotate around camera's Up vecto.
+     rotateYaw(angle)
+     {
+       let q = Quaternion.createFromAxisAngle(angle, this.up);
+       this.forward = q.rotateVector(this.forward);
+       this.updateView();
+     }
+
+     // Rotate around camera's pitch axis (X axis) elevate camera view.
+     rotatePitch(angle)
+     {
+       let axis = cross(this.up, this.forward);
+       let q = Quaternion.createFromAxisAngle(angle, axis);
+       this.forward = q.rotateVector(this.forward);
+       this.updateView();
+     }
+
+     // Move camera in Y axis 
+     moveCameraUpDow(factor)
+     {
+       // Increase of decrease Y component of Eye vector
+       this.eye[1] = this.eye[1] + factor;
+       this.updateView();
+       return this;
+     }
+
+     // Make the vector forward parallel to the plane XZ
+     parallelXZ()
+     {
+       this.forward[1] = 0.0; 
+       this.updateView();
+       return this;
+     }
+
+        // Move at forward vector direction (to where camera is looking at).
+     moveForward(factor)
+     {
+         // this->eye = this->eye + factor * this->forward;
+         let [ex, ey, ez] = this.eye; 
+         let [fx, fy, fz] = this.forward;
+         this.eye = [ex + factor * fx, ey + factor * fz, ez + factor * fz];
+         this.updateView();
+         return this
+     }
+
+     // Set camera position in world coordinates 
+     setPosition(position)
+     {
+       this.eye = position; 
+       this.updateView();
+       return this;
+     }
+
+     setPositonXYZ(x, y, z)
+     {
+       this.setPosition([x, y, z]);
+       return this;
+     }
+
+     lookAt(at)
+     {
+       // Set position to where camera is looking at.
+       this.forward = diff(at, this.eye) ;
+       this.updateView();
+       return this;
+     }
+
+     lookAtXYZ(x, y, z)
+     {
+       this.lookAt([x, y, z]);
+       return this;
+     }
+  
+
+     updateView() 
+     {
+       // Perspective/Projection matrix 
+       // Tp = glm::perspective( fov_angle, aspect, zNear, zFar );
+       const Tp = new Matrix4x4(); 
+       Tp.setPerspective(this.fov_angle, this.aspect, this.zNear, this.zFar);
+       // console.log(" [TRACE] Tp = ", Tp);
+
+       // View matrix 
+       // auto Tview = glm::lookAt(eye, cam_at, up);
+       const Tv = new Matrix4x4();
+       // Location where camera is looking at in world coordinates 
+       const at = [ this.eye[0] + this.forward[0], this.eye[1] + this.forward[1], this.eye[2] + this.forward[2] ];
+       Tv.setLookAt(this.eye, at, this.up);
+       // console.log(" [TRACE] Tv = ", Tv);
+  
+       // glUniformMatrix4fv(shader_uniform_view, 1, GL_FALSE, glm::value_ptr(Tview) );
+       this.gl.uniformMatrix4fv(this.uniform_view, false, Tv.mat);
+
+       // glUniformMatrix4fv(shader_uniform_proj, 1, GL_FALSE, glm::value_ptr(Tproj) );
+       this.gl.uniformMatrix4fv(this.uniform_proj, false, Tp.mat);
+
+     }
+
+     setIdentity()
+     {
+       let m = new Matrix4x4();
+       this.gl.uniformMatrix4fv(this.uniform_view, false, m.mat);
+       this.gl.uniformMatrix4fv(this.uniform_proj, false, m.mat);
+     }
+
+   }
+  
+
+   /** Encapsulates the position, scale and  rotation of an object in the space */
+   class Orientation
+   {
+     constructor()
+     {
+       // Default scale 1.0 - original object size 
+       this._scale     = 1.0; 
+       // Default position at origin 
+       this._position  = [0.0, 0.0, 0.0];
+       // Unit quaternion 
+       this._rotation = Quaternion.create(1.0, 0.0, 0.0, 0.0);
+       this._is_changed = false;
+       this._model = Matrix4x4.create()
+                             .translateV(this._position)
+                             .scale(this._scale)
+                             .rotateQuaternion(this._rotation)
+     }
+
+     reset()
+     {
+       this._scale     = 1.0; 
+       this._position  = [0.0, 0.0, 0.0];
+       this.__rotation = Quaternion.create(1.0, 0.0, 0.0);
+       this._is_changed = true;
+     }
+
+     setPosition(x, y, z)
+     {
+       this._position = [x, y, z];
+       this._is_changed = true;
+     }
+
+     translate(dx, dy, dz)
+     {
+         this._position[0] += dx;
+         this._position[1] += dy;
+         this._position[2] += dz;
+         this._is_changed = true;
+         return this;
+     }
+
+     setScale(scale)
+     {
+         this.scale = scale;
+         this.is_changed = true;
+         return this;
+     }
+
+     rotateZ(angle)
+     {
+       // console.log(" [TRACE] Rotating angle = ", angle);
+       // this.angle = this.angle + angle;
+       this.rotate(angle, [0.0, 0.0, 1.0]);
+       this._is_changed = true;
+       return this;
+     }
+
+     rotate(angle, axis)
+     {
+       let q = Quaternion.createFromAxisAngle(angle, axis);
+       this._rotation = this._rotation.multiply(q);
+       this._is_changed = true;
+       return this;
+     }
+
+     getModel()
+     {
+       if( this._is_changed )
+       {
+           this._is_changed = false;
+           this._model.setToIdentity()
+                     .translateV(this._position)
+                     .scale(this._scale)
+                     .rotateQuaternion(this._rotation);
+       }
+       return this._model;
+     }
+
+   }
+
+   class Entity 
+   {
+     constructor(gl, vbo, u_model, drawType)
+     {
+       this.gl = gl;
+       this.vbo = vbo; 
+       this.u_model = u_model;
+
+       this.is_visible = true;
+
+       // Draw Triangles by default 
+       this.drawType = drawType; 
+       this.orientaton = new Orientation();
+     }
+
+     setDrawTriangles() { this.drawType = this.gl.TRIANGLES; return this; }
+     setDrawLines() { this.drawType = this.gl.LINES;         return this; }
+     setDrawLineLoop() { this.drawType = this.gl.LINE_LOOP;  return this; }
+     setVisible(flag) { this.is_visible = flag;              return this; }
+     toggleVisible() { this.is_visible = !this.is_visible;         return this; }
+     setPosition(x, y, z) { this.orientaton.setPosition(x, y, z);  return this; }
+     translate(dx, dy, dz){ this.orientaton.translate(dx, dy, dz); return this; }
+     setScale(k){ this.orientaton.setScale(k);                     return this; }
+     rotateZ(angle){ this.orientaton.rotateZ(angle);               return this; }
+     rotate(angle, axis){ this.orientaton.rotate(angle, axis);     return this; }
+
+     draw() 
+     {
+       let model = this.orientaton.getModel();
+       if( this.is_visible )
+       {
+          this.gl.uniformMatrix4fv(u_model, false, model.mat); 
+          this.vbo.draw(this.drawType);
+       }
+     }
+   }
+
+   class EntityFactory 
+   {
+
+     /** @param {Vbuffer} - vbo */
+     constructor(gl, vbo, u_model)
+     {
+       this.gl = gl; 
+       this.vbo = vbo;
+       this.u_model = u_model;
+       this.drawType = gl.TRIANGLES;
+     }
+
+     setDrawTriangles()
+     {
+       this.drawType = this.gl.TRIANGLES;
+       return this;
+     }
+
+     setDrawLines()
+     {
+       this.drawType = this.gl.LINES;
+       return this;
+     }
+
+     setDrawLineLoop()
+     {
+       this.drawType = this.gl.LINE_LOOP;
+       return this;
+     }
+
+     create()
+     {
+         return new Entity(this.gl, this.vbo, this.u_model, this.drawType);
+     }
+   }
+
+       // ----- R E N D E R I N  G ------------------//
+
+
+   // Vertex Shader code => Performs vertex coordinate transforms in the GPU 
+   let code_shader_vert =` 
+     // precision mediump float;
+
+     // Note: keyword attribute is deprecated 
+     attribute vec3 position;
+     attribute vec3 color; 
+
+     varying vec3 out_color;
+
+     uniform vec3 u_eye;         // Cameras's position in space
+     uniform mat4 u_model;       // Model matrix 
+     uniform mat4 u_view;        // Camera's view matrix    
+     uniform mat4 u_projection;  // Camera's projection matrix 
+
+     void main(){
+
+       gl_Position = u_projection * u_view * u_model * vec4(position, 1.0);
+
+       // Forward to fragment shader 
+       out_color = color; 
+    
+     }
+   `;
+
+   // Fragment shader code => Sets color, lights and illumination 
+   let code_shader_frag = `
+      // precision mediump float;
+
+      // varying low vec3 out_color;
+      varying lowp vec3 out_color;
+
+       void main()
+       {
+         gl_FragColor = vec4(out_color, 1.0);
+         //gl_FragColor = vec4(0, 0, 1.0, 1.0);
+       }
+   `;
+
+     // ----------- Rendering Starts Here -----------//
+
+
+   const canvas = document.querySelector("#glCanvas");
+   const gl = canvas.getContext("webgl");
+
+   if(  gl == null ){
+     alert(" [ABORT] Unable to initialized WebGL");
+   }
+
+   console.log(" [DEBUG] OpenGL version = " + gl.getParameter(gl.VERSION) );
+   console.log(" [DEBUG] Shading language version = " + gl.getParameter(gl.SHADING_LANGUAGE_VERSION));
+
+   document.querySelector("#output1").textContent = gl.getParameter(gl.VERSION);
+   document.querySelector("#output2").textContent =  gl.getParameter(gl.SHADING_LANGUAGE_VERSION);
+
+   let prog =  compileShaderProgram(gl, code_shader_vert, code_shader_frag);
+   gl.useProgram(prog);
+
+   // Uniform variables 
+   let u_proj       = gl.getUniformLocation( prog, "u_projection");
+   let u_view       = gl.getUniformLocation( prog, "u_view");
+   let u_model      = gl.getUniformLocation( prog, "u_model");
+   let u_camera_eye = gl.getUniformLocation( prog, "u_eye");
+
+   // Attribute Locations 
+   let attr_position = gl.getAttribLocation(prog, "position");
+   let attr_color    = gl.getAttribLocation(prog, "color");
+
+   let identity = new Matrix4x4();
+
+   // Initialize with identity matrix 
+   gl.uniformMatrix4fv(u_model, false, identity.mat); 
+   gl.uniformMatrix4fv(u_view,  false, identity.mat); 
+   gl.uniformMatrix4fv(u_proj,  false, identity.mat);
+
+
+   function buildGridPlaneXY(gl, attr_position, attr_color, n , delta)
+   {
+       let vertices = [];
+
+       let xmax = n * delta; 
+       let ymax = n * delta;
+
+       // Draw lines in plane XY parallel to line X 
+       for(let i = 0; i < n; i++)
+       {
+         // Position of first vertex 
+         let position1 = [0.0, i * delta, 0.0 ];
+         // Positon of first line vertex   
+         vertices.push(...position1);    
+         // Color of second line vertex 
+         vertices.push(...COLOR_BLUE);   
+
+         // Position of second vertex  
+         let position2 = [xmax, i * delta, 0.0];
+         // Positon of first line vertex   
+         vertices.push(...position2);    
+         // Color of second line vertex 
+         vertices.push(...COLOR_BLUE);   
+       }
+
+       // Draw lines in plane XY parallel to line Y
+       for(let j = 0; j < n; j++)
+       {
+         // Position of first vertex 
+         let position1 = [j * delta, 0.0, 0.0 ];
+         // Positon of first line vertex   
+         vertices.push(...position1);    
+         // Color of second line vertex 
+         vertices.push(...COLOR_GREEN);   
+
+         // Position of second vertex  
+         let position2 = [j * delta, ymax, 0.0];
+         // Positon of first line vertex   
+         vertices.push(...position2);    
+         // Color of second line vertex 
+         vertices.push(...COLOR_GREEN);   
+       }
+
+       let buffer = new Vbuffer(gl, attr_position, attr_color);
+       buffer.setData(vertices);
+       return buffer;
+   }
+
+   function buildTetrahedron(gl, attr_position, attr_color, size)
+   {
+     let k = size;
+     // Position of Tetrahedron vertices 
+     let a = [0, 0, k];  // Point in Z axis 
+     let b = [k, 0, 0];  // Point in X axis 
+     let c = [0, k, 0];  // Point in Y axis 
+     let d = [0, 0, 0];  // Point in origin 
+
+     let COLOR_Triangle1 = COLOR_BLUE;
+     let COLOR_Triangle2 = COLOR_GREEN;
+     let COLOR_Triangle3 = COLOR_RED;
+     let COLOR_Triangle4 = COLOR_YELLLOW;
+
+     let vertices = [];
+  
+     // triangle vertices of face 1
+     vertices.push(...a, ...COLOR_Triangle1);
+     vertices.push(...b, ...COLOR_Triangle1);
+     vertices.push(...c, ...COLOR_Triangle1);
+
+     // triangle vertices of face 2
+     vertices.push(...a, ...COLOR_Triangle2);
+     vertices.push(...c, ...COLOR_Triangle2);
+     vertices.push(...d, ...COLOR_Triangle2);
+
+     // triangle vertices of face 3
+     vertices.push(...a, ...COLOR_Triangle3);
+     vertices.push(...b, ...COLOR_Triangle3);
+     vertices.push(...d, ...COLOR_Triangle3);
+
+     // triangle vertices of face 4
+     vertices.push(...d, ...COLOR_Triangle4);
+     vertices.push(...c, ...COLOR_Triangle4);
+     vertices.push(...b, ...COLOR_Triangle4);
+
+     // console.log(" [TRACE] vertices = ", vertices);
+
+     let buffer = new Vbuffer(gl, attr_position, attr_color);
+     buffer.setData(vertices);
+     return buffer;
+   }
+
+   // Note: OpenGL can only draw triangles and lines. 
+   // Therefore, the only way to draw a cube solid is to 
+   // draw the triangles for every face of the  cube.
+   // As a cube has 6 face and two triangles for every 
+   // face, it is necessary to draw 12 triangles. 
+   function buildCube(gl, attr_position, attr_color, size)
+   {
+     let k = size; 
+     // Cube vertices 
+     //       x  y  z
+     let a = [0, 0, k];
+     let b = [0, k, k];
+     let c = [k, k, k];
+     let d = [k, 0, k];
+     let e = [k, 0, 0];
+     let f = [k, k, 0];
+     let g = [0, k, 0];
+     let h = [0, 0, 0];
+
+     let vertices = [];
+
+     function triangle(t1, t2, t3, color)
+     {
+       vertices.push(...t1, ...color);
+       vertices.push(...t2, ...color);
+       vertices.push(...t3, ...color);
+     }
+     // Face 1 of cube 
+     triangle(a, b, c, COLOR_BLUE);
+     triangle(a, c, d, COLOR_BLUE);
+     // Face 2 of cube 
+     triangle(c, d, e, COLOR_DARK_GREEN);
+     triangle(c, f, e, COLOR_DARK_BLUE);
+     // Face 3 of cube 
+     triangle(a, d, e, COLOR_GREEN);
+     triangle(a, h, e, COLOR_GREEN);
+     // Face  4 of cube 
+     triangle(a, h, g, COLOR_YELLLOW);
+     triangle(a, b, g, COLOR_YELLLOW);
+     // Face  5 of cube 
+     triangle(b, c, g, COLOR_GRAY);
+     triangle(c, g, f, COLOR_GRAY);
+     // Face 6 of cube 
+     triangle(g, h, f, COLOR_RED);
+     triangle(h, f, e, COLOR_RED);
+
+     console.log(" [TRACE] vertices = ", vertices);
+
+     let buffer = new Vbuffer(gl, attr_position, attr_color);
+     buffer.setData(vertices);
+     return buffer;
+   }
+
+
+   // Vertices of (x, y) coordinates 
+   let vertices_triangle = [
+      // --- Vertices ----- //  // (R, G, B) --- Colors -----//
+       -0.25,  -0.25,  0,      1.0, 0.0, 0.0
+     ,  0.00,  +0.25,  0,      0.0, 1.0, 0.0
+     , +0.25,  -0.25,  0,      0.0, 0.0, 1.0  
+   ]; 
+
+   // Upload vertices GPU 
+
+   let vboGrid = buildGridPlaneXY(gl, attr_position, attr_color, 20, 0.1);
+   let gridFactory = new EntityFactory(gl, vboGrid, u_model).setDrawLines();
+   let gridXY = gridFactory.create();
+   let gridXZ = gridFactory.create().rotate(90.0, [1.0, 0.0, 0.0]);
+
+
+   let vboTetrahedron = buildTetrahedron(gl, attr_position, attr_color, 0.50);
+   let TetrahedronFactory = new EntityFactory(gl, vboTetrahedron, u_model);
+   let tetrahedron1 = TetrahedronFactory.create();
+   tetrahedron1.translate(0.6, 0.25, 0.70).rotate(70, [5, 2, 3]);
+
+   let tetrahedron2 = TetrahedronFactory.create();
+   tetrahedron2.setDrawLineLoop();
+   tetrahedron2.translate(1.0, 1.25, 0.9).rotate(70, [1, 2, 2]);
+
+   let vboCube = buildCube(gl, attr_position, attr_color, 0.50);
+   let cubeFactory = new EntityFactory(gl, vboCube, u_model);
+   let cube1 = cubeFactory.create().translate(0.9, 0.60, 0.50).rotate(80, [1, 1, 1]);
+
+
+   let vboTriangle = new Vbuffer(gl, attr_position, attr_color);
+   vboTriangle.setData(vertices_triangle);
+   const triangleFactory = new EntityFactory(gl, vboTriangle, u_model);
+
+   let triangle1 = triangleFactory.create();
+   triangle1.draw();
+
+   let triangle2 = triangleFactory.create();
+   triangle2.setPosition(0.60, 0.50, 0.0);
+   triangle2.setScale(1.25);
+   triangle2.draw();
+
+
+   gl.enableVertexAttribArray(attr_position);
+   gl.enableVertexAttribArray(attr_color);
+
+
+   let camera = new Camera(gl, u_view, u_proj, u_camera_eye)
+   camera.setPosition( [2, 2, 2 ]).lookAt( [0, 0, 0] );
+
+
+
+   function drawScene()
+   {
+       // resizeCanvasToDisplaySize(gl.canvas);
+       gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+       // Screen background color is black 
+       // => clearColor(Red intensity from 0 to 1, Green , Blue , Alpha)
+       gl.clearColor(0.0, 0.0, 0.0, 1.0);
+       gl.clear(gl.COLOR_BUFFER_BIT);
+       gl.clearDepth(1.0);         // Clear everything
+       gl.enable(gl.DEPTH_TEST);   // Enable depth testing
+       gl.depthFunc(gl.LEQUAL);    // Near things obscure far things
+       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+       triangle1.draw();
+       triangle2.draw();
+       // triangleA.draw();
+       // triangleB.draw();
+
+       gridXY.draw(); 
+       gridXZ.draw();
+
+       tetrahedron1.draw();
+       // tetrahedron2.draw();
+       cube1.draw();
+
+   }
+
+   drawScene();
+
+   const KEY_ARROW_LEFT  = 37; 
+   const KEY_ARROW_RIGHT = 39;
+   const KEY_ARROW_DOWN  = 40;
+   const KEY_ARROW_UP    = 38;
+
+   function precisionRound(vector, digits)
+   {
+     let factor = Math.pow(10, digits);
+     return vector.map(x => Math.round(x * factor) / factor);
+   }
+ 
+   function keyboardListener(event)
+   {
+       /** @param {number} key */ 
+       let key = event.keyCode; 
+
+       // console.log(" [TRACE] type(event) = ", typeof(event));
+       // console.log(" [TRACE] Event = ", event);
+
+       if( key == KEY_ARROW_LEFT )
+       {
+         // triangle1.translate(-0.10, 0.0, 0.0);
+         camera.rotateYaw(10.0);
+       } 
+
+       if( key == KEY_ARROW_RIGHT  )
+       {
+         // triangle1.translate(+0.10, 0.0, 0.0);
+         camera.rotateYaw(-10.0);
+       } 
+
+       if( key == KEY_ARROW_UP  )
+       {
+         // triangle1.translate(0.0, 0.1, 0.0);
+         camera.moveForward(0.2);
+       } 
+
+       if( key == KEY_ARROW_DOWN  )
+       {
+         // triangle1.translate(0.0, -0.1, 0.0);
+         camera.moveForward(-0.2);
+       } 
+
+       // Elevate camera view, rotate the forward vector upwards 
+       if( event.key == "a" )
+       {
+         camera.rotatePitch(10.0);
+       }
+
+       // Rotate camera view downwards 
+       if( event.key == "s")
+       {
+         camera.rotatePitch(-10.0);
+       }
+
+       if( event.key == "q")
+       {
+         cube1.rotate(25, [1, 2, 1]); 
+       }
+
+       if( event.key == "w")
+       {
+         console.log(" Rotate -10 degrees ");
+         triangle1.rotateZ(-10.0);
+       }
+
+       if( event.key == "o")
+       {
+         // triangle1.setVisible(true);
+         cube1.setDrawTriangles();
+       }
+
+       if(  event.key == "p" )
+       {
+         // triangle1.setVisible(false);
+         cube1.setDrawLineLoop();
+       }
+
+       // Move camera in the positive direction of Y axis 
+       if( event.key === "j" ){ camera.moveCameraUpDow(+0.1); }
+       // Move camera in the negative direction of Y axis 
+       if( event.key === "k" ){ camera.moveCameraUpDow(-0.1); }
+
+       // Make the vector forward parallel to the plane XZ
+       if( event.key == "h"){ camera.parallelXZ(); }
+
+       let eye =  precisionRound(camera.eye, 3);
+       let up =   precisionRound(camera.up, 3);
+       let forward = precisionRound(camera.forward, 3);
+       document.querySelector("#output-camera").textContent = `eye = ${eye} ; up = ${up} ; forward = ${forward}`;
+
+       drawScene();
+   }
+
+   addEventListener("keydown", keyboardListener);
+#+END_SRC
+
+** 3D - Quaternion
 
 The class Transform has the fields, position for setting the object
 position in world-coordinates; scale for adjusting object size and
@@ -13378,7 +14736,7 @@ File: _draw3d-camera.cpp_
 
   }
 #+END_SRC
-** 3D Graphics - 3D Surface wireframe chart  
+** 3D - Surface wireframe chart  
 
 This code draws a wireframe surface of a function of two variables
 y = f(x, z) using GL_LINE primitives. 
@@ -14283,7 +15641,7 @@ File: _draw3d-plot-surface.cpp_
 
 #+END_SRC
 
-** 3D Graphics - 3D model loading with illumination  
+** 3D - 3D model loading with illumination  
 
 This sample code loads 3D meshes from obj file with help from
 tinyObjLoader library and draws the loaded meshes (3D models)
