@@ -4723,6 +4723,18 @@ Dual Quaternion:
 
    + [[https://doc.magnum.graphics/magnum/transformations.html][Feature guide » 2D and 3D transformations]] - Magnum Engine
 
+   + [PDF] - Paper: [[https://web.archive.org/web/20220212092311/https://cs.gmu.edu/~jmlien/teaching/cs451/uploads/Main/dual-quaternion.pdf][A Beginners Guide to Dual-Quaternions]] - What They
+     Are, How They Work, and How to Use Them for 3D Character
+     Hierarchies
+
+   + [PDF] - Paper: [[https://web.archive.org/web/20210412220257/https://dcsl.gatech.edu/papers/acc18c.pdf][Modeling of Spacecraft-Mounted Robot Dynamics and Control Using Dual Quaternions]]
+
+   + [PDF] - Paper: [[https://web.archive.org/web/20210617042645/https://www.scss.tcd.ie/publications/tech-reports/reports.06/TCD-CS-2006-46.pdf][Dual Quaternions for Rigid Transformation Blending]]
+
+   + [PDF] - Report: [[https://web.archive.org/web/20211018040425/https://faculty.sites.iastate.edu/jia/files/inline-files/dual-quaternion.pdf][Dual Quaternions - Yan-Bin Jia]]
+
+   + [[https://www.mathworks.com/matlabcentral/fileexchange/39288-dual-quaternion-toolbox][Matalab File Exchange - Dual quaternion toolbox]]
+
 
 Quaternion Computer Implementations:
 
@@ -12636,6 +12648,85 @@ In the live example, there are the following controls:
   + 'k' => Move the camera in the negative direction of Y axis.
   + 'q' => Rotates the cube.
   + 'r' => Reset camera position (eye vector) and view (forward vector)
+    
+Notes:
+
+  + The class Matrix4x4 that represents a mutable 4x4 matrix
+    column-major matrix is inspired by the c++ class [[https://doc.qt.io/qt-5/qmatrix4x4.html][QMatrix4x4]] class from
+    Qt framework.
+    
+  + The Quaternion class was inspired by C++ class [[https://doc.qt.io/qt-5/qquaternion.html][QQuaternion]]  from Qt framework.
+
+  + The class Orientation was inspired by the C++ class [[https://web.archive.org/web/20210507012307/https://docs.unrealengine.com/en-US/API/Runtime/Core/Math/FTransform/index.html][FTransform]]
+    from Unreal game engine. The idea was copied from public
+    information available in the documentation.
+    
+  + _WebGL_ and OpenGL ES only support matrices in _column-major_ order memory
+    layout. Those APIs do not support matrices in _row-major order_. 
+
+  + _WebGL_, which is based on _OpenGL ES_ only supports the _retained_
+    _mode_. WebGL does not support _immediate mode_. Therefore there is no
+    equivalent in WebGL to the old and deprecated OpenGL retained mode
+    APIs, including glVertex3f(), glBegin(), glEnd(), glColor(),
+    glMaterial(), glRotate(), glTranslate(), glFrustum() and many
+    other deprecated OpenGL subroutines.
+
+  + In modern OpenGL and specially in OpenGL ES and WebGL, it is only
+    possible to draw primitive forms such as lines, points and
+    triangles, any complex shape requires a good enough amount of
+    primitive shapes in order to look like smooth and realistic. 
+
+
+ *Column-major matrices* 
+
+Let the array T of type float[16], containing 16 32 bits floating point
+numbers, be a comumn-major matrix represeting some affine transform or
+projection transform. WebGL and OpenGL ES only accept _column-major_
+_matrices._
+
+#+BEGIN_SRC cpp  
+  T: float[16] = [ T[0], T[1], T[2], T[3], T[4], T[5], T[6], T[7], T[8], T[9], T[11], T[12], T[13], T[14], T[15] ]
+#+END_SRC 
+
+The array T represents the following column-major matrix: 
+
+#+BEGIN_SRC text 
+               Matrix in Column-Major Order  
+         _                                        _ 
+        /                                          \
+       +                                            +
+  T  = | COLUMN[0], COLUMN[1], COLUMN[2], COLUMN[3] |
+   c   +                                            +
+        \_                                        _/  
+       
+      /                           \
+      |  T[00] T[04] T[08]  T[12]  |
+      |  T[01] T[05] T[09]  T[13]  |
+  T = |  T[02] T[06] T[10]  T[14]  |
+   c  |  T[03] T[07] T[11]  T[15]  |
+      \                            /
+ 
+    Where:
+ 
+                     | T[0] |               | T[4] |              | T[8]  |              | T[12] |
+                     | T[1] |               | T[5] |              | T[9]  |              | T[13] |
+         COLUMN[0] = | T[2] |   COLUMN[1] = | T[6] |  COLUMN[2] = | T[10] |  COLUMN[3] = | T[14] |
+                     | T[3] |               | T[7] |              | T[11] |              | T[15] |
+#+END_SRC
+
+If the matrix T  were a row-major matrix, it would be represented as:
+
+#+BEGIN_SRC text 
+      /                           \
+      |  T[00] T[01] T[02]  T[03]  |
+      |  T[04] T[05] T[06]  T[07]  |
+  T = |  T[08] T[09] T[10]  T[11]  |
+   r  |  T[12] T[13] T[14]  T[15]  |
+      \                            /
+#+END_SRC 
+
+
+ *Screenshots*
 
 
 [[file:images/opengl-webgl-cube3d-1.png][file:images/opengl-webgl-cube3d-1.png]]
@@ -12659,6 +12750,14 @@ In the live example, there are the following controls:
 
   + https://web.dev/webgl-shaders/
 
+  + [[https://en.m.wikipedia.org/wiki/In-place_matrix_transposition][In-place matrix transposition]]
+
+  + [[https://en.m.wikipedia.org/wiki/Row-_and_column-major_order][Row- and column-major order - Wikipedia]]
+
+  + [[https://fgiesen.wordpress.com/2012/02/12/row-major-vs-column-major-row-vectors-vs-column-vectors/][Row major vs. column major, row vectors vs. column vectors | The ryg blog]]
+
+  + [[https://www.scratchapixel.com/lessons/mathematics-physics-for-computer-graphics/geometry/row-major-vs-column-major-vector][Geometry (Row Major vs Column Major Vector)]]
+
  
  *Complete Html Code*  (File: webgl2.html)
 
@@ -12674,7 +12773,7 @@ In the live example, there are the following controls:
          <h1>WebGL 3D Scene with Cube</h1>
          OpenGL version:  <label id="output1"></label>          <br/>
          Shading language version: <label id="output2"></label> <br/> 
-         Camera Positon: <label id="output-camera"></label> <br/>
+         Camera Position: <label id="output-camera"></label> <br/>
          <canvas id="glCanvas" width="600" height="480">
      </body>
       <script>
