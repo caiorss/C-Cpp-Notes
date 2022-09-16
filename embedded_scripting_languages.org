@@ -3584,3 +3584,2283 @@ Program output:
    [*] v_path = C:\\Users\dummy\Documents\data
 
 #+END_SRC
+** Writing a Scheme-like lisp interpreter in C++
+*** Overview
+
+Scheme is a simple dialect of lisp with several functional-programming
+features. Functions are first class citizens, they can be passed as
+argument to other functions and returned from functions. Everything is
+an expression and evaluates to something, even assignments and if-else
+statements. Some versions of scheme also feature tail-call
+optimization that allow writing tail-recursive functions to be
+converted to loop without creating excessive stack frames.
+
+This section presents a lisp-like interpreter based on _Scheme_,
+implemented using modern C++ features and object oriented design
+patterns with a handwritten parser and lexer. This lisp interpreter is
+based on [[https://norvig.com/lispy.html][lispy]], a lisp interpreter written in Python. Just like lispy,
+this implementation is easy to understand and can be easily be embedded in
+C++ applications for adding scripting capabilities or ursing
+S-expressions as a DSL (Domain-Specific Language) or data description
+language. 
+
+
+Techniques used in this implementation: 
+
+  + Smart pointers are used for memory managment.
+    
+  + _Composite design pattern_ for representing the AST
+
+  + Visitor design pattern is used for traversing the AST and
+    implementing AST printing. In a functional programming language
+    with proper sum types (also known as variants or discriminated
+    unions), the visitor could be replaced by _pattern matching_.
+
+  + Inheritance is used for representing _sum types_ or _discriminated_
+    _unitons_, common in functional programming languages.  The AST
+    (Abstract Syntax Tree) nodes, including atoms and lists, are
+    represented by classes inheriting from _IEXpr_ abstract class.
+
+  + The interpreter uses direct recursive evaluation of the AST just
+    like the inspiration [[https://norvig.com/lispy.html][lispy]].
+
+  + Lists are not implemented using linked lists, instead they are
+    implemented using std::vector container.
+
+  + Besides the recursive abstract syntax tree evaluation
+    implementation, the interpreter could also be implemented using a
+    SECD (stack-environment-control-dump) virtual machine.
+
+  + This implementation uses the _fn_ keyword instead of _lambda_; _def_
+    instead of _define_ for creating named functions; and _set_ instead of
+    _define_ for defining variables.
+
+
+Possible implementation techniques of Lisp-like languages: 
+
+  + Recursive AST (Abstract Syntax Tree) evaluation
+    
+  + SECD (stack-environment-control-dump) virtual/abstract machine 
+
+  + _Meta-circular evaluator_ => Implement lisp-like dialects on top of
+    an existing lisp implementation such as Common Lisp.
+
+  + Compile lisp dialect to bytecodes of an existing virtual machine
+    including, JVM (Java Virtual Machine); CLR (Common Language
+    Runtime) - .NET virtual machine; parrot virtual machine or WASM -
+    Web Assembly.
+
+  + JIT (Just-In-Time) compiler => Compile itself to machine code at
+    runtime for improving performance and speed. This technique is
+    used by several common lisp implementations.
+
+  + Transpile S-expressions to another language, including C or C++.
+
+Lisp terminology:
+
+  + Sexp - S-Expression  
+    + Stands for symbolic expressions
+      
+  + Homoiconicity
+    + Code is data. The lisp code represents the AST (Abstract Syntax
+      Tree) that is just nested lists of lists or atoms.
+
+  + atoms
+    + Everything that is not a list is an atom. An indivisible value,
+      including strings, symbols, keywords, numbers and so on.
+    
+  + car - comes from 'Contents of the Address part of the Register'
+
+  + cdr - comes from 'Contents of the Decrement part of the Register' 
+    
+  + cons -  abbreviation of the word 'construct'
+
+  + Special forms
+    + They are forms or primitives not evaluated as functions
+      arguments may not be evaluated. Most special forms are control
+      structures and keyword such as 'if', 'set', 'define', 'lambda'
+      and so on.
+
+  + DSL - Domain Specific Lanaguage 
+
+  + (if <PREDICATE> <THEN-EXPR> <ELSE-EXPR> )
+    + The <THEN-EXPR> or then-expression is evaluated if the predicate
+      evaulates to true that happens when the predicate does not
+      evaluate to #f or nil. If the predicate is evaluated to any
+      other value, the else-expression is evaluated.
+
+  + User-defined procedures
+    + User-defined functions using the keyword _fn_ (equivalent to
+      lambda) or _def_ equivalent to Scheme's define keyword.
+
+  + Primitive procedures 
+    + Built-in functions or procedures, for instance (+), (*), apply,
+      map, list and so on. 
+
+  + Literals
+    + Boolean literals => #t or #f - in this implementation
+    + nil literal: nil => For designating empty return value.
+    + symbol literal: 'a-symbol
+    + keyword literal: :keyword1, :keyword2
+    + String literal - between quotes:  "my string"
+*** Code 
+
+File: _code.lisp_
+
+#+BEGIN_SRC lisp 
+  ; Lisp test code 
+  ;--------------------------------
+  
+  (comment "Comment special form is evaluated to nil and discarded.")
+  
+  ;; Create a sample list 
+  (set mylist (list 10 #t #f "hello world" 
+                'hello 'world
+                ; Operation 1
+                :keyword1 (+ 10 25 6) '(+ 10 25 6) 
+                ; Operation 2
+                :keyword2 (* 4 2 6)  '(* 4 2 6) 
+  
+                ))
+  
+  ; Factorial function 
+  (set code-fact "
+        ; Factorial function 
+        (def fact (n)
+            (if (= n 1)
+                1                    ;; Base case 
+                (* n (fact (- n 1))) ;; Recursion case 
+             )) 
+      ")
+  
+  ;; S-expression for fibbonaci function
+  (def fib(n)
+     (if (< n 2)
+       n 
+       (+ (fib (- n 1))  (fib (- n 2)) )
+      ))
+  
+  (def make-adder (k)
+      (fn (x) (+ k x)))
+  
+  ;; Define a function that adds 10 to a number 
+  (set add10 (make-adder 10))
+  ;; Defines a function that adds 10 to a number 
+  (set add50 (make-adder 50))
+  
+  
+  (set func 
+    (let (
+            (a (sqrt 125))
+            (b (+ 20 a))
+            (c (* a b))
+          )
+          (comment "Create  a function using lexical scope. 
+                    The variable (a, b and c) are not visible outside the function. 
+                    ")
+          (fn (x) (/ (+ a b x) c))
+     )
+   )
+  
+  ;; Compute many trigonometric properties of an angle 
+  (def compute-trig (angle-degrees)
+      (let (
+            (angle (/ (* angle-degrees PI) 180) )
+           )
+          (list :angle angle-degrees :cos (cos angle) :sin (sin angle) :tan (tan angle))
+       )
+   )
+
+#+END_SRC
+    
+File: _cpplisp.cpp_ (Lisp-like interpreter)
+
+#+BEGIN_SRC cpp 
+#include <iostream> 
+#include <string> 
+#include <sstream>
+#include <fstream>
+#include <cctype>
+#include <optional>
+#include <cassert>
+ #include <memory>
+#include <vector>
+#include <map>
+#include <iomanip>
+#include <functional>
+#include <cmath>
+#include <stack>
+
+enum class TokenType {
+      SYM    // Symbol 
+    , KEYW   // Keyword  Examples => :keyword, :x
+    , STR    // String literal 
+    , NUM    // Number literal 
+    , BOOL   // Boolean 
+    , QUOTE  // Quote  
+    , RPAREN // '(' Right parenthesis  
+    , LPAREN // ')' Left parenthesis 
+    , EOFF   //  End of File (It was named 'EOFF' since it conflicts with #define 'EOF')
+    , ERR    // Indicates error 
+};
+
+struct Token
+{
+    TokenType   type;
+    std::string text;
+    int pos;
+    int lin;
+    int col;
+
+    Token(): 
+     type(TokenType::ERR), text(""), pos(0), lin(0), col(0)
+    {}
+
+    Token(TokenType type_, std::string const& text_, int pos_, int lin_, int col_):
+        type(type_), text(text_), pos(pos_), lin(lin_), col(col_)
+    { }
+
+    bool isEOF() { return type == TokenType::EOFF; }
+};
+
+bool isNumber(std::string const& text)
+{
+    if( text[0] != '-' && !std::isdigit(text[0]) )
+    { return false; }
+    auto n = text.length();
+    for(size_t k = 1; k < n; k++){
+        if( !std::isdigit( text[k] ) ){ return false;}
+    }
+    return true;
+}
+
+class Tokenizer 
+{
+    std::istream& _is;
+    // Position of cursor in the inout stream 
+    int _pos = 0;
+    // Current line in the input stream 
+    int _lin = 0;
+    // Column in the input stream 
+    int _col = 0; 
+public:
+    Tokenizer(std::istream& is): _is(is){ }
+
+    // Read a single character and consumes it from the stream  
+    char next() { 
+        char chr = _is.get(); 
+        _pos++;
+        _col++;
+        // Assumes that the new line character is just '\n'
+        if( chr == '\n' ){
+            _col = 0;
+            _lin++;    
+        }
+        return chr;
+    }
+    // Read next character from input string without reading it 
+    char peek(){ 
+        return _is.peek();
+    } 
+
+    bool isBlankChar(){
+        char ch = peek();
+        return ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n';
+    }
+
+    bool isParenthesis(){
+        char ch = peek();
+        return ch == '(' || ch == ')';
+    }
+
+    // Is end of line     
+    bool isEOL(){ return peek() == '\n'; }
+
+    bool isEOF(){ return _is.eof(); }
+
+    void skipBlankChars() {
+        while( isBlankChar() ){ next(); }
+    }
+
+    void skipLineComment(){
+        char ch = peek();
+        while( ch != '\n' && !this->isEOF() ){ ch = next(); }
+    }
+
+
+    // Consume stream until a blank character is found 
+    std::string consumeUntilBlank()
+    {
+        // std::fprintf(stderr, " [TRACE] Consuming until blank \n");
+        char ch = peek();
+        std::string text;
+        while( !this->isBlankChar() && !this->isParenthesis()  && !this->isEOF())
+        {
+            ch = this->next();
+            // fprintf(stderr, " [TRACE] ConsumeUntilBlank ch = %d \n", ch);
+            text = text + ch;
+        }
+        // std::fprintf(stderr, " [TRACE] consumeUntilBlank = %s \n", text.c_str());
+        return text;
+    }
+
+    std::vector<Token> readTokens()
+    {
+        std::vector<Token> out{};
+        Token tok; 
+        while( !tok.isEOF() ){
+            tok = this->nextToken();
+            if( !tok.isEOF() ){ out.push_back(tok); }
+        }
+
+        auto stack = std::stack<Token>{};
+
+        // Check if parentheses are balanced 
+        for(auto const& tok: out)
+        {
+            // Push left parentheses to the stack 
+            if(tok.type == TokenType::LPAREN){ stack.push(tok);  }
+            // If the stack is not empty and current parenthesis is a 
+            // right parentheses, if the top of stack is left parentheses 
+            // then pop the stack.
+            if(tok.type == TokenType::RPAREN )
+            {
+                if( !stack.empty() && stack.top().type == TokenType::LPAREN )
+                     { stack.pop(); }
+                else { throw std::runtime_error("Error: unbalanced parentheses."); }
+            }
+        }
+        
+        if( !stack.empty() ){ 
+            auto tok = stack.top();
+            std::fprintf(stderr, " [ERROR] Unbalanced parentheses at line %d and column %d \n", tok.lin, tok.col);
+            throw std::runtime_error("Error: unbalanced parentheses."); 
+        }
+
+        return out;
+    }
+
+    Token nextToken()
+    {
+
+        // std::fprintf(stderr, " [TRACE] Removing blank characters \n");
+        skipBlankChars();
+
+        char ch = next();
+        // std::fprintf(stderr, " [TRACE] nextChar = %c \n", ch);
+
+        if( this->isEOF() ){
+            return Token(TokenType::EOFF, "", _pos, _lin, _col);
+        }
+
+        // Skip comments 
+        if( ch == ';' ){ 
+            // std::fprintf(stderr, " [TRACE] Skiping comment \n");
+            skipLineComment(); 
+
+            // std::fprintf(stderr, " [TRACE] Skiping comment 2 \n");
+            return nextToken();
+        }
+
+        if( ch == '(')  { return Token(TokenType::LPAREN, "(", _pos, _lin, _col); }
+        if( ch == ')')  { return Token(TokenType::RPAREN, ")", _pos, _lin, _col); }
+        if( ch == '\'') { return Token(TokenType::QUOTE, "'",  _pos, _lin, _col); }
+
+        // Boolean value 
+        if( ch == '#'){
+            auto c = this->next();
+            auto text = std::string("#") + c;
+            if( c!= 'f' && c !='t' ){
+                return Token(TokenType::ERR, std::string("Error - invalid boolean literal => ") + text, _pos, _lin, _col); 
+            }
+            return Token(TokenType::BOOL, text,  _pos, _lin, _col);
+        }
+
+        // String literal 
+        if( ch == '"' )
+        { 
+            // std::fprintf(stderr, " [TRACE] Reading string literal \n");
+            std::string out = "";
+            int col = _col;
+            int pos = _pos;
+            int lin = _lin;
+            char c = 'x';
+            while( c != '"' && c != '\0' )
+            {
+                c  = this->next();
+                if(c == '"'){ break; }
+                out = out + c;
+            }
+            if( c!= '"'){ return Token(TokenType::ERR, "Error - non closed quote.", _pos, _lin, _col); }
+            else        { return Token(TokenType::STR, out, pos, lin, col); }
+        }
+
+        // assert(  )
+
+        int col = _col;
+        int pos = _pos;
+        int lin = _lin;
+        std::string text = ch + this->consumeUntilBlank();
+
+        if( text == ":"){
+            return Token(TokenType::ERR, "illegal terminating character after a colon:" ,pos, lin, col); 
+        }
+
+        // Keyworkd 
+        if( text[0] == ':' )
+        {
+            // std::fprintf(stderr, " [TRACE] Tokenizer =>> keyword = %s \n", text.c_str() );
+            return Token(TokenType::KEYW, text, pos, lin, col);
+        }
+
+        if( text == "-"){
+            return Token(TokenType::SYM, text, pos, lin, col);
+        }
+
+        if( std::isdigit(text[0]) )
+        {
+            if( isNumber(text) )
+                 { return Token(TokenType::NUM, text, pos, lin, col); } 
+            else { return Token(TokenType::ERR, std::string("Error - invalid number => ") + text, pos, lin, col); }
+        } else if( text[0] == '-' )
+        {
+            if( isNumber(text) )
+                 { return Token(TokenType::NUM, text, pos, lin, col); } 
+            else { return Token(TokenType::ERR, std::string("Error - invalid number => ") + text, pos, lin, col); }
+        }
+
+        // Anything else is a symbpl 
+        return Token(TokenType::SYM, text, pos, lin, col);
+    }
+
+};
+
+std::ostream& operator<<(std::ostream& os, TokenType type)
+{
+    if(type == TokenType::BOOL) { os << "[BOOL]"; }
+    if(type == TokenType::EOFF) { os << "[EOF]"; }
+    if(type == TokenType::STR) { os << "[STR]"; }
+    if(type == TokenType::LPAREN) { os << "[LPAREN]"; }
+    if(type == TokenType::RPAREN) { os << "[RPAREN]"; }
+    if(type == TokenType::NUM) { os << "[NUM]"; }
+    if(type == TokenType::SYM) { os << "[SYM]"; }
+    if(type == TokenType::ERR) { os << "[ERR]"; }
+    return os;
+}
+
+enum class ExprType {
+      ERR  // Error  
+    , NUM  // Number literal 
+    , STR  // String literal 
+    , BOOL // Boolean literal 
+    , SYM  // Symbol 
+    , KEY  // Keyword 
+    , NIL  // Nil or Null value 
+    , FUN  // Function  
+    , LST  // List literal 
+};
+
+
+// Forward declaration 
+struct ExprNil;
+struct ExprStr;
+struct ExprNum;
+struct ExprSym;
+struct ExprKey;
+struct ExprErr;
+struct ExprBool;
+struct ExprFun;
+struct ExprLst;
+
+// Visitor design pattern 
+struct IVisitor{
+public:
+    virtual ~IVisitor() = default;
+    virtual void visit(ExprNil& expr) = 0;
+    virtual void visit(ExprStr& expr) = 0;
+    virtual void visit(ExprNum& expr) = 0;
+    virtual void visit(ExprSym& expr) = 0;
+    virtual void visit(ExprKey& expr) = 0;
+    virtual void visit(ExprBool& expr) = 0;
+    virtual void visit(ExprErr& expr) = 0;
+    virtual void visit(ExprFun& expr) = 0;
+    virtual void visit(ExprLst& expr) = 0;
+};
+
+// Lisp-like AST - Abstract syntax tree 
+// IEXpr stands for Interface Expression 
+struct IExpr 
+{
+    virtual ~IExpr() = default;
+    virtual ExprType type()   const = 0;
+    // Returns true if AST node is ATOM
+    virtual bool     isAtom() const { return true; }
+    // Returns true if AST node is list  
+    virtual bool     isList() const { return false; }
+    // Returns true if AST node is error  
+    virtual bool     isErr()  const { return false; } 
+    // Returns true if AST node is symbol 
+    virtual bool     isSym()  const { return false; } 
+    // Returns true if AST node is string
+    virtual bool     isStr()  const { return false; } 
+    // Returns true if AST node is keyword
+    virtual bool     isKey()  const { return false; } 
+    // Returns true if AST node is number  
+    virtual bool     isNum()  const { return false; } 
+    // Returns true if AST node is boolean 
+    virtual bool     isBool()  const { return false; } 
+    // Returns true if AST node is nil   
+    virtual bool     isNil()  const { return false; } 
+    // Returns true if AST node is function 
+    virtual bool     isFun()  const { return false; } 
+
+    /// Returns the string value of a node 
+    virtual std::string  strValue()  const = 0;
+    virtual double       numValue()  const = 0;
+    // Evaluates to false if nil or #f and evaluates to true if it is anything else.
+    virtual bool         boolValue() const = 0;
+
+    // Method for accepting visitor (Related to visitor design pattern)
+    virtual void     accept(IVisitor& v) = 0; 
+
+    // Evaluate AST node and return a value (AST Node) 
+    virtual std::shared_ptr<IExpr> eval( std::map<std::string, std::shared_ptr<IExpr>>& env) = 0;
+};
+
+
+// Represents a null value (empty value) equivalent to void 
+// In Lisp just as other functional-like programming languages
+// everything is evaluated to something and can be replaced be a value.
+struct ExprNil: public IExpr
+{
+    ExprNil(){ } 
+    ExprType type() const { return ExprType::NIL; } 
+    bool isNil()    const { return true; } 
+
+    std::string  strValue()  const { return "";}
+    double       numValue()  const { return 0;   }
+    bool         boolValue() const { return false;}
+
+    void accept(IVisitor& v) { v.visit(*this); }
+
+    virtual std::shared_ptr<IExpr> eval( std::map<std::string, std::shared_ptr<IExpr>>& env) 
+    {
+       return std::make_shared<ExprNil>(); 
+    }
+};
+
+
+// Represents a string literal 
+struct ExprStr: public IExpr
+{
+    std::string value;
+    ExprStr(std::string const& value_): value(value_){ }
+    ExprType type() const { return ExprType::STR; } 
+
+
+    std::string  strValue()  const { return value;}
+    double       numValue()  const { return -1;   }
+    bool         boolValue() const { return true;}
+    bool        isStr()      const { return true; } 
+    void accept(IVisitor& v) { v.visit(*this); }
+
+    std::shared_ptr<IExpr> eval( std::map<std::string, std::shared_ptr<IExpr>>& env) 
+    {
+       return std::make_shared<ExprStr>(this->value); 
+    }
+};
+
+// Represents a number 
+struct ExprNum: public IExpr
+{
+    double value;
+    ExprNum(double value_): value(value_){ }
+    ExprType type() const { return ExprType::NUM; } 
+    bool isNum()    const { return true;  }
+    std::string  strValue()  const { return "";}
+    double       numValue()  const { return value;   }
+    bool         boolValue() const { return true;}
+    void accept(IVisitor& v) { v.visit(*this); }
+
+    std::shared_ptr<IExpr> eval( std::map<std::string, std::shared_ptr<IExpr>>& env) 
+    {
+       return std::make_shared<ExprNum>(this->value); 
+    }
+};
+
+// Represents a boolean literal (logical value)
+struct ExprBool: public IExpr  
+{
+    bool value;
+    ExprBool(bool value_): value(value_){ }
+    ExprType type() const { return ExprType::BOOL; } 
+
+    bool isBool() const { return true; } 
+
+    std::string  strValue()  const { return "";}
+    double       numValue()  const { return -1;   }
+    bool         boolValue() const { return value;}
+    void accept(IVisitor& v) { v.visit(*this); }
+
+    std::shared_ptr<IExpr> eval( std::map<std::string, std::shared_ptr<IExpr>>& env) 
+    {
+       return std::make_shared<ExprBool>(this->value); 
+    }
+
+};
+
+// Represents a lisp symbol
+struct ExprSym: public IExpr  
+{
+    std::string value;
+    ExprSym(std::string value_): value(value_){ }
+    ExprType type() const { return ExprType::SYM; } 
+    bool isSym()    const { return true;  }
+    std::string  strValue()  const { return value;}
+    double       numValue()  const { return -1;   }
+    bool         boolValue() const { return true;}
+    void accept(IVisitor& v) { v.visit(*this); }
+
+
+    std::shared_ptr<IExpr> eval( std::map<std::string, std::shared_ptr<IExpr>>& env) 
+    {
+
+        auto it = env.find(value);
+        if (it == env.end())
+        {
+            throw std::runtime_error(" [ERROR] Unbound variable " + value);
+            //return std::make_shared<ExprErr>(10, "Error - unbound variable " + value);
+           // return nullptr;
+        }
+        return it->second;
+    }
+};
+
+
+// Represents a lisp keyword such as :x, :y, :keyword1
+struct ExprKey: public IExpr  
+{
+    std::string value;
+    ExprKey(std::string value_): value(value_){ }
+    ExprType type() const { return ExprType::KEY; } 
+    bool isKey()    const { return true; }
+    std::string  strValue()  const { return value;}
+    double       numValue()  const { return -1;   }
+    bool         boolValue() const { return true;}
+    void accept(IVisitor& v) { v.visit(*this); }
+
+
+    std::shared_ptr<IExpr> eval( std::map<std::string, std::shared_ptr<IExpr>>& env) 
+    {
+       return std::make_shared<ExprKey>(this->value); 
+    }
+
+};
+
+
+
+// Represents an Error (Reserved for future use)
+struct ExprErr: public IExpr  
+{
+    int         code;
+    std::string info;
+
+    ExprErr(){}
+    ExprErr(int code_, std::string const& info_)
+        : code(code_), info(info_) { }
+
+    ExprType type() const { return ExprType::ERR; } 
+    bool isErr()    const { return true; }
+
+    std::string  strValue()  const { return info;}
+    double       numValue()  const { return -1;   }
+    bool         boolValue() const { return false;}
+
+    void accept(IVisitor& v) { v.visit(*this); }
+
+    std::shared_ptr<IExpr> eval( std::map<std::string, std::shared_ptr<IExpr>>& env) 
+    {
+       return std::make_shared<ExprErr>(code, info);
+    }
+};
+
+
+using LispFunc = std::function<std::shared_ptr<IExpr> (std::vector<std::shared_ptr<IExpr>> const& args)>;
+using LispEnv = std::map<std::string, std::shared_ptr<IExpr>>; 
+
+
+// Represents a function
+struct ExprFun: public IExpr
+{
+    std::string name;
+    std::string doc;
+    // std::vector<std::string> args;
+    // std::shared_ptr<IExpr>   body;
+    // ExprFun(std::vector<std::string> const& args_): args(args_) { }
+    ExprType type() const { return ExprType::FUN; }
+    bool isFun()    const { return true; }
+    double       numValue()  const { return -1;   }
+    bool         boolValue() const { return true;}
+
+    virtual bool isNativeFun() const = 0;
+
+    void accept(IVisitor& v) { v.visit(*this); }
+
+    virtual std::shared_ptr<IExpr>  call( std::vector<std::shared_ptr<IExpr>>& params
+                                        , std::map<std::string, std::shared_ptr<IExpr>>& env_) = 0;
+
+    ~ExprFun() = default;
+};
+
+
+// Non-native lisp function implemented in lisp 
+struct ExprFunLisp: public ExprFun 
+{
+    std::vector<std::string> args;
+    std::vector<std::shared_ptr<IExpr>>  body;
+    std::map<std::string, std::shared_ptr<IExpr>> env;
+
+    std::string  strValue()  const { return "(function) " + this->name;}
+    bool isNativeFun() const { return false; }
+
+    ExprFunLisp(){}
+    ExprFunLisp(std::vector<std::string> const& args_, std::vector<std::shared_ptr<IExpr>> const& body_)
+        : args(args_), body(body_) {
+
+         }
+
+    std::shared_ptr<IExpr> eval( std::map<std::string, std::shared_ptr<IExpr>>& env) 
+    {
+        // Invoke copy constructor 
+       return std::make_shared<ExprFunLisp>(*this); 
+    }
+
+    std::shared_ptr<IExpr> 
+    call( std::vector<std::shared_ptr<IExpr>>& params
+         ,std::map<std::string, std::shared_ptr<IExpr>>& env_)
+    {
+        if( params.size() != args.size() )
+        { throw std::runtime_error("Error: Function call error. "); }
+
+        // Create local environment 
+        auto envv = std::map<std::string, std::shared_ptr<IExpr>>{};
+        // Copy global environment to temporary environment 
+        for(auto& k : env_){ envv[k.first] = k.second; }
+
+        // Copy local environment to temporary environment 
+        for(auto& k : env){ envv[k.first] = k.second; }
+
+        // Pass parameters to local environment 
+        for(size_t n = 0; n < args.size(); n++ )
+        {
+            auto a = args[n];
+            envv[a] = params[n];   
+        }
+
+        auto N = body.size();
+        for(size_t n = 0; n < N - 1; n ++ )
+        {
+            body[n]->eval(envv);
+        }
+        auto result = body[N - 1]->eval(envv);
+
+        if( result->isFun() 
+            && !std::static_pointer_cast<ExprFun>(result)->isNativeFun() )
+        {
+            auto func = std::static_pointer_cast<ExprFunLisp>(result);
+            for(size_t n = 0; n < args.size(); n++ )
+            {
+                auto a = args[n];
+                func->env[a] = params[n];   
+            }
+        }
+
+        return result;
+    }
+                                
+};
+
+
+// Native function implemented in C or C++
+struct ExprFunNative: public ExprFun 
+{
+    LispFunc func; 
+    std::string  strValue()  const { return "(native function) " + this->name;}
+    bool isNativeFun() const { return true; }
+    ExprFunNative(LispFunc func_): func(func_){ } 
+
+    std::shared_ptr<IExpr> eval( std::map<std::string, std::shared_ptr<IExpr>>& env) 
+    {
+        // Invoke copy constructor 
+       return std::make_shared<ExprFunNative>(func); 
+    }
+
+    std::shared_ptr<IExpr> 
+    call( std::vector<std::shared_ptr<IExpr>>& params
+         ,std::map<std::string, std::shared_ptr<IExpr>>& env_)
+
+    {
+        // std::fprintf(stderr, " [TRACE] Calling native function \n");
+        return this->func(params);
+    }
+
+};
+
+// Represents a list 
+struct ExprLst: public IExpr  
+{
+    std::vector<std::shared_ptr<IExpr>> lst; 
+
+    ExprLst(std::vector<std::shared_ptr<IExpr>> const& lst_)
+        : lst(lst_){ } 
+
+    ExprType type() const { return ExprType::LST; } 
+    bool isAtom()   const { return false; } 
+    bool isList()   const { return true; }
+
+    std::string  strValue()  const { return "";}
+    double       numValue()  const { return -1;   }
+    bool         boolValue() const { return true;}
+
+    void accept(IVisitor& v) { v.visit(*this); }
+
+    std::shared_ptr<IExpr> eval(std::map<std::string, std::shared_ptr<IExpr>>& env)
+    {
+        if (lst.size() == 0)
+        {
+            return std::make_shared<ExprNil>();
+        }
+
+        auto type = lst[0]->type();
+
+        if ( type != ExprType::SYM && type != ExprType::LST  )
+        {
+            throw std::runtime_error(" [ERROR] =>> Object is not applicable.");
+        }
+
+        std::string symbol = lst[0]->strValue();
+
+        // Ignore comment special form
+        if(symbol == "comment")
+        { return std::make_shared<ExprNil>(); }
+
+        if (symbol == "set")
+        {
+            if (lst.size() != 3)
+            { throw std::runtime_error("Ill-formed syntax for SET special form"); }
+            if (lst[1]->type() != ExprType::SYM)
+            { throw std::runtime_error("Ill-formed syntax for SET special form. Expected symbol. "); }
+            auto res = lst[2]->eval(env); 
+            std::string name = lst[1]->strValue();
+            std::fprintf(stderr, " [TRACE] Defining symbol = %s . \n", name.c_str());
+            env[name] = res; //;std::make_shared<EnvVal>(res);
+            return std::make_shared<ExprNil>();
+        }
+
+        // Handle special form (if <cond> <then-expr>) or (if <cond> <then-expr> <else-expr>)
+        if( symbol == "if" )
+        {
+            if( lst.size() != 3 && lst.size() != 4) { throw std::runtime_error("Ill-formed syntax for IF special form"); }
+
+            auto cond = lst[1];
+            auto cond_result = cond->eval(env);
+
+            if( lst.size() == 3 && !cond_result->boolValue() ) 
+            { return std::make_shared<ExprNil>(); }
+
+            if( lst.size() == 4 && !cond_result->boolValue() )
+            {
+                // Evaluate the else-expr 
+                auto res = lst[3]->eval(env); // this->eval( *lst[3] );
+                return res;
+            }
+
+            assert( cond_result->boolValue() );
+            auto res = lst[2]->eval(env); //this->eval( *lst[2] );
+            return res;
+        }
+
+        // Handle quote special form 
+        if( symbol == "quote" || symbol == "$q")
+        {
+            if( lst.size() != 2 ) 
+            { throw std::runtime_error("Ill-formed syntax for QUOTE special form"); }
+            auto arg = lst[1];
+            return arg;
+        }
+
+        // Equivalent to scheme or lisp lambda or scheme lambda 
+        // (fn (a0 a1 ... a[N-1]) (expr1) (expr2) ... (expr[K-1]) )
+        if( symbol == "fn" )
+        {
+            if (lst.size() < 3)
+            { throw std::runtime_error("Ill-formed syntax for lambda special form"); }
+
+            if( !lst[1]->isList() )
+            { throw std::runtime_error("Ill-formed syntax for lambda. Expected arguments."); }
+
+            // Function/lambda arguments   
+            auto args = std::static_pointer_cast<ExprLst>(lst[1]);
+            // Function/lambda body (list of expressions)
+            auto body = lst;
+            // Remove first element ('lambda' symbol)
+            body.erase(body.begin()); 
+            // Remove frst element - function arguments 
+            body.erase(body.begin()); 
+
+            std::vector<std::string> _args{};
+
+            for(auto& a: args->lst)
+            {
+                if( !a->isSym() )            
+                { throw std::runtime_error("Ill-formed syntax for lamba. Arguments must be strings.");  }
+                _args.push_back( a->strValue() );
+            }
+
+            auto fun = std::make_shared<ExprFunLisp>(_args, body);
+            return fun;
+        }
+
+        /** Sepcial form def 
+         * (def function (a0 a1 ... a[N-1]) (expr1) (expr2) ... (expr[K-1]) )
+         * 
+         *  Example: 
+         *   (def addxy(x  y )
+         *             (disp x) 
+         *             (disp y)
+         *              (+ x y))
+         * 
+         */
+        if( symbol == "def" )
+        {
+            if (lst.size() < 4)
+            { throw std::runtime_error("Ill-formed syntax for def() special form"); }
+            if( !lst[1]->isSym() )
+            { throw std::runtime_error("Ill-formed syntax for def(). Expected function name."); }
+            if( !lst[2]->isList() )
+            { throw std::runtime_error("Ill-formed syntax for def(). Expected arguments."); }
+
+            // Function name 
+            auto name = lst[1]->strValue();
+            // Function/lambda arguments   
+            auto args = std::static_pointer_cast<ExprLst>(lst[2]);
+            // Function/lambda body (list of expressions)
+            auto body = lst;
+            // Remove first element ('lambda' symbol)
+            body.erase(body.begin()); 
+            body.erase(body.begin()); 
+            body.erase(body.begin()); 
+
+            std::fprintf(stderr, " [TRACE] Defining function = %s . \n", name.c_str());
+
+            std::vector<std::string> _args{};
+
+            for(auto& a: args->lst)
+            {
+                if( !a->isSym() )            
+                { throw std::runtime_error("Ill-formed syntax for lamba. Arguments must be strings.");  }
+                _args.push_back( a->strValue() );
+            }
+            auto fun = std::make_shared<ExprFunLisp>(_args, body);
+            fun->name = name;
+
+            env[name] = fun;
+
+            return std::make_shared<ExprNil>();
+        }
+
+        // Handle special form (begin (action1 ....) (action 2) (action N-1)) 
+        if( symbol == "begin" )
+        {
+            // arguments 
+            auto args = lst;
+            // Remove first element 
+            args.erase(args.begin());
+
+            if( args.size() == 0)
+            { return std::make_shared<ExprNil>(); }
+
+            for(size_t n = 0; n < args.size() - 1; n++)
+            {  args[n]->eval(env); }
+            // Revaluate last element 
+            auto result = args[ args.size() -1 ]->eval(env);
+            return result;
+        }
+        
+        /** (let (binding lists) (exp1) (exp2) .... (expN-1) )
+         *     
+         *  (let ( (a 20)
+         *         (b 30 )) 
+         *        (display a) (display b) (+ a b) )
+         *  
+         *  The previous expression evaluates to 30.
+         */
+        if( symbol == "let" )
+        {
+
+            if( lst.size() < 3 )
+            { throw std::runtime_error("Error: ill-formed sytax for let expression."); }
+            if( !lst[1]->isList() )
+            { throw std::runtime_error("Error: ill-formed sytax for let expression. Expected list of bindings."); }
+
+            auto bindings = std::static_pointer_cast<ExprLst>(lst[1])->lst;
+
+            // Create a new temporary environment 
+            auto envv = std::map<std::string, std::shared_ptr<IExpr>>{};
+            auto envs = std::map<std::string, std::shared_ptr<IExpr>>{};
+
+            // Copy environment     
+            for(auto& k : env){ envv[k.first] = k.second; }
+
+            for(auto const& b: bindings){
+                if( !b->isList() )
+                    { throw std::runtime_error("Error: ill-formed sytax for let expression. Expected list as binding argument."); }
+                auto bb = std::static_pointer_cast<ExprLst>(b)->lst;
+                if( bb.size() != 2)
+                    { throw std::runtime_error("Error: ill-formed sytax for let expression."); }
+                if( !bb[0]->isSym() ) 
+                    { throw std::runtime_error("Error: ill-formed sytax for let expression. Expected symbol."); }
+                auto sym = bb[0]->strValue();
+                auto val = bb[1]->eval(envv);
+                // Add symbols from let binding to the new temporary environment
+                envv[sym] = val;
+                envs[sym] = val;
+            }
+
+            for(size_t k = 2; k < lst.size() - 1; k ++)
+            { lst[k]->eval(envv); }
+
+            auto result = lst[lst.size() - 1]->eval(envv);
+            // Implement closure - function cature variables from local environment 
+            if( result->isFun() 
+                && !std::static_pointer_cast<ExprFun>(result)->isNativeFun() )
+            {
+                auto func = std::static_pointer_cast<ExprFunLisp>(result);
+                func->env = envs;
+            }
+
+            return result;
+        }
+
+        /** For-loop similar to common lisp => (repeat 10 n (action n)) */
+        if( symbol == "repeat" )
+        {
+            if( lst.size() != 4 ) 
+            { throw std::runtime_error("Error: ill-formed syntax for repeat special form. Expected 4 arguments"); }
+            if( !lst[2]->isSym() )
+            { throw std::runtime_error("Error: ill-formed syntax for repeat special form. Expected symbol."); }
+            auto n = lst[1]->eval(env);
+            if( !n->isNum() )
+            { throw std::runtime_error("Error: expected number as first argument."); }
+            auto ntimes = (int) n->numValue();
+            if( ntimes < 0)
+            { throw std::runtime_error("Error: ill-formed syntax for repeat special form . Iterations cannot be negative."); }
+
+            auto sym = lst[2]->strValue();
+
+            auto action = lst[3];
+            // Copy environment 
+            auto envv = env;
+
+            for(int k = 0; k < ntimes; k++)
+            {
+                envv[sym] = std::make_shared<ExprNum>(k);
+                action->eval(envv);
+            }
+            return std::make_shared<ExprNil>();
+        }
+
+
+        // ---------- Function Application --------------------//
+
+        auto it = lst[0]->eval(env);
+        if( !it->isFun() ){ throw std::runtime_error("Error - object not callable.");  }
+        auto function = std::static_pointer_cast<ExprFun>(it);
+
+        // Function arguments
+        auto args = lst;
+        // Remove first element
+        args.erase(args.begin());
+
+        std::vector<std::shared_ptr<IExpr>> evaluatedArgs;
+
+        // evaluatedArgs.reserve(args.size());
+        for (auto const &arg : args)
+        {
+            auto res = arg->eval(env); 
+            evaluatedArgs.push_back(res);
+        }
+
+        auto result = function->call(evaluatedArgs, env);
+        return result;
+    }
+};
+
+
+// Parser 
+auto readTokens(std::vector<Token>& tokens) -> std::shared_ptr<IExpr> 
+{
+    // auto tokens = tokens_;
+    if( tokens.size() == 0){
+        throw std::runtime_error("Error: Unexpected EOF - End of File");
+    }
+
+    auto tok = tokens[0];    
+    // Remove first element of vector 
+    tokens.erase(tokens.begin());
+
+    // std::cout << " [readToken] " << tok.type << " ; " << tok.text 
+    //           << " ; line = " << tok.lin << " ; col = " << tok.col 
+    //           << "\n";
+
+    if( tok.type == TokenType::ERR )
+    {
+        throw std::runtime_error("[ERROR] " + tok.text);
+    }
+
+    if( tok.type == TokenType::QUOTE )
+    {
+        auto lst = std::vector<std::shared_ptr<IExpr>>{};
+        lst.push_back( std::make_shared<ExprSym>("quote") );
+        auto next = readTokens(tokens);
+        lst.push_back(next);
+        return std::make_shared<ExprLst>(lst);
+    }
+
+    if( tok.type == TokenType::LPAREN  )
+    {
+        auto lst = std::vector<std::shared_ptr<IExpr>>{};
+
+        while( tokens[0].type != TokenType::RPAREN )
+        {
+            auto expr = readTokens(tokens);
+            lst.push_back( expr );
+        }
+        // Drop off ')' right parentheis
+        tokens.erase(tokens.begin());
+
+        return std::make_shared<ExprLst>(lst);
+    }
+
+    if( tok.type == TokenType::RPAREN  )
+    {
+        throw std::runtime_error("Error: Unexpected ')' right parenthesis ");
+    }
+
+    if( tok.type == TokenType::NUM)
+    {
+        return std::make_shared<ExprNum>( std::stoi(tok.text) );
+    }
+
+    if( tok.type == TokenType::SYM && tok.text == "nil" )
+    {
+        return std::make_shared<ExprNil>();
+    }
+
+    if( tok.type == TokenType::SYM )
+    {
+        return std::make_shared<ExprSym>( tok.text );
+    }
+
+    if( tok.type == TokenType::KEYW )
+    {
+        return std::make_shared<ExprKey>( tok.text );
+    }
+
+    if( tok.type == TokenType::BOOL )
+    {
+        return std::make_shared<ExprBool>( tok.text == "#t" ? true : false );
+    }
+
+    if( tok.type == TokenType::STR )
+    {
+        return std::make_shared<ExprStr>( tok.text );
+    }
+
+    return std::make_shared<ExprErr>(-1, "Edge found in the parser");
+}
+
+
+// Parse Lisp-like (scheme-like) S-Expression by reading a string source code 
+auto parseSexp(std::string const& code) -> std::shared_ptr<IExpr> 
+{
+    std::stringstream ss; 
+    ss << code; 
+    Tokenizer tokenizer(ss);
+    auto tokens = tokenizer.readTokens();
+    auto result = readTokens(tokens);
+    return result;
+}
+
+// Parse Lisp-like (scheme-like) S-Expression by reading an input stream 
+auto parseSexp(std::istream& is) -> std::shared_ptr<IExpr> 
+{
+    Tokenizer tokenizer(is);
+    auto tokens = tokenizer.readTokens();
+    auto result = readTokens(tokens);
+    return result;
+}
+
+
+class PrintVisitor: public IVisitor
+{
+public:
+
+    void visit(ExprNil&  expr)  override { std::cout << "nil"; } 
+    void visit(ExprStr&  expr)  override { std::cout << "\"" << expr.value << "\""; }
+    void visit(ExprNum&  expr)  override { std::cout << expr.value; }
+    void visit(ExprBool& expr)  override { std::cout << (expr.value ? "#t" : "#f"); }
+    void visit(ExprSym&  expr)  override { std::cout << expr.value; }
+    void visit(ExprKey&  expr) override { std::cout << expr.value; }
+    void visit(ExprErr&  expr)  override { std::cout << "<< [ERROR] " << expr.info; }
+    void visit(ExprFun&  expr)  override { std::cout << expr.strValue(); }
+
+    void visit(ExprLst& expr) override
+    {
+        std::cout << "( ";
+        for(auto node : expr.lst){ std::cout << " "; node->accept(*this); }
+        std::cout << " )";
+    }
+
+};
+
+class WriterVisitor: public IVisitor
+{
+    std::ostream& out;
+public:
+    WriterVisitor(std::ostream& os_): out(os_){}
+
+    void visit(ExprNil&  expr)  override { out << "nil"; } 
+    void visit(ExprStr&  expr)  override { out << "\"" << expr.value << "\""; }
+    void visit(ExprNum&  expr)  override { out << expr.value; }
+    void visit(ExprBool& expr)  override { out << (expr.value ? "#t" : "#f"); }
+    void visit(ExprSym&  expr)  override { out << expr.value; }
+    void visit(ExprKey&  expr)  override { out << expr.value; }
+    void visit(ExprErr&  expr)  override { out << "<< [ERROR] " << expr.info; }
+    void visit(ExprFun&  expr)  override { out << expr.strValue(); }
+
+    void visit(ExprLst& expr) override
+    {
+        // out << "\n ( ";
+        for(auto const& node : expr.lst)
+        { 
+            out << " "; node->accept(*this);
+            //if( node->isList() ){ out << '\n'; }
+         }
+        out << " )";
+    }
+
+};
+
+
+// Print S-Expression 
+void printSexp(IExpr& expr)
+{
+    PrintVisitor visitor;
+    expr.accept(visitor);
+    std::cout << std::endl;
+}
+
+
+struct IEnvType {
+    virtual bool isFunction() const = 0;
+    virtual bool isVariable() const = 0;
+    virtual std::shared_ptr<IExpr> getValue() const = 0;
+    virtual ~IEnvType() = default;
+};
+
+struct EnvVal: public IEnvType
+{
+    std::shared_ptr<IExpr> value;
+    EnvVal(std::shared_ptr<IExpr> value_): value(value_){ }
+    bool isFunction() const { return false; }
+    bool isVariable() const { return true;  } 
+    std::shared_ptr<IExpr> getValue() const { return value; }
+};
+
+struct EnvFun: public IEnvType
+{
+    LispFunc func; 
+    EnvFun(LispFunc func_): func(func_){ } 
+    bool isFunction() const { return true; }
+    bool isVariable() const { return false;  } 
+    std::shared_ptr<IExpr> getValue() const { return nullptr; }
+};
+
+/// Lisp interpreter's primitive functions 
+namespace primitives {
+
+    // All Lisp functions passed to the interpreter must have this type signature 
+    // Lisp function primitive 'list' => Example: (list 10 20 (+ 1 2 5) "Hello" #f #t nil)
+    std::shared_ptr<IExpr> list(std::vector<std::shared_ptr<IExpr>> const& args)
+    {
+        return std::make_shared<ExprLst>(args);
+    }
+
+
+    // Return the number of elements of alist 
+    std::shared_ptr<IExpr> length(std::vector<std::shared_ptr<IExpr>> const& args)
+    {
+        if( args.size() != 1 )
+        { throw std::runtime_error("Error: length() requires 1 argument of type list."); } 
+        if( !args[0]->isList() )
+        { throw std::runtime_error("Error: length() expects 1 argument of type list."); }
+
+        auto node = static_cast<ExprLst const&>( *args[0] );
+        auto lst = node.lst;
+        return std::make_shared<ExprNum>(lst.size());
+    }
+
+    //  car => Returns first element of the list or nil 
+    std::shared_ptr<IExpr> car(std::vector<std::shared_ptr<IExpr>> const& args)
+    {
+        if( args.size() != 1 )
+        { throw std::runtime_error("Error: car() requires 1 argument of type list."); } 
+        if( !args[0]->isList() )
+        { throw std::runtime_error("Error: car() expects 1 argument of type list."); }
+
+        auto node = static_cast<ExprLst const&>( *args[0] );
+        auto lst = node.lst;
+        if( lst.size() == 0 ){ return std::make_shared<ExprNil>(); }
+        return lst[0];
+    }
+
+    std::shared_ptr<IExpr> cdr(std::vector<std::shared_ptr<IExpr>> const& args)
+    {
+        if( args.size() != 1 )
+        { throw std::runtime_error("Error: cdr() requires 1 argument of type list."); } 
+        if( !args[0]->isList() )
+        { throw std::runtime_error("Error: cdr() expects 1 argument of type list."); }
+
+        auto node = static_cast<ExprLst const&>( *args[0] );
+        auto lst = node.lst;
+        if( lst.size() == 0 ){ return std::make_shared<ExprNil>(); }
+        // Remove first list argument 
+        lst.erase(lst.begin());
+        return std::make_shared<ExprLst>(lst);
+    }
+
+    // cons => List constructor 
+    std::shared_ptr<IExpr> cons(std::vector<std::shared_ptr<IExpr>> const& args)
+    {
+        if( args.size() != 2 )
+        { throw std::runtime_error("Error: cons() requires 2 arguments."); } 
+        if( !args[1]->isList() && !args[1]->isNil() )
+        { throw std::runtime_error("Error: pairs construction not allowed. Second argument can only be a list or nil."); }
+
+        if( args[1]->isList() )
+        {
+            auto lst  = std::static_pointer_cast<ExprLst>( args[1] )->lst;
+            lst.insert(lst.begin(), args[0]);
+            return std::make_shared<ExprLst>(lst);
+        }
+        assert( args[1]->isNil() );
+        auto lst =  std::vector<std::shared_ptr<IExpr>>{ args[0] };
+        return std::make_shared<ExprLst>(lst);
+    }
+
+    // Get the nth element of a list
+    std::shared_ptr<IExpr> nth(std::vector<std::shared_ptr<IExpr>> const& args)
+    {
+        if( args.size() != 2 )
+        { throw std::runtime_error("Error: cons() requires 2 arguments."); } 
+        if( !args[0]->isNum() ) 
+        { throw std::runtime_error("Error: Expected number "); }
+        if( !args[1]->isList() && !args[1]->isNil() )
+        { throw std::runtime_error("Error: Expected list or nil."); }
+
+        if( args[1]->isNil() )
+        { return std::make_shared<ExprNil>(); }
+
+        auto n = (int) args[0]->numValue();    
+        auto lst = std::static_pointer_cast<ExprLst>(args[1])->lst;
+
+        if( n < lst.size() && n >= 0 ){ return lst[n]; }
+        return std::make_shared<ExprNil>();
+    }
+
+    // (= 10 20) => #f ; (= 10 10) => #t
+    std::shared_ptr<IExpr> equal_number(std::vector<std::shared_ptr<IExpr>> const& args)
+    {
+        if( args.size() != 2 )
+        { throw std::runtime_error("Error: = requires 2 arguments."); } 
+        if( !args[0]->isNum() && !args[1]->isNum() ) 
+        { throw std::runtime_error("Error: Expected number "); }
+        auto a = args[0]->numValue();    
+        auto b = args[1]->numValue();    
+        return std::make_shared<ExprBool>(a == b);
+    }
+
+    std::shared_ptr<IExpr> less_than(std::vector<std::shared_ptr<IExpr>> const& args)
+    {
+        if( args.size() != 2 )
+        { throw std::runtime_error("Error: = requires 2 arguments."); } 
+        if( !args[0]->isNum() && !args[1]->isNum() ) 
+        { throw std::runtime_error("Error: Expected number "); }
+        auto a = args[0]->numValue();    
+        auto b = args[1]->numValue();    
+        return std::make_shared<ExprBool>(a < b);
+    }
+
+
+    // Parse a string returning a S-Expression 
+    std::shared_ptr<IExpr> read(std::vector<std::shared_ptr<IExpr>> const& args)
+    {
+        if( args.size() != 1 )
+        { throw std::runtime_error("Error: read() requires 1 argument of type string."); } 
+        if( args[0]->type() != ExprType::STR )
+        { throw std::runtime_error("Error: read() expects 1 argument of type string."); }
+        std::string code  = args[0]->strValue();
+        auto result = parseSexp(code);
+        return result;
+    }
+
+    // Primitive predicate function list? => Return true if the argument is of type list 
+    std::shared_ptr<IExpr> is_list(std::vector<std::shared_ptr<IExpr>> const& args)
+    {
+        if( args.size() != 1 )
+        { throw std::runtime_error("Error: list?() requires 1 argument."); } 
+        return std::make_shared<ExprBool>( args[0]->isList() );
+    }
+
+    // Primitive predicate function symbol? => Return true if the argument is of type symbol
+    std::shared_ptr<IExpr> is_symbol(std::vector<std::shared_ptr<IExpr>> const& args)
+    {
+        if( args.size() != 1 )
+        { throw std::runtime_error("Error: symbol?() requires 1 argument."); } 
+        return std::make_shared<ExprBool>( args[0]->type() == ExprType::SYM );
+    }
+
+    std::shared_ptr<IExpr> is_keyword(std::vector<std::shared_ptr<IExpr>> const& args)
+    {
+        if( args.size() != 1 )
+        { throw std::runtime_error("Error: keyword?() requires 1 argument."); } 
+        return std::make_shared<ExprBool>( args[0]->type() == ExprType::KEY );
+    }
+
+    // Primitive predicate function number? => Return true if the argument is of type number
+    std::shared_ptr<IExpr> is_number(std::vector<std::shared_ptr<IExpr>> const& args)
+    {
+        if( args.size() != 1 )
+        { throw std::runtime_error("Error: number?() requires 1 argument."); } 
+        return std::make_shared<ExprBool>( args[0]->isNum() );
+    }
+
+    // Primitive predicate function boolean? => Return true if the argument is of type number
+    std::shared_ptr<IExpr> is_boolean(std::vector<std::shared_ptr<IExpr>> const& args)
+    {
+        if( args.size() != 1 )
+        { throw std::runtime_error("Error: boolean?() requires 1 argument."); } 
+        return std::make_shared<ExprBool>( args[0]->type() == ExprType::BOOL );
+    }
+
+    // Primitive predicate function nil? => Return true if the argument is of type nil
+    std::shared_ptr<IExpr> is_nil(std::vector<std::shared_ptr<IExpr>> const& args)
+    {
+        if( args.size() != 1 )
+        { throw std::runtime_error("Error: nil?() requires 1 argument."); } 
+        return std::make_shared<ExprBool>( args[0]->isNil() );
+    }
+
+    // Primitive predicate function string? => Return true if the argument is of type string
+    std::shared_ptr<IExpr> is_string(std::vector<std::shared_ptr<IExpr>> const& args)
+    {
+        if( args.size() != 1 )
+        { throw std::runtime_error("Error: string?() requires 1 argument."); } 
+        return std::make_shared<ExprBool>( args[0]->type() == ExprType::STR );
+    }
+
+
+    // Display an S-Expression 
+    std::shared_ptr<IExpr> disp(std::vector<std::shared_ptr<IExpr>> const& args)
+    {
+        if( args.size() != 1 ){
+           throw std::runtime_error("Error: function disp() requires 1 argument.");
+        } 
+        PrintVisitor visitor;
+        args[0]->accept(visitor);
+        std::cout << "\n";
+        return std::make_shared<ExprNil>();
+    }
+
+    // Lisp function (+) => Example: (+ 1 2 3 4 5) = 15
+    std::shared_ptr<IExpr> add(std::vector<std::shared_ptr<IExpr>> const& args)
+    {
+       if( args.size() == 0 ){
+           throw std::runtime_error("Error: this function requires at least 1 argument.");
+       } 
+       double acc = 0.0;
+       for(auto const& a: args){
+           if( a->type() != ExprType::NUM){
+               throw std::runtime_error("Invalid argument. Expected a number");
+           }
+           acc = acc + a->numValue();
+       }
+       return std::make_shared<ExprNum>(acc);
+    }
+
+    // Lisp function (*) => Example: (* 1 2 3 4 5) = 120
+    std::shared_ptr<IExpr> mul(std::vector<std::shared_ptr<IExpr>> const& args)
+    {
+       if( args.size() == 0 ){
+           throw std::runtime_error("Error: this function requires at least 1 argument.");
+       } 
+       double acc = 1.0;
+       for(auto const& a: args){
+           if( a->type() != ExprType::NUM){
+               throw std::runtime_error("Invalid argument. Expected a number");
+           }
+           acc = acc * a->numValue();
+       }
+       return std::make_shared<ExprNum>(acc);
+    }
+
+    // List function (-) => Example: (- 100 20 30 ) = 100 - 20 - 30 = 50 
+    std::shared_ptr<IExpr> sub(std::vector<std::shared_ptr<IExpr>> const& args)
+    {
+
+        // std::fprintf(stderr, " [TRACE] Called Lispfun sub() \n "); 
+        if (args.size() == 0)
+        {
+            throw std::runtime_error("Error: this function requires at least 1 argument.");
+        }
+        if (args.size() == 1)
+        {
+            if (args[0]->type() != ExprType::NUM)
+            {
+                throw std::runtime_error("Error: invalid argument type. Expected number");
+            }
+            assert(args[0]->type() == ExprType::NUM);
+            return std::make_shared<ExprNum>(-args[0]->numValue());
+        }
+
+        if (args[0]->type() != ExprType::NUM)
+        {
+            throw std::runtime_error("Error: invalid argument type. Expected number");
+        }
+        double acc = args[0]->numValue();
+
+        // std::fprintf(stderr, " [TRACE] acc = %f \n", acc);
+
+        auto args_ = args;
+        // Remove first element
+        args_.erase(args_.begin());
+
+        for (auto const &a : args_)
+        {
+            if (a->type() != ExprType::NUM)
+            {
+                throw std::runtime_error("Invalid argument. Expected a number");
+            }
+            double x = a->numValue();
+            // std::fprintf(stderr, " [TRACE] x = %f \n", x);
+            acc = acc - x; 
+        }
+        return std::make_shared<ExprNum>(acc);
+    }
+
+    std::shared_ptr<IExpr> div(std::vector<std::shared_ptr<IExpr>> const& args)
+    {
+
+        // std::fprintf(stderr, " [TRACE] Called Lispfun sub() \n "); 
+        if (args.size() == 0)
+        {
+            throw std::runtime_error("Error: this function requires at least 1 argument.");
+        }
+        if (args.size() == 1)
+        {
+            if (args[0]->type() != ExprType::NUM)
+            {
+                throw std::runtime_error("Error: invalid argument type. Expected number");
+            }
+            assert(args[0]->type() == ExprType::NUM);
+            return std::make_shared<ExprNum>(1.0 / args[0]->numValue());
+        }
+
+        if (args[0]->type() != ExprType::NUM)
+        {
+            throw std::runtime_error("Error: invalid argument type. Expected number");
+        }
+        double acc = args[0]->numValue();
+
+        // std::fprintf(stderr, " [TRACE] acc = %f \n", acc);
+
+        auto args_ = args;
+        // Remove first element
+        args_.erase(args_.begin());
+
+        for (auto const &a : args_)
+        {
+            if (a->type() != ExprType::NUM)
+            {
+                throw std::runtime_error("Invalid argument. Expected a number");
+            }
+            double x = a->numValue();
+            // std::fprintf(stderr, " [TRACE] x = %f \n", x);
+            acc = acc / x; 
+        }
+        return std::make_shared<ExprNum>(acc);
+    }
+
+
+}
+
+class Eval
+{
+    // Reference to itself in oder to provide code completion
+    Eval& self = *this;
+
+public:
+    using Env = std::map<std::string, std::shared_ptr<IExpr>>; 
+
+    // Lisp environment 
+    Env _env;
+
+    Eval()
+    {
+        self.addFunction("disp",    &primitives::disp);
+        // Primitive list functions 
+        self.addFunction("list",    &primitives::list);
+        self.addFunction("length",  &primitives::length);
+        self.addFunction("car",     &primitives::car);
+        self.addFunction("cdr",     &primitives::cdr);
+        self.addFunction("cons",    &primitives::cons);
+        self.addFunction("nth",     &primitives::nth);
+        // Primitive predicate functions  
+        self.addFunction("number?",  &primitives::is_number);
+        self.addFunction("boolean?", &primitives::is_boolean);
+        self.addFunction("symbol?",  &primitives::is_symbol);
+        self.addFunction("nil?",     &primitives::is_nil);
+        self.addFunction("keyword?", &primitives::is_keyword);
+        self.addFunction("list?",    &primitives::is_list);
+        // Primtive math functions 
+        self.addFunction("=",       &primitives::equal_number);
+        self.addFunction("<",       &primitives::less_than);
+        self.addFunction("+",       &primitives::add);
+        self.addFunction("*",       &primitives::mul); 
+        self.addFunction("-",       &primitives::sub);
+        self.addFunction("/",       &primitives::div);
+        self.addMath1ArgFun("sin", static_cast<double (*) (double)>(&std::sin));
+        self.addMath1ArgFun("cos", static_cast<double (*) (double)>(&std::cos));
+        self.addMath1ArgFun("tan", static_cast<double (*) (double)>(&std::tan));
+        self.addMath1ArgFun("sqrt", static_cast<double (*) (double)>(&std::sqrt));
+        self.addMath1ArgFun("inv", [](double x){ return 1.0 / x; });
+        self.addVariable("PI", 3.1415);
+
+        // Parse string into a SExp - S-Expression 
+        self.addFunction("read", &primitives::read);
+
+        // Evaluate a List (AST - Abstract Syntax Tree) or SEXP returning a SEXP (S-Expression)
+        self.addFunction("eval", [=](std::vector<std::shared_ptr<IExpr>> const& args)
+        {
+            if( args.size() != 1 )
+            { throw std::runtime_error("Error: eval(sexp) requires 1 argument of type list."); } 
+            if( !args[0]->isList() )
+            { throw std::runtime_error("Error: eval(sexpr) expects 1 argument of type list."); }
+            auto expr = static_cast<ExprLst const&>( *args[0] );
+            return expr.eval(this->_env); 
+        });
+
+        // load a file 
+        self.addFunction("load-file", [=](std::vector<std::shared_ptr<IExpr>> const& args)
+        {
+            if( args.size() != 1  && !args[0]->isStr() )
+            { throw std::runtime_error("Error: load-file() requires 1 argument of type string."); } 
+            auto file = args[0]->strValue(); 
+            auto expr = this->evalFile(file); 
+            return expr;
+        });
+
+        // Read a single S-Expression from file without evaluating it 
+        self.addFunction("read-file", [=](std::vector<std::shared_ptr<IExpr>> const& args)
+        {
+            if( args.size() != 1  && !args[0]->isStr() )
+            { throw std::runtime_error("Error: eval(sexp) requires 1 argument of type string."); } 
+            auto file = args[0]->strValue(); 
+            auto ifs  = std::ifstream(file);
+            auto sexp  = parseSexp(ifs);
+            return sexp;
+        });
+
+        // Write a single S-Expression to a file 
+        self.addFunction("write-file", [=](std::vector<std::shared_ptr<IExpr>> const& args)
+        {
+            if( args.size() != 2  && !args[0]->isStr() )
+            { throw std::runtime_error("Error: eval(sexp) requires 1 argument of type string."); } 
+            auto file = args[0]->strValue(); 
+            auto ofs  = std::ofstream(file);
+            WriterVisitor visitor(ofs); 
+            args[1]->accept(visitor);
+            return std::make_shared<ExprNil>();
+        });
+
+        // Read a multiple S-Expression from file without evaluating it 
+        self.addFunction("read-file-multiple", [=](std::vector<std::shared_ptr<IExpr>> const& args)
+        {
+            if( args.size() != 1  && !args[0]->isStr() )
+            { throw std::runtime_error("Error: eval(sexp) requires 1 argument of type string."); } 
+            auto file = args[0]->strValue(); 
+            std::ifstream is(file);
+            if( !is.good() ){ throw std::runtime_error("Error: stream has errors."); }
+            std::stringstream ss;
+            ss << is.rdbuf();
+            auto code = "( \n" +  ss.str() + "\n )";
+            auto sexp = parseSexp(code);
+            return sexp;
+        });
+
+
+        self.addFunction("apply", [=](std::vector<std::shared_ptr<IExpr>> const& args)
+        {
+            if( args.size() != 2 )
+            { throw std::runtime_error("Error: apply() requires 2 arguments."); } 
+            if( !args[0]->isFun() )
+            { throw std::runtime_error("Error: expected function as first argument."); }
+            if( !args[1]->isList() )
+            { throw std::runtime_error("Error: expected list as second argument."); }
+            auto func = std::static_pointer_cast<ExprFun>(args[0]);
+            auto params = std::static_pointer_cast<ExprLst>(args[1]); 
+            return func->call(params->lst, this->_env);
+        });
+  
+        self.addFunction("map", [=](std::vector<std::shared_ptr<IExpr>> const& args)
+        {
+            if( args.size() != 2 )
+            { throw std::runtime_error("Error: apply() requires 2 arguments."); } 
+            if( !args[0]->isFun() )
+            { throw std::runtime_error("Error: expected function as first argument."); }
+            if( !args[1]->isList() )
+            { throw std::runtime_error("Error: expected list as second argument."); }
+            auto func = std::static_pointer_cast<ExprFun>(args[0]);
+            auto params = std::static_pointer_cast<ExprLst>(args[1]); 
+
+            auto result = std::vector<std::shared_ptr<IExpr>>{};
+            auto args_ = std::vector<std::shared_ptr<IExpr>>{ std::make_shared<ExprNil>() };
+            result.reserve( params->lst.size() );
+            for(auto const& p: params->lst){
+                args_[0] = p; 
+                result.push_back( func->call( args_, this->_env ) );
+            }
+            return std::make_shared<ExprLst>(result);
+
+        });
+
+    }
+
+    void addVariable(std::string const& name, double value)
+    {
+        auto expr = std::make_shared<ExprNum>(value);
+        _env[name] = expr;
+    }
+
+    void addVariable(std::string const& name, std::shared_ptr<IExpr> expr) 
+    {
+        _env[name] = expr;
+    }
+
+    void addFunction(std::string const& name, LispFunc func)
+    {
+        auto fn = std::make_shared<ExprFunNative>(func);
+        fn->name = name;
+        _env[name] = fn;
+    }
+
+    template<typename Func>
+    void addMath1ArgFun(std::string const& name, Func funcMath) 
+    {
+       auto func = [=](std::vector<std::shared_ptr<IExpr>> const& args) {
+           if( args.size() != 1){
+               throw std::runtime_error(" [ERROR] This function requires exactly one argument.");
+           }
+           auto x = args[0];
+           if( x->type() != ExprType::NUM ){
+               throw std::runtime_error(" [ERROR] Invalid arguument type. Number required. ");
+           }
+           double res = funcMath(x->numValue());
+           return std::make_shared<ExprNum>(res);
+       };
+       auto val = std::make_shared<ExprFunNative>(func);
+       val->name = name;
+       _env[name] = val;
+    }
+
+    std::shared_ptr<IExpr> eval(IExpr& expr)
+    {
+        return expr.eval( this->_env );
+    }
+
+    // Interactive read-print eval loop0 
+    void repl()
+    {
+        std::string line; 
+        std::string arg, command; 
+
+        for(;;)
+        {
+            std::cout << " $ lisp>> ";
+            if( !std::getline(std::cin, line) ){ break; }
+            if( line == "" ){ continue; }
+            std::stringstream ss(line);
+            ss >> command >> arg;
+            try
+            {
+                if( command == ":file")
+                {
+                    auto res = this->evalFile(arg);
+                    continue;
+                }
+
+                if( command == ":block")
+                {
+                    std::fprintf(stderr, " [INFO] Type a multi-line s-expression and type (;;) as the last line when you are done. \n");
+                    std::string code;
+
+                    while( line != ";;" ){ 
+                        std::getline(std::cin, line);
+                        code = code + "\n" + line;
+                     }
+                    auto res = this->evalCode(code);
+                    self.addVariable("ans", res);
+                    printSexp(*res);
+                    continue;
+
+                }
+                auto res = this->evalCode(line);
+                self.addVariable("ans", res);
+                printSexp(*res);
+            }
+            catch(const std::exception& e)
+            {
+                std::cerr << e.what() << '\n';
+            }
+
+        }
+    }
+
+    /// Eval lisp-like code given as string 
+    std::shared_ptr<IExpr>  
+    evalCode(std::string const& code) 
+    {
+        auto expr = parseSexp(code);
+        auto result = expr->eval(_env); 
+        return result;
+    }
+
+    std::shared_ptr<IExpr>  
+    evalFile(std::string const& file) 
+    {
+        std::ifstream is(file);
+        if( !is.good() ){ throw std::runtime_error("Error: stream has errors."); }
+        std::stringstream ss;
+        ss << is.rdbuf();
+        auto code = "(begin \n" +  ss.str() + "\n )";
+        auto expr = parseSexp(code);
+        auto result = expr->eval(_env); 
+        return result;
+    }
+};
+
+int main(){
+
+    std::cout << " [TRACE] Testing " << std::endl;
+    
+    const char* text = R"( 
+         ; comment1
+         ;   comment 2  
+         ; comment 3 
+     (  print->list 
+         ; comment 4
+          " Hello world" A8 B100
+          ; Next comment 
+          #t #f 
+             (+  20 30 -200(* 20 -20 x y z 8000)) ) 
+    )";
+
+    std::stringstream ss;
+   
+    #if 0 
+    std::cout << " =========== Tokenizer  ======================== " << std::endl;
+    ss << text; 
+    ss << "100";
+    
+    Tokenizer tokenizer(ss);
+    Token tok;
+    
+    while( !tok.isEOF() ){
+        tok = tokenizer.nextToken();
+        std::cout << " => " << tok.type << " ; " << tok.text 
+                  << " ; line = " << tok.lin << " ; col = " << tok.col 
+                  << "\n";
+    }
+    #endif 
+
+    auto expr = parseSexp(text); 
+
+    std::cout <<  std::boolalpha << " [TRACE] expr->isList() = " << expr->isList() << "\n";
+
+    printSexp(*expr);
+
+    std::cout << " ====== Evaluate Code  ======================== " << std::endl;
+
+    const char* code1 = R"( 
+        (list 10 #t #f "hello world" 
+            ; Operation 1
+            (+ 10 25 6) 
+            ; Operation 2
+            (* 4 2 6) )
+     )";
+
+    Eval eval; 
+
+    auto res = eval.evalCode(code1);
+    std::cout << " [TRACE] Result = ";
+    printSexp(*res);
+
+    std::cout << "============ Start LISP REPL ======================" << std::endl;
+    eval.repl(); 
+
+
+    return 0;
+}
+
+#+END_SRC
+
+Building  the lisp interpreter: 
+
+#+BEGIN_SRC sh 
+  $  g++ cpplisp.cpp -o cpplisp.bin -g -Wall -Wextra -std=c++1z
+#+END_SRC
+
+Running: 
+
+#+BEGIN_SRC lisp
+  $ >> rlwrap ./cpplisp.bin
+   [TRACE] Testing 
+   [TRACE] expr->isList() = true
+  (  print->list " Hello world" A8 B100 #t #f (  + 20 30 -200 (  * 20 -20 x y z 8000 ) ) )
+   ====== Evaluate Code  ======================== 
+   [TRACE] Result = (  10 #t #f "hello world" 41 48 )
+  ============ Start LISP REPL ======================
+   
+   $ lisp>> (list '(+ 1 2 3 4 5) (+ 1 2 3 4 5) '(* 4 100) (* 4 100) :keyword #t #f nil "Hello world")
+  (  (  + 1 2 3 4 5 ) 15 (  * 4 100 ) 400 :keyword #t #f nil "Hello world" )
+  
+   $ lisp>> '(list (+ 1 2 3 4 5) (+ 1 2 3 4 5) '(* 4 100) (* 4 100) :keyword #t #f nil "Hello world")
+  (  list (  + 1 2 3 4 5 ) (  + 1 2 3 4 5 ) (  quote (  * 4 100 ) ) (  * 4 100 ) :keyword #t #f nil "Hello world" )
+  
+  
+  
+   $ lisp>> (+ 1 2 3 4 5 6)
+  21
+   $ lisp>> (* 1 2 3 4 5 6)
+  720
+   
+   $ lisp>> (list 1 2 3 5 6 7 8)
+  (  1 2 3 5 6 7 8 )
+  
+   $ lisp>> ( (if (< x  5) + *)  100 20)
+  2000
+  
+   $ lisp>> ( (if (< x  50) + *)  100 20)
+  120
+  
+  $ lisp>> (set code "(apply + (list 1 3 4 5 6 7))")
+   [TRACE] Defining symbol = code . 
+  nil
+  
+   $ lisp>> code
+  "(apply + (list 1 3 4 5 6 7))"
+  
+   $ lisp>> (set expr (read code)); read SExp - S-Expression from string
+   [TRACE] Defining symbol = expr . 
+  nil
+   $ lisp>> expr
+  (  apply + (  list 1 3 4 5 6 7 ) )
+  
+   $ lisp>> (eval expr) ;; Evaluate S-Expression 
+  26
+  
+  $ lisp>> :block
+   [INFO] Type a multi-line s-expression and type (;;) as the last line when you are done. 
+  ; Execute a let-binding expression
+  (let (
+        (a 10)
+        (b (+ (* a a) 10))
+        (c (sqrt (+ a b)))
+       )
+     (disp a) (disp b) (disp c)
+     (list :x a :y b :result3 c :z (+ a b c)))
+  ;;
+  10
+  110
+  10.9545
+  (  :x 10 :y 110 :result3 10.9545 :z 130.954 )
+  
+   $ lisp>> a
+   [ERROR] Unbound variable a
+  
+   $ lisp>> b
+   [ERROR] Unbound variable b
+  
+   $ lisp>> c
+   [ERROR] Unbound variable c
+   $ lisp>> 
+  
+   $ lisp>> (load-file "code.lisp") ; Load a lisp file
+   [TRACE] Defining symbol = mylist . 
+   [TRACE] Defining symbol = code-fact . 
+   [TRACE] Defining function = fib . 
+   [TRACE] Defining function = make-adder . 
+   [TRACE] Defining symbol = add10 . 
+   [TRACE] Defining symbol = add50 . 
+   [TRACE] Defining symbol = func . 
+   [TRACE] Defining function = compute-trig . 
+  nil
+   $ lisp>> 
+  
+   $ lisp>> mylist
+  (  10 #t #f "hello world" hello world :keyword1 41 (  + 10 25 6 ) :keyword2 48 (  * 4 2 6 ) )
+  
+   $ lisp>> (car mylist)
+  10
+  
+   $ lisp>> (cdr mylist)
+  (  #t #f "hello world" hello world :keyword1 41 (  + 10 25 6 ) :keyword2 48 (  * 4 2 6 ) )
+  
+   $ lisp>> (car (cdr mylist))
+  #t
+  
+  $ lisp>> (nth 5 mylist)
+  world
+  
+   $ lisp>> (add10 20)
+  30
+  
+   $ lisp>> (add50 80)
+  130
+  
+   $ lisp>> (map add10 (list 1 2 3 4 5 6 7 ))
+  (  11 12 13 14 15 16 17 )
+  
+   $ lisp>> (map add50 (list 1 2 3 4 5 6 7 ))
+  (  51 52 53 54 55 56 57 )
+  
+   $ lisp>> (map (fn (x) (* x x)) (list 1 2 3 4 5 6 7 )) ; Map a lambda
+  (  1 4 9 16 25 36 49 )
+  
+   $ lisp>> (compute-trig 45)
+  (  :angle 45 :cos 0.707123 :sin 0.70709 :tan 0.999954 )
+  
+   $ lisp>> (compute-trig 90)
+  (  :angle 90 :cos 4.63268e-05 :sin 1 :tan 21585.8 )
+  
+   $ lisp>> (compute-trig 30)
+  (  :angle 30 :cos 0.866033 :sin 0.499987 :tan 0.57733 )
+  
+   $ lisp>> (map compute-trig (list 30 90 45))
+  (  (  :angle 30 :cos 0.866033 :sin 0.499987 :tan 0.57733 ) (  :angle 90 :cos 4.63268e-05 :sin 1 :tan 21585.8 ) (  :angle 45 :cos 0.707123 :sin 0.70709 :tan 0.999954 ) )
+#+END_SRC
+
+*** Further Reading
+
+Scheme and Lisp Introduction:
+
+  + [[https://beautifulracket.com/appendix/glossary.html#reader][Beautiful Racket: Glossary]]
+
+  + [[https://spritely.institute/static/papers/scheme-primer.html][A Scheme Primer]]
+    + Introduction to Scheme programming language.
+
+  + [[http://axisofeval.blogspot.com/2010/08/three-principles-of-lisp.html][The Axis of Eval: Three Principles of Lisp]]
+
+  + [[http://calculist.org/blog/2012/04/17/homoiconicity-isnt-the-point/][Homoiconicity isn’t the point]]
+
+  + [[https://beautifulracket.com/appendix/why-racket-why-lisp.html][Beautiful Racket: Why Racket? Why Lisp?]]
+
+  + [[http://www.paulgraham.com/rootsoflisp.html][The Roots of Lisp]]
+
+  + [[http://www.cs.virginia.edu/~evans/cs655/readings/steele.pdf][Growing a Language - Guy L. Steele Jr.]]
+   
+About how to implement Lisp-like dialects:
+ 
+  + [[https://norvig.com/lispy.html][(How to Write a (Lisp) Interpreter (in Python))]]
+    
+  + [[http://norvig.com/lispy2.html][(An ((Even Better) Lisp) Interpreter (in Python))]]
+
+  + [[http://fogus.me/fun/lithp/][Lithp - A interpreter for John McCarthy's original Lisp.]]
+    + Interpreter written in Python in literate programming style. 
+
+  + BOOK: [[https://en.m.wikibooks.org/wiki/Write_Yourself_a_Scheme_in_48_Hours][Write Yourself a Scheme in 48 Hours - Wikibooks, open books for an open world]]
+    + Scheme implementation in Haskell programming language, that can
+      be hard to understand for people not acquainted with Haskell.
+
+  + BOOK: [[https://wespiser.com/writings/wyas/00_overview.html][Write You A Scheme, Version 2.0]]
+    + Scheme implementation in Haskell.
+
+  + BOOK: [[https://www.buildyourownlisp.com][Learn C • Build Your Own Lisp]]
+
+  + BOOK: [[http://t3x.org/lfn/][Lisp from nothing]] 
+    + Presents how to build a metacircular LISP interpreter in common
+      lisp; a metacircular lisp interpreter in Scheme; a self-hosting
+      lisp compiler and garbage collector.
+
+  + BOOK: [[https://lispcookbook.github.io/cl-cookbook/][The Common Lisp Cookbook]]
+    
+  + BOOK: [[https://sarabander.github.io/sicp/html/][Structure and Interpretation of Computer Programs, 2e: Top]]
+
+  + BOOK: [[https://en.m.wikipedia.org/wiki/Structure_and_Interpretation_of_Classical_Mechanics][Structure and Interpretation of Classical Mechanics]]
+
+  + BOOK: [[https://www.cs.cmu.edu/~dst/LispBook/][Common Lisp: A Gentle Introduction to Symbolic Computation]]
+
+  + [[https://kseo.github.io/posts/2016-12-30-write-you-an-interpreter.html][Kwang's Haskell Blog - Write you an interpreter]]
+    + Scheme implementation in Haskell.
+
+  + [[http://kflu.github.io/2018/04/15/2018-04-15-implement-scheme/][How to write a Scheme interpreter · hello world ]] 
+    + Implementation in .NET
+    + Repository: https://github.com/Microsoft/schemy
+      
+  + [[http://peter.michaux.ca/articles/scheme-from-scratch-introduction][Scheme from Scratch - Introduction]]
+
+  + [[https://swatson555.github.io/posts/2022-05-06-make-a-lisp-2.html][Roll A Lisp In C - Evaluation]] 
+
+  + [[https://github.com/rzubek/CSLisp][rzubek/CSLisp: C# Scheme - Lisp implementation for embedding in .NET projects]]
+
+  + [[https://brianmckenna.org/blog/sexp_scala][S-expression Compiler in Scala]]
+
+  + [[http://www.elizas.website/seax/implementation/secd.html][The SECD Abstract Machine]]
+
+  + [[https://eli.thegreenplace.net/2022/why-is-it-easy-to-implement-a-lisp/][Why is it easy to implement a Lisp? - Eli Bendersky's website]]
+
+  + [[https://www.cs.umd.edu/class/spring2022/cmsc430/Notes.html][CMSC 430:  Design and Implementation of Programming Languages]]
+
+
+Lisp Variants: 
+
+  + [[https://janet-lang.org][Janet Programming Language]] (akin to Clojure)
+    
+  + [[https://github.com/picolisp/pil21][GitHub - picolisp/pil21: PicoLisp dialect]]
+
+  + [[https://github.com/programming-nu/nu][NU Lisp]]
+    + "Nu is an interpreted Lisp that builds on the Objective-C runtime and Foundation framework."
+
+  + [[http://www.ulisp.com/show?2XZH][uLisp - ARM Assembler in Lisp]]
+
+  + http://lush.sourceforge.net/
+    
+  + [[https://ccrma.stanford.edu/software/snd/snd/s7.html][s7 Scheme - Embedded Scripting Language]]
+
+  + [PDF] [[https://3e8.org/pub/scheme/doc/lisp-pointers/v6i3/p71-petrus.pdf][SKILL: a Lisp Based Extension Language]]
+
+  + [PDF] [[https://community.cadence.com/cfs-file/__key/telligent-evolution-components-attachments/00-28-01-00-00-01-04-75/CadScriptingLanguages_5F00_skill.pdf][A quick tour to skill programming language - Cadence CAD / Lisp.]]
+
+  + PDF: [[https://perun.pmf.uns.ac.rs/radovanovic/publications/2002-prim-lisp.pdf][An implementation of LISPKIT Lisp in Java]] (SECD Abstract Machine)
+
+  + [[http://www.lispme.de/lispme/doc/lm_hood.htm][LispMe internals]]
+    + This implementation uses a SECD Virtual Machine instead of a
+      recursive AST evaluator. The code is compiled to SECD machine
+      bytecodes and later executed by a SECD virtual machine.
+
+  + [[http://kflu.github.io/2018/04/15/2018-04-15-implement-scheme/][How to write a Scheme interpreter · hello world ]] 
+    + Implementation in .NET
+    + Repository: https://github.com/Microsoft/schemy
+
+  + PDF: [[https://www.dreamsongs.com/Files/Timrep.pdf][Performance and Evaluation of Lisp Systems]]
+
+  + [[https://paulhammant.com/2013/03/28/interface-builders-alternative-lisp-timeline/][Interface Builder's Alternative Lisp timeline]]
+
+  + [[https://www.softwarepreservation.org/projects/LISP/le_lisp][Le_Lisp — Software Preservation Group]]
+
+  + [[https://gitlab.com/embeddable-common-lisp/ecl/][Embeddable Common-Lisp / ECL · GitLab]]
+
+  + [[https://www.isi.edu/isd/LOOM/Stella/index.html][STELLA Programming Language / Lisp that compiles to Java or C++ ; lisp]]
+
+  + [[https://github.com/kanaka/mal][GitHub - kanaka/mal: mal - Make a Lisp]]
+    + "Each implementation of mal is separated into 11 incremental,
+      self-contained (and testable) steps that demonstrate core
+      concepts of Lisp. The last step is capable of self-hosting
+      (running the mal implementation of mal). See the make-a-lisp
+      process guide. Mal is implemented in 87 languages (93 different
+      implementations and 115 runtime modes)."
+
+  + [[https://en.m.wikipedia.org/wiki/Game_Oriented_Assembly_Lisp][Game Oriented Assembly Lisp - Wikipedia]]
+
+  + [[https://opengoal.dev][OpenGOAL | OpenGOAL]]
+
+  + [[https://www.gamedeveloper.com/design/postmortem-naughty-dog-s-i-jak-and-daxter-the-precursor-legacy-i-][Postmortem: Naughty Dog's Jak and Daxter: the Precursor Legacy]]
+
+  + [[https://all-things-andy-gavin.com/2011/03/12/making-crash-bandicoot-gool-part-9/][Making Crash Bandicoot – GOOL – part 9 - All Things Andy Gavin]]
+
+
+Common Lisp:
+
+  + [[http://www.n-a-n-o.com/lisp/cmucl-tutorials/LISP-tutorial.html][Common LISP Hints - 1993]]
+
+  + [[https://mikelevins.github.io/posts/2020-12-18-repl-driven/][On repl-driven programming - by mikel evins]]
+
+  + [[https://journal.infinitenegativeutility.com/structurally-typed-condition-handling][Structurally-Typed Condition Handling — Infinite Negative Utility]]
+
+  + [[http://www.nhplace.com/kent/Papers/Condition-Handling-2001.html][Condition Handling in the Lisp Language Family'' c by Kent Pitman]]
+
+  + [[https://lisper.in/restarts][Common Lisp: A Tutorial on Conditions and Restarts]]
+
+  + [[https://www.kazimirmajorinc.com/Documents/On-Pitmans-Special-forms-in-Lisp/index.html][On Pitman's „Special forms in Lisp“]]
+
+  + [[https://ostash.dev/posts/2021-06-24-edn-data-notation/][Data notation in Clojure - Ostash.Dev]]
+
+  + [[http://www.lispworks.com/documentation/lw71/COM/html/com-11.htm#pgfId-889564][LispWorks - 1.7 Calling COM interface methods]]
+
+  + [[https://courses.cs.northwestern.edu/325/readings/clos.php][The Common Lisp Object System]]
+
+  + [[https://lisper.in/reader-macros][Reader Macros in Common Lisp]]
+
+  + [[https://gist.github.com/chaitanyagupta/9324402][Reader Macros in Common Lisp · GitHub]]
+
+  + [[https://www.lurklurk.org/cpp_clos.html][C++ and Lisp / multiple dispatch, multimethod, visitor design pattern]]
+
+  + [[https://borodust.org/delivering-common-lisp][Delivering games written in Common Lisp]]
+
+  + [[https://texdraft.github.io/lisp-compiler/internals.html][Lisp Compiler]]
+
+
+S-Expression Parsing:
+
+  + [[https://wiki.c2.com/?EssExpressions][Wiki C2 - ESS Expressions]]
+
+  + [[https://rosettacode.org/w/index.php?title=S-expressions&useformat=mobile][S-expressions - Rosetta Code]]
+
+  + [[https://learnxinyminutes.com/docs/edn/][Clojure EDN - Learn edn in Y Minutes]]
+
+  + [[https://gist.github.com/DmitrySoshnikov/2a434dda67019a4a7c37][S-expression parser · GitHub]] (JavaScript)
+
+  + [[https://wiki.c2.com/?XmlIsaPoorCopyOfEssExpressions][WIKI C2 - Xml Isa Poor Copy Of Ess Expressions]]
+
+  + [[https://eli.thegreenplace.net/2012/03/04/some-thoughts-on-json-vs-s-expressions][Some thoughts on JSON vs. S-expressions]]
+
+  + [[https://wiki.c2.com/?ExampleOfGreenspunsTenthAtWork][Example Of Greenspuns Tenth At Work]]
+
+  + [[https://kitchingroup.cheme.cmu.edu/blog/2017/05/04/An-emacs-lisp-dsl-for-gnuplot/][An Emacs Lisp DSL for GNU Plot]]
+
+  + [[https://macoy.me/blog/programming/CakelispIntro][Cakelisp: a programming language for games]]
+
+  + [[https://people.csail.mit.edu/rivest/Sexp.txt][S-expressions data structure - Ron Rivest]]
+
+  + [[https://github.com/janestreet/sexplib][GitHub - janestreet/sexplib: Automated S-expression conversion]]
+    + OCaml S-Expression parser
+
+  + [[https://dev.realworldocaml.org/data-serialization.html][Data Serialization with S-Expressions - Real World OCaml]]
+
+  + https://github.com/BitPuffin/sexpresso
+    + C++ S-Expression parser library
+
+  + https://github.com/SuperTux/sexp-cpp
+    + C++ S-Expression parser library (GPL 3)
+
+  + [[https://hackage.haskell.org/package/s-cargot][s-cargot: A flexible, extensible s-expression library]]
+    + Haskell S-Expression parser. The description of this page also
+      tells how SExp can be used as storage format, serialization
+      format and data description language.
+
+  + [[https://github.com/drslump/sexp-php][GitHub - drslump/sexp-php: S-expression parser and serializer for PHP]]
+
+  + [[https://srfi.schemers.org/srfi-110/srfi-110.html][SRFI 110: Sweet-expressions (t-expressions)]]
+
+
