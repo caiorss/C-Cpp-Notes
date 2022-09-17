@@ -3584,7 +3584,7 @@ Program output:
    [*] v_path = C:\\Users\dummy\Documents\data
 
 #+END_SRC
-** Writing a Scheme-like lisp interpreter in C++
+** Scheme-like lisp interpreter in C++
 *** Overview
 
 Scheme is a simple dialect of lisp with several functional-programming
@@ -3705,7 +3705,7 @@ Lisp terminology:
     + String literal - between quotes:  "my string"
 *** Code 
 
-File: _code.lisp_
+File: _code.lisp_  - Sample Lisp scripting code 
 
 #+BEGIN_SRC lisp 
   ; Lisp test code 
@@ -3773,7 +3773,7 @@ File: _code.lisp_
 
 #+END_SRC
     
-File: _cpplisp.cpp_ (Lisp-like interpreter)
+File: _cpplisp.cpp_ (Lisp-like interpreter) - about 1600 lines of code.
 
 #+BEGIN_SRC cpp 
 #include <iostream> 
@@ -3783,7 +3783,7 @@ File: _cpplisp.cpp_ (Lisp-like interpreter)
 #include <cctype>
 #include <optional>
 #include <cassert>
- #include <memory>
+#include <memory>
 #include <vector>
 #include <map>
 #include <iomanip>
@@ -3985,7 +3985,7 @@ public:
             int pos = _pos;
             int lin = _lin;
             char c = 'x';
-            while( c != '"' && c != '\0' )
+            while( c != '"' && !this->isEOF() )
             {
                 c  = this->next();
                 if(c == '"'){ break; }
@@ -4409,6 +4409,7 @@ struct ExprFunNative: public ExprFun
 // Represents a list 
 struct ExprLst: public IExpr  
 {
+
     std::vector<std::shared_ptr<IExpr>> lst; 
 
     ExprLst(std::vector<std::shared_ptr<IExpr>> const& lst_)
@@ -4777,7 +4778,7 @@ auto readTokens(std::vector<Token>& tokens) -> std::shared_ptr<IExpr>
         return std::make_shared<ExprStr>( tok.text );
     }
 
-    return std::make_shared<ExprErr>(-1, "Edge found in the parser");
+    return std::make_shared<ExprErr>(-1, "BUG Found => Edge case found in the parser.");
 }
 
 
@@ -4861,31 +4862,6 @@ void printSexp(IExpr& expr)
     std::cout << std::endl;
 }
 
-
-struct IEnvType {
-    virtual bool isFunction() const = 0;
-    virtual bool isVariable() const = 0;
-    virtual std::shared_ptr<IExpr> getValue() const = 0;
-    virtual ~IEnvType() = default;
-};
-
-struct EnvVal: public IEnvType
-{
-    std::shared_ptr<IExpr> value;
-    EnvVal(std::shared_ptr<IExpr> value_): value(value_){ }
-    bool isFunction() const { return false; }
-    bool isVariable() const { return true;  } 
-    std::shared_ptr<IExpr> getValue() const { return value; }
-};
-
-struct EnvFun: public IEnvType
-{
-    LispFunc func; 
-    EnvFun(LispFunc func_): func(func_){ } 
-    bool isFunction() const { return true; }
-    bool isVariable() const { return false;  } 
-    std::shared_ptr<IExpr> getValue() const { return nullptr; }
-};
 
 /// Lisp interpreter's primitive functions 
 namespace primitives {
@@ -5345,6 +5321,24 @@ public:
 
         });
 
+        self.addFunction("for-each", [=](std::vector<std::shared_ptr<IExpr>> const& args)
+        {
+            if( args.size() != 2 )
+            { throw std::runtime_error("Error: apply() requires 2 arguments."); } 
+            if( !args[0]->isFun() )
+            { throw std::runtime_error("Error: expected function as first argument."); }
+            if( !args[1]->isList() )
+            { throw std::runtime_error("Error: expected list as second argument."); }
+            auto func = std::static_pointer_cast<ExprFun>(args[0]);
+            auto params = std::static_pointer_cast<ExprLst>(args[1]); 
+            for(auto const& p: params->lst){ 
+                auto args_ = std::vector<std::shared_ptr<IExpr>>{ p };
+                func->call( args_, this->_env ); 
+            }
+            return std::make_shared<ExprNil>();
+
+        });
+
     }
 
     void addVariable(std::string const& name, double value)
@@ -5521,7 +5515,7 @@ int main(){
 
 
     return 0;
-}
+  }
 
 #+END_SRC
 
@@ -5557,7 +5551,11 @@ Running:
    
    $ lisp>> (list 1 2 3 5 6 7 8)
   (  1 2 3 5 6 7 8 )
-  
+ 
+   $ lisp>> (set x 10)
+   [TRACE] Defining symbol = x . 
+  nil
+ 
    $ lisp>> ( (if (< x  5) + *)  100 20)
   2000
   
@@ -5659,6 +5657,56 @@ Running:
   
    $ lisp>> (map compute-trig (list 30 90 45))
   (  (  :angle 30 :cos 0.866033 :sin 0.499987 :tan 0.57733 ) (  :angle 90 :cos 4.63268e-05 :sin 1 :tan 21585.8 ) (  :angle 45 :cos 0.707123 :sin 0.70709 :tan 0.999954 ) )
+
+   $ lisp>> (func 10)
+  0.1502
+ 
+   $ lisp>> (func 1)
+  0.124383
+
+   $ lisp>> a
+   [ERROR] Unbound variable a
+
+   $ lisp>> b
+   [ERROR] Unbound variable b
+
+   $ lisp>> c
+   [ERROR] Unbound variable c
+   $ lisp>> 
+
+   $ lisp>> (for-each disp (list "Hello" 'world :lisp 100 nil #t #f))
+  "Hello"
+  world
+  :lisp
+  100
+  nil
+  #t
+  #f
+  
+  $ lisp>> (set make-multiplier-function (fn (mult) (fn (x) (* mult x))))
+   [TRACE] Defining symbol = make-multiplier-function . 
+  nil
+  
+   $ lisp>> (set mult-by-10 (make-multiplier-function 10))
+   [TRACE] Defining symbol = mult-by-10 . 
+  nil
+  
+   $ lisp>> (set mult-by-6 (make-multiplier-function 6))
+   [TRACE] Defining symbol = mult-by-6 . 
+  nil
+  
+   $ lisp>> (map mult-by-10 (list 1 2 3 4 5))
+  (  10 20 30 40 50 )
+  
+   $ lisp>> (map mult-by-6 (list 1 2 3 4 5))
+  (  6 12 18 24 30 )
+  
+   $ lisp>> ( (make-multiplier-functon 4) (list 1 2 3 4 5))
+   [ERROR] Unbound variable make-multiplier-functon
+  
+   $ lisp>> (map (make-multiplier-function 4) (list 1 2 3 4 5))
+  (  4 8 12 16 20 )
+   $ lisp>> 
 #+END_SRC
 
 *** Further Reading
@@ -5752,7 +5800,7 @@ Lisp Variants:
 
   + [PDF] [[https://community.cadence.com/cfs-file/__key/telligent-evolution-components-attachments/00-28-01-00-00-01-04-75/CadScriptingLanguages_5F00_skill.pdf][A quick tour to skill programming language - Cadence CAD / Lisp.]]
 
-  + PDF: [[https://perun.pmf.uns.ac.rs/radovanovic/publications/2002-prim-lisp.pdf][An implementation of LISPKIT Lisp in Java]] (SECD Abstract Machine)
+  + [PDF] [[https://perun.pmf.uns.ac.rs/radovanovic/publications/2002-prim-lisp.pdf][An implementation of LISPKIT Lisp in Java]] (SECD Abstract Machine)
 
   + [[http://www.lispme.de/lispme/doc/lm_hood.htm][LispMe internals]]
     + This implementation uses a SECD Virtual Machine instead of a
@@ -5827,6 +5875,10 @@ S-Expression Parsing:
 
   + [[https://rosettacode.org/w/index.php?title=S-expressions&useformat=mobile][S-expressions - Rosetta Code]]
 
+  + [[https://github.com/edn-format/edn][EDN / Clojure - edn-format/edn: Extensible Data Notation]] 
+    + Clojure variant of S-Expressions (SExp) - Clojure EDN is easier
+      to read and has more rich data types than lisp's SEXP.
+    
   + [[https://learnxinyminutes.com/docs/edn/][Clojure EDN - Learn edn in Y Minutes]]
 
   + [[https://gist.github.com/DmitrySoshnikov/2a434dda67019a4a7c37][S-expression parser · GitHub]] (JavaScript)
