@@ -3675,11 +3675,25 @@ Lisp terminology:
     
   + cons -  abbreviation of the word 'construct'
 
+  + Lisp 1 =>> There is a single namespace for variables and
+    functions. Example: Scheme variants.
+
+  + Lisp 2 =>> There are separate namespaces for variables and
+    functions. Example: Common Lisp and Elisp - Emacs' lisp.
+
   + Special forms
-    + They are forms or primitives not evaluated as functions
-      arguments may not be evaluated. Most special forms are control
-      structures and keyword such as 'if', 'set', 'define', 'lambda'
-      and so on.
+    + They are forms or primitives not evaluated as functions, instead
+      arguments may not be evaluated at all. Most special forms are
+      primitives or control structures such as 'if', 'set', 'define', 'lambda'
+      and so on. For instance the 'if' special form, that has three
+      arguments, the first argument is a predicate, the second
+      argument is the action that happens when the predicate is true
+      and  the third argument is the action that happens when the
+      predicate is false. If the predicate is true, the second
+      argument is not evaluated and the if expression is evaluated to
+      the value of the first argument. If the predicate is false, the
+      first argument is not evaluated and the if expression is
+      evaluated to the value of the second argument.
 
   + DSL - Domain Specific Lanaguage 
 
@@ -3703,6 +3717,122 @@ Lisp terminology:
     + symbol literal: 'a-symbol
     + keyword literal: :keyword1, :keyword2
     + String literal - between quotes:  "my string"
+      
+C++ Features used in this interpreter prototype:
+
+  1. [[https://en.cppreference.com/w/cpp/memory/shared_ptr][std::shared_ptr]]
+    
+  2. [[https://en.cppreference.com/w/cpp/io/basic_istream][std::basic_istream and std::istream]]
+
+  3. [[https://en.cppreference.com/w/cpp/io/basic_istream/getline][std::getline()]]
+
+  4. [[https://en.cppreference.com/w/cpp/container/vector][std::vector container]]
+
+  5. [[https://en.cppreference.com/w/cpp/string/basic_string][std::string container]]
+
+  6. [[https://en.cppreference.com/w/cpp/container/map][std::map container]]
+
+  7. [[https://en.cppreference.com/w/cpp/utility/functional/function][std::function container]]
+
+  8. [[https://en.cppreference.com/w/cpp/memory/shared_ptr/pointer_cast][std::static_pointer_cast]]
+
+  9. [[https://en.cppreference.com/w/cpp/memory/shared_ptr/make_shared][std::make_shared()]]
+
+
+Typical AST - Abstract Syntax Tree of Lisp/Scheme implementations:
+
+#+BEGIN_SRC text 
+                  Expr - Expression 
+                      |
+                      |
+       +--------------+-------------------------+
+       |                                        |  
+   Cons(Expr, Expr)                           Atom - anything that is not a pair (cons cell)
+ (cons pair,                                    |
+  cons linked list         +--------+--------+---+------+-----------+---------+--------------+
+  or cons cell   )         |        |        |          |           |         |              |
+                         Nil     Number    String    Boolean     Symbol    Keyword       Function 
+                       literal   literal   Literal   Literal                                 |
+                                                                                -------------+-------------
+                                                                                |                         |
+                                                                             Native                  Lisp Function
+                                                                            Function              implemented in Lisp 
+                                                                            
+     data Expr =  -- Cons cell  
+                  Cons Expr, Expr                      
+                  -- Nil literal - represents an empty value 
+                | Nil                             
+                  -- Boolean literal 
+                | Bool Bool                       
+                  -- Number literal 
+                | Num  Double                     
+                  -- String literal 
+                | Str  String                     
+                  -- Symbol 
+                | Sym  String                     
+                  -- keyword 
+                | Key  String                     
+                  -- Native function written in the hosting language 
+                | NativeFun ([Expr] -> Expr)     
+                   -- Function written in Lisp 
+                | LispFunc (environment: Dict<String,Expr>, args: <String>, name: <String>, call:  [Expr] -> Expr)
+                
+
+  Example =>> The pair or cons cell '( hello . 100) is reprented as:
+  
+       Cons( Sym("hello"), Num(100))
+       
+    Example ->> The list (1 hello "world") is represented as a linked list in the following format:
+ 
+       Cons( Num(1), Cons( Sym("Hello"), Cons( Str("hello"), Nil )))
+#+END_SRC  
+
+
+AST - Abstract Syntax Tree used in this implementation: 
+
+#+BEGIN_SRC text 
+             Expression  
+                 |
+                 |
+     +-----------+------------------------+
+     |                                    |
+     |                                    |
+  List of Expr                          Atom - anything that is not alist 
+                                          |
+                 +-------+---------+------+--+---+--------------+----------+
+                 |       |         |         |        |         |          |
+                Nil    Number    String   Boolean   Symbol   Keyword   Function 
+              Literal  Literal   Literal   Literal          :keyword    object 
+                                          #t (true)                       |
+                                          #f (false)           +----------+---------------+
+                                                               |                          |
+                                                        Native Function            Lisp Function 
+                                                      written in C or C++         written in Lisp 
+                                                      or in the hosting 
+                                                         language 
+                                                      
+  Haskell-like notation:
+ 
+     data Expr =  -- List data structure - can be represented by a linked list or vector  
+                  List [Expr]                     
+                  -- Nil literal - represents an empty value 
+                | Nil                             
+                  -- Boolean literal 
+                | Bool Bool                       
+                  -- Number literal 
+                | Num  Double                     
+                  -- String literal 
+                | Str  String                     
+                  -- Symbol 
+                | Sym  String                     
+                  -- keyword 
+                | Key  String                     
+                  -- Native function written in the hosting language 
+                | NativeFun ([Expr] -> Expr)     
+                   -- Function written in Lisp 
+                | LispFunc (environment: Dict<String,Expr>, args: <String>, name: <String>, call:  [Expr] -> Expr)
+#+END_SRC 
+
 *** Code 
 
 File: _code.lisp_  - Sample Lisp scripting code 
@@ -5542,7 +5672,27 @@ Running:
    $ lisp>> '(list (+ 1 2 3 4 5) (+ 1 2 3 4 5) '(* 4 100) (* 4 100) :keyword #t #f nil "Hello world")
   (  list (  + 1 2 3 4 5 ) (  + 1 2 3 4 5 ) (  quote (  * 4 100 ) ) (  * 4 100 ) :keyword #t #f nil "Hello world" )
   
+    $ lisp>> (cons 10 20)
+  Error: pairs construction not allowed. Second argument can only be a list or nil.
   
+   $ lisp>> (cons 20 nil)
+  (  20 )
+  
+   $ lisp>> (cons 10 (cons 20 nil))
+  (  10 20 )
+  
+   $ lisp>> (cons "hello" (cons 10 (cons 20 nil)))
+  (  "hello" 10 20 )
+   $ lisp>> 
+   $ lisp>> (cons 'world (cons "hello" (cons 10 (cons 20 nil))))
+  (  world "hello" 10 20 )
+  
+   $ lisp>> (cons :keyword (cons 'world (cons "hello" (cons 10 (cons 20 nil)))))
+  (  :keyword world "hello" 10 20 )
+  
+   $ lisp>> (cons sqrt (cons :keyword (cons 'world (cons "hello" (cons 10 (cons 20 nil))))))
+  (  (native function) sqrt :keyword world "hello" 10 20 )
+   $ lisp>> 
   
    $ lisp>> (+ 1 2 3 4 5 6)
   21
@@ -5711,7 +5861,7 @@ Running:
 
 *** Further Reading
 
-Scheme and Lisp Introduction:
+ *Scheme and Lisp Introduction:*
 
   + [[https://beautifulracket.com/appendix/glossary.html#reader][Beautiful Racket: Glossary]]
 
@@ -5727,8 +5877,20 @@ Scheme and Lisp Introduction:
   + [[http://www.paulgraham.com/rootsoflisp.html][The Roots of Lisp]]
 
   + [[http://www.cs.virginia.edu/~evans/cs655/readings/steele.pdf][Growing a Language - Guy L. Steele Jr.]]
+
+  + [[https://lwn.net/Articles/778550/][Lisp and the foundations of computing - LWN.net]]
+
+  + [[https://gist.github.com/vindarel/c1ef5e043773921e3b11d8f4fe1ca7ac][Common Lisp VS Racket. Feedback from lispers. · GitHub]]
+
+  + [[https://dept-info.labri.fr/~strandh/Teaching/Langages-Enchasses/Common/Strandh-Tutorial/diff-scheme.html][Differences between Scheme and Common Lisp]]
+
+  + [[https://www-users.cse.umn.edu/~gini/4511/lisp/scheme.html][Notes on Lisp ]]
+
+  + [[https://dreamsongs.com/Separation.html][Function Cells and Value Cells]]
+
+  + Book: [[https://people.eecs.berkeley.edu/~bh/ss-toc2.html][Simply Scheme: Introducing Computer Science]] - 1999
    
-About how to implement Lisp-like dialects:
+ *About how to implement Lisp-like dialects:*
  
   + [[https://norvig.com/lispy.html][(How to Write a (Lisp) Interpreter (in Python))]]
     
@@ -5740,6 +5902,8 @@ About how to implement Lisp-like dialects:
   + BOOK: [[https://en.m.wikibooks.org/wiki/Write_Yourself_a_Scheme_in_48_Hours][Write Yourself a Scheme in 48 Hours - Wikibooks, open books for an open world]]
     + Scheme implementation in Haskell programming language, that can
       be hard to understand for people not acquainted with Haskell.
+
+  + BOOK: [[https://write-yourself-a-scheme.pangwa.com/#/][Write Yourself a scheme in 48 hours in F# (FSharp)]]
 
   + BOOK: [[https://wespiser.com/writings/wyas/00_overview.html][Write You A Scheme, Version 2.0]]
     + Scheme implementation in Haskell.
@@ -5781,20 +5945,54 @@ About how to implement Lisp-like dialects:
   + [[https://www.cs.umd.edu/class/spring2022/cmsc430/Notes.html][CMSC 430:  Design and Implementation of Programming Languages]]
 
 
-Lisp Variants: 
+ *Lisp Variants:*
 
   + [[https://janet-lang.org][Janet Programming Language]] (akin to Clojure)
     
   + [[https://github.com/picolisp/pil21][GitHub - picolisp/pil21: PicoLisp dialect]]
 
+  + [[https://woodrush.github.io/blog/lambdalisp.html][LambdaLisp - A Lisp Interpreter That Runs on Lambda Calculus | Woodrush’s Blog]]
+
   + [[https://github.com/programming-nu/nu][NU Lisp]]
     + "Nu is an interpreted Lisp that builds on the Objective-C runtime and Foundation framework."
+
+  + [[http://www.newlisp.org/index.cgi?FAQ][newLISP  - FAQ]] 
+    + "newLISP is a general purpose scripting language for developing
+      web applications and programs in general in the domains of
+      artificial intelligence (AI), statistics and machine learning."
 
   + [[http://www.ulisp.com/show?2XZH][uLisp - ARM Assembler in Lisp]]
 
   + http://lush.sourceforge.net/
     
   + [[https://ccrma.stanford.edu/software/snd/snd/s7.html][s7 Scheme - Embedded Scripting Language]]
+
+  + [[https://scsh.net/][SCSH Scheme]] - Unix-shell scripting in scheme scripting language
+    + "Scsh is an open-source Unix shell embedded within Scheme,
+      running on all major Unix platforms including AIX, Cygwin,
+      Linux, FreeBSD, GNU Hurd, HP-UX, Irix, Mac OS X, Solaris, and
+      some others. Scsh is a variant of Scheme 48 (an R5RS compliant
+      new-tech Scheme system) Scsh is designed for writing real-life
+      standalone Unix programs and shell scripts. Scsh spans a wide
+      range of application, from “script” applications usually handled
+      with perl or sh, to more standard systems applications usually
+      written in C."
+
+  + [[https://scsh.net/docu/html/man-Z-H-1.html][Scsh - Scheme Unix Shell Scripting - Reference Manual]]
+    + "This is the reference manual for scsh, a Unix shell that is
+      embedded within Scheme. Scsh is a Scheme system designed for
+      writing useful standalone Unix programs and shell scripts -- it
+      spans a wide range of application, from ``script'' applications
+      usually handled with perl or sh, to more standard systems
+      applications usually written in C. Scsh comes built on top of
+      Scheme 48, and has two components: a process notation for
+      running programs and setting up pipelines and redirections, and
+      a complete syscall library for low-level access to the operating
+      system. This manual gives a complete description of scsh. A
+      general discussion of the design principles behind scsh can be
+      found in a companion paper, ``A Scheme Shell.'' "
+
+  + [PDF] [[https://www.ccs.neu.edu/home/shivers/papers/scsh.pdf][A Scheme Shell - MIT - Olin Shivers]]
 
   + [PDF] [[https://3e8.org/pub/scheme/doc/lisp-pointers/v6i3/p71-petrus.pdf][SKILL: a Lisp Based Extension Language]]
 
@@ -5811,7 +6009,14 @@ Lisp Variants:
     + Implementation in .NET
     + Repository: https://github.com/Microsoft/schemy
 
-  + PDF: [[https://www.dreamsongs.com/Files/Timrep.pdf][Performance and Evaluation of Lisp Systems]]
+  + [[https://github.com/shikantaza/pLisp][GitHub - shikantaza/pLisp: Don't Lisp, Talk!]]
+    
+  + [[https://european-lisp-symposium.org/static/2018/jayaprakash.pdf][pLisp: A Friendly Lisp IDE for Beginners]]
+    + "pLisp is an integrated development environment for Lisp. While
+      it aims to be a friendly Lisp development system for beginners,
+      its feature-set is comprehensive enough to address the needs of
+      a small-to-medium sized Lisp project."
+    + Note: Based on Commonlisp, Scheme and Smalltalk. 
 
   + [[https://paulhammant.com/2013/03/28/interface-builders-alternative-lisp-timeline/][Interface Builder's Alternative Lisp timeline]]
 
@@ -5829,6 +6034,8 @@ Lisp Variants:
       process guide. Mal is implemented in 87 languages (93 different
       implementations and 115 runtime modes)."
 
+  + [[https://web.archive.org/web/20160324184251/https://carloscarrasco.com/embedding-scheme-for-a-game-mission-scripting-dsl.html][Embedding Scheme for a game mission scripting DSL]]
+
   + [[https://en.m.wikipedia.org/wiki/Game_Oriented_Assembly_Lisp][Game Oriented Assembly Lisp - Wikipedia]]
 
   + [[https://opengoal.dev][OpenGOAL | OpenGOAL]]
@@ -5837,8 +6044,18 @@ Lisp Variants:
 
   + [[https://all-things-andy-gavin.com/2011/03/12/making-crash-bandicoot-gool-part-9/][Making Crash Bandicoot – GOOL – part 9 - All Things Andy Gavin]]
 
+  + [PDF] [[https://www.dreamsongs.com/Files/Timrep.pdf][Performance and Evaluation of Lisp Systems]]
 
-Common Lisp:
+  + _AutoLisp_ - Lisp Dialect, based on common lisp, used by Autocad
+    software for engineering drawings.
+    + [[https://en.wikipedia.org/wiki/AutoLISP][AutoLISP - Wikipedia]]
+    + [[https://www.afralisp.net/index.php][Learn AutoLISP for AutoCAD productivity]]
+    + [[https://www.cad-notes.com/good-autolisp-programming-techniques/][Good AutoLISP Programming Techniques]]
+    + [PDF] [[http://docs.autodesk.com/ACDMAC/2013/ENU/PDFs/acdmac_2013_autolisp_developers_guide.pdf][AutoCAD 2013 AutoLISP Developer's Guide]]
+    + https://autocadtips1.com/category/autolisp-3d/
+
+
+ *Common Lisp:*
 
   + [[http://www.n-a-n-o.com/lisp/cmucl-tutorials/LISP-tutorial.html][Common LISP Hints - 1993]]
 
@@ -5864,12 +6081,14 @@ Common Lisp:
 
   + [[https://www.lurklurk.org/cpp_clos.html][C++ and Lisp / multiple dispatch, multimethod, visitor design pattern]]
 
+  + [[https://sodocumentation.net/common-lisp/topic/1369/loop--a-common-lisp-macro-for-iteration][common-lisp Tutorial - LOOP, a Common Lisp macro for iteration]]
+
   + [[https://borodust.org/delivering-common-lisp][Delivering games written in Common Lisp]]
 
   + [[https://texdraft.github.io/lisp-compiler/internals.html][Lisp Compiler]]
 
 
-S-Expression Parsing:
+ *S-Expression Parsing:*
 
   + [[https://wiki.c2.com/?EssExpressions][Wiki C2 - ESS Expressions]]
 
@@ -5898,7 +6117,20 @@ S-Expression Parsing:
   + [[https://github.com/janestreet/sexplib][GitHub - janestreet/sexplib: Automated S-expression conversion]]
     + OCaml S-Expression parser
 
+  + [[https://blog.janestreet.com/s-expressions-in-ruby/][S-Expressions in ruby - Janestreet]]
+    + "We use a lot of S-Expressions at Jane Street. Almost every
+      system written at Jane Street in OCaml uses sexps for config
+      files, and we use it for a lot of IPC (Inter-Process
+      Communication) when resources aren’t an issue."
+
   + [[https://dev.realworldocaml.org/data-serialization.html][Data Serialization with S-Expressions - Real World OCaml]]
+
+  + [[https://github.com/dryruby/sxp.rb][SXP - A universal S-expression parser for Ruby]]
+    + "This is a Ruby implementation of a universal S-expression
+      parser. Parses S-expressions in universal, Scheme, Common Lisp,
+      or SPARQL syntax."
+
+  + [[https://jena.apache.org/documentation/notes/sse.html][SPARQL S-Expressions (or "SPARQL Syntax Expressions")]]
 
   + https://github.com/BitPuffin/sexpresso
     + C++ S-Expression parser library
