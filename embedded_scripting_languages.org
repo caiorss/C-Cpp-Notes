@@ -3717,26 +3717,60 @@ Lisp terminology:
     + symbol literal: 'a-symbol
     + keyword literal: :keyword1, :keyword2
     + String literal - between quotes:  "my string"
-      
-C++ Features used in this interpreter prototype:
+     
 
-  1. [[https://en.cppreference.com/w/cpp/memory/shared_ptr][std::shared_ptr]]
+Known uses of Lisp-like languages as _configuration language_, _scripting_
+_language_, _embedded scripting language_ or _extension language_:
+
+  1. _Emacs text editor_ - uses its own Lisp dialect ELisp as a
+     configuration language and scripting language. Note: Elisp is
+     older than Scheme and Common Lisp.
     
-  2. [[https://en.cppreference.com/w/cpp/io/basic_istream][std::basic_istream and std::istream]]
+  2. [[https://guix.gnu.org/][GNU Guix]] functional package manager that uses [[https://www.gnu.org/software/guile/][GNU GUile]] as a
+     configuration and scripting language. GNU Guix solves the Linux
+     dependency hell problem by allowing reproducible installation of
+     any package. This package manager also allows multiple versions
+     of the same software to cohexis.
 
-  3. [[https://en.cppreference.com/w/cpp/io/basic_istream/getline][std::getline()]]
+  3. _Autocad®_ from Autodesk - CAD (Computer Aided Design) software for
+     engineering drawing that uses Autolisp, its own lisp dialect based
+     on common lisp, as an embedded scripting language.
 
-  4. [[https://en.cppreference.com/w/cpp/container/vector][std::vector container]]
+ 
+C++ Features useful for implementation of lexers, AST (Abstract Syntax
+Trees) and interpreters:
 
-  5. [[https://en.cppreference.com/w/cpp/string/basic_string][std::string container]]
+  + [[https://en.cppreference.com/w/cpp/memory/shared_ptr][std::shared_ptr]]
+    
+  + [[https://en.cppreference.com/w/cpp/io/basic_istream][std::basic_istream and std::istream]]
 
-  6. [[https://en.cppreference.com/w/cpp/container/map][std::map container]]
+  + [[https://en.cppreference.com/w/cpp/io/basic_istream/getline][std::getline()]]
 
-  7. [[https://en.cppreference.com/w/cpp/utility/functional/function][std::function container]]
+  + [[https://en.cppreference.com/w/cpp/container/vector][std::vector container]]
 
-  8. [[https://en.cppreference.com/w/cpp/memory/shared_ptr/pointer_cast][std::static_pointer_cast]]
+  + [[https://en.cppreference.com/w/cpp/string/basic_string][std::string container]]
 
-  9. [[https://en.cppreference.com/w/cpp/memory/shared_ptr/make_shared][std::make_shared()]]
+  + [[https://en.cppreference.com/w/cpp/container/map][std::map container]]
+
+  + [[https://en.cppreference.com/w/cpp/utility/functional/function][std::function container]]
+
+  + [[https://en.cppreference.com/w/cpp/language/enum][Enum class (scoped enumeration)]]
+
+  + [[https://www.modernescpp.com/index.php/c-core-guidelines-rules-for-enumerations][C++ Core Guidelines: Rules for Enumerations - ModernesCpp.com]]
+
+  + [[https://stackoverflow.com/questions/18335861/why-is-enum-class-preferred-over-plain-enum][c++ - Why is enum class preferred over plain enum? - Stack Overflow]]
+
+  + [[https://en.cppreference.com/w/cpp/memory/shared_ptr/pointer_cast][std::static_pointer_cast]]  (downcasting shared pointers)
+
+  + [[https://en.cppreference.com/w/cpp/memory/shared_ptr/make_shared][std::make_shared()]]
+
+  + [[https://en.cppreference.com/w/cpp/memory/enable_shared_from_this][std::enable_shared_from_this - cppreference.com]]
+
+  + [[https://www.codeproject.com/Articles/286304/Solution-for-multiple-enable-shared-from-this-in-i][Solution for Multiple enable_shared_from_this in Inheritance Tree - CodeProject]]
+
+  + [[https://medium.com/@hmminto/using-enabled-shared-from-this-aa84c2b283c3][Using enabled_shared_from_this. enable_shared_from_this allows to…]]
+
+  + [[https://www.caichinger.com/blog/2016/05/21/enable_shared_from_this/][Remarks on enable_shared_from_this - Christian Aichinger's posts]]
 
 
 Typical AST - Abstract Syntax Tree of Lisp/Scheme implementations:
@@ -3797,7 +3831,7 @@ AST - Abstract Syntax Tree used in this implementation:
      +-----------+------------------------+
      |                                    |
      |                                    |
-  List of Expr                          Atom - anything that is not alist 
+  List of Expr                          Atom - anything that is not a list 
                                           |
                  +-------+---------+------+--+---+--------------+----------+
                  |       |         |         |        |         |          |
@@ -3902,6 +3936,26 @@ File: _code.lisp_  - Sample Lisp scripting code
    )
 
 #+END_SRC
+
+File: _gui-dsl.lisp_ - Hypothetical configuration file written in Lisp
+that represents a html-like user interface.
+
+#+BEGIN_SRC lisp 
+  ;; Theoretical GUI DSL (Domain Specific Language)
+  
+  (div :class "myclass-csss-style"
+            :bgcolor "#ff81a" 
+            ;; <p>Paragraph 1</p>
+            (p "Paragraph 1 ")
+            ;; <img  src="http://..../myimage.png" /> 
+            (img :src "http://www.mydomain/images/myimage.png" :caption "Image 1 data")
+            ;; <button id="btn-submit" class="my-style-button" >Submit</button>
+            (button :label "Submit" :id "btn-submit" :class "my-style-button"
+                    :onclick (fn (event) (display "Button was clicked") ))
+         )
+
+#+END_SRC
+
     
 File: _cpplisp.cpp_ (Lisp-like interpreter) - about 1600 lines of code.
 
@@ -5649,6 +5703,7 @@ int main(){
 
 #+END_SRC
 
+
 Building  the lisp interpreter: 
 
 #+BEGIN_SRC sh 
@@ -5859,6 +5914,42 @@ Running:
    $ lisp>> 
 #+END_SRC
 
+Read file _gui-dsl.lisp_: 
+
+#+BEGIN_SRC lisp 
+   $ lisp>> (set expr (read-file "gui-dsl.lisp"))
+   [TRACE] Defining symbol = expr . 
+  nil
+  
+   $ lisp>> expr
+  (  div :class "myclass-csss-style" :bgcolor "#ff81a" (  p "Paragraph 1 " ) (  img :src "http://www.mydomain/images/myimage.png" :caption "Image 1 data" ) (  button :label "Submit" :id "btn-submit" :class "my-style-button" :onclick (  fn (  event ) (  display "Button was clicked" ) ) ) )
+  
+  
+   $ lisp>> (car expr)
+  div
+  
+   $ lisp>> (car (cdr expr))
+  :class
+  
+   $ lisp>> (nth 5 expr)
+  (  p "Paragraph 1 " )
+  
+   $ lisp>> (car (nth 5 expr))
+  p
+  
+   $ lisp>> (cdr (nth 5 expr))
+  (  "Paragraph 1 " )
+  
+   $ lisp>> (car (cdr (nth 5 expr)))
+  "Paragraph 1 "
+
+    $ lisp>> (nth 6 expr)
+  (  img :src "http://www.mydomain/images/myimage.png" :caption "Image 1 data" )
+
+   $ lisp>> (nth 7 expr)
+  (  button :label "Submit" :id "btn-submit" :class "my-style-button" :onclick (  fn (  event ) (  display "Button was clicked" ) ) )
+#+END_SRC
+
 *** Further Reading
 
  *Scheme and Lisp Introduction:*
@@ -5874,7 +5965,7 @@ Running:
 
   + [[https://beautifulracket.com/appendix/why-racket-why-lisp.html][Beautiful Racket: Why Racket? Why Lisp?]]
 
-  + [[http://www.paulgraham.com/rootsoflisp.html][The Roots of Lisp]]
+  + [[http://www.paulgraham.com/rootsoflisp.html][The Roots of Lisp]] - Paul Graham 
 
   + [[http://www.cs.virginia.edu/~evans/cs655/readings/steele.pdf][Growing a Language - Guy L. Steele Jr.]]
 
@@ -5888,14 +5979,17 @@ Running:
 
   + [[https://dreamsongs.com/Separation.html][Function Cells and Value Cells]]
 
-  + Book: [[https://people.eecs.berkeley.edu/~bh/ss-toc2.html][Simply Scheme: Introducing Computer Science]] - 1999
+  + [[https://erikexplores.substack.com/p/what-makes-lisp-unique][What Makes LISP Unique? - by Erik Engheim - Erik Explores]]
+
+  + Book: [[https://people.eecs.berkeley.edu/~bh/ss-toc2.html][Simply Scheme: Introducing Computer Science]] (1999)
+
    
  *About how to implement Lisp-like dialects:*
  
-  + [[https://norvig.com/lispy.html][(How to Write a (Lisp) Interpreter (in Python))]]
+  + [[https://norvig.com/lispy.html][(How to Write a (Lisp) Interpreter (in Python))]] - Peter Norvig
     
-  + [[http://norvig.com/lispy2.html][(An ((Even Better) Lisp) Interpreter (in Python))]]
-
+  + [[http://norvig.com/lispy2.html][(An ((Even Better) Lisp) Interpreter (in Python))]] - Peter Norvig
+ 
   + [[http://fogus.me/fun/lithp/][Lithp - A interpreter for John McCarthy's original Lisp.]]
     + Interpreter written in Python in literate programming style. 
 
@@ -5964,6 +6058,10 @@ Running:
   + [[http://www.ulisp.com/show?2XZH][uLisp - ARM Assembler in Lisp]]
 
   + http://lush.sourceforge.net/
+
+  + [[https://github.com/JeffBezanson/femtolisp][Femtolisp]]
+    + Scheme-lisp dialect that inspired the Julia programming
+      language.
     
   + [[https://ccrma.stanford.edu/software/snd/snd/s7.html][s7 Scheme - Embedded Scripting Language]]
 
