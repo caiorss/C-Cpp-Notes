@@ -3736,6 +3736,11 @@ _language_, _embedded scripting language_ or _extension language_:
      engineering drawing that uses Autolisp, its own lisp dialect based
      on common lisp, as an embedded scripting language.
 
+  4. [[https://www.gimp.org/tutorials/Basic_Scheme2/][GNU Gimp]] - Image editor that uses [[https://tinyscheme.sourceforge.net/home.html][TinyScheme]] as embedded
+     scripting language.
+
+  5. [[https://ubrigens.com/posts/sandbox_tour.html][Apple Sandbox]] - Uses TinyScheme as configuration language.
+
  
 C++ Features useful for implementation of lexers, AST (Abstract Syntax
 Trees) and interpreters:
@@ -6326,15 +6331,14 @@ constructs were borrowed from Basic and Pascal programming languages.
            | "(" expr ")"
            | expr_if         // If-else statement 
            | expr_def        // Function definition  
-           | block           // scope block 
            ;   
 
-    # IF-Else statement (NOT IMPLEMENTED)
+    // IF-Else statement (NOT IMPLEMENTED)
     expr_if: "if" expr "then" stat+ "end"
            | "if" expr "then" stat+ "else" stat+ "end"
            ;
    
-    # Function definition 
+    // Function definition 
     expr_def: "fn" IDEN "(" (IDEN  ("," IDEN)*)?  ")" stat* "end"
             | "fn" IDEN "(" (IDEN ("," IDEN)* ))? ")" "->" expr 
             ;
@@ -6399,6 +6403,23 @@ The expression parser is able to parse the following syntax:
 
  *BNF - Backus-Naur and grammar-related terminology*
 
+  + _CFG_ - Context-Free Grammar
+    + As opposite to CSG - Context-Sensitive Grammars, production
+      rules of CFG grammars does not depend on the context. This type
+      of grammar can be described by BNF or EBFN notation.  
+    
+  + _CSG_ - Context-Sensitive Grammar 
+    + Grammar which production rules are context-sensitive and depends
+      on the current context. The C and C++ programming languages grammars are
+      context-sensitive, since the interpretation of many programming
+      constructs are context-dependent. For instance, the meaning of
+      T * X in C and are dependent on the context, if T is type, such
+      as int, then X is a pointer variable. If both X and T are of
+      type int, float or any other numeric type, then the expression
+      is a multiplication between variables T and X.
+
+  + CFG - _Control Flow Graph_
+
   + [[https://en.wikipedia.org/wiki/Backus%25E2%2580%2593Naur_form][BNF]] - Backus-Naur Normal Form
     + Notation introduced by John Backus and Peter Naur for formally
       describing _context-free grammars_, which are _not_
@@ -6433,6 +6454,9 @@ The expression parser is able to parse the following syntax:
   + [[https://en.wikipedia.org/wiki/Flex_(lexical_analyser_generator)][Flex]] (Lexical Analyser Generator) - GNU alternative to Lex.
 
   + [[https://en.wikipedia.org/wiki/GNU_Bison][GNU Bison]] - GNU alternative to Yacc. Ofen used together with Flex (Flex & Bison).
+ 
+  + [[https://re2c.org/][RE2C]] - Lexer code generator for C/C++, Go and Rust. This tool is
+    used by PHP, Ninja build system and BRL-CAD.
 
   + _Parsing_ - process of turning a string from text or source code
     into some data structure such as AST - Abstract Syntax
@@ -6444,20 +6468,73 @@ The expression parser is able to parse the following syntax:
       source code used as input of compiler code generators, bytecode
       code generators, interpreters and pretty printers.
 
+  + [[https://en.wikipedia.org/wiki/Document_Object_Model][DOM]] - Document Object Model 
+    + Abstract Syntax Tree representation of an XML or HTML
+      document. Whenever a web page is loaded, the web browser turns
+      the html code into a DOM object, a tree-like representatio the
+      html source code that is exposed to the JavaScript (ECMaScript)
+      code.
+
+  + DAG - Direct Acyclic Graph 
+
+  + _SEXP_ S-Expression from Lisp 
+    + Lisp S-expressions are one of the most convenient and compact to
+      represent AST - Abstract Syntax Trees as text.  
+
   + _Top-down Recursive Descent Parsing_ or just _Recursive Descent Parsing_
-    + Parsing algorithm that uses mutually recursive functions or
+    + Parser algorithm that uses mutually recursive functions or
       methods for each non-terminal production rule. Despite the
       simplicity of implementation of this parsing technique, it has
       few shortcomings such as not being able to deal with
       left-recursive and ambiguous grammars.
 
+  + _TDOP - Top-Down Operator Precedence Parser_ (the same as _Pratt Parser_)
+    + Parser algorithm that can parse infix, prefix and postfix
+      expressions different operator precedence levels without a
+      non-terminal grammar rule for every precedence level. This
+      algorithm is more flexible than Top-Down Recursive Descent
+      Parsing since new operator precedence levels can be added
+      without modifying the grammar or adding new recursive function.
+
+  + _Shunting-yard algorithm_ (Edsger Dijkstra)
+    + This algorithm uses a stack for turning infix expressions into
+      postfix expression, RPL - Reverse Polish Notation, which is
+      suitable for direct evaluation of infix expressions. Unlike
+      other algorithms, the output is not an AST - Abstract Syntax
+      Tree. Therefore, if an AST is needed, an additional algorithm
+      will be required for turning the postfix output into an AST.
+
   + _LALR_ - Look Ahead Left-to-Right Rightmost derivation parser (Parser Algorithm)
 
+  + [[https://en.wikipedia.org/wiki/Deterministic_finite_automaton][DFA]] - Deterministic Finite Automaton 
+
+  + DSA - Deterministic Stack Automata (related to automata theory and formal languages)
+
+  + NSA - Non-deterministic Stack Automata  (related to automata theory and formal languages)
+
   + _DSL_ - Domain Specific Language
+
+  + _GPL_ - General Purpose Language 
 
   + [[https://en.wikipedia.org/wiki/Computer_algebra_system][CAS]] - Computer Algebra System
 
   + _SAS_ - Symbolic Algebra System (Another name of CAS)
+
+  + IR - Intermediate Representation
+
+  + IL - Intermediate Language
+
+  + EOI - End Of Input
+
+  + EOF - End Of File
+
+  + EOL - End Of Line
+
+  + CR - Carriage Return - new line character (~\r~ - 0x0D - 13)
+
+  + LF - Line Feed - new line character (~\n~ - 0x0A - 10)
+
+  + CRLF - Carriage Return and Line Feed (~\r\n~)
 
   + LHS - Left-Hand Side, often the left-hand side of an infix
     operator such as (plus): lhs + rhs.
@@ -6519,6 +6596,60 @@ The expression parser is able to parse the following syntax:
     notation. 
 
 
+ *Performance Optimization for Interpreters*
+
+  
+   + Compilation to [[https://en.wikipedia.org/wiki/Virtual_machine][virtual machine]]
+     + Most programming languages interpreter engines do not execute
+       AST nodes directly, instead they compile the source code to
+       bytecodes, which are a instructions for some virtual machine.
+       
+   + Compilation to a standardized virtual machine
+     + Rather than implementing its own bytecode virtual machine, a
+       programming language may use standardized bytecode virtual
+       machine runtimes that are not exposed to external use and not
+       likely to have breaking changes on every release. Some of these
+       virtual machines, that are a compilation target to many
+       programming languages, are: _JVM_ - Java Virtual Machine, used by
+       Jython (Python for JVM), Clojure and Groovy; _CRL_ -
+       Commong Language Runtime (.NET Virtual Machine), use by C#
+       (CSharp), F# (FSharp), IronPython; and _WASM_ - Web Assembly.  
+
+   + [[https://en.wikipedia.org/wiki/Just-in-time_compilation][JIT - Just-In-Time compilation]] 
+     + Compilation of bytecodes (virtual machine instructions) to
+       machine code (also known as native code) at runtime. This
+       processs combines the advantage of interpretation and
+       compilation to native code. The shortcoming of this approach is
+       the loss of flexibility and portability, since the JIT has to
+       be ported to every processor architecture where the virtual
+       machine will be deployed.
+
+   + FFI - Foreign Function Interface
+     + FFI allows loading native code shared libraries, which may be written
+       in C, C++, Rust, D (Dlang), exposing a C interface and C symbols.
+
+   + Native Extension API 
+     + A plugin system that allows loading libraries provided as
+       shared libraries (*.so - files on Linux, BSD; *.dylib on MacOSX
+       or *.dll on Windows), written in C, C++, Rust or any other
+       language that compiles to native code, conforming to an
+       expected C interface. Example: Java's JNI that allows loading
+       Java Libraries written in C or C++ that conforms to the JNI API
+       by using JNI SDK - Software Development Kit.
+
+   + Choice and implementation of garbage collector algorithm 
+
+   + [[https://en.wikipedia.org/wiki/String_interning][String Interning]]
+
+   + [[https://arpitbhayani.me/blogs/constant-folding-python][Constant Folding]]
+
+   + [[https://compileroptimizations.com/category/constant_propagation.htm][Constant Propagation]]
+
+   + [[https://blogs.oracle.com/javamagazine/post/escape-analysis-in-the-hotspot-jit-compiler][Escape Analysis]]
+
+   + [[https://piotrduperas.com/posts/nan-boxing/][NaN Boxing]]
+
+
  *Further Reading* 
 
   + [[https://tomassetti.me/guide-parsing-algorithms-terminology/][A Guide To Parsing: Algorithms And Terminology]]
@@ -6552,6 +6683,12 @@ The expression parser is able to parse the following syntax:
 
   + [[https://www.cs.cornell.edu/courses/cs211/2006sp/Sections/S3/grammars.html][CS211 - Gramamr and Parsing - Cornell]]
 
+  + [[http://trevorjim.com/c-and-cplusplus-are-not-context-free/][C and C++ are not context free]]
+
+  + [[https://eli.thegreenplace.net/2011/05/02/the-context-sensitivity-of-cs-grammar-revisited][The context sensitivity of C’s grammar, revisited]]
+
+  + [[https://eli.thegreenplace.net/2007/11/24/the-context-sensitivity-of-cs-grammar/][The context sensitivity of C's grammar]]
+
   + [[https://mortoray.com/2012/07/20/why-i-dont-use-a-parser-generator/][Why I don’t use a Parser Generator – Musing Mortoray]]
 
   + [[https://tomassetti.me/antlr-mega-tutorial/][The ANTLR Mega Tutorial]] - tomassetti.net
@@ -6566,6 +6703,20 @@ The expression parser is able to parse the following syntax:
     + Collection of ANTLR-EBNF grammars for several programming
       languages and markup languages including, Fortran 77, GraphQL,
       Java, Kotlin, Lua, JSON - JavaScript Object Notation, html.
+
+  + [[https://blog.adamant-lang.org/2019/operator-precedence/][Operator Precedence: We can do better]]
+
+  + [[https://wiki.c2.com/?OperatorPrecedenceConsideredHarmful][Operator Precedence Considered Harmful]]
+
+  + [[http://lambda-the-ultimate.org/node/2943][Languages without operator precedence]]
+
+  + [[https://www.jsoftware.com/papers/APLOperators.htm][The Role of Operators in APL]] - Kenneth E. Iverson
+    + Note: APL, just like Smalltalk programming language, does not
+      have operator precedence, all operators have the same precedence
+      level. In order to specify a particular order of evaluation, the
+      user must use parentheis.
+
+  + [[https://wiki.c2.com/?SmalltalkMessageRules][Smalltalk Message Rules]]
 
   + [[https://en.wikipedia.org/wiki/Operator_associativity][Operator associativity]]
 
@@ -6587,6 +6738,14 @@ The expression parser is able to parse the following syntax:
 
   + [[https://www.scattered-thoughts.net/writing/better-operator-precedence/][Better operator precedence]]
 
+  + https://en.wikipedia.org/wiki/Null_coalescing_operator
+
+  + [[https://kotlin-quick-reference.com/156-R-elvis-operator.html][Kotlin - The Elvis Operator (?:) - null coalescing operator]]
+
+  + [[https://kotlinlang.org/docs/null-safety.html][Kotlin - Null Safety]]
+
+  + [[https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/operators/null-coalescing-operator][Null coalescing operators - ?? and ??= operators (C# reference)]]
+
   + [[https://tomassetti.me/domain-specific-languages/][The complete guide to (external) Domain Specific Languages - Strumenta]]
 
   + [[https://en.wikipedia.org/wiki/Turing_completeness][Turing completeness - Wikipedia]]
@@ -6602,9 +6761,28 @@ The expression parser is able to parse the following syntax:
   + [[https://www.martinfowler.com/dslCatalog/][DSL Patterns]] - Martin Fowler 
 
   + https://craftinginterpreters.com
-    + => Online book about how to implement interpreter in C programming language. 
+    + => Online book about how to implement interpreter in C programming language.
+
+  + [[https://rust-hosted-langs.github.io/book/chapter-interp-vm-impl.html][Writing Interpreters in Rust: a Guide]]
+    + => Online book about how to implement interpreter and bytecode
+      virtual machines using Rust (better memory-safety). 
+
+  + https://craftinginterpreters.com/optimization.html
+
+  + [[https://docs.oracle.com/javase/specs/jvms/se14/html/jvms-2.html][Chapter 2. The Structure of the Java Virtual Machine]]
+
+  + [[https://www.slideshare.net/nwind/virtual-machine-and-javascript-engine][Virtual machine and javascript engine]]
+
+  + [[https://jmmv.dev/2022/11/endbasic-bytecode.html][From AST to bytecode execution in EndBASIC]]
+
+  + [[https://www.pypy.org/posts/2022/07/toy-optimizer.html][Implementing a Toy Optimizer | PyPy]]
+
+  + [[https://v8.dev/blog/pointer-compression][Pointer Compression in V8 · V8]] (JavaScript Engine used by Chrome browser variants, NodeJS and Deno runtime)
+
+  + [[https://v8.dev/blog/oilpan-pointer-compression][Pointer compression in Oilpan]]
+
+  + [[https://bernsteinbear.com/blog/small-objects/][Small objects and pointer tagging | Max Bernstein]]
      
- 
 *** Code 
 
 All the sources are available at gist: 
