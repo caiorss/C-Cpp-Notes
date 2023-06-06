@@ -6,6 +6,111 @@
 * Embedded Scripting Languages 
 ** Overview 
 
+Embedded scripting languages, sometimes called extension languages,
+are programming languages available as self-contained software
+libraries and designed to be embedded in a host programming language,
+often a compiled statically typed language. Embedded scripting
+languages allow adding new features, modifying the behavior of a
+program at runtime without recompilation and source code
+modification. Since embedded scripting languages are available as
+libraries, the host language can inspect variables defined by a
+scripting language program and call functions defined in the scripting
+language for possibly allowing end-users to customize and configure
+the application. Functions, also called subroutines or procedure, or
+performance-intensive functions, that would not be suitable to
+implement in a scripting language, registered by the host language can
+also be called by the embedded scripting language.
+
+
+Embedded scripting is useful for a wide range of user-case, including,
+video games, interactivity, repl, configuration languages, sandboxing
+and DSL - domain-specific programming languages. In video game
+programming, languages such as Lua, Moonscript or GDScript (Godot game
+engine) allow non-programmers such as game designers or game modders
+to configure, extend and add new functionality to games written in C++
+at runtime without any recompilation and dealing with low level
+programming. These programming languages can also be useful for adding
+interactivity, faster iteration cycle and feedback. An example of this
+case is the beloved text editor Emacs that uses Elisp as its embedded
+scripting language. End-users can inspect, modify and customize Emacs
+behavior at runtime with instantaneous feedback by just evaluating
+Elisp functions or modifying variables at the scratch buffer or Elisp
+interactive REPL, the IELM repl. Another case where embedded scripting
+can be found is web browsers, that are usually written in C++ and use
+JavaScript, also known by the official name of ECMascript, and html
+(non-turing complete) as its embedded scripting languages. Html
+defines how the user interface look like and JavaScript modifies the
+browser behavior and the html interface at runtime allowing curious
+users to evaluate JavaScript, in the development tools console for
+inspecting and interacting with html DOM (Domain Object Model) objects
+with instantaneous feedback and synchronization between a modified DOM
+element and its graphical representation.
+
+
+ *Common API Functionalities*
+
+Some common API functionalities of a embedded scripting language API
+are evaluation of source code provided as string, file or input
+stream; ability to register functions of the host language and call
+them from the scripting language and possiblity insptecting variables
+defined in the scripting language. Another common feature is the
+ability to call functions defined in the scripting language from the
+host language. The following code block provide some examples about
+theses features.
+
+#+BEGIN_SRC cpp 
+    
+   Engine engine;
+
+   // Ability to evaluate source code at runtime 
+   value* result = engine.eval("10 * 3 - 5 / 100 * x3 + 2.51 * if(x > 0, 1/x, 0/0) ;")
+   if( result == nullptr){
+      printf("There was an error => shutdown the application.");
+      exit(-1);
+   } 
+   
+   printf(" [INFO] Result = %f ", result->to_float());
+  
+   // Interactive Python-like REPL 
+   for(;;){
+      std::string user_input = getline_from_console():
+      if(user_input == "quit" || user_input == "exit"){ break; }
+      result = engine.eval(line);
+      assert ( result == nullptr );
+      printf(" RESULT>> %s ", result->to_string().to_cstr());
+   }
+   
+   // ----  Ability to register functions of the host language -------//
+
+   value* udf_user_defined_function(size_t size, value* args) 
+   {
+        // .... ... do computations here... 
+        return result; 
+   }
+    
+   engine.add_function("user_defined_function, "&udf_user_defined_function);
+   
+   result = egine.eval(r"(
+          x = 10.2512; 
+          y = user_defined_function('hello', x);
+          z = x + y;
+          return z;
+    )";
+
+   // ------- Ability to call functions defined in the scripting language -------//
+
+   engine.eval(" def myfunc(x, y) = 3 * x + 5.1 * y; ")
+
+   FuncObject* = engine.getFunction("myfunc");
+   assert FuncObject != nullptr;
+
+   auto args = engine.make_args();
+   args->add_int(10);
+   args->add_float(20.0);
+   result = FuncObject->call(args);
+#+END_SRC
+
+
   *Reasonable Features of Embedded Scripting Languages*
 
 This section lsits some reasonable features that a language designed
@@ -938,7 +1043,7 @@ Running 'repl' subcommand for interactive shell.
 
 Lua (moon in Portuguese) is a ligthweight multi paradigm scripting
 language written in C. Due to Lua be available as small footprint
-libraryn this language is widely used as embedded scripting by many
+library, this language is widely used as embedded scripting by many
 applications for scripting and as configuration or data description
 language.
 
@@ -1086,6 +1191,10 @@ More at:
 
 
  *Lua scripting on Unreal Engine / game engine* 
+
+  * [[https://tylerneylon.com/a/learn-lua/][Learn Lua in 15 Minutes]]
+
+  * [[https://matt.blwt.io/post/lua-the-little-language-that-could/][Lua: The Little Language That Could]]
 
   * [[https://www.slideshare.net/Codemotion/roberto-de-ioris-scriptiamo-unreal-engine-con-lua-codemotion-rome-2019][Roberto De Ioris - Scriptiamo Unreal Engine con Lua - Codemotion Rome…]]
 
@@ -6637,14 +6746,15 @@ The expression parser is able to parse the following syntax:
        
    + Compilation to a standardized virtual machine
      + Rather than implementing its own bytecode virtual machine, a
-       programming language may use standardized bytecode virtual
-       machine runtimes that are not exposed to external use and not
-       likely to have breaking changes on every release. Some of these
-       virtual machines, that are a compilation target to many
-       programming languages, are: _JVM_ - Java Virtual Machine, used by
-       Jython (Python for JVM), Clojure and Groovy; _CRL_ -
-       Commong Language Runtime (.NET Virtual Machine), use by C#
-       (CSharp), F# (FSharp), IronPython; and _WASM_ - Web Assembly.  
+       programming language could use a standardized bytecode virtual
+       machine runtimes that are exposed to external use and not
+       likely to have breaking changes on every release since they are
+       regarded as public APIs and interfaces. Some of these virtual
+       machines, that are a compilation target of many programming
+       languages, are _JVM_ - Java Virtual Machine, used by Jython
+       (Python for JVM), Clojure and Groovy; _CRL_ - Commong Language
+       Runtime (.NET Virtual Machine), use by C# (CSharp), F#
+       (FSharp), IronPython; and _WASM_ - Web Assembly. 
 
    + [[https://en.wikipedia.org/wiki/Just-in-time_compilation][JIT - Just-In-Time compilation]] 
      + Compilation of bytecodes (virtual machine instructions) to
@@ -6668,6 +6778,8 @@ The expression parser is able to parse the following syntax:
        Java Libraries written in C or C++ that conforms to the JNI API
        by using JNI SDK - Software Development Kit.
 
+   + Hidden Class Optimization used in JavaScript V8 engine => See: [[https://richardartoul.github.io/jekyll/update/2015/04/26/hidden-classes.html][richardartoul - hidden class]]
+
    + Choice and implementation of garbage collector algorithm 
 
    + [[https://en.wikipedia.org/wiki/String_interning][String Interning]]
@@ -6683,7 +6795,11 @@ The expression parser is able to parse the following syntax:
 
  *Further Reading* 
 
+Parsing:
+
   + [[https://tomassetti.me/guide-parsing-algorithms-terminology/][A Guide To Parsing: Algorithms And Terminology]]
+    
+  + [[https://www.oilshell.org/blog/2017/02/11.html][From AST to Lossless Syntax Tree]]
     
   + [[https://en.wikipedia.org/wiki/Context-free_grammar][Context-free grammar - wikipedia]]
     
@@ -6735,9 +6851,61 @@ The expression parser is able to parse the following syntax:
       languages and markup languages including, Fortran 77, GraphQL,
       Java, Kotlin, Lua, JSON - JavaScript Object Notation, html.
 
+
+    
+Semantics:
+
+  + [[https://en.m.wikipedia.org/wiki/Evaluation_strategy][Evaluation strategy]]
+
+  + [[https://en.wikipedia.org/wiki/Eval][eval - programming languages]]
+
+  + https://wiki.c2.com/?CallByName
+
+  + [[https://en.wikipedia.org/wiki/Thunk][Thunk]]
+
+  + [[https://en.m.wikipedia.org/wiki/De_Bruijn_notation][De Bruijn notation]]
+
+  + [[https://eecs390.github.io/notes/data.html][Functional Data Abstraction]]
+
+  + [[https://en.wikipedia.org/wiki/Halting_problem][Halting problem]]
+
+  + [[https://bguppl.github.io/interpreters/class_material/2.5OperationalSemantics.html][Operational Semantics | Principles of Programming Languages]]
+
+  + [[https://en.wikibooks.org/wiki/Introduction_to_Programming_Languages/Evaluation_Strategies][Introduction to Programming Languages/Evaluation Strategies]]
+
+  + [[https://en.wikipedia.org/wiki/TLA%252B][TLA+ - Formal Specification Language]]
+
+  + [[https://en.wikipedia.org/wiki/Formal_specification][Formal Specification]]
+
+  + [[https://en.wikipedia.org/wiki/Turing_completeness][Turing completeness - Wikipedia]]
+
+  + [[https://increment.com/programming-languages/turing-incomplete-advantages/][It doesn’t have to be Turing complete to be useful – Increment: Programming Languages]]
+
+  + [[https://www.infoq.com/articles/excel-lambda-turing-complete/][The Excel Formula Language Is Now Turing-Complete]]
+
+  + [[https://tomassetti.me/domain-specific-languages/][The complete guide to (external) Domain Specific Languages - Strumenta]]
+
+  + [[https://en.m.wikipedia.org/wiki/Abstract_semantic_graph][Abstract semantic graph]]
+
+  + [[https://www.informit.com/articles/article.aspx?p=25914][Common Object Operations in .NET | Object Equality and Identity]]
+
+  + [[https://developer.mozilla.org/en-US/docs/Web/JavaScript/Equality_comparisons_and_sameness][Equality comparisons and sameness - JavaScript | MDN]]
+
+  + [[https://en.m.wikipedia.org/wiki/Computability][Computability and models of computation]]
+
+  + [[https://tratt.net/laurie/blog/2023/why_arent_programming_language_specifications_comprehensive.html][Laurence Tratt: Why Aren't Programming Language Specifications Comprehensive?]]
+
+
+
+Operator Precedence:
+
+  + [[https://en.wikipedia.org/wiki/Polish_notation][Polish notation]]
+
   + [[https://blog.adamant-lang.org/2019/operator-precedence/][Operator Precedence: We can do better]]
 
   + [[https://wiki.c2.com/?OperatorPrecedenceConsideredHarmful][Operator Precedence Considered Harmful]]
+
+  + [[https://web.archive.org/web/20190804031555/https://www.nytimes.com/2019/08/02/science/math-equation-pedmas-bemdas-bedmas.html][The Math Equation That Tried to Stump the Internet - The New York Times]]
 
   + [[http://lambda-the-ultimate.org/node/2943][Languages without operator precedence]]
 
@@ -6777,13 +6945,20 @@ The expression parser is able to parse the following syntax:
 
   + [[https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/operators/null-coalescing-operator][Null coalescing operators - ?? and ??= operators (C# reference)]]
 
-  + [[https://tomassetti.me/domain-specific-languages/][The complete guide to (external) Domain Specific Languages - Strumenta]]
 
-  + [[https://en.wikipedia.org/wiki/Turing_completeness][Turing completeness - Wikipedia]]
+Non-Categorized:
 
+  + [[https://astexplorer.net/][AST explorer]]
+
+  + [[https://nextjournal.com/dubroy/ohm-parsing-made-easy][Ohm: Parsing Made Easy - Nextjournal]]  => JavaScript parser
+    library, but it is useful for prototyping parsers and grammars for
+    custom/bespoke DSL - Domain Specific Programming languages.
+    
   + [[https://www.freecodecamp.org/news/programming-naming-conventions-explained/][Programming Naming Conventions – Camel, Snake, Kebab, and Pascal Case Explained]]
 
   + [[https://khalilstemmler.com/blogs/camel-case-snake-case-pascal-case/][Camel Case vs. Snake Case vs. Pascal Case — Naming Conventions]]
+
+  + [[https://github.com/DSLsofMath/DSLsofMath][GitHub - DSLsofMath/DSLsofMath: Domain-Specific Languages of Mathematics]]
 
   + [[http://mathscitech.org/articles/pol][Forth, Lisp, & Ruby: languages that make it easy to write your own domain specific language (DSL)]]
 
@@ -6794,10 +6969,6 @@ The expression parser is able to parse the following syntax:
   + [[https://el-tramo.be/blog/waforth/][A Dynamic Forth Compiler for WebAssembly | mko.re]]
 
   + [[https://ayazhafiz.com/articles/23/a-lambda-calculus-with-coroutines-and-heapless-closures#source-language][A Lambda Calculus With Coroutines and Heapless, Directly-Called Closures]]
-
-  + [[https://increment.com/programming-languages/turing-incomplete-advantages/][It doesn’t have to be Turing complete to be useful – Increment: Programming Languages]]
-
-  + [[https://www.infoq.com/articles/excel-lambda-turing-complete/][The Excel Formula Language Is Now Turing-Complete]]
 
   + [[https://blog.regehr.org/archives/169][Why Take a Compiler Course? – Embedded in Academia]]
 
@@ -6874,6 +7045,25 @@ The expression parser is able to parse the following syntax:
   + [[https://elixir-lang.org/getting-started/binaries-strings-and-char-lists.html#bitstrings][Binaries, strings, and charlists - The Elixir programming language]]
 
   + [[https://llsoftsec.github.io/llsoftsecbook/][Low-Level Software Security for Compiler Developers]]
+
+  + [[https://softwareengineering.stackexchange.com/questions/387526/how-can-one-interpret-an-abstract-syntax-tree-without-recursion][data structures - How can one interpret an Abstract Syntax Tree without recursion?]]
+
+  + [[https://softwareengineering.stackexchange.com/questions/185406/what-is-the-purpose-of-nan-boxing][design patterns - What is the purpose of NaN boxing? - Software Engineering Stack Exchange]]
+
+  + [[https://ppkwok.blogspot.com/2012/11/java-cafe-1-never-write-nan-nan_24.html][ppkwok: Java Cafe 1 : Never write NaN == NaN (they're not equal)]]
+
+  + [[https://github.com/byo-books/pretty_laughable_lang][GitHub - byo-books/pretty_laughable_lang]]
+    + An educational C-like toy programming language that compiles to x64 binary.
+
+  + [[https://github.com/AZHenley/teenytinycompiler][GitHub - AZHenley/teenytinycompiler: A small BASIC-to-C compiler written in Python.]]
+
+  + [[https://www.zhenghao.io/posts/javascript-memory][JavaScript memory model demystified]]
+
+  + http://c2.com/cgi/wiki?TransparentPersistence
+
+  + [[http://lambda-the-ultimate.org/node/526][Transparent Persistence | Lambda the Ultimate]]
+
+
      
 *** Code 
 
