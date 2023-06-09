@@ -6083,6 +6083,837 @@ Read file _gui-dsl.lisp_:
   (  button :label "Submit" :id "btn-submit" :class "my-style-button" :onclick (  fn (  event ) (  display "Button was clicked" ) ) )
 #+END_SRC
 
+*** Dotted list parser 
+
+In traditional Scheme and Lisp implementations, lists are not
+reprsented as vectors or arrays, instead they are represented as
+linked list of cons, also called dotted pairs cells. Each cons cell
+has two parts.  The first part _car_ points to another s-expression,
+that either can be an atomic element or other cons cell. The second
+part of a dotted pair, cons can point to another dotted pair, an empty
+list or an atomic element. If the cons of the final dotted pair of a
+list points to an empty list (nil in common lisp), the list is said to
+be a _proper list_. If the dotted pair points to an atomic element, the
+list is said to be an _improper list._
+
+
+The terms car, cdr and cons, come from the following abbreviations:
+
+  + car - comes from 'Contents of the Address part of the Register'
+
+  + cdr - comes from 'Contents of the Decrement part of the Register' 
+    
+  + cons -  abbreviation of the word 'construct'
+
+A single dotted pair (a . b) denoting an association of two atoms
+'a' and 'b' can be represented with the following diagram.
+
+#+BEGIN_SRC 
+   (a . b) or (cons a b)
+
+   +-----+-----+     
+   | car | cdr | ---> b
+   +-----+-----+     
+      |              
+     \ /             
+      a              
+#+END_SRC
+
+According to this dotted-pairs or cons-cell linked lista approach, a
+list (a b c) is represented as:
+
+#+BEGIN_SRC 
+   representation 1: (cons a (cons b (cons c nil)))
+   representation 2: (a . (b . (c . nil)))
+
+   +-----+-----+     +-----+-----+     +-----+-----+
+   | car | cdr | --->| car | cdr | --->| car | cdr |---> NIL 
+   +-----+-----+     +-----+-----|     +-----+-----+     => Empty list in Scheme '())
+      |                 |                 |              => nil (null pointer) in Common Lisp
+     \ /               \ /               \ /
+      a                 b                 c
+ 
+#+END_SRC
+
+A proper list, such as (a b c d), is terminated in nil as shown in the
+following diagram:
+
+#+BEGIN_SRC text 
+   cons(a, cons(b, cons(c, cons(d, nil))) 
+   (a . (b . (c . (d . nil))))
+#+END_SRC
+
+An improper list, such as (a b . c), is terminated in a non nil or non
+empty-list atom. The next diagram show how this list is represented in
+memory.
+
+#+BEGIN_SRC text 
+   cons(a, cons(b, c))
+   (a . (b . c))
+   
+   +-----+-----+     +-----+-----+     
+   | car | cdr | --->| car | cdr | ---> c
+   +-----+-----+     +-----+-----|     
+      |                 |              
+     \ /               \ /             
+      a                 b              
+
+#+END_SRC
+
+The EBNF grammar of this dotted-pairs linked list can be specified as follow:
+
+#+BEGIN_SRC text 
+   sexp := atom | pair | list 
+   pair := "(" sexp "." sexp ")"
+   list := "(" sexp* ")"
+   atom := NUMBER 
+         | SYMBOL 
+         | STRING 
+         | BOOLEAN 
+         | SYMBOL 
+         | NULL 
+#+END_SRC
+
+The AST can be represnted using OCaml algebraic data type notation as:
+
+#+BEGIN_SRC cpp 
+   type sexp = num  of int          // number literal 
+             | sym of string        // symbol, identifier or keyword
+             | str  of string       // string literal between quotes ""
+             | bool of boolean      // boolean literak #t or #f 
+             | nil                  // represents null value 
+             | cons of sexp * sexp  // cons cell => It can represent a null-terminated 
+#+END_SRC
+
+The previous grammar can be parsed using this pascal-like pseudocode:
+
+#+BEGIN_SRC pascal 
+    //                Token Types                     //
+    //------------------------------------------------//
+    // Delimiters 
+    T_LPAR "("  // left parenthesis 
+    T_RPAR ")"  // right parenthesis
+    T_DOT  "."  // Dot - found in dotted pair '(a . b)
+    // Literal token types (terminal elements of grammar)
+    T_NUM       // number 
+    T_STR       // string literal "something else"
+    T_SYM       // symbol         'my-symbol
+    T_NIL       // nil => null element and empty list 
+    T_BOOL      // boolean #t (true) or #f (false)
+    // Sentinel Token Types 
+    T_EOF       // End Of File 
+    T_ERR       // Error 
+    T_NDF       // Non Defined - non initialized token 
+    
+  // -------------------------------------------------------// 
+
+
+   // Those tokens come from the tokenizer which skips blank characters, white spaces and new lines, and 
+   // breaks the source code into terminal elements of the grammar. 
+   tokens := [ Token(T_LPAR, "(", Token(T_NUM, "-1245.13e3"), Token(T_SYM, "x1")
+             ,Token(T_STR, "hello world"), Token(T_NIL, "nil"), Token(T_BOOL, "#f")
+             ,Token(T_BOOL, "#t"), Token(T_DOT, "."), Token(T_RPAR, ")") 
+            ] 
+  
+  // ------- Global Variables ==> They should be contained in an object.
+  // Current position of cursors           
+  index := 0 
+  // Current token  
+  current := Token(T_NDF, "")
+ 
+  // Advance to next token  
+  FUNCTION advance(): void  
+    IF index >= len(tokens) THEN 
+        RETURN  Token(T_EOF, "")
+    END
+    current := tokens[index]
+    index := index + 1 
+  END 
+  
+  // Check whether the current token type has the same type as the argument 
+  FUNCTION check(token_type): bool  
+    RETURN current.type == token_type 
+  END 
+ 
+  // Returns true if the current token matches the expected type and consume it.
+  FUNCTION match(token_type): bool  
+    IF current.type == token_type THEN 
+       advance()
+       RETURN true 
+    END 
+    RETURN false 
+  END 
+  
+  // If the current token does not match the expected type, raise an error. 
+  FUNCTION expect(token_type)
+    IF current.type == token_type 
+       advance() 
+    ELSE 
+       error("Expected token ", token_type, ", but given ", current)
+    END 
+  END 
+
+  // Return true if the current token is EOF (End Of File)  
+  FUNCTION is_eof(): bool 
+    RETURN current.type == EOF 
+  END 
+ 
+  //--------------------------------------------------------//
+
+  // Parse Lisp symbolic expression 
+  FUNCTION parse_sexp(): Ast 
+  BEGIN 
+     IF   token.is_atom() THEN  
+         RETURN parse_atom() 
+     ELSE IF match(T_LPAR) THEN 
+         RETURN parse_list() 
+     ELSE
+         error("Invalid token: ", token_string)
+     END   
+  END  
+
+
+  FUNCTION parse_atom(): Ast 
+  BEGIN 
+     ast := null  
+     IF      check(TOKEN_NUM)  THEN ast := AstInt(parse_num(lexeme)) END 
+     ELSE IF check(TOKEN_STR)  THEN ast := AstStr(lexeme) END 
+     ELSE IF check(TOKEN_SYM)  THEN ast := AstSym(lexeme) END 
+     ELSE IF check(TOKEN_NULL) THEN ast := AstNil()       END 
+     // If this line runs, it means that there is a bug.
+     ELSE 
+        error("parse_atom() => invalid token: ", token_string)
+     END 
+     // Advance token 
+     advance() 
+     RETURN ast 
+  END 
+  
+  FUNCTION parse_list(): Ast 
+     IF match(T_RPAR) THEN 
+        RETURN AstNil()
+     ELSE IF match(T_DOT) THEN 
+        IF match(T_RPAR) THEN 
+           error("Error: ill-formed dotted list.")
+        END
+        element := parse_sexp()
+        expect(T_RPAR)  
+        RETURN element 
+     ELSE iF match(T_EOF)  THEN 
+        error("Expected right parenthesis")
+     END  
+     head := parse_sexp()
+     tail := pase_list()
+     pair := cons(head, tail)   
+     RETURN pair 
+  END  
+
+  
+  //---------- Program entry point - main() --------//
+  // 
+  FUNCTION main(): void 
+     // Lexical analysis, break text/source into tokens
+     tokens := tokenize(source_code)
+     // Initialize parser 
+     advance()
+     // parser AST 
+     ast    := parse_sexp()
+     // Display result
+     print(" Lisp AST: ", ast)
+  END 
+
+#+END_SRC
+
+The next code is an executable implementation of the presented parsing
+algorithm implemented in Python, but that can be easily translated to
+any other programming language.
+
+File: _sexp_parser1.py_
+
+#+BEGIN_SRC python
+from typing import Any, Callable, Dict, NamedTuple, Optional, List, Tuple
+
+
+#  ============= >>>> Token types <<<<===================
+# --- Literals -------------------------------------------------
+T_INT   = "T_INT"  # Integer:  1002 -245  9025
+T_FLT   = "T_FLT"  # Floating point number: -10.2522 9.25221 .0252e3 102.5E3
+T_STR   = "T_STR"  # String literal: "world"
+T_SYM   = "T_SYM"  # Symbol: 'hello 
+T_NIL   = "T_NIL"  # Nil element or end of list 
+T_BOOL  = "T_BOOL" # Boolean: #f or #t 
+# --- Delimiters -----------------------------------------------
+T_LPAR  = "T_LPAR" # left parenthesis 
+T_RPAR  = "T_RPAR" # right parenthesis 
+T_DOT   = "T_DOT"  # dot '.'
+T_QUOTE = "T_QUOTE" # quote (')
+# --- Sentinel tokens ---------------------------------------
+T_NDF   = "T_NDF"  # Non defined, non initialized sentinel token 
+T_EOF   = "T_EOF"  # End of file sentinel token 
+
+
+class Token(NamedTuple):
+    type:   str  # Token type 
+    text:   str  # Token text, also known as lexeme 
+    pos:    int  # Token position 
+    col:    int  # Token column - starts with 1 
+    lin:    int  # Token line  - starts with 1 
+
+TOKEN_EOF = Token(T_EOF, "", 0, 0, 0)
+NULLCHAR = '\0'
+
+class Tokenizer:
+
+    def __init__(self, source: str) -> None:
+        # Source code to be tokenized
+        self._source = source
+        # Current position of cursor 
+        self._pos = 0 
+        # Current line of cursor 
+        self._lin = 1 
+        # Current column of cursor 
+        self._col = 1
+        # Position of first token character  
+        self._token_pos = 0 
+        # Column of first token character 
+        self._token_col = 1 
+        # Line of first token chracter 
+        self._token_lin = 1 
+        # Current character 
+        self._chr = ''
+        # Current token 
+        self.advance()
+
+    def advance(self):
+        if self._pos >= len(self._source):
+            self._chr = '\0'
+            return 
+        self._chr = self._source[self._pos]
+        self._col += 1
+        if self._chr == '\n':
+            self._lin += 1
+            self._col = 1
+        self._pos += 1
+
+    def is_eof(self):
+        """Return true if character is end of input"""
+        return self._chr == NULLCHAR
+
+    def has_next(self) -> bool:
+        """Return true if tokenizer has next token"""
+        return not self.is_eof()
+
+    def is_space(self):
+        """Return true if current character is space or blank character. """
+        return self._chr.isspace()
+
+    def is_digit(self):
+        """Return true if current character is digit."""
+        return self._chr.isdigit()
+
+    def is_delimiter(self):
+        return self._chr in ["(", ")", ".", "'"]
+
+    def check(self, chr: str):
+        return self._chr == chr 
+
+    def peek(self):
+        """Return current character"""
+        return self._chr
+
+    def lookahead(self, n: int = 1):
+        """Returns next character in the stream without consuming it"""
+        if self._pos + n >= len(self._source):
+            return NULLCHAR
+        return self._source[self._pos + n - 1]
+
+    def expect(self, chr: str):
+        if self._chr  == chr:
+            self.advance()
+            return 
+        raise RuntimeError(f"Expected character {chr}, but given {self._chr}.")
+    
+    def match(self, chr: str):
+        if self._chr == chr: 
+            self.advance()
+            return True 
+        return False
+
+    def next(self) -> Token:
+        """Return next token"""
+        if self.is_eof(): return self._token(T_EOF, "")
+        # Skip whitespace 
+        self._skip_whitespace()
+        self.set_token_position()
+        if   self.match("("):  return self._token(T_LPAR, "(")
+        elif self.match(")"):  return self._token(T_RPAR, ")")
+        elif self.match("."):  return self._token(T_DOT, ".")
+        elif self.match("'"):  return self._token(T_QUOTE, "'")
+        elif self.check('-') and self.lookahead().isdigit(): 
+            return self._next_number()
+        elif self.is_digit():  return self._next_number()
+        elif self.check("\""): return self._next_string()
+        else:                  return self._next_symbol_or_bool()
+
+    def tokens(self) -> List[Token]:
+        lst = []
+        while not self.is_eof():
+            t = self.next()
+            if t.type == T_EOF: break
+            lst.append(t)
+        return lst
+
+    def set_token_position(self):
+        """Store position of beginning of token until this function is called again."""
+        self._token_pos = self._pos - 1
+        self._token_col = self._col - 1
+        self._token_lin = self._lin
+
+    def _skip_whitespace(self):
+        while self.is_space() and not self.is_eof(): 
+            self.advance()
+
+    def _token(self, type: str, lexeme: str) -> Token:
+        return Token(type, lexeme
+                    ,self._token_pos
+                    ,self._token_col
+                    ,self._token_lin)
+
+    def _next_symbol_or_bool(self) -> Token:
+        lexeme = ""
+        self.set_token_position()
+        while not self.is_eof() and not self.is_space() and not self.is_delimiter():
+            lexeme += self.peek()
+            self.advance()
+        if lexeme == "": 
+            return self._token(T_EOF, "")
+        if lexeme == "#t" or lexeme == "#f": 
+            return self._token(T_BOOL, lexeme)
+        return self._token(T_SYM, lexeme)
+
+    def _next_number(self) -> Token:
+        lexeme = ""
+        self.set_token_position()
+        # In grammars where '-' negative sign is not part of literal
+        # remove the next line 
+        if self.match('-'): lexeme += "-"
+        if not self.check('.'): lexeme += self._next_integer() 
+        if not self.check('.') and not self.check('e') and not self.check('E'):
+            if self.peek().isalpha():
+                raise RuntimeError("Error: invalid number, cannot end with letter") 
+            # Identified integer type 
+            return self._token(T_INT, lexeme)
+        if self.match('.'): lexeme += "." + self._next_integer()
+        letter = self.peek()
+        if self.match('e') or self.match('E'):
+            lexeme += letter
+            if not self.match('-') and not self.is_digit():
+                raise RuntimeError("Error: invalid floating point number: " + lexeme)
+            if self.match('-'): lexeme += "-"
+            if not self.is_digit():
+                raise RuntimeError("Error: invalid floating point number. Expected digit, but got: " + lexeme)
+            lexeme += self._next_integer()
+        if self.peek().isalpha():
+            raise RuntimeError("Error: invalid number, it cannot end with letter") 
+        # Return a lexeme (string representation) of a floating point number literal 
+        return self._token(T_FLT, lexeme)
+
+    def _next_integer(self) -> str:
+        assert self.is_digit()
+        lexeme = ""
+        while self.is_digit() and not self.is_eof():
+            lexeme += self.peek()
+            self.advance()
+        return lexeme
+
+    def _next_string(self) -> Token:
+        self.expect('"')
+        lexeme = ""
+        self.set_token_position()
+        while not self.is_eof() and not self.check('"'):
+            if self.match('\\'):
+                  if self.match('n'): lexeme += "\n"; continue 
+                  if self.match('t'): lexeme += "\t"; continue 
+                  if self.match('v'): lexeme += "\v"; continue 
+                  if self.match('"'): lexeme += "\""; continue 
+                  if self.match('\\'): lexeme += "\\"; continue
+                  raise RuntimeError("Tokenizer error, invalid escape character: '" + self._ch + "'")
+            lexeme += self.peek()
+            self.advance()
+        self.expect('"')
+        return self._token(T_STR, lexeme)
+
+
+EXPR_CONS = "EXPR_CONS"
+EXPR_NIL  = "EXPR_NIL"
+EXPR_BOOL = "EXPR_BOOL"
+EXPR_STR  = "EXPR_STR"
+EXPR_SYM  = "EXPR_SYM"
+EXPR_NUM  = "EXPR_NUM"
+EXPR_ERR  = "EXPR_ERR"
+
+class Expr:
+    """Reprsents a S-Expression symbolic expression LISP linked list."""
+    def to_repr(self) -> str:    return "<NOT IMPLEMENTED>"
+    def to_str(self)  -> str:    return "<NOT IMPLEMENTED>"
+    def type(self)    -> str:    return "<NOT IMPLEMENTED>"
+    def to_num(self)  -> float:  return 0.0
+    def is_atom(self) -> bool:   return False
+    def is_pair(self) -> bool:   return False
+    def is_nil(self)  -> bool:   return False
+    def is_num(self)  -> bool:   return False 
+    def is_sym(self)  -> bool:   return False 
+    def is_bool(self) -> bool:   return False
+    def is_str(self)  -> bool:   return False 
+    def is_err(sefl)  -> bool:   return False
+    def car(self)     -> 'Expr': raise RuntimeError("Not implemented")
+    def cdr(self)     -> 'Expr': raise RuntimeError("Not implemented")
+    def __repr__(self) -> str: return self.to_repr()
+
+class ExprNil(Expr):
+    """This AST node represents an empty list or null element."""
+    def is_atom(self) -> bool: return True
+    def is_nil(self)  -> bool: return True
+    def to_repr(self) -> str: return "nil"
+    def to_str(self)  -> str: return "nil"
+    def type(self)    -> str: return EXPR_NIL 
+
+class ExprCons(Expr):
+    """AST node represents a cons cell."""
+    def type(self)    -> str: return EXPR_CONS
+    def is_pair(self) -> bool: return True
+    def __init__(self, car: Expr, cdr: Expr) -> None:
+        self._car = car 
+        self._cdr = cdr 
+    def car(self) -> 'Expr': return self._car 
+    def cdr(self) -> 'Expr': return self._cdr 
+    def to_repr(self) -> str:
+        head = self._car.to_repr()
+        tail = self._cdr.to_repr()
+        return f"cons({head}, {tail})"
+    def to_str(self) -> str:
+        return self.to_repr() 
+    def type(self)    -> str: return EXPR_CONS
+        
+class ExprSym(Expr):
+    """AST node represents a lisp symbol."""
+    def __init__(self, value: str): self._value = value 
+    def is_atom(self) -> bool: return True
+    def is_sym(self)  -> bool: return True
+    def to_repr(self): return "'" + self._value 
+    def to_str(self): return self._value 
+    def type(self)    -> str: return EXPR_SYM
+
+class ExprNum(Expr):
+    """AST node represents a lisp number."""
+    def __init__(self, value: int): self._value = value 
+    def is_atom(self) -> bool: return True
+    def is_sym(self)  -> bool: return True
+    def to_repr(self): return str(self._value)
+    def to_str(self): return str(self._value)
+    def to_num(self) -> float: return self._value 
+    def type(self)    -> str: return EXPR_NUM 
+
+
+class ExprStr(Expr):
+    """AST node represents a lisp symbol."""
+    def __init__(self, value: str): self._value = value 
+    def is_atom(self) -> bool: return True
+    def is_str(self)  -> bool: return True
+    def to_repr(self): return  '"' + self._value +  '"' 
+    def to_str(self): return self._value 
+    def type(self)    -> str: return EXPR_STR
+
+class ExprBool(Expr):
+    """AST node represents a lisp boolean value."""
+    def __init__(self, value: bool): self._value = value 
+    def is_atom(self) -> bool: return True
+    def is_bool(self) -> bool: return True
+    def to_repr(self): return  "#t" if self._value else "#f"
+    def to_str(self): return  "#t" if self._value else "#f"
+    def type(self)    -> str: return EXPR_BOOL
+
+class ExprErr(Expr):
+    """AST node represents a runtime error value (not an AST value)."""
+    def __init__(self, value: str): self._value = value 
+    def is_atom(self) -> bool: return True
+    def is_err(sefl)  -> bool: return True
+    def to_repr(self): return "err => " + self._value 
+    def to_str(self): return  self._value
+    def type(self)    -> str: return EXPR_ERR 
+
+
+class Parser:
+    def __init__(self, source: str) -> None:
+        self._source = source 
+        tok = Tokenizer(source)
+        self._tokens = tok.tokens() 
+        self._pos = 0 
+        self._current = Token(T_NDF, "", 0, 0, 0)
+        self.advance()
+
+    def peek(self):
+        return self._current
+
+    def lookahead(self, n: int = 1):
+        """Returns next character in the stream without consuming it"""
+        if self._pos + n >= len(self._tokens):
+            return Token(T_EOF, 0, 0, 0, 0)
+        return self._tokens[self._pos + n - 1]
+
+    def advance(self):
+        """Advance to next token"""
+        if self._pos >= len(self._tokens):
+            self._current = Token(T_EOF, 0, 0, 0, 0)
+            return 
+        self._current = self._tokens[self._pos]
+        self._pos += 1
+
+    def match(self, type: str):
+        """Returns true if the current token matches the expected type and consume it."""
+        if self._current.type == type: 
+            self.advance()
+            return True 
+        return False
+
+    def check(self, type: str):
+        """Returns true if the current token matches the expected type and consume it."""
+        return self._current == type 
+    
+    def expect(self, type: str):
+        """Consume current token if it matches the expected type. Otherwise raise an error."""
+        if self._current.type == type:
+            self.advance()
+            return 
+        raise RuntimeError(f"Expected token of type {type}, but given {self._current}.")
+
+    def is_eof(self):
+        """Return true if current token is T_EOF"""
+        return self._current.type == T_EOF
+
+    # ------- End of reusable parser code ---------------_#
+
+    def is_atom(self):
+        """Return true if current token is atom"""
+        return self.peek().type in [ T_BOOL, T_FLT, T_INT, T_SYM, T_NIL, T_STR ]
+
+    def parse_sexp(self) -> Expr:
+        if self.is_atom():        return self.parse_atom()
+        elif self.match(T_LPAR):  return self.parse_list()
+        # 'x is parsed as(quote x)
+        #  '(+ x 10) is parsed as (quote (+ x 10))
+        elif self.match(T_QUOTE): 
+            q = self.parse_sexp()
+            return ExprCons(ExprSym("quote"), ExprCons(q, ExprNil()))
+        else: raise RuntimeError("Invalid token: " + str(self.peek()))
+
+    def parse_atom(self) -> Expr:
+        lexeme = self.peek().text
+        if   self.match(T_INT):  return ExprNum(float(lexeme))
+        elif self.match(T_FLT):  return ExprNum(float(lexeme))
+        elif self.match(T_STR):  return ExprStr(lexeme)
+        elif self.match(T_SYM):  return ExprSym(lexeme)
+        elif self.match(T_BOOL): return ExprBool(lexeme == "#t")
+        else: 
+            raise RuntimeError("Invalid token: " + lexeme)
+
+    def parse_list(self) -> Expr:
+        # self.expect(T_LPAR)
+        if self.match(T_RPAR):
+            return ExprNil()
+        elif self.match(T_DOT):
+            if self.match(T_RPAR):
+                raise RuntimeError("Ill-formed dotted list.")
+            elem = self.parse_sexp()
+            self.expect(T_RPAR)
+            return elem 
+        elif self.match(T_EOF):
+            raise RuntimeError("Expected right parenthesis")
+        car = self.parse_sexp()
+        cdr = self.parse_list()
+        ast = ExprCons(car, cdr)
+        return ast 
+
+
+def sexp_parse(source: str) -> Expr:
+    p = Parser(source)
+    return p.parse_sexp()
+
+
+def sexp_equal(lhs: Expr, rhs: Expr) -> bool:
+    """Determine whether two S-Expressions are equal"""
+    if lhs.type() != rhs.type():
+        return False
+    elif lhs.is_atom() and rhs.is_atom():
+        if   lhs.is_num():   return lhs.to_num() == rhs.to_num()
+        elif lhs.is_str():   return lhs.to_str() == rhs.to_str()
+        elif lhs.is_sym():   return lhs.to_str() == rhs.to_str()
+        elif lhs.is_bool():  return lhs._value == rhs._value 
+        elif lhs.is_nil():   return True
+        else: raise RuntimeError("Error: edge case => code has bugs. ")
+    else:
+        t = sexp_equal(lhs.car(), rhs.car())
+        if not t: return False
+        k = sexp_equal(lhs.cdr(), rhs.cdr())
+        return k 
+
+def sexp_to_str(sexp: Expr) -> Expr:
+    """Pretty printer of S-Expression"""
+    ## import pdb; pdb.set_trace()
+    if sexp.is_str(): 
+        return sexp.to_repr()
+    elif sexp.is_atom(): 
+        return sexp.to_str()
+    elif sexp.is_pair():
+        s = sexp 
+        text = "(" 
+        while s.is_pair():
+            head = s.car()
+            s = s.cdr()
+            text = text + " " + sexp_to_str(head) 
+        if s.is_nil():
+            text = text + ")"
+        elif s.is_atom():
+            text = text + " . " + s.to_str() + " )"
+        else:
+            RuntimeError("Edge case => this branch is impossible to happen.")
+        return text 
+    else:
+        raise RuntimeError("Not implemented for this Ast element: " + sexp)
+
+
+
+def test_expr1():
+    """unit test of SEXP parser."""
+    src =  ' ( 9.214 "world" a . end )' 
+    expected = ExprCons(ExprNum(9.214), 
+                    ExprCons(ExprStr("world"), 
+                      ExprCons(  ExprSym('a'), ExprSym("end"))) )
+    ast = sexp_parse(src)
+    assert sexp_equal(ast, expected)
+
+def test_expr2():
+    """Test in-meory AST representation of sexp"""
+    src = '( "hello world" (100 a . b) x1  z )'
+    expected = ExprCons( ExprStr("hello world")
+                          , ExprCons(  ExprCons(ExprNum(100.0), ExprCons(ExprSym("a"), ExprSym("b")))
+                            , ExprCons(ExprSym("x1")
+                               , ExprCons(ExprSym("z"),  ExprNil())))
+                          )
+    ast = sexp_parse(src)
+    assert sexp_equal(ast, expected)
+
+def test_expr3():
+    """Test  quote quoted expression"""
+    src = ' \'(+ x y z)'
+    lst =  ExprCons( ExprSym("+") , ExprCons(ExprSym("x"), ExprCons(ExprSym("y"), ExprCons( ExprSym("z"), ExprNil()))))
+    expected = ExprCons( ExprSym("quote"), ExprCons(lst, ExprNil()))
+    ast = sexp_parse(src)
+    assert sexp_equal(ast, expected)
+
+def test_expr4():
+    """Test  quoted expression"""
+    src = ' \'(+ x y z)'
+    expected =  "cons('quote, cons(cons('+, cons('x, cons('y, cons('z, nil)))), nil))"  
+    ast = sexp_parse(src)
+    assert str(ast) == expected
+
+def test_exrp5():
+    """Test string representation of sexp"""
+    src = ' \'(+ x y z)'
+    s = sexp_parse(src)
+    # Pretty print representation of SEXP
+    p = sexp_to_str(s)
+    expected = '( quote ( + x y z))' 
+    assert p == expected 
+
+def test_expr6():
+    src = """ (fn  myfunction(x y . lst)
+            (print x)
+            (print y)
+            (map print lst)
+           )
+     """
+    expected = '( fn myfunction ( x y . lst ) ( print x) ( print y) ( map print lst))' 
+    ast = sexp_parse(src)
+    # Pretty print representation of SEXP
+    p = sexp_to_str(ast)
+    assert p== expected
+#+END_SRC
+
+Run unit tests:
+
+#+BEGIN_SRC python 
+   $  pytest -q -v -rA sexp_parser1.py
+  ============================================== test session starts ==============================================
+  platform linux -- Python 3.8.10, pytest-7.3.1, pluggy-1.0.0
+  rootdir: /home/user/formula-parser
+  plugins: anyio-3.5.0, xonsh-0.13.3
+  collected 6 items                                                                                               
+  
+  sexp_parser1.py ......                                                                                    [100%]
+  
+  ==================================================== PASSES =====================================================
+  ============================================ short test summary info ============================================
+  PASSED sexp_parser1.py::test_expr1
+  PASSED sexp_parser1.py::test_expr2
+  PASSED sexp_parser1.py::test_expr3
+  PASSED sexp_parser1.py::test_expr4
+  PASSED sexp_parser1.py::test_exrp5
+  PASSED sexp_parser1.py::test_expr6
+  =============================================== 6 passed in 0.04s ===============================================
+#+END_SRC
+
+Interact with the parser in the REPL:
+
+#+BEGIN_SRC python
+  $ python3 -i sexp_parser1.py 
+
+  src =  """ ( a  x->1  
+                  "My string literal"
+                  (m1 . w ) 
+                       (1.25 -9.251e3 0.255 nil)  
+                          z2->w .  object:method  )  """
+  
+  ast = sexp_parse(src)
+
+  >>> ast
+  cons('a, cons('x->1, cons("My string literal", cons(cons('m1, 'w), cons(cons(1.25, cons(-9251.0, cons(0.255, cons('nil, nil)))), cons('z2->w, 'object:method))))))
+
+  >>> ast.car()
+  'a
+
+  >>> ast.cdr()
+  cons('x->1, cons("My string literal", cons(cons('m1, 'w), cons(cons(1.25, cons(-9251.0, cons(0.255, cons('nil, nil)))), cons('z2->w, 'object:method)))))
+
+  >>> ast.cdr().cdr()
+  cons("My string literal", cons(cons('m1, 'w), cons(cons(1.25, cons(-9251.0, cons(0.255, cons('nil, nil)))), cons('z2->w, 'object:method))))
+
+  >>> ast.cdr().cdr().cdr()
+  cons(cons('m1, 'w), cons(cons(1.25, cons(-9251.0, cons(0.255, cons('nil, nil)))), cons('z2->w, 'object:method)))
+  
+  >>> sexp_to_str(ast)
+  '( a x->1 "My string literal" ( m1 . w ) ( 1.25 -9251.0 0.255 nil) z2->w . object:method )'
+ 
+  >>> sexp_to_str(ast.cdr())
+  '( x->1 "My string literal" ( m1 . w ) ( 1.25 -9251.0 0.255 nil) z2->w . object:method )'
+
+  >>> sexp_to_str(ast.cdr().cdr())
+  '( "My string literal" ( m1 . w ) ( 1.25 -9251.0 0.255 nil) z2->w . object:method )'
+
+  >>> sexp_to_str(ast.cdr().cdr().cdr())
+  '( ( m1 . w ) ( 1.25 -9251.0 0.255 nil) z2->w . object:method )'
+
+  >>> sexp_to_str(ast.cdr().cdr().cdr().car())
+  '( m1 . w )'
+
+  >>> sexp_to_str(ast.cdr().cdr().cdr().car().car())
+  'm1'
+
+  >>> sexp_to_str(ast.cdr().cdr().cdr().car().cdr())
+  'w'
+#+END_SRC
+
 *** Further Reading
 
  *Scheme and Lisp Introduction:*
@@ -6115,6 +6946,8 @@ Read file _gui-dsl.lisp_:
   + [[https://erikexplores.substack.com/p/what-makes-lisp-unique][What Makes LISP Unique? - by Erik Engheim - Erik Explores]]
 
   + Book: [[https://people.eecs.berkeley.edu/~bh/ss-toc2.html][Simply Scheme: Introducing Computer Science]] (1999)
+
+  + [[https://www.arxiv-vanity.com/papers/1505.07375/][The Mysteries of Lisp -- I: The Way to S-expression Lisp – arXiv Vanity]]
 
    
  *About how to implement Lisp-like dialects:*
