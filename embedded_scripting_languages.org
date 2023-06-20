@@ -7862,6 +7862,2556 @@ arithmetic expressions.
    :=  float division by zero
 #+END_SRC
 
+*** Interpreter for Kotlin - Java Platform 
+    
+There ara many lisp-like programming languages for the Java Platform
+and JVM, including Clojure, ABCL common lisp and Kawa Scheme. All
+those implementations compile to JVM bytecodes, instructions of Java
+Virtual Machine at runtime, but they don't work on Android, that uses
+Dalvik virtual machine, a different virtual machine than JVM. 
+
+This code is an incomplete Scheme-like embedded tree walking
+interpreter implemented in Kotlin language, that is able to compile to
+both JVM and Android Dalvik virtual machine. As a result, the code can
+be embedded in Java desktop application or android apps for faster
+experimentation and iteration since the interpreter allows instanting
+and calling Java objects at runtime without any recompilation. 
+
+File: _sexpr.kt_ (About: 2130 lines of code)
+
+#+BEGIN_SRC java 
+// Embedded lisp-like interpreter hosted on Kotlin/JVM (Java Virtual Machine)
+//
+// Compile this program with: 
+//  $ kotlinc sexpr.kt -include-runtime -d sexpr.ja 
+// 
+// Run this sample program with:
+//  $ java -jar sexpr.jar  
+//  $ rlrwrap java -jar sexpr.jar 
+//
+// ----------------------------------------------------------------------------
+
+typealias Func = (List<Ast>) -> Ast 
+
+enum class AstType {
+    INT, FLT, STR, SYM, KEY, OBJ, LST, ENV, BOOL, NIL
+    , VOID, ERR, FUNC_NATIVE, FUNC_UDF
+}
+
+// Lisp Ast - Abstract Syntax Tree and Runtime values  
+// This is equivalent to an AGDT - Algebraic Data Type
+sealed class  Ast {
+
+    open fun type():      AstType      { throw Exception("Not implemented for this type of AST node.") }
+    open fun toInt():     Int          { return 0   }
+    open fun toFlt():     Double       { return 0.0 }
+    open fun toBool():    Boolean      { throw Exception("Not valid for this type of AST node.")  }
+    open fun toStr():     String       { throw Exception("Not valid for this type of AST node.")  }
+    open fun toObj():     Object       { throw Exception("Not valid for this type of AST node.")  }
+    open fun nth(n: Int): Ast          { throw Exception("Not valid for this type of AST node. ") }
+    open fun nodes():     List<Ast>    { throw Exception("Not valid for this type of AST node. ") }
+    open fun size():      Int          { throw Exception("Not valid for this type of AST node.")}
+    open fun head():      Ast          { throw Exception("Not valid for this type of AST node. ")}
+    open fun tail():      List<Ast>    { throw Exception("Not valid for this type of AST node. ")}
+    open fun isAtom():     Boolean     { return false }
+    // Return true if object is callable, in other words, the 
+    // object is a primtive function (defined in the host language)
+    // or a UDF (User-Defined-Function) defined in the hosted language 
+    open fun isCallable(): Boolean     { return false }
+    // Return true if AST node is a runtime error 
+    open fun isErr():      Boolean     { return false }
+    // Return true is AST node is a symbol  
+    open fun isSym():      Boolean     { return false }
+    // Return true is AST node is a string literal 
+    open fun isStr():      Boolean     { return false }
+    // Return true if AST node is a keyword literal  
+    open fun isKey():      Boolean     { return false }
+    // Return true if AST node is a list 
+    open fun isList():     Boolean     { return false }
+    // Return true if AST node is a integer or floating point 
+    open fun isNum():      Boolean     { return false}
+    // Return true if AST node is a nil (null) object 
+    open fun isNil():      Boolean     { return false }
+    // Return true if AST node is void 
+    open fun isVoid():     Boolean     { return false }
+    // If true, then the runtime value represents a wrapped Java Object 
+    open fun isObj():      Boolean     { return false }
+    // Anything that is not false or nil is regarded  as true
+    // in if-else special forms (if <cond> <then> <else>)
+    open fun asBool():     Boolean   { return true }
+
+    // Null-element ASt - emtpy AST for initialializing variables of type AST
+    object AstVoid: Ast() { 
+        override fun isVoid(): Boolean { return true } 
+        override fun isAtom(): Boolean { return true }
+        override fun type():   AstType  { return AstType.VOID }
+    }
+
+    // Lisp integer literal 
+    data class AstInt(val value: Int): Ast(){
+        override fun toInt():  Int     { return value }
+        override fun toFlt():  Double  { return value.toDouble() }
+        override fun isNum():  Boolean { return true }
+        override fun isAtom(): Boolean { return true }
+        override fun type():   AstType  { return AstType.INT }
+    }
+    // Lisp floating point literal 
+    data class AstFlt(val value: Double): Ast(){
+        override fun toFlt(): Double  { return value }
+        override fun isNum(): Boolean { return true }
+        override fun isAtom(): Boolean { return true }
+        override fun toStr(): String { return value.toString() }
+        override fun type():   AstType  { return AstType.FLT }
+    }
+    // Lisp string literal 
+    data class AstStr(val value: String): Ast(){
+        override fun toStr():  String  { return value }
+        override fun isAtom(): Boolean { return true }
+        override fun isStr():  Boolean { return true }
+        override fun type():   AstType  { return AstType.STR }
+    }
+    // Lisp symbol literal  => 'hello-world, string->num  
+    data class AstSym(val value: String): Ast() {
+        override fun toStr(): String  { return value }
+        override fun isSym(): Boolean { return true }
+        override fun isAtom(): Boolean { return true }
+        override fun type():   AstType  { return AstType.SYM }
+    }
+    // Lisp keyworkd literal, example => :width, :size 
+    data class AstKey(val value: String): Ast() {
+        override fun toStr():  String  { return value }
+        override fun isAtom(): Boolean { return true }
+        override fun isKey():  Boolean { return true }
+        override fun type():   AstType  { return AstType.KEY }
+    }
+    // Lisp boolean value 
+    data class AstBool(val value: Boolean): Ast(){
+        override fun toBool(): Boolean  { return value } 
+        override fun asBool(): Boolean  { return value }
+        override fun isAtom(): Boolean { return true }
+        override fun toStr(): String { return if(value) "#t" else "#f" }
+        override fun type():   AstType  { return AstType.BOOL }
+    }
+    // Ast - indicates null or empty list 
+    object AstNil: Ast() {
+        override fun asBool(): Boolean { return false }
+        override fun isNil():  Boolean { return true }
+        override fun isAtom(): Boolean { return true }
+        override fun toStr():  String   { return "nil"} 
+        override fun type():   AstType  { return AstType.NIL }
+    }
+    // Lisp list 
+    data class AstLst(val value: List<Ast>): Ast() {
+        override fun nth(n: Int): Ast          { return value[n]   }
+        override fun size():      Int          { return value.size }
+        override fun nodes():     List<Ast>    { return value      } 
+        override fun head():      Ast          { return value[0] }
+        override fun tail():      List<Ast>    { return value.takeLast( value.size - 1 )}
+        override fun isList():    Boolean      { return true }
+        override fun type():      AstType      { return AstType.LST }
+    }
+
+    // ------ Intepreter Runtime Values ---------------------------//
+    // They don't represent AST nodes. They are the result of AST evaluation 
+    // by the interpreter.
+
+    // Runtime error 
+    data class AstErr(val value: String): Ast()
+    {
+        override fun toStr(): String  { return value }
+        override fun isErr(): Boolean { return true }
+        override fun type():  AstType { return AstType.ERR }
+    }
+
+    // Lisp environment contains bindings between variables and 
+    // runtime values  
+    class AstEnv(val parent: AstEnv? = null) : Ast()
+    {
+       public val env: MutableMap<String, Ast> = mutableMapOf<String, Ast>()
+       public var name: String = "" 
+
+       override fun type():  AstType { return AstType.ENV }
+
+       override fun isAtom(): Boolean { return true }
+
+       fun has(name: String): Boolean 
+       {
+           if( env.contains(name) ){ return true}
+           if( parent == null ){ return false }
+           val r = parent!!.has(name)
+           return r
+       }
+
+       fun set(name: String, value: Ast){ env.put(name, value) }
+
+       // Set only an existing binding
+       fun setExisting(name: String, value: Ast): Boolean
+       {
+           if( env.contains(name)  ){ 
+                env.put(name, value) 
+                return true 
+            }
+           else if( parent != null){
+              val b = parent!!.setExisting(name, value)  
+              return b
+           }
+           return false 
+       }
+
+        // Remove all elements from current environment
+       fun reset(){ env.clear() }
+
+       fun get(name: String): Ast?
+       {
+            // print(" [TRACE] (109) AstEnv.get() =>  name = ${name} =>  ${this}")
+            if(env.contains(name))  { return env!!.get(name) }
+            else if(parent == null) { return AstErr("Error: (line 113) unbound variable ${name}") }
+            val r =  parent!!.get(name)
+            // println(" [TRACE] (116) AstEnv.get() => ${name} = ${r}")
+            return r
+       }
+    }
+
+    data class AstFunc(val name: String, val func: Func): Ast()
+    {
+        override fun isCallable(): Boolean   { return true }
+        override fun isAtom(): Boolean { return true }
+        override fun type():  AstType { return AstType.FUNC_NATIVE }
+    }
+
+    // Represents a user-defined function 
+    data class AstFuncUDF( val name:   String
+                         , val args:   List<String>
+                         , val body:   List<Ast>   
+                         , var env:    AstEnv 
+                      ): Ast()
+    {
+        override fun isCallable(): Boolean   { return true }
+        override fun isAtom(): Boolean { return true }
+        override fun type():  AstType { return AstType.FUNC_UDF }
+    }
+
+    // This AST node represents a Java object 
+    data class AstObj(val value: Object): Ast()
+    {
+        override fun isObj():  Boolean { return true }
+        override fun isAtom(): Boolean { return true }
+        override fun toObj():  Object  { return value }
+        override fun type():   AstType { return AstType.OBJ }
+    }
+}
+
+enum class Type {
+      T_Flt  // Floating point number literal
+    , T_Int  // Integer 
+    , T_Str  // String literal 
+    , T_Sym  // Symbol literal `
+    , T_Key  // keyword literal 
+    , T_Nil  // Nil literal 
+    , T_Bool // Boolean literal 
+    , T_Quote // (')
+    , T_Lpar // '(' Left parenthesis 
+    , T_Rpar // ')' Right parenthesis 
+    , T_EOF  // Type EOF token 
+    , T_ERR  // Token error 
+    , T_EMPTY 
+
+}
+
+// Strings that matches the terminal element of a grammar 
+data class Token( val type: Type
+                , val text: String
+                , val pos:  Int
+                , val lin:  Int
+                , val col:  Int
+                )
+                {
+                    fun isErr(): Boolean { return type == Type.T_ERR }
+                    fun isEof(): Boolean { return type == Type.T_EOF }
+                }
+
+class Tokenizer(val source: String)
+{
+    // Null character constant (sentinel value)
+    val NULL_CHAR = 0.toChar()
+    val QUOTE_CHAR = 34.toChar() // '"' breaks the syntax highlight
+
+    // Initialize current character with NullChar
+    var ch: Char = NULL_CHAR 
+    // Current position 
+    var pos: Int = 0
+    // Current line 
+    var lin: Int = 1
+    // Current column 
+    var col: Int = 1 
+
+    private val TOKEN_EMPTY = Token(Type.T_EMPTY, "", 0, 0, 0)
+
+    init {
+        advance()
+    }
+
+    fun peek(): Char {  return ch }
+
+    fun lookahed(n: Int): Char {
+        if (pos + n >= source.length){ return NULL_CHAR }
+        return source[pos + n - 1]
+    }
+
+    fun isEof(): Boolean { return ch == NULL_CHAR }
+
+    fun match(c: Char): Boolean
+    {
+        if(c == ch){ 
+            advance() 
+            return true 
+        }
+        return false
+    }
+
+    fun check(c: Char): Boolean { return c == ch } 
+
+    fun expect(c: Char): Token 
+    {
+        if(c == ch){
+            advance()
+            return TOKEN_EMPTY
+        }
+        // throw Exception("Lexical error. Invalid character. Expected '${c}', but given '${ch}' ") 
+        return error("Lexical error. Invalid character. Expected '${c}', but given '${ch}' ") 
+    }
+
+    fun advance()
+    {
+        if (pos >= source.length) {
+            ch = 0.toChar()
+        } else {
+            ch = source[pos]
+            pos = pos +  1
+        } 
+    }
+
+    fun isSpace(): Boolean { return ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n' }
+
+    fun isDelimiter(): Boolean { return ch == ')' || ch == '(' || ch == '\'' 
+                                        || ch == '`' || ch == ',' || ch == '@' }
+
+    fun isDigit(): Boolean { return ch.isDigit() }
+
+    fun token(type: Type, lexeme: String): Token 
+    {
+        val tok = Token(type, lexeme, pos, lin, col)
+        return tok 
+    }
+
+    // Returns an error sentinel token. It is an alternative to exceptions.
+    fun error(message: String): Token 
+    {
+        val tok = token(Type.T_ERR, message)
+        return tok
+    }
+
+    fun tokens(): List<Token> 
+    {
+        val tokens = mutableListOf<Token>()
+        while( !isEof() ){
+            val t = next()
+            if(t.type == Type.T_EOF){ break }
+            tokens.add(t)
+        }
+        return tokens
+    }
+
+    fun next(): Token 
+    {
+        // Return sentinel token when at end of input 
+        if (isEof()) { return token(Type.T_EOF, "") }
+        while (isSpace() && !isEof()) { advance() }
+        assert( !isSpace() )
+        // Skip comment
+        if( match(';')){
+            while( !match('\n') && !this.isEof() ){  advance() }
+            return next()
+        }
+        if ( match('(') )  return token(Type.T_Lpar, "(")
+        if ( match(')') )  return token(Type.T_Rpar, ")")
+        if ( match('\'') ) return token(Type.T_Quote, "'")
+	    if ( check('-') && lookahed(1).isDigit() ){ return nextNumber() }
+        if ( isDigit() ) { return nextNumber() }
+        if ( check(QUOTE_CHAR) )  { return nextString()  }
+		return nextSymbolOrBool()
+        // throw Exception("edge case")
+    }
+
+    private fun nextSymbolOrBool(): Token
+    {
+        var lexeme = ""
+        while( !isEof() && !isSpace() && !isDelimiter() )
+        {
+            lexeme += peek()
+            advance()
+        }
+        if( lexeme == ""){ return token(Type.T_EOF, "") }
+        if( lexeme == "#t" || lexeme == "#f"){ return token(Type.T_Bool, lexeme)}
+        if( lexeme.startsWith(":") ){ return token(Type.T_Key, lexeme.drop(1)) }
+        return token(Type.T_Sym, lexeme)
+    }
+
+    private fun nextString(): Token
+    {
+        // println(" [TRACE] peek() = " + peek())
+        var err = expect(QUOTE_CHAR)
+        if(err.isErr()){ return err}
+        var lexeme = ""
+        while( !isEof() && !check(QUOTE_CHAR))
+        {
+            if( match('\\') ){
+                if( match('n') ){ lexeme += "\n"; continue }
+                if( match('t') ){ lexeme += "\t"; continue }
+                // if( match('v') ){ lexeme += "\v"; continue }
+                if( match('\\') ){ lexeme += "\\"; continue }
+                if( match(QUOTE_CHAR) ){ lexeme += "\""; continue }
+                //throw Exception("Tokenizer error, invalid escape character.")
+                return error("Tokenizer error, invalid escape character.")
+            }
+            lexeme += peek()
+            advance()
+        }
+        // println(" [TRACE] lexeme = '${lexeme}' ")
+        err = expect(QUOTE_CHAR)
+        if(err.isErr()){ return err}
+        return token(Type.T_Str, lexeme)
+    }
+
+    private fun nextNumber(): Token 
+    {
+        var lexeme = ""
+        if( match('-')){ lexeme += "-" }
+        if(!check('.')){ lexeme += nextInteger() }
+        if(!check('.') && !check('e') && !check('E') )
+        {
+            if( peek().isLetter() ){
+                // throw Exception("Invalid number. Numbers cannot terminate with letter.")
+                return error("Invalid number. Numbers cannot terminate with letter.")
+            }
+            return token(Type.T_Int, lexeme)
+        }
+        if ( match('.') ) { lexeme += '.' + nextInteger() }
+        val letter = peek()
+        if( match('e') or match('E'))
+        {
+            lexeme += letter
+            if( !match('-') && !isDigit()){
+                // throw Exception("Invalid floating point number: " + lexeme)
+                return error("Invalid floating point number: " + lexeme)
+            }
+            if( match('-') ){ lexeme += "-" }
+            if( !isDigit() ){
+                // throw Exception("Invalid floating point. Expected digit, but got: " + lexeme)
+                return error("Invalid floating point. Expected digit, but got: " + lexeme)
+            }
+            lexeme += nextInteger()
+        }
+        if( peek().isLetter() ){
+            // throw Exception("Invalid number. It cannot end with letter.")
+            return error("Invalid number. It cannot end with letter.")
+        }
+        return token(Type.T_Flt, lexeme)
+    }
+
+	private fun nextInteger(): String 
+	{
+		var lexeme = ""
+		while( this.peek().isDigit() && !this.isEof() )
+		{
+			lexeme += peek()
+			advance()
+		}
+        return  lexeme 
+	}
+
+} // ----- End of class Tokenizer() -------------- //
+
+
+class Parser(val source: String)
+{
+    // List of tokens to be processed 
+    val tokens = Tokenizer(source).tokens()
+    // Initialize current token with a null element 
+    var current: Token = Token(Type.T_EMPTY, "", 0, 0, 0)
+    // Position of current tokens 
+    var pos = 0 
+
+    // Initialize parser state 
+    init {
+        advance()
+    }
+
+    fun peek(): Token { return current }
+
+    fun advance()
+    {
+        if( pos >= tokens.size ){
+            current = Token(Type.T_EOF, "", 0, 0, 0)
+            return 
+        }
+        current = tokens[pos]
+        pos = pos + 1    
+    }
+
+    fun match(type: Type): Boolean  
+    {
+        if( current.type == type  ){
+            advance()
+            return true 
+        }
+        return false
+    }
+
+    fun check(type: Type): Boolean
+    {
+        return current.type == type 
+    }
+
+    fun expect(type: Type): Ast
+    {
+        if( current.type == type ) { advance(); return Ast.AstVoid }
+        return Ast.AstErr("Parser Error: expected token " + type + ", but given " + current)
+    }
+
+    private fun isEof(): Boolean { return current.type == Type.T_EOF }
+
+    private fun isAtom(): Boolean
+    {
+        return peek().type == Type.T_Bool || peek().type == Type.T_Flt || peek().type == Type.T_Int
+            || peek().type == Type.T_Sym || peek().type == Type.T_Str || peek().type == Type.T_Key
+    }
+    
+    fun parseSexp(): Ast
+    {
+        if     ( isAtom() )          { return parseAtom() } 
+        else if( check(Type.T_Lpar) ){ return parseList() }
+        else if( match(Type.T_Quote) ){ 
+            val s = parseSexp()
+            val lst = listOf<Ast>( Ast.AstSym("quote"), s ) 
+            val r = Ast.AstLst(lst)
+            return r
+        }
+        else if( check(Type.T_ERR) ){ 
+            return Ast.AstErr(" [LEXICAL ERROR] " + current )
+        }
+        return Ast.AstErr("Parser Error: unexpected invalid token: " + peek() )
+    }
+
+    private fun parseAtom(): Ast 
+    {
+        val lexeme = peek().text 
+        if     ( match(Type.T_Int) ){ return Ast.AstInt( lexeme.toInt() ) }
+        else if( match(Type.T_Flt) ){ return Ast.AstFlt( lexeme.toDouble() ) }
+        else if( match(Type.T_Str) ){ return Ast.AstStr(lexeme) }
+        else if( match(Type.T_Bool) ){ return Ast.AstBool(lexeme == "#t") }
+        else if( match(Type.T_Key) ){ return Ast.AstKey(lexeme)}
+        else if( match(Type.T_Sym) ){ 
+            if( lexeme == "nil" ){ return Ast.AstNil }
+            return Ast.AstSym(lexeme) 
+        }
+        else {
+            return Ast.AstErr("Parser Errror: Invalid token: ${peek()}")
+        }
+    }
+
+    private fun parseList(): Ast
+    {
+        var err = expect(Type.T_Lpar) 
+        if(err.isErr()){ return err}
+        val nodes = mutableListOf<Ast>()
+        while( !check(Type.T_Rpar) && !isEof() )
+        {
+            val sexp = parseSexp()
+            nodes.add(sexp)
+        }
+        err = expect(Type.T_Rpar)
+        if(err.isErr()){ return err}
+        val ast = Ast.AstLst(nodes)
+        return ast
+    }
+
+} // --- End of class Parser() ---------//
+
+object Sexp {
+
+    // Get S-Expression lisp-like string representation of AST
+    fun toStr(r: Ast): String = when(r) {
+            // Emtpy AST => Null 
+            is Ast.AstVoid -> "<void>"
+            // Boolean value 
+            is Ast.AstBool -> if(r.value) "#t" else "#f"
+            // Floating point literal  
+            is Ast.AstFlt  -> r.value.toString()
+            // Integer point literal 
+            is Ast.AstInt  -> r.value.toString()
+            // Symbol literal 
+            is Ast.AstSym  -> r.value 
+            // Keyword literal 
+            is Ast.AstKey  -> ":" + r.value 
+            // Nul - null value 
+            is Ast.AstNil  -> "nil"
+            // String 
+            is Ast.AstStr  -> "\"" + r.value + "\""
+            // List 
+            is Ast.AstLst  -> "(" + r.value.map { toStr(it) }.joinToString( separator = " ") + ")"
+            // Runtime error 
+            is Ast.AstErr  -> "EROR: " + r.value 
+            // Environment - contains bindings between variables and values 
+            is Ast.AstEnv  -> "<Env: ${r.env}>"
+            // Primitive function 
+            is Ast.AstFunc    -> "<FuncPRM: ${r.name}>"
+            // User-defined function 
+            is Ast.AstFuncUDF -> "<FuncUDF: ${r.name}>"
+            // Java Object 
+            is Ast.AstObj ->  { 
+                // val klass = r.value::class.java.getName() 
+                // "<Object: ${klass}>" 
+                "<Obj: ${r.value}>"
+            }
+            //else       -> "Not implemented"
+    }
+
+    fun parse(source: String): Ast 
+    {
+        val p = Parser(source)
+        val ast = p.parseSexp()
+        return ast 
+    }
+
+    // Checks whether two S-Expressions are equal
+    fun equal(lhs: Ast, rhs: Ast): Boolean
+    {
+        if( lhs.type() != rhs.type() ){ return false }
+        else if ( rhs.isAtom() && lhs.isAtom() )
+        {
+            val t = rhs.type()
+            if      ( t == AstType.INT  ){ return lhs.toInt() == rhs.toInt() }
+            else if ( t == AstType.FLT  ){ return lhs.toFlt() == rhs.toFlt() }
+            else if ( t == AstType.STR  ){ return lhs.toStr() == rhs.toStr() }
+            else if ( t == AstType.SYM  ){ return lhs.toStr() == rhs.toStr() }
+            else if ( t == AstType.KEY  ){ return lhs.toStr() == rhs.toStr() }
+            else if ( t == AstType.ERR  ){ return lhs.toStr() == rhs.toStr() }
+            else if ( t == AstType.BOOL ){ return lhs.toBool() == rhs.toBool() }
+            else if ( t == AstType.NIL  ){ return true } 
+            else if ( t == AstType.VOID ){ return true } 
+            else {
+                throw Exception("Edge case reached not implemented for => lhs = ${lhs} and rhs ${rhs}")
+            }
+        }
+        else if( rhs.type() == AstType.LST )
+        {
+            val a = lhs.nodes()
+            val b = rhs.nodes()
+            if( a.size != b.size){ return false }
+            for(n in 0..(a.size - 1))
+            {
+                if( !equal(a[n], b[n]) ){  return false }
+            }
+            return true 
+        } else {
+            throw Exception("Reached edge case => This exception is never supposed to be thrown.")
+        }
+    }
+
+}
+
+class Evaluator {
+
+    var logOnError = false
+
+    // Default environment
+    val _env =  Ast.AstEnv()
+    // Special forms 
+    val _forms = mutableMapOf<String, (List<Ast>, Ast.AstEnv) -> Ast>()
+
+    init {
+        _env.name = "global"
+        reset()
+    }
+
+    fun reset()
+    {
+        this._env.reset()
+        // ---- Register primitive special forms --------------//
+        // Sepcial form for updating an already defined variable 
+        addSpecialForm("set",   { args, env -> this.form_set(args, env) }   ) 
+        // Special form for defining a new  variable 
+        addSpecialForm("def",   { args, env -> this.form_def(args, env )}  )
+        // If-else special form 
+        addSpecialForm("if",    { args, env -> this.form_if(args, env) }   ) 
+        // Function defintion or lambda special form 
+        addSpecialForm("fn",    { args, env -> this.form_fn(args, env) }   ) 
+        // Quote (quote (args ...)) sepcial form 
+        addSpecialForm("quote", { args, env -> this.form_quote(args, env) } ) 
+        // Do special-form borrowed from Clojure: (do (println "x") (println "z") (+ x  y z)) 
+        addSpecialForm("do",    { args, env -> this.form_do(args, env)}   )
+        // Call object default constructor (new javax.swing.Swing.JFrame)
+        addSpecialForm("new",   { args, env -> this.form_new(args, env) }   ) 
+        // Clojure-like doto special form 
+        addSpecialForm("doto",  { args, env -> this.form_doto(args, env)}   )
+        //
+        // ---- Register primitive functions ------------------ //
+          /// addFuncMathMany("+",     { a, b -> a + b })
+        addPrimitive("+",           ::primitive_add)
+        addPrimitive("-",           ::primitive_sub)
+        addPrimitive("*",           ::primitive_mul)
+        addPrimitive("/",           ::primitive_div)
+        addPrimitive("eval",        ::primitive_eval)
+        addPrimitive("load-script", ::primitive_loadScript)
+        addPrimitive("read",        ::primitive_read)
+        addPrimitive("list",        { args -> Ast.AstLst(args)  })
+        addPrimitive("car",      ::primitive_car )
+        addPrimitive("cdr",      ::primitive_cdr )
+        addPrimitive("cons",     ::primitive_cons )
+        addPrimitive("first",    ::primitive_car )
+        addPrimitive("rest",     ::primitive_cdr )
+        addPrimitive("nth",      ::primitive_nth )
+        // Apply a function over a list 
+        addPrimitive("apply",    ::primitive_apply)
+        // Map a function over list 
+        addPrimitive("map",      ::primitive_map )
+        // Get element of a plist (property list) that matches a keyword argument
+        // (getf :x (list :z 200 :h 300 :x "hello")) => returns "hello"
+        addPrimitive("getf",     ::primitive_getf)
+        // Concatenate strings 
+        addPrimitive("concat",   ::primitive_concat)
+        // addPrimitive("for-each", ::primitive_foreach )
+        addPrimitive("println",  ::primitive_println )
+        addMath1Arg("m/sin",     { java.lang.Math.sin(it) } )
+        addMath1Arg("m/cos",     { java.lang.Math.cos(it) } )
+        addMath1Arg("m/tan",     { java.lang.Math.tan(it) } )
+        addMath1Arg("m/exp",     { java.lang.Math.exp(it) } )
+        addMath1Arg("m/sqrt",    { java.lang.Math.sqrt(it) } )
+        addMath1Arg("m/log",     { java.lang.Math.log(it) } )
+        addMath1Arg("m/log10",   { java.lang.Math.log10(it) } )
+        // Show all avaialabe methods of a Java object AstObj
+        addPrimitive("ref/show-methods",  ::primitive_showMethods )
+        // Get a java class meta-object by its name as string 
+        addPrimitive("ref/class-by-name", ::primitive_getClassByName )
+        // Get class meta-object of a java object 
+        addPrimitive("ref/get-obj-class", ::primitive_getObjClass )
+        //Cast a java object to an interface by reflection 
+        // (ref/cast java.awt.Container object-here-Ast.AstObj)
+        addSpecialForm("ref/cast",         { args, env -> this.form_cast(args, env) }   ) 
+        addSpecialForm("ref/static-field", { args, env -> this.form_staticField(args, env) }   ) 
+        addPrimitive("action-listener", ::primitive_toActionListener)
+        addPrimitive("java-null", ::primitive_javaNull)
+        // PI constant 
+        set("m/PI", Ast.AstFlt( 3.141592653589793))
+        // Variable that references this environment object 
+        set("env", _env)
+    }
+
+    // Eval AST (Abstract Syntax Tree) by walking over it 
+    // and generate a interpreter runtime value 
+    fun eval(s: Ast, env: Ast.AstEnv): Ast = when(s){
+        is Ast.AstErr     -> s 
+        is Ast.AstVoid    -> s 
+        is Ast.AstBool    -> s 
+        is Ast.AstFlt     -> s 
+        is Ast.AstInt     -> s  
+        is Ast.AstKey     -> s 
+        is Ast.AstNil     -> s 
+        is Ast.AstStr     -> s 
+        is Ast.AstSym     -> { 
+            // println(" [TRACE]  envName = ${env.name} ; Evaluator.get =>> ${s}  \n")
+            env.get(s.toStr()) ?: Ast.AstErr("Error: (line 549) unbound symbol ${s.toStr()} in ${env.name}") 
+        }
+        is Ast.AstEnv     -> s 
+        is Ast.AstFunc    -> s
+        is Ast.AstFuncUDF -> s
+        is Ast.AstObj     -> s 
+        is Ast.AstLst     -> evalApp(env, s) 
+    }
+
+    fun eval(source: String): Ast 
+    {
+        val ast = Sexp.parse(source)
+        val res = eval(ast, _env)
+        return res 
+    }
+   fun eval(ast: Ast): Ast 
+    {
+        val res = eval(ast, _env)
+        return res 
+    }
+
+    // Get value from environment 
+    fun get(name: String): Ast?
+    {
+        return _env.get(name)
+    }
+
+    // Set value in environment 
+    fun set(name: String, value: Ast) 
+    {
+        _env.set(name, value)
+    }
+
+    // Interactive Read-Print-Eval-Loop
+    fun repl()
+    {
+        val sc = java.util.Scanner(System.`in`)
+
+        var count = 0
+
+        while(true){
+           System.out.print(" In[${count}]> ")
+           System.out.flush()
+           // val line = sc.nextLine()
+           var line = readLine() ?: ""
+           if(line == ""){ continue }
+           if(line == ".h"){
+            println("""
+            The interpreter has the following commands:
+              + .h or .help  => To display this help menu.
+              + .q or .quit  => To quit the interpreter.
+              + .multi       => To paste multi-line S-Expression in the repl 
+              + .reset or .r => To reset the interpreter state 
+              + .vars        => To display all variables 
+              + .funcs       => To show all functions 
+              + .verbose-on  => Enable verbose mode 
+              + .verbose-off => Disable verbose mode 
+            
+            """)
+            continue
+           }
+           if(line == ".verbose-on"){ 
+                println(" [INFO] Verbose mode enabled.")
+                this.logOnError = true 
+                continue
+            }
+           if(line == ".verbose-off"){ 
+                println(" [INFO] Verbose mode disabled.")
+                this.logOnError = true 
+                continue
+            }
+           if(line == ".quit" || line == ".q"){ System.exit(0); break }
+           if(line == ".reset" || line == ".r"){ 
+                this.reset()
+                println(" [INFO] Reset repl. All variables removed. Ok.") 
+                continue 
+            }
+            if(line == ".multi"){
+                println(" [INFO] Type a multi-line expression and then type (;;) when you are done.")
+                var entry = ""
+                while(true){
+                    val lin = readLine() ?: ""
+                    if(lin == ";;"){ break }
+                    entry = entry + lin  
+                }
+                println(" [INFO] Exit multi-line mode. ")
+                line = entry 
+            }
+            // Display all defined variables in current environment 
+            if(line == ".vars")
+            {
+                println(" =>> Variables: ")
+                _env.env.forEach{ (k, v) -> if( !v.isCallable()){ println(" " + k) } } 
+                continue 
+            }
+            // Display all defined functions in current environment 
+            if(line == ".funcs")
+            {
+                println(" =>> Functions: ")
+                _env.env.forEach{ (k, v) -> if( v.isCallable()){ println(" " + k) } } 
+                continue 
+            }
+           val result = this.eval(line)
+           if( result.isErr() ){
+               println("Error: " + result.toStr())
+               continue
+           }
+           // History variables $0, $1, $2, ... 
+           // containing the evaluation results of 
+           // previous inputs entered by the user 
+           val label = "\$${count}"
+           println(" ${label} = " + Sexp.toStr(result))
+           count += 1
+           // Variable answer always contains the result 
+           // of the last computation 
+           this.set("ans", result)
+           this.set(label, result)           
+        }
+        
+    }
+
+    // Evaluate application of function or special form 
+    // (function-or-form arg0 arg1 ... argN-1)
+    private fun evalApp(env: Ast.AstEnv, lst: Ast): Ast
+    {
+        if(lst.size() == 0){ return Ast.AstNil }
+        val head = lst.head()
+        val args = lst.tail()
+        if( head is Ast.AstSym ){
+            val x = head.toStr()
+            if(x == "comment")
+            {
+                return Ast.AstVoid
+            }
+            if( _forms.contains(x)  ){
+                val handler = _forms!!.get(x)
+                // Apply Special form 
+                val res =  handler!!.invoke(args, env)
+                return res 
+            }
+        }
+        // Check whether argument is function 
+        val obj = eval(head, env)
+        // Abort computation on error 
+        if( obj.isErr() ){ return obj }
+        // Check whether object is a Java object (instance of a Java class)
+        if( obj.isObj() ){ 
+            // Perform method call
+            val r = invokeObjectMethod(obj as Ast.AstObj, args, env)
+            return r 
+        }
+        // Abort computation if object is not callable
+        if( !obj.isCallable() ){
+            return error("Object not callable ${head}")
+        }
+        val res = funCall(env, obj, args)
+        return res 
+    }
+
+    // Handle function call and evalute all arguments before function application.
+    // funCall(environment, function, list-of-arguments)
+    private fun funCall(env: Ast.AstEnv, obj: Ast, args: List<Ast>): Ast
+    {
+        val evaluatedArgs = mutableListOf<Ast>()
+        // Evaluate arguments and abort evaluation on error 
+        for(arg in args){
+           val r = this.eval(arg, env) 
+           if( r.isVoid() ){ continue }
+           if( r.isErr() ){ return r}
+           evaluatedArgs.add(r)
+        }
+        // ---- Evaluation of primtive function call in host language -------- //
+        // Object is primtive function (defined in host language) 
+        if(obj is Ast.AstFunc){
+            // println(" [TACE] Call primitive function ${obj}")
+            val func = obj as Ast.AstFunc
+            val result = func.func(evaluatedArgs)
+            return result 
+        }
+        // ------_ Evaluation of user-defined function call -----------// 
+        // Object is UDF - User-Defined Function  
+        val func = obj as Ast.AstFuncUDF
+        val nargs = func.args.size  
+        if(nargs != args.size ){ 
+            return error("Invalid number of arguments passed to function. It expects $nargs arguments. ")
+        }
+        // Create temporary environment for function evaluation
+        val tenv = Ast.AstEnv(func.env)
+        // Set arguments in the temporary environment 
+        for(k in (0..(nargs - 1))){
+            val argName = func.args[k]
+            tenv.set(argName, evaluatedArgs[k])
+        }
+        var last: Ast = Ast.AstNil
+        // Evaluate function body and return evaluation of last form
+        for(form in func.body)
+        {
+            last = this.eval(form, tenv)
+            // abort evaluation on error
+            if(last.isErr()){ return last }
+        }
+        return last
+    }
+
+
+    private fun error(message: String): Ast
+    {
+        if(this.logOnError){ System.err.println(" [ERROR] " + message) }
+        return Ast.AstErr(message)
+    }
+
+    // Add primitive function 
+    fun addPrimitive(name: String, func: (List<Ast>) -> Ast)
+    {
+        _env.set(name, Ast.AstFunc(name, func))
+    }
+
+    // Register primitive math function of 1 argument 
+    fun addMath1Arg(name: String, func: (Double) -> Double)
+    {
+        val func = { args: List<Ast> -> 
+            if(args.size != 1){ error("Function ${name} expects 1 argument. ") }
+            else if( !args[0].isNum() ) { error("Expected numeric argument") }
+            else {
+                val a = args[0].toFlt()
+                val r = func(a)
+                Ast.AstFlt( r )
+            }
+        }
+        addPrimitive(name, func)
+    }
+
+    // Add special form (macro or control structure)
+    fun addSpecialForm(name: String, form: (List<Ast>, Ast.AstEnv) -> Ast)
+    {
+        _forms.put(name, form)
+    }
+
+    // ----- Functions and special forms called by the interpreter --------//
+
+    // Add math function of many arguments that is evaluated as:
+    // (func a b c d e f g h ...) = 
+    // a func b func c func d func e ... 
+    // func(a, func(b, func(c, func(e, ...))))
+    //
+    // For instance: '+'
+    // (+ 10 2 5 6) = 10 + 2 + 5 + 6
+    private fun addFuncMathMany(name: String, func: (Double, Double) -> Double)
+    {
+        val value = Ast.AstFunc(name, { args -> fold1(func, args) } )
+        _env.set(name, value)
+    }
+
+
+    private fun fold1(func: (Double, Double) -> Double, args: List<Ast>): Ast 
+    {
+       if(args.size == 0){ return Ast.AstErr("Error: function expects at leat 1 argument.") } 
+       val head = args[0]
+       if(  !(head is Ast.AstInt || head is Ast.AstFlt)  ){ 
+          return error("Error: function requires numeric argument, given ${head}.") 
+       }
+       var acc = head.toFlt()
+       for(k in 1..(args.size - 1)){
+          val a = args[k]
+          if(  !(a is Ast.AstInt || a is Ast.AstFlt)  ){ 
+            return error("Error: function requires numeric argument, given ${a}.") 
+          }
+          val x = a.toFlt()
+          acc = func(acc, x)
+       }
+       return Ast.AstFlt(acc) 
+    }
+
+    // Read S-expression from string  
+    private fun primitive_read(args: List<Ast>): Ast
+    {
+        if(args.size != 1){ return error("Error: function read() requires 1 (one) agument of type string.") }
+        if( !(args[0] is Ast.AstStr)){ return error("Function read() expects 1 argument of type string.") }
+        val code = args[0].toStr()
+        val ast  = Sexp.parse(code)
+        return ast
+    }
+
+    private fun primitive_eval(args: List<Ast>): Ast
+    {
+        if(args.size != 1){ return error("Error: function eval() requires 1 (one) agument of type string.") }
+        val result  = this.eval(args[0], _env)
+        return result
+    }
+
+
+    // Get list head 
+    private fun primitive_car(args: List<Ast>): Ast
+    {
+        if(args.size != 1){ return error("Error: function 'car' requires at least 1 (one) agument.") }
+        if( !args[0].isList() ){ return error("Function car expects 'list' argument. ") }
+        val lst = args[0] as Ast.AstLst
+        if( lst.isNil() || lst.size() == 0){ return Ast.AstNil }
+        // The rendudant variable is 'r' is useful for debugging 
+        // since debuggers work in a line by line manner.
+        val r = lst.head()
+        return r
+    }
+
+    // Get list tail 
+    private fun primitive_cdr(args: List<Ast>): Ast
+    {
+        if(args.size != 1){ return error("Error: function 'car' requires at least 1 (one) agument.") }
+        if( !args[0].isList() ){ return error("Function car expects list argument. ") }
+        val lst = args[0] as Ast.AstLst
+        if( lst.isNil() || lst.size() == 0){ return Ast.AstNil }
+        // The rendudant variable is 'r' is useful for debugging 
+        // since debuggers work in a line by line manner.
+        val r = Ast.AstLst(lst.tail())
+        return r 
+    }
+
+    private fun primitive_cons(args: List<Ast>): Ast 
+    {
+        if(args.size != 2)      { return error("Error: function 'cons' requires at least 2 agument.") }
+        if( !args[0].isAtom() ) { return error("Function cons() expects first argument be an atom.") }
+        if( !args[1].isList() ) { return error("Function cons() expects second argument be a list or nil.") }
+        val result = listOf(args[0]).plus( args[1].nodes() )  
+        return Ast.AstLst(result)
+    }
+
+    // Get nth element of a list 
+    // (nth 0 lst) => Get element of list 'lst'
+    private fun primitive_nth(args: List<Ast>): Ast
+    {
+        if(args.size != 2){ return error("Error: function 'nth' requires at least 2  agument.") }
+        if( !(args[0] is Ast.AstInt) ){ return error("Function nth expects number as 1st argument. ") }
+        if( !args[1].isList() ){ return error("Function nth expects list as 2nd argument. ") }
+        val n = args[0].toInt()
+        val lst = args[1] as Ast.AstLst
+        if( lst.isNil() || lst.size() == 0){ return Ast.AstNil }
+        if(n >= lst.size()){ return error("Error: out of bounds access.") }
+        val r = lst.nth(n)
+        return r 
+    }
+
+    // Apply => Apply a function to a list of arguments
+    // (apply + (list 1 2 3 5 6))
+    // ( (fn (x y) (+ x y))  (list 3 5)) => 7
+    private fun primitive_apply(args: List<Ast>): Ast
+    {
+        if(args.size != 2){ return error("Error: function apply() requires at least 2  agument.") }
+        if( !args[0].isCallable()    ){ return error("Function apply() expects a function as 1st argument. ") }
+        if( !(args[1] is Ast.AstLst) ){ return error("Function apply() expects a list as 2nd argument. ") }
+        val res = funCall(_env, args[0], args[1].nodes())
+        return res 
+    }
+
+    // Example: (+ 1 2 5 100.252)
+    fun primitive_add(args: List<Ast>): Ast 
+    {
+        if(args.size == 0){ return error("Function + (add) expects at least 1 argument. No argument was given.")}
+        var result: Ast = Ast.AstInt(0)
+        for(x in args){
+            if( !x.isNum() ){ return error("Function + (add) expects number argument") }
+            if( x is Ast.AstInt && result is Ast.AstInt){  result = Ast.AstInt( result.toInt() + x.value ) }
+            if( x is Ast.AstInt && result is Ast.AstFlt){  result = Ast.AstFlt( result.toFlt() + x.value ) }
+            if( x is Ast.AstFlt ){  result = Ast.AstFlt( result.toFlt() + x.value ) }
+        }
+        return result 
+    }
+
+    fun primitive_sub(args: List<Ast>): Ast 
+    {
+        if(args.size == 0){ return error("Function - (sub) expects at least 1 argument. No argument was given.")}
+        var result: Ast = args[0]
+        if( !result.isNum() ){ return error("Function (sub) arguments must be numbers.") }
+        for(i in 1..(args.size - 1)){
+            val x = args[i]
+            if( !x.isNum() ){ return error("Function - (sub) expects number argument") }
+            if( x is Ast.AstInt && result is Ast.AstInt){  result = Ast.AstInt( result.toInt() - x.value ) }
+            if( x is Ast.AstInt && result is Ast.AstFlt){  result = Ast.AstFlt( result.toFlt() - x.value ) }
+            if( x is Ast.AstFlt ){  result = Ast.AstFlt( result.toFlt() - x.value ) }
+        }
+        return result 
+    }
+
+    fun primitive_mul(args: List<Ast>): Ast 
+    {
+        if(args.size == 0){ return error("Function * (mul) expects at least 1 argument. No argument was given.")}
+        var result: Ast = Ast.AstInt(1)
+        for(x in args){
+            if( !x.isNum() ){ return error("Function * (mul) expects number argument") }
+            if( x is Ast.AstInt && result is Ast.AstInt){  result = Ast.AstInt( result.toInt() * x.value ) }
+            if( x is Ast.AstInt && result is Ast.AstFlt){  result = Ast.AstFlt( result.toFlt() * x.value ) }
+            if( x is Ast.AstFlt ){  result = Ast.AstFlt( result.toFlt() * x.value ) }
+        }
+        return result 
+    }
+
+    fun primitive_div(args: List<Ast>): Ast 
+    {
+        if(args.size == 0){ return error("Function '/' (div) expects at least 1 argument. No argument was given.")}
+        var result: Ast = args[0]
+        if( !result.isNum() ){ return error("Function '/' arguments must be numbers.") }
+        for(i in 1..(args.size - 1)){
+            val x = args[i]
+            if( !x.isNum() ){ return error("Function - '/' expects number argument") }
+            result = Ast.AstFlt( result.toFlt() / x.toFlt() )
+        }
+        return result 
+    }
+
+    private fun primitive_map(args: List<Ast>): Ast
+    {
+        if(args.size != 2){ return error("Error: function apply() requires at least 2  agument.") }
+        if( !args[0].isCallable()    ){ return error("Function apply() expects a function as 1st argument. ") }
+        if( !(args[1] is Ast.AstLst) ){ return error("Function apply() expects a list as 2nd argument. ") }
+        val func = args[0]
+        val lst = args[1].nodes()
+        val result = mutableListOf<Ast>()
+        for(n in lst){
+            val r = this.funCall(_env, func, listOf<Ast>(n)) 
+            if(r.isErr()){ return r}
+            result.add(r)
+        }
+        return Ast.AstLst(result) 
+    }
+
+    // Concatenate the string representation of arguments 
+    private fun primitive_concat(args: List<Ast>): Ast 
+    {
+        var s = ""
+        for(a in args){ 
+            if(a is Ast.AstStr){ 
+                s = s  + a.toStr()
+                continue
+            }
+            s = s + Sexp.toStr(a) 
+        }
+        val result = Ast.AstStr(s) 
+        return result 
+    }
+
+    // Example: (getf :title (:x 100 :y 300 :title "hello")) => result: "hello"
+    private fun  primitive_getf(args: List<Ast>): Ast
+    {
+        if(args.size != 2){ return error("Error: function getf() requires at least 2  agument.") }
+        if( !(args[0] is Ast.AstKey)   ){ return error("Function getf() expects a function as 1st argument. ") }
+        if( !(args[1] is Ast.AstLst) ){ return error("Function getf() expects a list as 2nd argument. ") }
+        if( args[1].size() == 0 || args[1].isNil() ){ return Ast.AstNil }
+        val key = args[0].toStr()
+        val lst = args[1].nodes()
+        for(i in 0..(lst.size - 1))
+        {
+            if(i + 1 == lst.size){ return Ast.AstNil}
+            if(lst[i] is Ast.AstKey && lst[i].toStr() == key)
+            { return lst[i + 1] }
+        } 
+        return Ast.AstNil
+    }
+
+
+    // Show methods of a Java objects => This function is intended for interactive use 
+    // Example: 
+    //   (set obj (new javax.swing.JFrame))
+    //   (reflect/show-methods obj)           => Display all object methods 
+    //   (reflect/show-methods obj "method")  => Display all object methods containing the string method
+    private fun primitive_showMethods(args: List<Ast>): Ast
+    {
+        if(args.size < 1 || args.size > 2) { return error("Error: function requires 1 agument of AstObj.") }
+        if( !args[0].isObj()){ return error("Function requires 1 argument of type AstObj.") }
+        val obj = (args[0] as Ast.AstObj).value::class.java
+        if( args.size == 1)
+        {
+            for(m in obj.getMethods()){ println(m) } 
+            return Ast.AstNil 
+        }
+        if( !args[1].isStr() ){ 
+            return error("Expected string as second argument") 
+        }
+        val search = args[1].toStr()
+        for(m in obj.getMethods()){ 
+            val s = m.toString()
+            if( s.contains(search, ignoreCase  =  true) )
+            { println(s) }
+        } 
+        return Ast.AstNil
+    }
+
+    private fun primitive_getClassByName(args: List<Ast>): Ast
+    {
+        if(args.size != 1){ return error("Error: function requires 1 agument of type string.") }
+        if( !(args[0] is Ast.AstStr) ){ return error("Function requires 1 argument of type string.") }
+        val className = args[0].toStr()
+
+        try{
+            val cls = Class.forName(className) 
+            return Ast.AstObj(cls as Object)
+        } catch(ex: java.lang.ClassNotFoundException)
+        {
+            return error(ex.toString())
+        }
+    }
+
+    private fun primitive_getObjClass (args: List<Ast>): Ast
+    {
+        if(args.size != 1){ return error("Error: function reflect/get-obj-class() requires 1 agument of type string.") }
+        if( !args[0].isObj()){ return error("Function requires 1 argument of type AstObj.") }
+        val cls = (args[0] as Ast.AstObj).value::class.java
+        return Ast.AstObj(cls as Object)
+    }
+
+    // // For-each => Apply a function with side-effect to each element of a list 
+    // // (for-each print (list 1 2 5 10))
+    // private fun primitive_foreach(args: List<Ast>): Ast
+    // {
+    //     if(args.size != 2){ return error("Error: function 'for-each' requires at least 2  agument.") }
+    //     if( !(args[0].isCallable() ){ return error("Function for-each expects a function as 1st argument. ") }
+    //     return r 
+    // }
+
+    // (print "string ..."  arg1 arg2 ... argN-1) 
+    private fun primitive_println(args: List<Ast>): Ast
+    {
+        for(a in args){
+            if     ( a is Ast.AstStr ){ System.out.print(a.value) }
+            else if( a is Ast.AstInt ){ System.out.print(a.value) }
+            else if( a is Ast.AstFlt ){ System.out.print(a.value) }
+            else if( a is Ast.AstBool){ Sexp.toStr(a) }
+            else if( a is Ast.AstNil){ System.out.print("nil") }
+            else { System.out.print(Sexp.toStr(a)) }
+            System.out.print(" ")
+        }
+        System.out.print("\n")
+        return Ast.AstNil 
+    }
+
+    // Function used to pass lambda to arguments of type java.awt.event.ActionListener 
+    // Example:   
+    //   (set btn (doto (new javax.swing.JButton) (setLabel "hello"))
+    //   (btn addActionListener 
+    //                   (action-listener (fn () (println "clicked") )))
+    private fun primitive_toActionListener(args: List<Ast>): Ast 
+    {
+        if( args.size != 1 ){
+            return error("Function expects 1 argument.")
+        }
+        if( !args[0].isCallable() ){ return error("Function expectes 1 argument of type function.") }
+            // import java.awt.event.ActionEvent;
+            //  import java.awt.event.ActionListener;
+        val self = this 
+        val listener = object: java.awt.event.ActionListener {
+            override fun actionPerformed(evt: java.awt.event.ActionEvent)
+            {
+                self.funCall(self._env, args[0], listOf())
+            }
+        }
+        val ret =  Ast.AstObj(listener as Object)
+        return ret
+    }
+
+    // Return a Java Null object 
+    private fun primitive_javaNull(args: List<Ast>): Ast 
+    {
+        if( args.size !=0 ){
+            return error("Function expects 0 argument.")
+        }
+        //val ret = Ast.AstObj(null)
+        val ret = Ast.AstNil
+        return ret
+    }
+
+
+    // Load file  (load-script "script.jlsp") 
+    private fun primitive_loadScript(args: List<Ast>): Ast 
+    {
+        if( args.size != 1 && !args[0].isStr() ){
+            return error("Function expects 1 argument of type string.")
+        }
+        val fileName = args[0].toStr()
+        var source: String? = null 
+        try {
+            source = java.io.File(fileName).inputStream().readBytes().toString(Charsets.UTF_8)  
+        } catch(ex: java.io.FileNotFoundException)
+        {
+            return error(ex.toString())
+        }
+        println(" [========>>> Loaded Code <<<============]")
+        println(source)
+        source = "(do\n" + source + "\n)"
+        val ast = Sexp.parse(source)
+        if( ast.isErr() ){ return ast }   
+        val res = this.eval(ast, _env)
+
+        return res 
+    }
+
+    // Update an aready existing variablr 
+    // Special form set => (set x (+ 1 2 4  6))
+    // Example: (def x 100) (set x (+ x 1)) ...
+    private fun form_set(args: List<Ast>, env: Ast.AstEnv): Ast
+    {
+        if( args.size != 2 ){
+            return error("Ill-formed special form set. Expected 2 arguments.")
+        }
+        if( !args[0].isSym() ){ return error("Ill-formed special form 'set'. Expected symbol as first argument.") }
+        val name = args[0].toStr()
+        val expr = args[1]
+        if( !env.has(name) ){ return error("Unbound variable ${name}") }
+        val result = this.eval(expr, env)
+        if( result.isErr() ){ return result }
+        env.setExisting(name, result)                
+        return result 
+    }
+
+    // Define a new variable 
+    // (def x 2000)
+    private fun form_def(args: List<Ast>, env: Ast.AstEnv): Ast
+    {
+        if( args.size != 2 ){
+            return error("Ill-formed special form def. Expected 2 arguments.")
+        }
+        val name = args[0]
+        if( !name.isSym() ){ return error("Ill-formed special form 'def'. Expected symbol as first argument.") }
+        val expr = args[1]
+        val result = this.eval(expr, env)
+        if( result.isErr() ){ return result }
+        env.set(name.toStr(), result)                
+        return result 
+    }
+
+    // Quote special form '(+ 1 2 3) or (quote (+ 1 2 3))
+    private fun form_quote(args: List<Ast>, env: Ast.AstEnv): Ast
+    {
+        if( args.size != 1 ){
+            return error("Ill-formed special form 'quote'. Expected 1 argument.")
+        }
+        val expr = args[0]
+        return expr 
+    }
+
+    // Special form 'do' - equivalent to 'begin' in Scheme.
+    // (do (println x) (println y) (+ x y z)) 
+    private fun form_do(args: List<Ast>, env: Ast.AstEnv): Ast
+    {
+        var result: Ast = Ast.AstNil
+        for(form in args){
+            result = this.eval(form, env)
+        }
+        return result
+    }
+
+
+    // IF-else special form: 
+    // =>> (if <cond> <then>) or 
+    // =>> (if <cond> <then> <else>)
+    //   (if (> x 10) (print "greater than 10") (print "less than 10"))
+    //   (+ z (if (> x 10)  (* 3 x) (+ 10 x ) ))
+    private fun form_if(args: List<Ast>, env: Ast.AstEnv): Ast 
+    {
+        if( args.size < 2 || args.size > 3)
+        { return error("Ill-formed special form if-else. Expected at least 2 arguments.") }
+        val cond = args[0]
+        // Evaluate condition/predicate 
+        val cond_result = this.eval(cond, env)
+        // Short-circuit - abort computation on error 
+        if(cond_result.isErr()){ return cond_result}
+
+        if(cond_result.asBool()){
+            val then_ast = args[1]
+            val then_result = this.eval(then_ast, env)
+            return then_result 
+        }
+        if( args.size == 2 ) { return Ast.AstNil }
+        val else_ast = args[2]        
+        val else_result = this.eval(else_ast, env)
+        return else_result
+    }
+
+    // Lambda special form FN => function definition or lambda
+    //  Lambda function    =>> (fn (x) (+ x  1))
+    //  Function defintion =>> (fn increment (x) (+ x 1))
+    // 
+    //   
+    private fun form_fn(args: List<Ast>, env: Ast.AstEnv): Ast 
+    {
+        if(args.size < 2){ return error("Ill-formed syntax for lambda. The function requires at least 2 arguments.") }
+        val n = args[0]
+        // Function name 
+        val name = if(n.isSym()) n.toStr() else ""
+        // List of arguments 
+        val pargs =  if(n.isSym()) args[1] else n 
+        if( !(pargs is Ast.AstLst) ){ return error("Special form FN expected list of arguments.") }
+        val _args = pargs.nodes().map {  it.toStr() }
+        val k = if (n.isSym()) 2 else 1
+        // println(" [TRACE] name = ${name}  ; args = ${_args}")
+        val body = mutableListOf<Ast>()  
+        for (i in k..(args.size - 1)) { body.add(  args[i] ) }
+        // User-defined function 
+        val p =  Ast.AstEnv(env)
+        // p.name = "Function: " + name 
+        // println(" [TRACE] (890) Function def =>> env.name = ${p.name}  p =  ${p}")
+        val udf = Ast.AstFuncUDF(name, _args, body,  p )
+        // Register function in evironment if it is a non-lambda function
+        if(name != ""){ env.set(name, udf) }
+        return udf
+    }
+
+
+    // Special form borrowed from Clojure that allows calling 
+    // multiple methods of a java object with less repetition. 
+    // Example:
+    //   (set frame (new javax.swing.JFrame))
+    //   (doto frame 
+    //         (setSize 400 500)      ;; size     
+    //         (setTitle "My frame")  ;; set  title 
+    //         (show))                ;; Show 
+    //          
+    // --------- It is simila rto 
+    //  frame.setSize(400 500)
+    //  frame.setTitle("Mytitle")
+    private fun form_doto(args: List<Ast>, env: Ast.AstEnv): Ast
+    {
+        if( args.size < 2 ){
+            return error("Ill-formed special form 'quote'. Expected 1 argument.")
+        }
+        val ref = args[0]
+        val obj = eval(ref, env)
+        if( obj.isErr() ){ return obj } 
+        if( !obj.isObj() ){ return error("Expected an instance of Java object, but got ${ Sexp.toStr(obj) }") }
+        val _args = args.takeLast( args.size - 1)
+        // println(" [TRACE] args = " + _args)
+        for(a in _args){
+           if( !(a is Ast.AstLst) ){
+                return error("Expected list argument, but got ${ Sexp.toStr(a) }")
+           } 
+           // println(" [TRACE] =>> a = ${ Sexp.toStr(a) }")
+           var argList = a as Ast.AstLst
+           val res = this.invokeObjectMethod(obj as Ast.AstObj, argList.value, env)
+           if( res.isErr() ){ return res}
+        }
+        return obj 
+    }
+
+
+    private fun objToASt(arg: Any): Ast 
+    {
+        if( arg == null){ return Ast.AstNil }
+        else if( arg is Int)    { return Ast.AstInt(arg as Int) }
+        else if( arg is Double ){  return Ast.AstFlt(arg as Double) }
+        else if( arg is Boolean ){ return Ast.AstBool(arg as Boolean) }
+        else if( arg is String ) { return Ast.AstStr(arg as String) }
+        else { return Ast.AstObj(arg as Object) } 
+    }
+
+    // Special form for invoking consturctor of Java objects, for instance 
+    // for building a Java Swing 
+    // (set frame (new javax.swing.JFrame  arg0 arg1 ... argN-1))
+    private fun form_new(args: List<Ast>, env: Ast.AstEnv): Ast
+    {
+        if( args.size < 1 ){
+            return error("Ill-formed special form 'new'. Expected at least argument.")
+        }
+        if( !args[0].isSym() )
+        {
+            return error("Ill-formed special form 'new'. Expected firstargument to be symbol.")
+        }
+        val klassName: String = args[0].toStr()
+        var klass:  java.lang.Class<*>? = null 
+
+        try {
+            // Attempt to retrieve class metaobject 
+            klass = Class.forName(klassName)
+        } catch(ex: java.lang.ClassNotFoundException)
+        {
+            return error(ex.toString())
+        }
+        if( args.size == 1)
+        {
+            // Create object using reflection and default costructor 
+            val obj = klass.newInstance()
+            return Ast.AstObj(obj as Object)
+        }
+        val types = ArrayList<Class<*>>()
+        val invokedArgs  = ArrayList<Any>()
+        val _args = args.takeLast( args.size - 1)
+        // Attempt to evalute arguments before method application 
+        // and abort if an error happens. 
+        for(arg in _args){
+           val a = this.eval(arg, env) 
+           if( a.isErr() ){ return a}
+           if( a.isVoid() ){ continue }
+           if (a is Ast.AstBool){ 
+               types.add(Boolean::class.java) 
+               invokedArgs.add(a.value)
+           }
+           else if (a is Ast.AstFlt){  
+               types.add(Double::class.java) 
+               invokedArgs.add(a.value)
+           }
+           else if (a is Ast.AstInt){  
+               types.add(Int::class.java) 
+               invokedArgs.add(a.value)
+           }
+           else if (a is Ast.AstStr){  
+               types.add(String::class.java) 
+               invokedArgs.add(a.value)
+           }
+           else if (a is Ast.AstObj){
+               types.add(a.value::class.java)
+               invokedArgs.add(a.value)
+           }
+           else return error("Special form new() not implemented for argument of type ${a} ")
+        }
+        try {
+             val ctor = klass.getConstructor(*types.toTypedArray())
+             val obj = ctor.newInstance(*invokedArgs.toTypedArray())
+             if( obj == null){ return Ast.AstNil }
+             val r = objToASt(obj)
+             return r 
+         } catch(ex: java.lang.NoSuchMethodException) 
+         {
+             return error(ex.toString())
+         } catch(ex: Exception)
+         {
+             return error(ex.toString())
+         }
+    }
+
+    // Special form for getting static field of a class at runtime through reflection 
+    // Example: (static-field java.awt.Color Red)
+    private fun form_staticField(args: List<Ast>, env: Ast.AstEnv): Ast
+    {
+        if( args.size < 1 ){
+            return error("Ill-formed special form 'new'. Expected at least argument.")
+        }
+        if( !args[0].isSym() && !args[1].isSym() )
+        {
+            return error("Ill-formed special form 'new'. Expected firstargument to be symbol.")
+        }
+        val klassName: String = args[0].toStr()
+        val field = args[1].toStr()
+        var klass:  java.lang.Class<*>? = null 
+
+        try {
+            // Attempt to retrieve class metaobject 
+            klass = Class.forName(klassName)
+        } catch(ex: java.lang.ClassNotFoundException)
+        {
+            return error(ex.toString())
+        }
+        try {
+            val field = klass!!.getField(field).get(null)
+            val result = Ast.AstObj(field as Object)
+            return result
+        } catch(ex: java.lang.NoSuchFieldException)
+        {
+            return error(ex.toString())
+        }
+
+    }
+
+    // Attempt to cast object to a class or interface 
+    // this method is useful for calling overloding methods 
+    // Example:
+    //   (set fr (doto (new javax.swing.JButton) setLabel "Click me"))
+    //   (cast java.awt.Container fr)
+    private fun form_cast(args: List<Ast>, env: Ast.AstEnv): Ast
+    {
+        if( args.size < 2 ){
+            return error("Ill-formed special form 'cast'. Expected 1 argument.")
+        }
+        if( !args[0].isSym() )
+        { return error("Ill-formed special form 'cast'. Expected first argument to be symbol.") }
+        // Evaluate first argument 
+        val arg1 = this.eval(args[1], env)
+        if( !arg1.isObj() && !arg1.isNil() ){ return error("Ill-formed special form 'cast'. Expected java object type as 2nd argument.")  }
+        val obj: Object? = if( arg1.isNil() ) { null } else { (arg1 as Ast.AstObj).value  }
+        try {
+            // Attempt to retrieve class metaobject 
+            val klass = Class.forName(args[0].toStr())
+            val ret = klass.cast(obj)
+            return Ast.AstObj(ret as Object)
+        } catch(ex: java.lang.ClassNotFoundException)
+        {
+            return error(ex.toString())
+        } catch(ex: java.lang.ClassCastException )
+        {
+            return error(ex.toString())
+        }
+    }
+
+
+    // Invoke/call method of java method using reflection 
+    //  Example: 
+    //     (set frame (new javax.swing.JFrame))
+    //     (frame setSize 400 500)     ; invoke object method => frame.setSize(400, 500)
+    //     (frame setVisible #t )      ; set object visible   => frame.setVisible(true)
+    private fun invokeObjectMethod(obj: Ast.AstObj, args: List<Ast>, env: Ast.AstEnv): Ast 
+    {
+        val x: Object = obj.value 
+        if( args.size < 1){ return error("Method requires a method name as symbol.") }
+        // Object method 
+        val m = args[0]
+
+        // Get a property or set a property 
+        //  (object :property)       => Get a property value => object.property 
+        //  (object :property value) => Set a property value => object.property = value 
+        if( m.isKey() )
+        { 
+            val property = args[0].toStr()
+            // Getter (Object :property) => Similar to object.property in infix notation
+            if( args.size == 1)
+            {
+                val method = "get" + property.capitalize()
+                val argList = listOf( Ast.AstSym(method) )
+                val res = invokeObjectMethod(obj, argList, env)
+                return res 
+            // Setter (Object :property value) => Similar to object.property = value in infix notation 
+            } else if( args.size == 2) {
+                val method = "set" + property.capitalize()
+                val values = this.eval(args[1], env)
+                if(values.isErr()){ return values }
+                var argList: List<Ast> =  if( values.isList() ) { 
+                                            listOf( Ast.AstSym(method) ).plus( values.nodes() ) 
+                                          }  else { 
+                                            listOf( Ast.AstSym(method), values ) 
+                                          }
+                val res = invokeObjectMethod(obj, argList, env)
+                return res 
+            } 
+            return error("""Invalid property call. Example of valid call: (object :property) or (object :property value)  """)  
+        }
+
+        if( !m.isSym() )
+        { return error("Invalid method call, expected symbol") }
+
+        val methodName = m.toStr()
+        // Remove first element of args list 
+        val _args = args.takeLast( args.size - 1)
+        // Java metaclass, meta object => an object that describes a class
+        val klass = x::class.java  
+        val types = ArrayList<Class<*>?>()
+        val invokedArgs  = ArrayList<Any?>()
+
+        // Attempt to evalute arguments before method application 
+        // and abort if an error happens. 
+        for(arg in _args){
+           val a = this.eval(arg, env) 
+           if( a.isErr() ){ return a}
+           if (a is Ast.AstBool){ 
+               // invokedArgs.add(java.lang.Boolean(a.value) as Object)
+               types.add(Boolean::class.java) 
+               invokedArgs.add(a.value)
+           }
+           else if (a is Ast.AstFlt){  
+               types.add(Double::class.java) 
+               invokedArgs.add(a.value)
+           }
+           else if (a is Ast.AstInt){  
+               types.add(Int::class.java) 
+               invokedArgs.add(a.value)
+           }
+           else if (a is Ast.AstStr){  
+               types.add(String::class.java) 
+               //invokedArgs.add(a.value as Object)
+               invokedArgs.add(a.value)
+           }
+           else if (a is Ast.AstObj){
+               types.add(a.value::class.java)
+               invokedArgs.add(a.value)
+           }
+           else if (a is Ast.AstNil){
+                invokedArgs.add(null)
+            }
+           else return error("Not implemented invokeObjectMethod() for argument of type {a} ")
+        }
+
+        try {
+            // Attempt to get method metaObject 
+            val mocMethod = klass.getMethod(methodName, *types.toTypedArray())
+            val result = mocMethod.invoke(x, *invokedArgs.toTypedArray())
+            if( result == null){ return Ast.AstNil}
+            val r = objToASt(result)
+            return r 
+        } catch(ex: java.lang.NoSuchMethodException) 
+        {
+            // println(" [TRACE] Second attempt to find method.")
+            val result = this.invoke(x, methodName, invokedArgs)
+            return result 
+        } catch(ex: Exception)
+        {
+            return error(ex.toString())
+        }
+    }
+
+    // Invoke object method using reflection 
+    //private fun invoke(targetObject: Object, methodName: String, parameters: List<Object> ): Ast
+    private fun invoke(targetObject: Object, methodName: String, parameters: List<Any?> ): Ast
+    {
+        // println(" [TRACE] parameters.size = ${parameters.size}")
+        for (method in targetObject::class.java.getMethods()) 
+        {
+             if ( method.getName() != methodName) { continue  }
+             val parameterTypes = method.getParameterTypes()
+             if( parameterTypes.size != parameters.size ){ continue }
+             // System.out.println("\n ----------------------------");
+             // System.out.println(" [TRACE] Found method " + method);
+             var matches = true;
+             for (i in  0..(parameterTypes.size - 1)) 
+             {
+                 val p =  parameterTypes[i];
+                 // System.out.println(" [TRACE] p[" + i + "] = " + p)
+                 val param =  parameters[i] 
+                 val klass = if(param == null) null else param!!::class.java 
+                 // println(" [TRACE] klass = ${klass} ")
+                 if( klass == null){ continue }
+                 //if (!p.isAssignableFrom( param.getClass())) 
+                 if (!p.isAssignableFrom(klass)) 
+                 {
+                     matches = false;
+                     break;
+                 }
+             }
+             if (matches) {
+                 // System.out.println(" [TRACE] Method invoked ");
+                 // obtain a Class[] based on the passed arguments as Object[]
+                 try {
+                    // println(" [TRACE] parameters = ${parameters}")
+                    val result = method.invoke(targetObject, *parameters.toTypedArray());
+                    if( result == null){ return Ast.AstNil}
+                    val r = objToASt(result)                 
+                    return r
+                 } catch(ex: Exception)
+                 {
+                    return error( ex.toString() )
+                 }
+             }
+         } // --- End for ---------- //
+         return error("Method ${methodName} not found.") 
+    }
+
+} 
+// ---- End of  class Eval --------- // 
+
+
+// ----- Primitive unit test framework --------//
+object Assert {
+
+    fun assert(predicate: Boolean, message: String = "Assertion failure") 
+    {
+        if(predicate){  throw AssertionError(message) }
+    }
+
+    fun<T> equal(expected: T, output: T) 
+    {
+        if(expected != output){  
+            throw AssertionError("Equality test failure. Expected ${expected}, but got ${output}.") 
+        }
+    }
+
+    fun astEqual(expected: Ast, output: Ast) 
+    {
+        val expectedStr = Sexp.toStr(expected)
+        val outputStr = Sexp.toStr(output)
+        if( !Sexp.equal(expected, output) ){  
+            throw AssertionError("AST equality test failure. \n => Expected ${expectedStr}, \n => but got ${outputStr}.") 
+        }
+    }
+
+    fun<T> listEqual(expected: List<T>, output: List<T>) 
+    {
+        val size = expected.size 
+        if( expected.size != output.size ){
+            var msg =  "List equality test failure. Expected ${expected} (${expected.size} elements)," 
+            msg    +=  " but got ${output} (${output.size} elements).  "
+            throw AssertionError(msg)
+        }
+        for(n in 0..(size  -1) )
+        {
+            val a = expected[n]
+            val b = output[n]
+            if(a == b){ continue }
+            var msg =  """
+            List equality test failure. Expected ${expected} (${expected.size} elements) 
+            Element ${n} expected to be ${a}, but got ${b}.            
+            """.trimIndent()
+            throw AssertionError("Equality test failure. Expected ${expected}, but got ${output}.") 
+        }
+    }
+
+
+    fun<T> notEqual(expected: T, output: T) 
+    {
+        if(expected == output){  
+            throw AssertionError("Inequality test failure. Not expected ${expected}, but got ${output}.") 
+        }
+    }
+
+}
+
+
+enum class TestStatus {
+      // Indicates successful execution of a test 
+      // (assertion does not thrown an AssertionError)
+      PASSED    
+      // Indicates that the assertion predicate was evaluated to false
+      // and the assumption made by the assertion failed.
+    , FAILURE
+      // Indicates an unexpected error - not an AssertionError
+    , ERROR
+}
+
+data class TestCase(val name: String, val func: () -> Unit)
+
+data class TestResult(val name: String,  val status: TestStatus,  val exception: Throwable?)
+{
+    fun isPassed():  Boolean { return status == TestStatus.PASSED  }
+    fun isFailure(): Boolean { return status == TestStatus.FAILURE }
+    fun isError():   Boolean { return status == TestStatus.ERROR   }
+}
+
+class TestSet
+{
+    private var name: String = ""
+    private val testcases = mutableListOf<TestCase>()
+    private var results =  mutableListOf<TestResult>()
+
+    fun addTest(name: String, testFunc: () -> Unit)
+    {
+        val test =  TestCase(name, testFunc)
+        testcases.add(test)
+    }
+
+    // Print all test cases and their identifiers.
+    fun showTests() { 
+        var count = 0 
+        for(t in testcases){ 
+            println(" [${count}] => ${t.name} ")
+            count = count + 1
+        } 
+    }
+
+    fun runTest(test: TestCase): TestResult
+    {
+        try {
+            test.func()
+            return TestResult(test.name, TestStatus.PASSED, null)
+        } catch(ex: AssertionError){
+            return TestResult(test.name, TestStatus.FAILURE, ex)
+        } catch(ex: Exception){
+            return TestResult(test.name, TestStatus.ERROR, ex)
+        }
+    }
+
+    // Run a single test case given its number (unique identifier)
+    fun runTestByNumber(n: Int)
+    {
+        if(n >= testcases.size){
+            System.err.println(" [ERROR] Test case with this number not found ${n}")
+            return
+        }
+        val test = testcases[n]
+        val r = runTest(test)
+        if ( r.status == TestStatus.PASSED  )
+        {  
+            println("[PASSED] Test '${test.name}' (id = ${n}) passed. Ok.") 
+        }
+        else if( r.status == TestStatus.FAILURE )
+        {  
+            println(" [FAILED] Test '${test.name}' (id = ${n}) failed. Assertion error. ")
+            println()
+            // println(r.exception)
+            r.exception!!.printStackTrace()
+        }
+        else if( r.status == TestStatus.ERROR   )
+        {
+            println(" [ERROR ] Test '${test.name} (id = ${n}) error. Unexpected exception.")
+            println()
+            // println(r.exception)
+            r.exception!!.printStackTrace()
+        }
+    }
+
+    fun runAll()
+    {
+        var count = 0 
+        var passed = 0 
+        var failed = 0 
+        var error  = 0
+        for(t in this.testcases)
+        {
+            val r = runTest(t) 
+            results.add(r)
+            if     (r.status == TestStatus.PASSED  ){  passed += 1 }
+            else if(r.status == TestStatus.FAILURE ){  failed += 1 }
+            else if(r.status == TestStatus.ERROR   ){  error += 1 }
+            count = count + 1
+        }
+        val passedPercent = 100.0 * passed / count 
+        val failedPercent = 100.0 * failed / count 
+        val errorPercent  = 100.0 * error  / count 
+        println("------------------------ TEST REPORT ----------------------------------\n")   
+        if( failed == 0 || error == 0 ){ println(" [*] SUCCESS - ALL TESTS PASSED OK. ") }
+        println(" [*] Passed =  ${passed} (${passedPercent}%) / Failures = ${failed} (${failedPercent}%) / Error = ${error} (${errorPercent}%) / Total = ${count}")
+        var id = -1 
+        for(r in results){
+            id = id + 1
+            if(r.isFailure()){
+                println("\n [+] Test Failure =>  name: '${r.name}' (id = ${id}) / Assertion Error ")
+                println("........................................................................")
+                println()
+                // println(r.exception)
+                r.exception!!.printStackTrace()
+                continue
+            }
+            if(r.isError()){
+                println("\n [+] Test Error => name: '${r.name}' (id = ${id}) / Unexpected Exception")
+                println("........................................................................")
+                println()
+                // println(r.exception)
+                r.exception!!.printStackTrace()
+                continue
+            }
+        }
+    }
+}
+
+
+
+// ---------- Program Entry Point --------------------//
+
+fun main(args: Array<String>)
+{
+    val interp = Evaluator()
+     if(args.size == 0){
+        return 
+    }
+
+    if( args[0] == "repl"){
+        interp.eval(startCode)
+        println(" =====> Interactive S-Expression interpreter started. Ok. ")
+        println("  [*] Type .help or .h for showing the help menu.")
+        println()
+        interp.repl()
+        return 
+    }
+
+    if( args[0] == "tests")
+    {
+
+        val testSet = TestSet()
+
+        // Create a test case 
+        testSet.addTest("test parser - case parse a simple list", { 
+            val src    = "(list \"some string\" 100.60 symbol :akeyword :x  )"
+            val expected = Ast.AstLst( 
+                listOf( Ast.AstSym("list"), Ast.AstStr( "some string" ), Ast.AstFlt(100.60)
+                       , Ast.AstSym("symbol"), Ast.AstKey("akeword")
+                       , Ast.AstKey("x")
+                       //, Ast.AstLst( listOf( Ast.AstSym("+"), Ast.AstInt(1), Ast.AstInt(2), Ast.AstInt(3) ) )
+                ))
+            val ast: Ast = Sexp.parse(src) 
+            // val nodes = ast.nodes()
+            Assert.assert( Sexp.equal(expected, ast) )
+        })
+
+        testSet.addTest("test parser -parse a nested list", { 
+            val src    = "(list \"some string\" 100.60 symbol :akeyword :x  (+ 1 2 sym) )"
+            val expected = Ast.AstLst( 
+                listOf( Ast.AstSym("list"), Ast.AstStr( "some string" ), Ast.AstFlt(100.60)
+                       , Ast.AstSym("symbol"), Ast.AstKey("akeyword")
+                       , Ast.AstKey("x")
+                       , Ast.AstLst( listOf( Ast.AstSym("+"), Ast.AstInt(1), Ast.AstInt(2), Ast.AstSym("sym") ) )
+                ))
+            val ast: Ast = Sexp.parse(src) 
+            Assert.astEqual(expected, ast) 
+        })
+
+        testSet.addTest("test intepreter - eval () empty list evaluation", { 
+            val interpreter = Evaluator()
+            val src         = " () ; empty list "
+            val expected    = Ast.AstNil
+            val ast: Ast    = Sexp.parse(src) 
+            val result      = interpreter.eval(ast)
+            Assert.astEqual(expected, result)
+        })
+
+        testSet.addTest("test intepreter - expression evaluation", { 
+            val interpreter = Evaluator()
+            val src         =  " (list :x (* 1 2 3 4 5) '(sqrt 100) :y (/ (+ (* 3 5 1) 20) 100) :z \"hello world\")  "
+            val astExpected = Sexp.parse("  (:x 120 (sqrt 100) :y 0.35 :z \"hello world\"  )   ")
+            val result      = interpreter.eval(src)
+            Assert.astEqual( astExpected, result )
+        })
+
+        testSet.addTest("test intepreter - quoted expression evaluation", { 
+            val interpreter = Evaluator()
+            val src         =  " '(list (* 3 5) x 'z 'w :keyword \"some string\" ) " 
+            val astExpected = Sexp.parse(" (list (* 3 5) \n\t x 'z \n'w :keyword \"some string\" ) ")
+            val result      = interpreter.eval(src)
+            Assert.astEqual( astExpected, result )
+        })
+
+        testSet.addTest("test intepreter - lambda function application ", { 
+            val interpreter = Evaluator()
+            val src         =  "(map (fn (x) (+ 5 (* 10 x)))  (list 1 2 5 -6 3.5 9.0 (+ 1 2 3 4)))) " 
+            val astExpected = Sexp.parse("  (15 25 55 \t\n-55 40.0\n95.0 105 ) ; comment expected result ")
+            val result      = interpreter.eval(src)
+            Assert.astEqual( astExpected, result )
+        })
+
+        if( args.size == 1){
+            testSet.runAll()
+        } 
+        else if (args.size == 2 && args[1] == "--all")
+        {
+            testSet.runAll()
+        }
+        else if(args.size == 2 && args[1] == "--list")
+        {
+            testSet.showTests()
+        } 
+        else if(args.size == 3 && args[1] == "--single") 
+        {
+            val n = args[2].toInt()
+            testSet.runTestByNumber(n)
+        }
+        else {
+            System.err.println(" Error: invalid option.")
+        }
+              
+        return 
+    }
+}
+#+END_SRC
+
+File: _swing.jlisp_ => Sample script that creates a Java Swing GUI at runtime.
+
+#+BEGIN_SRC clojure
+  ;;----------------------------------------------;;
+  ;;            Lisp Script                       ;;
+  ;;----------------------------------------------;;
+  
+  (comment  Anything in this comment special form is not evaluted.)
+  
+  (fn make-color (r g b) (new java.awt.Color r g b))
+  
+  ;; ------- Color contants ------------------------;;
+  (def color-light-blue (make-color 51 204 255))
+  (def color-red        (make-color 255 0 0)) 
+  (def color-white      (make-color 255 255 255))
+  (def color-black      (make-color 0 0 0 ))
+  
+  
+  (def label (new javax.swing.JLabel "my label"))
+  (label setBounds 200 10 200 30 )
+  
+  (def output (new javax.swing.JTextArea))
+  (def entry (new javax.swing.JTextArea))
+  (def btn-run (new javax.swing.JButton "Run"))
+  (btn-run setBounds 10 60 100 30)
+  
+  (def btn-demo (doto (new javax.swing.JButton) 
+          (setName "btn-demo")
+          (setLabel "Clik me")
+          (setBounds 10 10 100 30)
+           )) 
+  (btn setBackground color-light-blue)
+  
+  (def scroll-entry (doto (new javax.swing.JScrollPane)
+                            (setViewportView entry)
+                            (setBounds 30 120 500 100)
+                          ))
+  
+  
+  (def scroll-output (new javax.swing.JScrollPane))
+  (scroll-output setViewportView output)
+  ;; (setBounds x y width height) => (x, y) origin at top-left corner 
+  (scroll-output setBounds  30 250 500 250)
+  
+  (def frame (doto (new javax.swing.JFrame) 
+                    (:name "frame1")
+                    (:size '(632 568))
+                    (:title "My Java Swing App") 
+                    (setLayout nil)
+                    ;; (setContentPane pane) 
+                    ;; (:visible #t)
+                    )) 
+  
+  (frame add btn-demo)
+  (frame add btn-run)
+  (frame add label)
+  (frame add scroll-entry)
+  (frame add scroll-output)
+  
+  (def count 0)
+  (btn-demo addActionListener (action-listener 
+                            (fn () 
+                                 (def text  (concat "Button clicked "  count))
+                                 (set count (+ 1 count))
+                               ;; (frame :title text)
+                                 (label :text text)
+                                 (frame setTitle text)
+                               ))) 
+  
+  (btn-run addActionListener (action-listener 
+                                (fn () 
+                                    (println "Btn-run clicked OK")
+                                    (def result (eval (read (concat "(do\n" (entry getText) "\n)"))))
+                                    (println result)
+                                    (output setText (concat result))
+                                    (println "Code evaluated. OK.")
+                                )))
+  
+  ((frame getContentPane) :background color-light-blue)
+  (frame setVisible #t)
+  
+  (println  " [TRACE] Script started Ok. ")
+  
+  ;;; ------------------------------------------ ;;;
+  
+  (fn jframe-setSize (fr width height) (fr setSize width height)) 
+  
+  (fn jframe-setVisible (fr flag) (fr setVisible flag)) 
+  
+  (fn build-frame (title width height)
+      (doto (new javax.swing.JFrame)
+          (setSize height height)
+          (setTitle title)
+          (setVisible #t)
+        )
+   )
+  
+  (println " [TRACE ] Code evaluated OK. ")
+#+END_SRC
+
+
+Check compiler version:
+
+#+BEGIN_SRC sh 
+  $ kotlin -version
+  Kotlin version 1.7.10-release-333 (JRE 16.0.1+9-Ubuntu-120.04)
+#+END_SRC
+
+Building:
+
+#+BEGIN_SRC sh 
+  $ kotlinc sexpr.kt -include-runtime -d sexpr.jar
+#+END_SRC
+
+Run unit tests:
+
+#+BEGIN_SRC sh 
+   # ------ List all tests -----------------------#
+   #
+   $ >> java -jar sexpr.jar tests --list
+   [0] => test parser - case parse a simple list 
+   [1] => test parser -parse a nested list 
+   [2] => test intepreter - eval () empty list evaluation 
+   [3] => test intepreter - expression evaluation 
+   [4] => test intepreter - quoted expression evaluation 
+   [5] => test intepreter - lambda function application
+   
+   # --------- Run a single unit test -------------#
+   #
+   $ java -jar sexpr.jar tests --single 2
+  [PASSED] Test 'test intepreter - eval () empty list evaluation' (id = 2) passed. Ok.
+  
+   $ java -jar sexpr.jar tests --single 4
+  [PASSED] Test 'test intepreter - quoted expression evaluation' (id = 4) passed. Ok.
+  
+  #-------- Run all unit tests -------------------#
+  #
+   $ >> java -jar sexpr.jar tests
+  ------------------------ TEST REPORT ----------------------------------
+  
+   [*] SUCCESS - ALL TESTS PASSED OK. 
+   [*] Passed =  6 (100.0%) / Failures = 0 (0.0%) / Error = 0 (0.0%) / Total = 6
+#+END_SRC
+
+Run the REPL:
+
+#+BEGIN_SRC clojure 
+   $ >> rlwrap java -jar sexpr.jar repl
+   [TRACE ] Code evaluated OK.  
+   =====> Interactive S-Expression interpreter started. Ok. 
+    [*] Type .help or .h for showing the help menu.
+  
+  
+   ; ------------ Show the REPL help menu -----------;
+   In[23]> .h
+  
+              The interpreter has the following commands:
+                + .h or .help  => To display this help menu.
+                + .q or .quit  => To quit the interpreter.
+                + .multi       => To paste multi-line S-Expression in the repl 
+                + .reset or .r => To reset the interpreter state 
+                + .vars        => To display all variables 
+                + .funcs       => To show all functions 
+                + .verbose-on  => Enable verbose mode 
+                + .verbose-off => Disable verbose mode 
+              
+  
+   ; ------------ Playing with lits --------------------;
+   ; 
+  
+   In[0]> 
+  
+   In[0]> (list '+ (* 3 5 1) :y (m/sqrt (+ (* 3.0 3.0) (* 4.0 4.0))) 'symbol 'x 'z '(+ 1 2 3 5)))
+   $0 = (+ 15 :y 5.0 symbol x z (+ 1 2 3 5))
+   In[1]> 
+  
+   In[1]> $0
+   $1 = (+ 15 :y 5.0 symbol x z (+ 1 2 3 5))
+  
+   In[2]> (car $0)
+   $2 = +
+  
+   In[3]> (cdr $0)
+   $3 = (15 :y 5.0 symbol x z (+ 1 2 3 5))
+  
+   In[4]> (car (cdr $0))
+   $4 = 15
+  
+   In[5]> (cdr (cdr $0))
+   $5 = (:y 5.0 symbol x z (+ 1 2 3 5))
+  
+   In[6]> (car (cdr (cdr $0)))
+   $6 = :y
+  
+   ; --------- Ge the nth element of a list ------------
+  
+   In[10]> (nth 1 $0)
+   $10 = 15
+  
+   In[11]> (nth 2 $0)
+   $11 = :y
+  
+   In[12]> (nth 4 $0)
+   $12 = symbol
+  
+   In[13]> (nth 5 $0)
+   $13 = x
+  
+   In[14]> (nth 6 $0)
+   $14 = z
+  
+   ; ------------ Define variables ------------------;
+  
+   In[15]> (def r '(+ (* 3 5 10) (/ 100 20 5) (m/exp 1)))
+   $15 = (+ (* 3 5 10) (/ 100 20 5) (m/exp 1))
+  
+   In[16]> r
+   $16 = (+ (* 3 5 10) (/ 100 20 5) (m/exp 1))
+  
+   In[17]> (eval r)
+   $17 = 153.71828182845906
+   
+   In[18]> (nth 1 r)
+   $18 = (* 3 5 10)
+  
+   In[19]> (eval (nth 1 r))
+   $19 = 150
+  
+   ;----------- Functions ---------------------------------;
+  
+   (def cnt 0)
+   (fn increment() (set cnt (+ cnt 1)) (println "cnt = " cnt))
+  
+   In[25]>  (fn increment() (set cnt (+ cnt 1)) (println "cnt = " cnt))
+   $25 = <FuncUDF: increment>
+   In[26]> 
+   In[26]> (increment)
+  cnt =  1 
+   $26 = nil
+   In[27]> (increment)
+  cnt =  2 
+   $27 = nil
+   In[28]> (increment)
+  cnt =  3 
+   $28 = nil
+   In[29]> (increment)
+  cnt =  4 
+   $29 = nil
+   In[30]> (increment)
+  cnt =  5 
+   $30 = nil
+   In[31]> (increment)
+  cnt =  6 
+   $31 = nil
+   In[32]> (increment)
+  cnt =  7 
+   $32 = nil
+  
+   In[33]> cnt
+   $33 = 7
+   
+   In[34]> (list (+ cnt 10) (* 3 cnt) (* 5 (+ 10 cnt)))
+   $34 = (17 21 85)
+  
+   ;----- Functions that return functions ------------------;
+   
+   In[35]> (fn make-add (k) (fn (x) (+ k x)))
+   $35 = <FuncUDF: make-add>
+  
+   In[36]> ((make-add 10) 5)
+   $36 = 15
+  
+   In[37]> ((make-add 10) 80)
+   $37 = 90
+  
+   In[38]> ((make-add 20) 5)
+   $38 = 25
+  
+   In[39]> ((make-add 20) 80)
+   $39 = 100
+  
+   In[40]> (def add10 (make-add 10))
+   $40 = <FuncUDF: >
+  
+   In[41]> (def add20 (make-add 20))
+   $41 = <FuncUDF: >
+  
+   In[42]> (add20 50)
+   $42 = 70
+   In[43]> (add10 50)
+   $43 = 60
+  
+   In[44]> (map (make-add 10) (list 1 2 3 4 5 6))
+   $44 = (11 12 13 14 15 16)
+  
+   In[45]> (map (make-add 20) (list 1 2 3 4 5 6))
+   $45 = (21 22 23 24 25 26)
+   In[46]> 
+  
+   ;------- Interact with Java Objects --------------------;
+   
+   In[46]> (def frame (new javax.swing.JFrame "My Window"))
+   $46 = <Obj: javax.swing.JFrame[frame0,0,0,0x0,invalid,hidden,layout=java.awt.BorderLayout
+            ,title=My Window,resizable,normal,defaultCloseOperation=HIDE_ON_CLOSE
+              ,rootPane=javax.swing.JRootPane[,0,0,0x0,invalid,layout=javax.swing.JRootPane$RootLayout
+             ,alignmentX=0.0,alignmentY=0.0,border=,flags=16777673,maximumSize=,minimumSize=,preferredSize=]
+            ,rootPaneCheckingEnabled=true]>
+  
+   In[48]> (frame :size '(400 500)) ; equivalent to frame.size = (400 500) property
+   $48 = nil
+  
+   In[49]> (frame setSize 400 500) ; equivalent to frame.setSize(400, 500)
+   $49 = nil
+  
+   In[50]> (frame setTitle "My Java Swing Lisp")
+   $50 = nil
+  
+   In[51]> (frame setVisible #t) ;; Equivlanet to frame.setVisible(true)
+   $51 = nil
+  
+   In[52]> (frame :visible #f) ; Property call. frame.visible = false
+   $52 = nil
+  
+   In[53]> (frame :visible #t) ; Property call. frame.visible = true
+   $53 = nil
+   In[54]> 
+
+  ; ----- Quit the interpreter --------------------------;;
+  In[59]> .q
+#+END_SRC
+
+Loading a script that creates a Java Swing GUI application:
+
+#+CAPTION: Sample Java GUI created by the lisp script swing.jlisp
+[[file:images/lisp-java-swing-gui1.png][file:images/lisp-java-swing-gui1.png]]
+
+
+#+BEGIN_SRC clojure 
+   $ >> rlwrap java -jar sexpr.jar repl
+   [TRACE ] Code evaluated OK.  
+   =====> Interactive S-Expression interpreter started. Ok. 
+    [*] Type .help or .h for showing the help menu.
+  
+   In[0]> 
+   In[0]> (load-script "swing.jlisp")
+   [========>>> Loaded Code <<<============]
+  ;;----------------------------------------------;;
+  ;;            Lisp Script                       ;;
+  ;;----------------------------------------------;;
+  
+   ... ... ... ... ... ..
+  
+  (println " [TRACE ] Code evaluated OK. ")
+  
+   [TRACE] Script started Ok.  
+   [TRACE ] Code evaluated OK.  
+   $0 = nil
+   
+  
+   ; ...... Show all variables in the repl ---------;;
+  
+   In[1]> .vars
+   =>> Variables: 
+   m/PI
+   env
+   color-light-blue
+   color-red
+   color-white
+   color-black
+   label
+   output
+   entry
+   btn-run
+   btn-demo
+   scroll-entry
+   scroll-output
+   frame
+   count
+   ans
+   $0
+   
+   In[2]> (m/sin m/PI)
+   $2 = 1.2246467991473532E-16
+  
+   In[3]> (m/cos (* 2 m/PI))
+   $3 = 1.0
+  
+   In[4]> (m/tan (* 2 m/PI))
+   $4 = -2.4492935982947064E-16
+  
+   In[5]> (frame getTitle)
+   $5 = "My Java Swing App"
+  
+   In[6]> (frame :title)
+   $6 = "My Java Swing App"
+  
+   ; =>> User clicks at the button with the label 'Click me'
+   In[8]> (label getText)
+   $8 = "Button clicked 25"
+   In[9]> 
+   In[9]> (label :text)
+   $9 = "Button clicked 25"
+   In[10]> 
+   In[10]> (label :text)
+   $10 = "Button clicked 29"
+   In[11]> 
+   In[11]> (label :text)
+   $11 = "Button clicked 32"
+   In[12]> 
+   In[12]> count
+   $12 = 33
+   In[13]> 
+  
+   ;; ----- User enters some code at the upper JTextArea widget and press the button with label 'Run'
+   ;;
+  
+   In[15]> (def code (entry getText))
+   $15 = "(def myFrame (doto (new javax.swing.JFrame)
+                                (:size '(400 500))
+                                (:title "Lisp Interpreter")
+                                (:visible #t)))
+  "
+  
+  ;; User clicks at the button 'Run' and the code is evaluated creating the variable myFrame 
+   In[16]> Btn-run clicked OK 
+  <Obj: javax.swing.JFrame[frame0,0,0,400x500, ....>
+  Code evaluated. OK. 
+  
+   In[16]> (myFrame :text)
+  Error: Method getText not found.
+  
+   In[16]> (myFrame :title)
+   $16 = "Lisp Interpreter"
+  
+  ;; ----- Now the user types a new code in the upper JTextArea widget ------------;;
+   In[17]> (entry :text)
+   $17 = "(println "Code typed by user in a JFrame Widget")"
+  
+    In[19]> (read (entry :text))
+   $19 = (println "Code typed by user in a JFrame Widget")
+  
+   In[20]> (eval (read (entry :text)))
+  Code typed by user in a JFrame Widget 
+   $20 = nil
+  
+   In[22]> (nth 1 (read (entry :text)))
+   $22 = "Code typed by user in a JFrame Widget"
+  
+  ;; ---- Now the user clicks at button 'Run' -------------------------------;;
+  ;;
+   In[23]> Btn-run clicked OK 
+  Code typed by user in a JFrame Widget 
+  nil 
+Code evaluated. OK. 
+
+#+END_SRC
+
+
 *** Further Reading
 
  *Scheme and Lisp Introduction:*
