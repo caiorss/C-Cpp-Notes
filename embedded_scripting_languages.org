@@ -7875,9 +7875,11 @@ interpreter implemented in Kotlin language, that is able to compile to
 both JVM and Android Dalvik virtual machine. As a result, the code can
 be embedded in Java desktop application or android apps for faster
 experimentation and iteration since the interpreter allows instanting
-and calling Java objects at runtime without any recompilation. 
+and calling Java objects at runtime without any time wasted on
+compilation. 
 
-File: _sexpr.kt_ (About: 2130 lines of code)
+
+File: _sexpr.kt_ (Almost: 2130 lines of code)
 
 #+BEGIN_SRC java 
 // Embedded lisp-like interpreter hosted on Kotlin/JVM (Java Virtual Machine)
@@ -8636,9 +8638,27 @@ class Evaluator {
         val res = eval(ast, _env)
         return res 
     }
-   fun eval(ast: Ast): Ast 
+
+    fun eval(ast: Ast): Ast 
     {
         val res = eval(ast, _env)
+        return res 
+    }
+
+
+    fun loadScript(fileName: String): Ast 
+    {
+        var source: String? = null 
+        try {
+            source = java.io.File(fileName).inputStream().readBytes().toString(Charsets.UTF_8)  
+        } catch(ex: java.io.FileNotFoundException)
+        {
+            return error(ex.toString())
+        }
+        source = "(do\n" + source + "\n)"
+        val ast = Sexp.parse(source)
+        if( ast.isErr() ){ return ast }   
+        val res = this.eval(ast, _env)
         return res 
     }
 
@@ -9668,7 +9688,7 @@ object Assert {
 
     fun assert(predicate: Boolean, message: String = "Assertion failure") 
     {
-        if(predicate){  throw AssertionError(message) }
+        if(!predicate){  throw AssertionError(message) }
     }
 
     fun<T> equal(expected: T, output: T) 
@@ -9862,6 +9882,18 @@ fun main(args: Array<String>)
         println("  [*] Type .help or .h for showing the help menu.")
         println()
         interp.repl()
+        return 
+    }
+
+    if( args[0] == "script")
+    {
+        if( args.size < 2){ 
+            System.err.println("ERROR - exepcted script file name") 
+            System.err.println("Usage: java -jar sexpr.jar script <FILE-NAME>")
+            return 
+        }
+        val fileName = args[1]
+        interp.loadScript(fileName)
         return 
     }
 
@@ -10066,6 +10098,13 @@ Building:
 
 #+BEGIN_SRC sh 
   $ kotlinc sexpr.kt -include-runtime -d sexpr.jar
+#+END_SRC
+
+Inspect the generated file:
+
+#+BEGIN_SRC sh 
+  $ file sexpr.jar
+  sexpr.jar: Java archive data (JAR)
 #+END_SRC
 
 Run unit tests:
@@ -10280,12 +10319,38 @@ Run the REPL:
    In[53]> (frame :visible #t) ; Property call. frame.visible = true
    $53 = nil
    In[54]> 
+   
+
+   ; Get object class object 
+   ;---------------------------------------------------;
+   In[55]> (ref/get-obj-class frame)
+   $55 = <Obj: class javax.swing.JFrame>
+
+   ; Display all methods of object javax.swing.JFrame 
+   ;---------------------------------------------------;
+   In[56]> (ref/show-methods frame)
+   public void javax.swing.JFrame.remove(java.awt.Component)
+   public void javax.swing.JFrame.update(java.awt.Graphics)
+   public static boolean javax.swing.JFrame.isDefaultLookAndFeelDecorated()
+   public javax.swing.JRootPane javax.swing.JFrame.getRootPane()
+   public void javax.swing.JFrame.setJMenuBar(javax.swing.JMenuBar)
+   public javax.swing.JMenuBar javax.swing.JFrame.getJMenuBar()
+     ... ... ... ... ....           ... .... ... ... 
+     ... ... ... ... ....           ... .... ... ... 
+     
+  ; Display all methods of object javax.swing.JFrame containing the string "visible"
+  ;-----------------------------------------------------------------
+  In[47]> (ref/show-methods frame "visible")
+  public void java.awt.Window.setVisible(boolean)
+  public boolean java.awt.Component.isVisible()
+  $57 = nil
+
 
   ; ----- Quit the interpreter --------------------------;;
   In[59]> .q
 #+END_SRC
 
-Loading a script that creates a Java Swing GUI application:
+Loading script _swing.jlisp_, in the REPL, that creates a Java Swing GUI application:
 
 #+CAPTION: Sample Java GUI created by the lisp script swing.jlisp
 [[file:images/lisp-java-swing-gui1.png][file:images/lisp-java-swing-gui1.png]]
@@ -10411,6 +10476,287 @@ Code evaluated. OK.
 
 #+END_SRC
 
+Run script _swing.jlisp_ from command line without entering in the REPL:
+
+#+BEGIN_SRC sh 
+  $ java -jar sexpr.jar script swing.jlisp
+#+END_SRC 
+
+ *Creating a self-executable jar file*
+
+A self-executable Jar file can be run without _java -jar file.jar_ on
+any Unix-like operating system, including, Linux, BSD or MacOSX. This
+technique does not work on Microsoft Windows because unlike Unix-based
+operating system, simple text files cannot be set as executable or be run
+like a native executable on Windows without explicitly specifying the
+interpreter.
+
+#+BEGIN_SRC sh 
+  # Creates Unix shell script file 'sexpr' 
+  cat <<EOF > sexpr  
+  #!/usr/bin/env sh 
+  java -jar "\$0" \$*
+  exit 0
+  EOF
+  
+  # append the contents of jar file to the script.
+  $ cat sexpr.jar >> sexpr
+  
+  # Inspect it 
+  $ file sexpr
+  sexpr: a /usr/bin/env sh  script executable (binary data)
+  
+  # Make it executable. 
+  chmod +x sexpr
+#+END_SRC
+
+Inspect the generated file:
+
+#+BEGIN_SRC sh
+  $ file ./sexpr 
+  ./sexpr: a /usr/bin/env sh  script executable (binary data)
+  
+  $ head -n 3 ./sexpr 
+  #!/usr/bin/env sh 
+  java -jar "$0" $*
+  exit 0
+#+END_SRC
+
+Run the executable:
+
+#+BEGIN_SRC sh 
+  # List all unit tests 
+  $ ./sexpr tests --list 
+   [0] => test parser - case parse a simple list 
+   [1] => test parser -parse a nested list 
+   [2] => test intepreter - eval () empty list evaluation 
+   [3] => test intepreter - expression evaluation 
+   [4] => test intepreter - quoted expression evaluation 
+   [5] => test intepreter - lambda function application
+  
+  # Run a single unit test
+  $ ./sexpr tests --single 3
+  [PASSED] Test 'test intepreter - expression evaluation' (id = 3) passed. Ok.
+  
+  # Run the script 
+  $ ./sexpr script swing.jlisp 
+   [TRACE] Script started Ok.  
+   [TRACE ] Code evaluated OK.  
+  Btn-run clicked OK 
+  Hello world Java Rulez! 
+  nil 
+  Code evaluated. OK. 
+#+END_SRC
+
+Install the executable for running it without specifying the relative
+path with _/path/executable/sexpr_ <OPTIONS>. Just move the file 'sexpr'
+to any directory listed in $PATH environment variable such as /bin. 
+
+#+BEGIN_SRC sh 
+   #-------------------------------#
+   #       BEFORE                  #
+   #-------------------------------#
+   $ which sexpr
+
+   $ sexpr
+   
+   Command 'sexpr' not found, did you mean:
+   
+     command 'expr' from deb coreutils (8.30-3ubuntu2)
+   
+   Try: sudo apt install <deb name>
+   
+   #--------------------------------#
+   #      INSTALLATION              #
+   #--------------------------------#
+   $ sudo cp -v ./sexpr /bin
+  
+   #------------------------------# 
+   #       AFTER                  #
+   #------------------------------#
+   $ which sexpr
+   /usr/bin/sexpr
+   
+   $ sexpr tests
+   ------------------------ TEST REPORT ----------------------------------
+   
+    [*] SUCCESS - ALL TESTS PASSED OK. 
+    [*] Passed =  6 (100.0%) / Failures = 0 (0.0%) / Error = 0 (0.0%) / Total = 6
+#+END_SRC
+
+Run the script _swing.jlisp_ without explicitly specifying the
+interpreter in the command line. 
+
+ + Add the following header to the script:
+
+
+#+BEGIN_SRC sh
+  #!/usr/bin/env sh 
+  exec /bin/sexpr script "$0"
+  !#
+#+END_SRC
+
+or 
+
+#+BEGIN_SRC js 
+  #!/usr/bin/env sh 
+  exec java -jar /bin/sexpr.jar script "$0"
+  !#
+#+END_SRC
+
+Now, the script _swing.jlisp_ becomes:
+
+#+BEGIN_SRC sh 
+  #!/usr/bin/env sh 
+  exec /bin/sexpr script "$0"
+  !#
+  ;;----------------------------------------------;;
+  ;;            Lisp Script                       ;;
+  ;;----------------------------------------------;;
+  
+  (comment  Anything in this comment special form is not evaluted.)
+  
+  (fn make-color (r g b) (new java.awt.Color r g b))
+  
+  . .. ..  ... ...         ... ... ... ... ... ... 
+  . .. ..  ... ...         ... ... ... ... ... ... 
+#+END_SRC
+
+Make the script executable:
+
+#+BEGIN_SRC sh 
+  $ chmod +x swing.jlisp 
+#+END_SRC
+
+Run the script:
+
+#+BEGIN_SRC sh 
+  $ ./swing.jlisp 
+  
+   [TRACE] Script started Ok.  
+   [TRACE ] Code evaluated OK.  
+  Btn-run clicked OK 
+  Btn-run clicked OK 
+   ... ... ... ... ... ... ... ... 
+   ... ... ... ... ... ... ... ... 
+#+END_SRC
+
+The script execution can simplified even further by creating an
+executor script named as _sexprsh_ at /bin directory or any other
+directory listed in the $PATH enviroment variable.
+
+File: _/bin/sexprsh_
+
+#+BEGIN_SRC sh 
+  #!/usr/bin/env sh
+  exec java -jar /bin/sexpr.jar script "$1"
+  # exec java -jar /bin/sexpr script "$1"  # Alternative way
+#+END_SRC
+
+or:
+
+#+BEGIN_SRC sh 
+  #!/usr/bin/env sh
+  exec /bin/sexpr script "$1"  
+#+END_SRC
+
+Set the shell script as executable:
+
+#+BEGIN_SRC sh 
+  $ sudo chmod  +x /bin/sexprsh
+#+END_SRC
+
+Create a new script named as myscript.jlisp
+
+#+BEGIN_SRC clojure  
+  #!/bin/sexprsh 
+  
+  (def frame (doto (new javax.swing.JFrame) 
+                (:title "Hello world") ; Similar doto frame.setTile("hello world")
+                (:size '(400 500))     ; Similar to frame.setSize(400, 400)
+                (:visible #t)))        ; Similar to frame.setVisible(true) 
+                
+  
+  (def EXIT-ON-CLOSE 3)
+  
+  ; Exit process when user clicks at button close 
+  (frame setDefaultCloseOperation EXIT-ON-CLOSE)
+  
+  (println "Hello world! [EN] / Hola Mundo! [ES]") 
+#+END_SRC
+
+Make the script executable:  
+
+#+BEGIN_SRC sh 
+  $ sudo chmod +x myscript.jlisp 
+#+END_SRC
+
+Run the script - the process terminates when the user clicks at the
+button close of the Java Swing window located at the left upper
+corner:
+
+#+BEGIN_SRC sh 
+  $ ./myscript.jlisp 
+  Hello world! [EN] / Hola Mundo! [ES] 
+#+END_SRC
+
+The GUI script myscript.jlisp can be launched clicking by creating a
+desktop entry launcher file .desktop at directory
+~/Desktop/myscript.jlisp. The shortcut files specified by Freedesktop
+standard which is used by Linux and BSD distributions for launching
+applications by clicking at icons don't support relative paths without
+complicated shell scripts hacks what makes it harder to ship
+self-contained applications for Linux desktop. Unfortunately, what
+should be simple is not simple. 
+
+Creating the file _~/Desktop/myscript.desktop_
+
+#+BEGIN_SRC conf  
+  [Desktop Entry]
+  Version=1.0
+  Type=Application
+  Name=Myscript Launcher
+  Comment=JLisp Script with GUI interface 1 
+  Exec=java -jar /bin/sexpr.jar script /home/user/formula-parser/myscript.jlisp
+  Icon=terminator
+  Path=
+  Terminal=false
+  StartupNotify=true
+#+END_SRC
+
+Or:
+
+#+BEGIN_SRC conf 
+  [Desktop Entry]
+  Version=1.0
+  Type=Application
+  Name=Myscript Launcher
+  Comment=JLisp Script with GUI interface 1 
+  Exec= /home/user/formula-parser/myscript.jlisp
+  Icon=terminator
+  Path=
+  Terminal=false
+  StartupNotify=true
+#+END_SRC
+
+Make the desktop entry executable. Now the ad-hoc GUI lisp-like
+application can be launched just by clicking at the desktop file icon.
+
+#+BEGIN_SRC sh 
+  $ chmod +x  myscript.desktop
+#+END_SRC
+
+See:
+ 
+ 1. [[https://unix.stackexchange.com/questions/428992/why-do-freedesktop-desktop-files-not-allow-relative-paths][Why do freedesktop .desktop files not allow relative paths?]]
+
+ 2. [[https://askubuntu.com/questions/5172/running-a-desktop-file-in-the-terminal][Running a .desktop file in the terminal]] 
+
+ 3. [[https://askubuntu.com/questions/262861/how-to-change-working-directory-when-open-a-file-with-double-clicking-on-ubuntu][How to change working directory when open a file with double clicking on ubuntu desktop?]]
+
+ 4. [[https://unix.stackexchange.com/questions/144422/getting-the-current-path-in-desktop-exec-command][Getting the current path in .desktop EXEC command]]
+
+ 5. [[https://askubuntu.com/questions/722179/icon-path-in-desktop-file][Icon path in .desktop file]]
 
 *** Further Reading
 
