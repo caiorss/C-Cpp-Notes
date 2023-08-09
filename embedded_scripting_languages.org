@@ -14914,6 +14914,37 @@ associativity table of this language.
       exponentiation operator is right associative, so ~4^3^2~ is
       evaluated as ~4^(3^2)~ = (^ 4 (^ 3 2)) = 262144
 
+ *Operator Classification*
+
+
+#+BEGIN_SRC text 
+                             +---->> Unary Operator
+                            |           Takes one argument
+              +--- arity -->+           Example: -10, not x > y, !finished()
+             /              |                          
+ operator-->+               +---->> Binary Operator
+            |               |           Takes 2 arguments. 
+            |               |           Example: +, *, -, ^
+            |               | 
+            |               +---->> Ternary Operator => Example from C or C++: x > y ? 10 : 50  or lisp (if (> x y) 10 50)
+            |
+            |                      /----> Left associative:   
+            |                     |               20 * 5 * 3 is computed as ((20 * 5) * 3) or in Lisp notation: (* (* 20 5) 3) 
+            +---->> associativity +
+            |                     |
+            |                      \----> Right associative (exponentiaion and operators 'and' and 'or' in Python)  
+            |                               Example: 2 ^ 3 ^ 4 = (2 ^ (3 ^ 4)) = (^ 2 (^ 3 4))
+            |
+            | 
+            |               +--> Logical 
+            |              /
+            |             /
+            +---->> types +----> Arithmetic 
+            |             \
+            |              \----> Bitwise operators => << (left shift in C or C++), >> (right shift in C or C++)
+ 
+
+#+END_SRC
 
 
  *See:*
@@ -15891,11 +15922,11 @@ Running:
 
 
   >> let e = parseExpr "20 + hypoth(x^2 + 3 * x / z ^ 2, y, z * 2) / k"  ;;
-   "(+ 20 (/ (CALL hypoth (+ (^ x 2) (/ (* 3 x) (^ z 2))) y (* z 2)) k))"
- 
+
   >> e.ToStr() ;;
-  val it: string = "(+ (* 3 x) (* 20 (^ z (^ x 2))))"
-  
+  val it: string =
+    "(+ 20 (/ (CALL hypoth (+ (^ x 2) (/ (* 3 x) (^ z 2))) y (* z 2)) k))"
+
 
   >> let e = parseExpr "4 + 3 * log(10 + 3 * sqrt(5 * 2 ^ 3 ^ 3 / 100))" ;;
 
@@ -15988,6 +16019,82 @@ Running:
                           End = { Offset = 21
                                   Line = 1
                                   Column = 22 } }, 2)))))
+
+
+
+#+END_SRC
+
+Test the Recursive descent parser that uses an embedded operator precedence
+climbing parser.
+
+#+BEGIN_SRC fsharp
+let s = "  
+         // Comment: compute the value of x 
+         x = 3 * 4 + 5;
+         // compute the value z 
+         y = 2 * z + x / 10; 
+         // Compute the last dependency z
+         z = - y + sqrt(- x^2 + y^2 / 5 + 20) * z ^ 2 + log10(x^2 + 3 * x);          
+        "
+let p = RecursiveParser s 
+;;
+
+
+>> p ;;
+val it: RecursiveParser = FSI_0002+RecursiveParser
+
+
+// Get the AST  Abstract Syntax Tree from the sample source code.
+>> let ast = p.Parse() ;;
+val ast: ast =
+  AstProg
+    ({ File = ""
+       Start = { Offset = 12
+                 Line = 2
+                 Column = 10 }
+       End = { Offset = 269
+               Line = 8
+               Column = 7 } },
+     [AstComment
+        ({ File = ""
+           Start = { Offset = 12
+                     Line = 2
+                     Column = 10 }
+           End = { Offset = 46
+                   Line = 3
+                   Column = -1 } }, " Comment: compute the value of x ");
+      AstBinop
+        ({ File = ""
+           Start = { Offset = 57
+                     Line = 3
+                     Column = 10 }
+           End = { Offset = 69
+       ... ... ... ... ... .. 
+       ... ... ... ... ... .. 
+       ... ... ... ... ... .. 
+
+
+>> ast.Location() ;;
+val it: Location = { File = ""
+                     Start = { Offset = 12
+                               Line = 2
+                               Column = 10 }
+                     End = { Offset = 269
+                             Line = 8
+                             Column = 7 } }
+
+
+// View the AST in a more terse/concise way by using Lisp or S-Expression notation 
+>> ast.ToStr() ;;
+val it: string =
+  "(Program 
+  (comment " Comment: compute the value of x ")
+  (= x (+ (* 3 4) 5))
+  (comment " compute the value z ")
+  (= y (+ (* 2 z) (/ x 10)))
+  (comment " Compute the last dependency z")
+  (= z (+ (+ (- y) (* (CALL sqrt (+ (+ (^ (- x) 2) (/ (^ y 2) 5)) 20)) (^ z 2))) (CALL log10 (+ (^ x 2) (* 3 x)))))
+)"
 
 
 
