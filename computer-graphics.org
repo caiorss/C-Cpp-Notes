@@ -2775,8 +2775,8 @@ the cross product matrix $[\boldsymbol{u}]_{\times}$ operator defined as:
 \begin{equation}
    [\boldsymbol{u}]_{\times} = \begin{pmatrix}
                                0   & -u_z &  u_y \\ 
-                               u_x &  0   & -u_z \\
-                              -u_y & u_z  &    0 \\
+                               u_z &  0   & -u_x \\
+                              -u_y & u_x  &    0 \\
                            \end{pmatrix}
 \end{equation}
 
@@ -3460,6 +3460,415 @@ Finally, from Wolfram mathematica session, the rotation matrix  can be determine
    \end{bmatrix}
   }
 \end{equation}
+
+ *Computing the General Rotation Matrix using Sympy* 
+
+Install Python  [[https://docs.sympy.org/latest/index.html][Sympy]] library:
+
+#+BEGIN_SRC sh 
+  $ pip3 install --user sympy
+#+END_SRC
+
+Sympy import: 
+
+#+BEGIN_SRC python
+  from sympy import * 
+  init_printing('utf-8')
+#+END_SRC
+
+Define symbolic variables:
+
+#+BEGIN_SRC python
+  nx, ny, nz, q, C, S = symbols("nx ny nz theta C S")
+#+END_SRC
+
+Define function that turns vector into cross-product matrix.
+
+#+BEGIN_SRC python
+  def crossm(v):
+      "Generate cross-product matrix"
+      x = v[0]
+      y = v[1]
+      z = v[2]
+      m = Matrix([[0, -z, y], [z, 0, -x], [-y, x, 0]])
+      return m
+#+END_SRC
+
+Identity matrix.
+
+#+BEGIN_SRC python
+  >>> I3 = Matrix([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
+
+  >>> I3
+  ⎡1  0  0⎤
+  ⎢       ⎥
+  ⎢0  1  0⎥
+  ⎢       ⎥
+  ⎣0  0  1⎦
+#+END_SRC
+
+Define rotation axis unit vector $\mathbf{n}$
+
+#+BEGIN_SRC python
+  >>> n = Matrix([nx, ny, nz])
+ 
+  >>> n
+  ⎡nx⎤
+  ⎢  ⎥
+  ⎢ny⎥
+  ⎢  ⎥
+  ⎣nz⎦
+#+END_SRC
+
+Cross-product matrix $[\mathbf{n}]_{\times}$, equivalent to the the cross 
+product operator $[\mathbf{u}_{\times}] \mathbf{v} = \mathbf{u} \times \mathbf{v}$.
+
+#+BEGIN_SRC python
+  >>> xN = crossm(n)
+  
+  >>> xN
+  ⎡ 0   -nz  ny ⎤
+  ⎢             ⎥
+  ⎢nz    0   -nx⎥
+  ⎢             ⎥
+  ⎣-ny  nx    0 ⎦
+#+END_SRC
+
+Check the cross-product matrix is correctness $\mathbf{n} \times \mathbf{n} = [\mathbf{n}]_{\times} \mathbf{n} = \mathbf{0}$.
+The product of the cross-product matrix of a vector by itself should be a zero vector.
+Note: The matrix multiplication operator of Sympy is (*), not (@) 'at' like Python's numpy.
+
+#+BEGIN_SRC python
+  >>> xN * n
+  ⎡0⎤
+  ⎢ ⎥
+  ⎢0⎥
+  ⎢ ⎥
+  ⎣0⎦
+#+END_SRC
+
+Compute the general rotation matrix.
+
+\begin{equation*} 
+      R = \boldsymbol{n} \boldsymbol{n}^T 
+               + (I  - \boldsymbol{n} \boldsymbol{n}^T )  \cos \theta + [\mathbf{n}]_{\times} \sin \theta
+\end{equation*}
+
+#+BEGIN_SRC python
+  >>> R = n * n.T + (I3 - n * n.T) * C + xN * S
+  
+  >>> R
+  ⎡     ⎛      2⎞     2                                                     ⎤
+  ⎢   C⋅⎝1 - nx ⎠ + nx      -C⋅nx⋅ny - S⋅nz + nx⋅ny  -C⋅nx⋅nz + S⋅ny + nx⋅nz⎥
+  ⎢                                                                         ⎥
+  ⎢                              ⎛      2⎞     2                            ⎥
+  ⎢-C⋅nx⋅ny + S⋅nz + nx⋅ny     C⋅⎝1 - ny ⎠ + ny      -C⋅ny⋅nz - S⋅nx + ny⋅nz⎥
+  ⎢                                                                         ⎥
+  ⎢                                                       ⎛      2⎞     2   ⎥
+  ⎣-C⋅nx⋅nz - S⋅ny + nx⋅nz  -C⋅ny⋅nz + S⋅nx + ny⋅nz     C⋅⎝1 - nz ⎠ + nz    ⎦
+#+END_SRC
+
+Generate latex code of the rotation matrix $R(\mathbf{n}, \theta)$:
+
+#+BEGIN_SRC python
+  >>> R_tex = latex(R).replace("nx", "n_x").replace("ny", "n_y").replace("nz", "n_z")
+
+  >>> print(R_tex)
+  \left[\begin{matrix}C \left(1 - n_x^{2}\right) + n_x^{2} 
+                & - C n_x n_y - S n_z + n_x n_y 
+                 & - C n_x n_z + S n_y + n_x n_z \\ 
+                - C n_x n_y + S n_z + n_x n_y & C 
+             \left(1 - n_y^{2}\right) + n_y^{2} 
+            & - C n_y n_z - S n_x + n_y n_z\\- C n_x n_z - S n_y + n_x n_z 
+          & - C n_y n_z + S n_x + n_y n_z 
+        & C \left(1 - n_z^{2}\right) + n_z^{2}\end{matrix}\right]
+
+
+#+END_SRC
+
+\begin{equation*} 
+  R(\mathbf{n}, \theta) = 
+
+  \left[\begin{matrix}C \left(1 - n_x^{2}\right) + n_x^{2} 
+                & - C n_x n_y - S n_z + n_x n_y 
+                 & - C n_x n_z + S n_y + n_x n_z \\ 
+                - C n_x n_y + S n_z + n_x n_y & C 
+             \left(1 - n_y^{2}\right) + n_y^{2} 
+            & - C n_y n_z - S n_x + n_y n_z\\- C n_x n_z - S n_y + n_x n_z 
+          & - C n_y n_z + S n_x + n_y n_z 
+        & C \left(1 - n_z^{2}\right) + n_z^{2}\end{matrix}\right]
+\end{equation*}
+
+Rotation matrix around X axis $R_x(\theta)$
+
+#+BEGIN_SRC python
+  >>> Rx = R.subs({nx: 1, ny: 0, nz: 0, C: cos(q), S: sin(q)})
+  
+  >>> Rx
+  ⎡1    0        0   ⎤
+  ⎢                  ⎥
+  ⎢0  cos(θ)  -sin(θ)⎥
+  ⎢                  ⎥
+  ⎣0  sin(θ)  cos(θ) ⎦
+#+END_SRC
+
+Rotation matrix around Y axis $R_y(\theta)$
+
+#+BEGIN_SRC python
+  >>> Ry = R.subs({nx: 0, ny: 1, nz: 0, C: cos(q), S: sin(q)})
+  
+  >>> Ry
+  ⎡cos(θ)   0  sin(θ)⎤
+  ⎢                  ⎥
+  ⎢   0     1    0   ⎥
+  ⎢                  ⎥
+  ⎣-sin(θ)  0  cos(θ)⎦
+#+END_SRC
+
+Rotation matrix around Z axis $R_z(\theta)$:
+
+#+BEGIN_SRC python
+  >>> Rz = R.subs({nx: 0, ny: 0, nz: 1, C: cos(q), S: sin(q)})
+  
+  >>> Rz
+  ⎡cos(θ)  -sin(θ)  0⎤
+  ⎢                  ⎥
+  ⎢sin(θ)  cos(θ)   0⎥
+  ⎢                  ⎥
+  ⎣  0        0     1⎦
+#+END_SRC
+
+Complete Rotation Matrix: 
+
+#+BEGIN_SRC python
+  R_ = R.subs({C: cos(q), S: sin(q)})
+
+  for i in range(0, 3):
+      for j in range(0, 3):
+          print(f"R({i+1},{j+1}) = "); pprint(R_[i, j]); print()
+  
+  >>> for i in range(0, 3):
+  ...     for j in range(0, 3):
+  ...         print(f"R({i+1},{j+1}) = "); pprint(R_[i, j]); print()
+  ... 
+  R(1,1) = 
+    2   ⎛      2⎞       
+  nx  + ⎝1 - nx ⎠⋅cos(θ)
+  
+  R(1,2) = 
+  -nx⋅ny⋅cos(θ) + nx⋅ny - nz⋅sin(θ)
+  
+  R(1,3) = 
+  -nx⋅nz⋅cos(θ) + nx⋅nz + ny⋅sin(θ)
+  
+  R(2,1) = 
+  -nx⋅ny⋅cos(θ) + nx⋅ny + nz⋅sin(θ)
+  
+  R(2,2) = 
+    2   ⎛      2⎞       
+  ny  + ⎝1 - ny ⎠⋅cos(θ)
+  
+  R(2,3) = 
+  -nx⋅sin(θ) - ny⋅nz⋅cos(θ) + ny⋅nz
+  
+  R(3,1) = 
+  -nx⋅nz⋅cos(θ) + nx⋅nz - ny⋅sin(θ)
+  
+  R(3,2) = 
+  nx⋅sin(θ) - ny⋅nz⋅cos(θ) + ny⋅nz
+  
+  R(3,3) = 
+    2   ⎛      2⎞       
+  nz  + ⎝1 - nz ⎠⋅cos(θ)
+
+#+END_SRC
+
+CSE - Common Subexpression Elimination for code generation. 
+
+  + Common Subexpression Elimination is a compiler optimization that
+    collects multiple subexpressions and evaluates them only once in
+    order to increase the performence and avoid evaluating expression
+    multiple times. Python's Sympy library for symbolic computing has
+    CSE function that can be used for generating code from math
+    formulas with subexpressions evaluated just a single time.
+
+#+BEGIN_SRC python
+   >>> terms = cse(R_)
+   
+   >>> len(terms)
+   2
+   
+   >>> len(terms[0])
+   14
+   
+   >>> len(terms[1])
+   1
+
+   >>> print(terms)
+   ([(x0, nx**2), (x1, cos(theta)), (x2, sin(theta)), (x3, nz*x2), 
+   (x4, nx*ny), (x5, x1*x4), (x6, nx*nz), (x7, ny*x2), (x8, x1*x6), 
+   (x9, ny**2), (x10, nx*x2), (x11, ny*nz), (x12, x1*x11), (x13, nz**2)], [Matrix([
+   [x0 + x1*(1 - x0),  nx*ny - x3 - x5,       x6 + x7 - x8],
+   [    x3 + x4 - x5, x1*(1 - x9) + x9,  ny*nz - x10 - x12],
+   [ nx*nz - x7 - x8,  x10 + x11 - x12, x1*(1 - x13) + x13]])])
+#+END_SRC
+
+Display CSE variables: 
+
+#+BEGIN_SRC python
+  >>> for (var, val) in terms[0]: print(f"{var} = {val}")
+  ... 
+  x0 = nx**2
+  x1 = cos(theta)
+  x2 = sin(theta)
+  x3 = nz*x2
+  x4 = nx*ny
+  x5 = x1*x4
+  x6 = nx*nz
+  x7 = ny*x2
+  x8 = x1*x6
+  x9 = ny**2
+  x10 = nx*x2
+  x11 = ny*nz
+  x12 = x1*x11
+  x13 = nz**2
+#+END_SRC
+
+General rotation matrix with subexpression elimination.
+
+#+BEGIN_SRC python
+   >>> R_cse
+   ⎡x₀ + x₁⋅(1 - x₀)  nx⋅ny - x₃ - x₅      x₆ + x₇ - x₈   ⎤
+   ⎢                                                      ⎥
+   ⎢  x₃ + x₄ - x₅    x₁⋅(1 - x₉) + x₉  ny⋅nz - x₁₀ - x₁₂ ⎥
+   ⎢                                                      ⎥
+   ⎣nx⋅nz - x₇ - x₈   x₁₀ + x₁₁ - x₁₂   x₁⋅(1 - x₁₃) + x₁₃⎦
+   
+   for i in range(0, 3):
+       for j in range(0, 3):
+           print(f"R({i+1},{j+1}) = {R_cse[i, j]}")
+   
+   >>> for i in range(0, 3):
+   ...     for j in range(0, 3):
+   ...         print(f"R({i+1},{j+1}) = {R_cse[i, j]}")
+   ... 
+   
+   R(1,1) = x0 + x1*(1 - x0)
+   R(1,2) = nx*ny - x3 - x5
+   R(1,3) = x6 + x7 - x8
+   R(2,1) = x3 + x4 - x5
+   R(2,2) = x1*(1 - x9) + x9
+   R(2,3) = ny*nz - x10 - x12
+   R(3,1) = nx*nz - x7 - x8
+   R(3,2) = x10 + x11 - x12
+   R(3,3) = x1*(1 - x13) + x13
+#+END_SRC
+
+Matlab/Octave-like Pseudo Code for the Rotation Matrix with CSE:
+
+#+BEGIN_SRC octave
+  % Initialize R as 3x3 zero matrix
+  function [R] rotMatrix(theta, n)
+     [nx, ny, nz] = n
+     % Create Intermediate Variables %
+     x0 = nx**2
+     x1 = cos(theta)
+     x2 = sin(theta)
+     x3 = nz*x2
+     x4 = nx*ny
+     x5 = x1*x4
+     x6 = nx*nz
+     x7 = ny*x2
+     x8 = x1*x6
+     x9 = ny**2
+     x10 = nx*x2
+     x11 = ny*nz
+     x12 = x1*x11
+     x13 = nz**2
+     % Create Rotation Matrix 
+     R = zeros(3, 3)
+     R(1,1) = x0 + x1*(1 - x0)
+     R(1,2) = nx*ny - x3 - x5
+     R(1,3) = x6 + x7 - x8
+     R(2,1) = x3 + x4 - x5
+     R(2,2) = x1*(1 - x9) + x9
+     R(2,3) = ny*nz - x10 - x12
+     R(3,1) = nx*nz - x7 - x8
+     R(3,2) = x10 + x11 - x12
+     R(3,3) = x1*(1 - x13) + x13
+  end
+#+END_SRC
+
+Code for the Rotation Matrix with CSE in Python's Numpy:
+
+#+BEGIN_SRC python
+import numpy as np
+
+def rotMat(theta, n):
+   nx, ny, nz = n
+   # Create Intermediate Variables %
+   x0 = nx**2
+   x1 = np.cos(theta)
+   x2 = np.sin(theta)
+   x3 = nz*x2
+   x4 = nx*ny
+   x5 = x1*x4
+   x6 = nx*nz
+   x7 = ny*x2
+   x8 = x1*x6
+   x9 = ny**2
+   x10 = nx*x2
+   x11 = ny*nz
+   x12 = x1*x11
+   x13 = nz**2
+   # Create Rotation Matrix 
+   R = np.zeros((3, 3))
+   R[0,0] = x0 + x1*(1 - x0)
+   R[0,1] = nx*ny - x3 - x5
+   R[0,2] = x6 + x7 - x8
+   R[1,0] = x3 + x4 - x5
+   R[1,1] = x1*(1 - x9) + x9
+   R[1,2] = ny*nz - x10 - x12
+   R[2,0] = nx*nz - x7 - x8
+   R[2,1] = x10 + x11 - x12
+   R[2,2] = x1*(1 - x13) + x13
+   return R
+#+END_SRC
+
+Testing: Comparison of Sympy rotation matrix computed by Sympy and
+Numpy with the previous code.
+
+#+BEGIN_SRC python
+   # 60 degrees (pi/3 rads) rotation around X axis
+   >>> rotMat(np.pi / 3, [1, 0, 0]) 
+   [[ 1.         0.         0.       ] 
+    [ 0.         0.5       -0.8660254] 
+    [ 0.         0.8660254  0.5      ]]
+   
+   # 60 degrees (pi/3 rads) rotation around X axis
+   >>> R_.subs({nx: 1, ny: 0, nz: 0, q: np.pi / 3})
+   ⎡1          0                  0         ⎤
+   ⎢                                        ⎥
+   ⎢0         0.5         -0.866025403784439⎥
+   ⎢                                        ⎥
+   ⎣0  0.866025403784439         0.5        ⎦
+   
+   
+   # 45 degrees (PI/4 radians) rotation around Z axis 
+   >>> rotMat(np.pi / 4, [0, 0, 1])
+    [[ 0.70710678 -0.70710678  0.        ]
+     [ 0.70710678  0.70710678  0.        ]
+    [ 0.          0.          1.        ]]
+   
+   # 45 degrees (PI/4 radians) rotation around Z axis 
+   >>> R_.subs({nx: 0, ny: 0, nz: 1, q: np.pi / 4})
+   ⎡0.707106781186548  -0.707106781186547  0⎤
+   ⎢                                        ⎥
+   ⎢0.707106781186547  0.707106781186548   0⎥
+   ⎢                                        ⎥
+   ⎣        0                  0           1⎦
+#+END_SRC
+
 
 *** Camera View Transform
 
